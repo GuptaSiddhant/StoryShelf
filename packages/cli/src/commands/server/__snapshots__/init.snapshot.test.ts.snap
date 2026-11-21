@@ -3,17 +3,25 @@
 exports[`server init output > is unchanged for auth oauth 1`] = `
 {
   "files": [
-    "package.json 644 6c56da0350f249ad3c24aff42db4c73caa54f10d6527f71e05176e744af09811",
-    "src/index.ts 1558 1acf2d991a546048913d14678bf89223469d6ffd8a6ef08342b5734be5db4079",
+    ".env.example 498 d505c90cda58b2df8b41275f35a1eecf674824451f61925ec4853f4d2a9553a2",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 722 26d50ae37f83959d33c9c790a93fe5fce5e299fce89f8bddf21268b7a0cfcc5b",
+    "package.json 635 64e640df2b51653eb67d2f3fa627ff27e4e16390de732c267fb22ecdbc3b4c43",
+    "src/index.ts 2200 367784e17fd6225c5e221d983bdf8b093ab00aa74a881954bf9f8fe12425e020",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: SECRET, PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export PUBLIC_BASE_URL=http://localhost:3000
   npm install
   npm start
 ",
@@ -23,19 +31,29 @@ Next steps:
 exports[`server init output > is unchanged for auth password 1`] = `
 {
   "files": [
-    "package.json 644 6c56da0350f249ad3c24aff42db4c73caa54f10d6527f71e05176e744af09811",
-    "src/index.ts 1598 d568bdadfa83c4f1580163c067894662b48b4c0d936b5d8b3afdda029554904d",
+    ".env.example 565 56f4c453513c1c15eb3423acfe986a22e88f47f0cfc1777e1cc728aab1cbfe58",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 862 3099a51867098212fab88c3367c7cdbd436cb083e43f869696bf54545114a594",
+    "package.json 635 64e640df2b51653eb67d2f3fa627ff27e4e16390de732c267fb22ecdbc3b4c43",
+    "src/index.ts 2257 8e0290cadffaea4bbdde97641a98abe6381682d137507e0386343394aa7c12f9",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export PUBLIC_BASE_URL=http://localhost:3000
+  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
   npm install
   npm start
+  # then sign in as admin@example.com
 ",
 }
 `;
@@ -44,12 +62,15 @@ exports[`server init output > is unchanged for aws full 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
-    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
-    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
-    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 946 9dc21258a4d527464d9a442f12b127eafcc5d3f3ecf368acd5a97f3af183ca3b",
+    "src/index.ts 2398 2f9d1259843a6f2c2eecfe4a11e1933c6df0ee7a971383490d9ee6f84ee42f5b",
+    "terraform/README.md 5054 3501919f329797d3e6d883723e74b0ada6195d6a01bd1f08e45c244148975232",
+    "terraform/compute.tf 8130 148078e836184f66fb68a249109049981e7e977d4afbada5d8c234def007e7b0",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
     "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
     "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
@@ -58,14 +79,16 @@ exports[`server init output > is unchanged for aws full 1`] = `
     "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
     "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
     "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
-    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/variables.tf 2028 41aca2e5a53f249d32c3353c08699be92795584f30de7b001097dafaf6094e61",
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -86,12 +109,15 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 946 9d51168c4f210a6ca587acf81832f3a32351e26de7b3124ba0a63dda2d2afd11",
-    "src/index.ts 1745 3766956929e3cade526d40b4341424e6b62b181a2ad16db0257436403941d3c0",
-    "terraform/README.md 4283 c91f9ce29ed9801a44c0a84d7cd866afcf13c76ef256244a7feb14c6c72fbcb4",
-    "terraform/compute.tf 6974 3c7fb565468973d6658369c127bd5a0e270f9cad2bccb835956d2d4fce3fd790",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 946 9dc21258a4d527464d9a442f12b127eafcc5d3f3ecf368acd5a97f3af183ca3b",
+    "src/index.ts 2398 2f9d1259843a6f2c2eecfe4a11e1933c6df0ee7a971383490d9ee6f84ee42f5b",
+    "terraform/README.md 5054 3501919f329797d3e6d883723e74b0ada6195d6a01bd1f08e45c244148975232",
+    "terraform/compute.tf 8130 148078e836184f66fb68a249109049981e7e977d4afbada5d8c234def007e7b0",
     "terraform/database.tf 1071 f65e89fc0eecc951f8082129d2ba471f7572cee25d74c29a4c0222fa6e8f1e87",
     "terraform/dns.tf 1879 57e77ea00724ea863c651c49a3997284f3649d7473e0c9459184f7f60fc68909",
     "terraform/identity.tf 1213 4cb9a3f9e6db6205c6c0282a7a7c3ca77d37686f07e94bff146f1681b9befe91",
@@ -100,14 +126,16 @@ exports[`server init output > is unchanged for aws minimal 1`] = `
     "terraform/secrets.tf 1330 70b15b2d9ea3ca498d4725d7384ade8905309a30c6032e1845e94d0ebbfe83c2",
     "terraform/storage.tf 1148 a7e79b5b49dd4928220ad33f378eecd5a3c54cbfbaa34145907b97ad0727af1c",
     "terraform/terraform.tfvars.example 312 85ce7a55e1dfae761a8875521a434c0a3fafe4677eb679671c329c138394d6a4",
-    "terraform/variables.tf 843 1a7c333726bb9e867b84804097a06dc0da9fabb4a9d8eeb3ea5a54b3428ad97a",
+    "terraform/variables.tf 2028 41aca2e5a53f249d32c3353c08699be92795584f30de7b001097dafaf6094e61",
     "terraform/versions.tf 368 574d628828a5c52dea18f53b658d99487e4de2bc2983356c7c6ddaed099efa60",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created terraform/ (12 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -128,28 +156,34 @@ exports[`server init output > is unchanged for azure full 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
-    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
-    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
-    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 949 7dcb1330a46022f962aeac8d867cbcd37ab3802ae3ede38fb0e4a6cd290fdb23",
+    "src/index.ts 2306 48710e7602e4b52ea84cb8e258ee85cb469f0142bcaa1e5834ce781ff8ebe8ca",
+    "terraform/README.md 2241 216701ca4772ff1cadcc2bdd14fa7c494e3a9f6cbe9dc603321d91debfaeae62",
+    "terraform/compute.tf 2674 e3fe18f7e15fdd290af9847a8423011216fc4ace573f3c5a5905a6e8dd1a6d66",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
     "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/git-access.tf 704 279875546621c9fa35247d9ab043f33aaabfde2de6fa2c4abbbb953b01daac4c",
     "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
-    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/main.tf 1045 5b7cef1171044179368eff5f283d7a17c3a4bd1d16ec6103460a86208ea9bcf6",
     "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
     "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
     "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
     "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
-    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/variables.tf 2119 6dc0a99c571ac59756e8a082873542d395f8b0755391d335308b1e309b24e4c2",
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
-Created terraform/ (12 files)
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -171,28 +205,34 @@ exports[`server init output > is unchanged for azure minimal 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 949 4c988d9a206255a17df6d4ea73b1322a84abb9029eeafcd31929bab99bbfea3b",
-    "src/index.ts 1653 bbd6623e80ab6a65c000e1f778b733466900e010555a993607bbca2b0f3fb48a",
-    "terraform/README.md 1923 241a255705792ac5905ad38c08b727d34efba173945ca95ca223da0530ebc7ff",
-    "terraform/compute.tf 1743 855093ff41287aac260f474c47f24cfaec67aadb01d74f9f7bf3a91dc10c85d2",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 949 7dcb1330a46022f962aeac8d867cbcd37ab3802ae3ede38fb0e4a6cd290fdb23",
+    "src/index.ts 2306 48710e7602e4b52ea84cb8e258ee85cb469f0142bcaa1e5834ce781ff8ebe8ca",
+    "terraform/README.md 2241 216701ca4772ff1cadcc2bdd14fa7c494e3a9f6cbe9dc603321d91debfaeae62",
+    "terraform/compute.tf 2674 e3fe18f7e15fdd290af9847a8423011216fc4ace573f3c5a5905a6e8dd1a6d66",
     "terraform/database.tf 1310 58e9e69d98663a5b3f4ff8ab57df2047f110a511cae9a58272519d90887cbc2a",
     "terraform/dns.tf 1248 2dc436b7e1ef3afb211fc22c529c11ed7d76043250ca6544c09798454f986961",
+    "terraform/git-access.tf 704 279875546621c9fa35247d9ab043f33aaabfde2de6fa2c4abbbb953b01daac4c",
     "terraform/identity.tf 601 75882c78c59a6653e8dbae4e8b117ecfb9a99b64f5935c4857f4f75024ef03bb",
-    "terraform/main.tf 487 7502b38fc54b0536ea784c00c5d3817faaf98383b6607b0e9e0102da5e186344",
+    "terraform/main.tf 1045 5b7cef1171044179368eff5f283d7a17c3a4bd1d16ec6103460a86208ea9bcf6",
     "terraform/outputs.tf 918 a2cf72b2768eaddcb3e98ec3b6bca44ed2bbb35417404f402709477e5fc1c49b",
     "terraform/secrets.tf 1337 eed50b518c20257bc33dd05304b902251cb79ad349d2c39cc4ce4b798ee5dea5",
     "terraform/storage.tf 666 337a7743dcc0546fad3bcb8c52b5303ccc3cb6bb371fb23eff7e8af419685e26",
     "terraform/terraform.tfvars.example 278 e9941daf32eb57f51201350e1f6b3b3528071eed9d8d3d9a0ed176a38b2a52d3",
-    "terraform/variables.tf 693 b1b6854bd4d2889535539d98a1668694b98391716011bc83414323fe5eb56c82",
+    "terraform/variables.tf 2119 6dc0a99c571ac59756e8a082873542d395f8b0755391d335308b1e309b24e4c2",
     "terraform/versions.tf 499 8c4f61d7302252a3525cfd1c7f21a6d73c0393a5eb4b4340dbaeb60a236c18f3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
-Created terraform/ (12 files)
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -213,12 +253,17 @@ Next steps:
 exports[`server init output > is unchanged for database better-sqlite3 1`] = `
 {
   "files": [
-    "package.json 644 57a721070f0105087e9255ebe93974467c957c1f6a0406b8876be4248877b4ce",
-    "src/index.ts 1215 4daab7c6b397b75bd8049ec5c4ce9be49d60675412d8644208a92a1c747492f1",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 635 9fbf30aacd02adf76368efdd1d213968343b4b59e19f52cdb2deb51817c216c7",
+    "src/index.ts 1629 3d26931bc323eb6e581783f3070510fc2f6c94bd0782d08fb73b20a044c40d34",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -233,12 +278,17 @@ Next steps:
 exports[`server init output > is unchanged for database bun-sqlite 1`] = `
 {
   "files": [
-    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
-    "src/index.ts 1203 0e1ac81afc772f32b8d1f7f29a87400a56990debdefa39b4446f15ca53efdca3",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
+    "src/index.ts 1617 a4c1b0c7a5e65171e8bb100843e8dc7cd5361b3523798c975b11bd14872f7403",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -253,12 +303,17 @@ Next steps:
 exports[`server init output > is unchanged for database d1 1`] = `
 {
   "files": [
-    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
-    "src/index.ts 1339 4ac97bc084a961d73662c4ad2b6fce6de923550034e6e015357b3a14ab65f832",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
+    "src/index.ts 1753 11a61996e79e82510d3de6859ae2d535eadb9eeed13c214c9c2660e557e470e1",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -273,17 +328,24 @@ Next steps:
 exports[`server init output > is unchanged for database mysql 1`] = `
 {
   "files": [
-    "package.json 634 0faabfdd850a8e963e44797b6508d6185d9c5434cd33850bd8c3b7e903faca2c",
-    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 625 0ccd166d7d8dd2ee5cf0ac6b07d0d21d3a6c8ab56d5e05e7a7d5038388840a26",
+    "src/index.ts 1815 9cfdaa3249e388994954b8fb0498933f5da89c64666c228e1f8c5675220c33ab",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -293,17 +355,24 @@ Next steps:
 exports[`server init output > is unchanged for database neon 1`] = `
 {
   "files": [
-    "package.json 655 5ca362d4c11a3a1ddb6d951616290b6f212d0967aab679fe62ac3d16640f4a72",
-    "src/index.ts 1192 652d808ab341eaf740ef4dd82ca3082e11b6a5240d109828659e4d17dfb6af8f",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 646 64f385779cb158d51ba9b6a8601cccc0d717026959c8f292ee65873a162a596b",
+    "src/index.ts 1821 48af150e4841457fa23a736d602d7e445763c7fb4895af34ac8b388e6492efd7",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -313,17 +382,24 @@ Next steps:
 exports[`server init output > is unchanged for database neon-http 1`] = `
 {
   "files": [
-    "package.json 655 5ca362d4c11a3a1ddb6d951616290b6f212d0967aab679fe62ac3d16640f4a72",
-    "src/index.ts 1205 5a6d8ac57ad794adf73e47dea3ddfb780785892ff1e0e6a3409849acb5d44698",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 646 64f385779cb158d51ba9b6a8601cccc0d717026959c8f292ee65873a162a596b",
+    "src/index.ts 1834 5a6a3f9554561ac405f8158faed55b7d46057722500e9aeb5762a6b3c6bfb2a8",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -333,17 +409,24 @@ Next steps:
 exports[`server init output > is unchanged for database pg 1`] = `
 {
   "files": [
-    "package.json 633 9494384798242e1626a46f6c82bdac26a1fbd210dd5acd4de858b7f369e905ab",
-    "src/index.ts 1186 322ac2d25c33aa32137bc4f5f900403b8370f55c56955b3c48016a1126e383c9",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 624 b340cdfc7d9785d8a9ef1ba0caa5966a8d777dae307517a7f47ba56d7cc41dd1",
+    "src/index.ts 1815 93d51be9952b1dbf207b2e51fa82e7302225fc41cb202eb64b4447fa740a0c9e",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -353,12 +436,17 @@ Next steps:
 exports[`server init output > is unchanged for database pglite 1`] = `
 {
   "files": [
-    "package.json 651 cf4e12c06ac23bc891d40241642df3977a446112ef9b7120fb48ccf96a1a60b1",
-    "src/index.ts 1164 13058f975c149f7347230e60b37bd44653969250bdce5d843389824dd4bc4d50",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 642 e04cc6cb1c8daa239a82cdaf495f4d7f84fe2e39daf50c778d60985bfc2a28ce",
+    "src/index.ts 1578 63421873aae167607979546ce7444626936a7d04a41662584766da29bbe6c20b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -373,17 +461,24 @@ Next steps:
 exports[`server init output > is unchanged for database planetscale 1`] = `
 {
   "files": [
-    "package.json 650 ba26dcaae6c73405bcb75d020c1a3f8dd740b6ff552f82148988d1cc59641249",
-    "src/index.ts 1210 db29550a58afcea062e930b57a1fa87c49ea0ea002f7fd6757fb6502d02741db",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 641 50210861da8d203cb6a77f699f8fe56d33f2ac51416edbda0123aaebe79fd8ce",
+    "src/index.ts 1839 e89fc4e7cb87789b85ef608dca19317b80858198e8a47a79cd7400428e28eb57",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -393,17 +488,24 @@ Next steps:
 exports[`server init output > is unchanged for database postgres 1`] = `
 {
   "files": [
-    "package.json 613 9c1cdaaa4066da27a4b446b6a3925979f7c637e10e3e72763f9853c68e878ba0",
-    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 604 6a1c8b16f91b3a9c7e9f69629744cdfdab83d80cad4e76e87e909b40e4fc05f9",
+    "src/index.ts 1824 fcae9aef44ba47f9cf26d6247bef6b01f4131eeb15c2c05ade2b7ef67a9e1727",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -413,12 +515,17 @@ Next steps:
 exports[`server init output > is unchanged for database sqlite 1`] = `
 {
   "files": [
-    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
+    "src/index.ts 1590 93621067978390b392a99cee31533ce3aa726ba6d4168d2f0e337a5e7a05754d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -433,17 +540,24 @@ Next steps:
 exports[`server init output > is unchanged for database tidb 1`] = `
 {
   "files": [
-    "package.json 649 ba3c509a26913ca5aa81f1cbd0dd3607de8f0ce8ed621a88f844a36a1851c6b0",
-    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 640 be4070a39c2469910ab67c6ac34d22391aa664f4cf921be00b33ad29253d7da3",
+    "src/index.ts 1818 24ce00b8a01913919cf86b6cf6679993a2d990db302404fb4f09672fc82b36bd",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -453,12 +567,17 @@ Next steps:
 exports[`server init output > is unchanged for database turso 1`] = `
 {
   "files": [
-    "package.json 644 dade401c3ef83e55ebfb3d5c15175db38a7ce8018c541c9ee5c7f2413e9699b3",
-    "src/index.ts 1240 930248aac2bfcc5ce355f7cb72d51c67130c382da3b56fd7e5fb37003f668087",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 635 e9f8e1d4a91ca09c84b7866384ed28b3bf6b05865d7e7d8000123b9151743bc5",
+    "src/index.ts 1654 9dfc1240fae47e5a58e59f3ce05fd7fffeee6b4c65bfde00b9bd7f12d46bf45b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -473,12 +592,17 @@ Next steps:
 exports[`server init output > is unchanged for database vercel 1`] = `
 {
   "files": [
-    "package.json 648 f9289676a5eb058fbd087c69bc4f7c96d961f2f95b1216fe2c5767453bde5f11",
-    "src/index.ts 1164 468c4fdc1dec69e978845e536ddb85dcb574f3f7bc9994b64c1f335867b03660",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 639 1e539afab7e92d08d0381abe5cee5acd781a97f3c8da5cebb0b200329560abef",
+    "src/index.ts 1578 feb3ccf5ddd6af8e83b5784d7f8c9fde208c231865a1c70e362b6fd230a2aefe",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -493,12 +617,17 @@ Next steps:
 exports[`server init output > is unchanged for design 1`] = `
 {
   "files": [
-    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
+    "src/index.ts 1590 93621067978390b392a99cee31533ce3aa726ba6d4168d2f0e337a5e7a05754d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -514,19 +643,25 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 789 b1d62d2056242c0d53e0f961efeee1065fc47ed24d0f71244da15b726d6ee219",
-    "src/index.ts 1186 3a7bcc52db7b364ff21d814808aa3aedc6d21cf29c63223e2d852c5ee7e6b768",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 770 6ad78870f25ff04488d00a97021f26c1a217a860eb40a10610877d85998f6b60",
+    "src/index.ts 1815 9cfdaa3249e388994954b8fb0498933f5da89c64666c228e1f8c5675220c33ab",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -537,19 +672,25 @@ exports[`server init output > is unchanged for docker single container 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 747 986fb77193eaf83bb7778f28abb5630d7cf0a0465353d8bcf2679368072b0755",
+    "src/index.ts 1590 93621067978390b392a99cee31533ce3aa726ba6d4168d2f0e337a5e7a05754d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -560,20 +701,26 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 790 a826359c7aa0f5d8644af8f51a8074e49f1a4a062e52215e81fb4357aaa6d7b4",
-    "src/index.ts 1195 e2eae3f2d52328b0c40a0a1be8a6da7e00df0f4a4f1776bdf3cda26fb3ef4d28",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 781 7d195c1af0b00d35ef48ec6e6f1dfecabf79a35f213436d4630279a5f4085762",
+    "src/index.ts 1824 fcae9aef44ba47f9cf26d6247bef6b01f4131eeb15c2c05ade2b7ef67a9e1727",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:up      # builds + starts the app
   npm run docker:logs    # follow logs
   npm run docker:down    # tear down
@@ -584,19 +731,30 @@ Next steps:
 exports[`server init output > is unchanged for everything on 1`] = `
 {
   "files": [
-    "package.json 748 f227703cd9e56ea6bb1b8a6f62e08d3242343f49ad727d08260d39fb2f24f0d5",
-    "src/index.ts 2802 4e15bac4f50c3172312a15e39b03e6bca9f5e24c761f1dd5603ae1c3e755ef64",
+    ".env.example 612 efbea3d78b8d4cb416a8be45799210e34acbf13dea2457ae3c9c309713670ef6",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 911 f422c871803bde26db5e1cac8c15d11fc8a24a45dde8c8d1911f084df007a626",
+    "package.json 748 7c512d89bb3085d21d39d7f8a4d106418f577a6209f5756ee4e920be1531a50e",
+    "src/index.ts 3472 deb2d87beed84e7b6cec664fa74f2c9cf8aeb8a99b7ebc86b3c9dc2d32a91218",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD, DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export PUBLIC_BASE_URL=http://localhost:3000
+  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
+  export DATABASE_URL=...
   npm install
   npm start
+  # then sign in as admin@example.com
 ",
 }
 `;
@@ -605,28 +763,34 @@ exports[`server init output > is unchanged for gcp full 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
-    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
-    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
-    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 947 163f5f3f06c6e9e02fd051f5ce85a9059030a41dea9f46d88fd451856ede981e",
+    "src/index.ts 2252 e6cdebc3fc522da52a41e6d5f91dfdaac56a54267367ccc8523ee645f0c11d6e",
+    "terraform/README.md 2048 e24ba88f16760dde3bba8970c68482cb7705209d26e593de4f5a9bb726fe6e14",
+    "terraform/compute.tf 1325 924f0a265f7e2e9c55997516ed00cad28a56685aadf6731c63f23a7fd3fe65c3",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
     "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/git-access.tf 526 351c83f9f299ebd9b34fea118218fe15ddcdaccb1298b858b13f16d644a1853d",
     "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
-    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/main.tf 1195 53c83e0572c208412c6020b34ab0bf0599f84f359cc365bab2dc005fa64f374d",
     "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
     "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
     "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
     "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
-    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/variables.tf 2205 6bd351529bef226b2e6188c517ed91ff48df2542ec00f7723605362b478c0152",
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
-Created terraform/ (12 files)
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -648,28 +812,34 @@ exports[`server init output > is unchanged for gcp minimal 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 545 1c881570cc9dbf816cd1f8d038663c44755b0ebca7d381caa43da70064b8c161",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "compose.yaml 773 54a964a25248486c4b63e496664e124118ed4d9f8d73fd92ecd8fd4872856154",
-    "package.json 947 6cfa9ed78ce3315829b9acdc255184d813f61081067d4e3160ce442974c11fb7",
-    "src/index.ts 1599 c7f0427190e3dc8b5620666aa73284f3b2621ce01ff86a3fa329fa7e9bb34583",
-    "terraform/README.md 1740 9723d83986584cf31019c1363e11793d5f28d0b255d570ea70500f165575e143",
-    "terraform/compute.tf 911 081cefd73c95a4572b9c8726b8e0219ce6f9058000b6723c6214ef0aab6fa97e",
+    "README.md 771 0c5f788fc7cef3475e0acbe381d12ba39073923bfa8c0f73baf9bbcf995e0fbb",
+    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "package.json 947 163f5f3f06c6e9e02fd051f5ce85a9059030a41dea9f46d88fd451856ede981e",
+    "src/index.ts 2252 e6cdebc3fc522da52a41e6d5f91dfdaac56a54267367ccc8523ee645f0c11d6e",
+    "terraform/README.md 2048 e24ba88f16760dde3bba8970c68482cb7705209d26e593de4f5a9bb726fe6e14",
+    "terraform/compute.tf 1325 924f0a265f7e2e9c55997516ed00cad28a56685aadf6731c63f23a7fd3fe65c3",
     "terraform/database.tf 1022 1dd6d9d8cf178496401e85f2a532d86439a118194cb7cc527a6258cdb304b1f0",
     "terraform/dns.tf 1145 1c1fd9a3681b045f5ee5328d7408f1c2c0a126fe58b51c3ee3e19a97dc91bd4a",
+    "terraform/git-access.tf 526 351c83f9f299ebd9b34fea118218fe15ddcdaccb1298b858b13f16d644a1853d",
     "terraform/identity.tf 508 e58d0694a0b39491fbb4525fdd04c68db8de1190483f2f8e324da7c6cbf07353",
-    "terraform/main.tf 641 e8f076b3806740a09940320e7c5418e5337ebe092fdb98f5e3843ea5f4894670",
+    "terraform/main.tf 1195 53c83e0572c208412c6020b34ab0bf0599f84f359cc365bab2dc005fa64f374d",
     "terraform/outputs.tf 790 348ba1fb232ec49bfe60c26140e18d15e58624bcaaa44d0f2ad7f568f26e45e3",
     "terraform/secrets.tf 1470 ba751c33e81bd5e0ffc7319b45e148cbd72e449bd0937de11cffc72272d96a7e",
     "terraform/storage.tf 786 231407a3eca6f39124cd397ae9b93c0e420ac5cefca01aa04ef83218dd5c76ff",
     "terraform/terraform.tfvars.example 323 7da5f64c5e3826ae47e9f7cbc803c8280a841bb1801b13377184e87a2b012c62",
-    "terraform/variables.tf 831 07be55482412023486810b54f8f52da751c8b836ac128bbe8b10a1a3323555f5",
+    "terraform/variables.tf 2205 6bd351529bef226b2e6188c517ed91ff48df2542ec00f7723605362b478c0152",
     "terraform/versions.tf 453 cb62a3ca9afa2df075e9f5741663c11cfbbc09185a27b597eaa1084772d7ba2c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
-Created terraform/ (12 files)
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created terraform/ (13 files)
 Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -690,12 +860,17 @@ Next steps:
 exports[`server init output > is unchanged for git on 1`] = `
 {
   "files": [
-    "package.json 611 870db22c7b1b1a6a6a4773ed0882b24b5ba436f9b31c26e748223b2b9c1847ad",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
+    "src/index.ts 1590 93621067978390b392a99cee31533ce3aa726ba6d4168d2f0e337a5e7a05754d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -711,19 +886,25 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "package.json 766 eb488521c07884e84661da25ea0204d003a18f782e0795c0584b57245ad63425",
-    "src/index.ts 1176 63e43a414834abeafb5d2c182c70a884eb0141436f249dcdd2fdd1ca35d70e29",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 747 986fb77193eaf83bb7778f28abb5630d7cf0a0465353d8bcf2679368072b0755",
+    "src/index.ts 1590 93621067978390b392a99cee31533ce3aa726ba6d4168d2f0e337a5e7a05754d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
 Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  export SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -733,17 +914,24 @@ Next steps:
 exports[`server init output > is unchanged for local with advanced adapters 1`] = `
 {
   "files": [
-    "package.json 649 ba3c509a26913ca5aa81f1cbd0dd3607de8f0ce8ed621a88f844a36a1851c6b0",
-    "src/index.ts 1189 f51e304db4f919450461e25d57cedcfa970ce8586dbe3071b373a6bfbda68993",
+    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "package.json 640 be4070a39c2469910ab67c6ac34d22391aa664f4cf921be00b33ad29253d7da3",
+    "src/index.ts 1818 24ce00b8a01913919cf86b6cf6679993a2d990db302404fb4f09672fc82b36bd",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
   npm install
   npm start
 ",
@@ -753,12 +941,17 @@ Next steps:
 exports[`server init output > is unchanged for notifications 1`] = `
 {
   "files": [
-    "package.json 674 ce6927696524333da0fcfbca2427b50c21884a700a4ded677c01409c0265a784",
-    "src/index.ts 1781 b9e2945dfe974fdf2bde23e4900d7f64402c9ba55ccef1bf7b24c5d72db7a9f0",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 632 6089a5f728f1ea46b56a7ebd7d3322d28d72b86dd3fa9bcbf8c84541c01f33f4",
+    "src/index.ts 2195 2257879a62d6f94f13685d9874f677756fb57dc87edf65f880f556458dd9cd51",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -773,17 +966,25 @@ Next steps:
 exports[`server init output > is unchanged for notifications with oauth 1`] = `
 {
   "files": [
-    "package.json 707 ace1380255c2f527d8786611dbeba8786acd9fd353e2e9dcf53d36234654a64e",
-    "src/index.ts 2287 7a7326c90ff824e4971cc0c30e433802b26e4bf8a090c5bbd176925be698d730",
+    ".env.example 498 d505c90cda58b2df8b41275f35a1eecf674824451f61925ec4853f4d2a9553a2",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 722 26d50ae37f83959d33c9c790a93fe5fce5e299fce89f8bddf21268b7a0cfcc5b",
+    "package.json 665 897b1ae040590f39e807c9d13914e42d81c9aed3a46e0731d88167f29ae765fa",
+    "src/index.ts 2929 22234c3b7968c59ba25f072759a008aa5b43a4770aabbec7077a50d3eb912113",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: SECRET, PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export PUBLIC_BASE_URL=http://localhost:3000
   npm install
   npm start
 ",
@@ -793,19 +994,29 @@ Next steps:
 exports[`server init output > is unchanged for notifications with password auth 1`] = `
 {
   "files": [
-    "package.json 707 ace1380255c2f527d8786611dbeba8786acd9fd353e2e9dcf53d36234654a64e",
-    "src/index.ts 2327 d339d8aa0200e2b3dbf2c15ce439dfc13956d4da95914569b5befec3487c1b94",
+    ".env.example 565 56f4c453513c1c15eb3423acfe986a22e88f47f0cfc1777e1cc728aab1cbfe58",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 862 3099a51867098212fab88c3367c7cdbd436cb083e43f869696bf54545114a594",
+    "package.json 665 897b1ae040590f39e807c9d13914e42d81c9aed3a46e0731d88167f29ae765fa",
+    "src/index.ts 2986 f5c5faec7a2a1e0339e9c7b3193c885f70926f0c9a8ce228eab5855317d502a6",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
+  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export PUBLIC_BASE_URL=http://localhost:3000
+  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
   npm install
   npm start
+  # then sign in as admin@example.com
 ",
 }
 `;
@@ -813,12 +1024,17 @@ Next steps:
 exports[`server init output > is unchanged for observability 1`] = `
 {
   "files": [
-    "package.json 686 b6fc158061e395dde1c9fc9789a82a40db84095cc536b8a5445583c20be7ac8a",
-    "src/index.ts 1582 eb10945da5377af69d8d5a8f5d12109605190a64e08d9c9ff3807afecf81fd3b",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 644 fc73577c5a7b7c603c1da91e9c77fe0a25dcae3900b53d1dcfe04df271c81a6e",
+    "src/index.ts 1996 37dbd60b48577247578c0205475bff1178d102be7db19a03e5881a49e06aecb4",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -833,12 +1049,17 @@ Next steps:
 exports[`server init output > is unchanged for storage azure 1`] = `
 {
   "files": [
-    "package.json 611 e224a556aa4439de652f02498d720e8f3b445a5a20aae791e813bb352be22fe7",
-    "src/index.ts 1252 55c0dcc7f6b1cee42929bc38815e7eb5f6f1048da3ac137ac74059532a66130b",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 611 8d701b2082ebb49eccc5e86a4356d8f3fc30ad4a5a68bc8a429aa164a1da4340",
+    "src/index.ts 1661 68b16cc006b118c1039061f43aece3b64b4c41dd7b088293ba6455cebd511128",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -853,12 +1074,17 @@ Next steps:
 exports[`server init output > is unchanged for storage gcs 1`] = `
 {
   "files": [
-    "package.json 609 cf7dd0cbba67757021776230b2d2fd535197afbbef555414c08185e2cc986fbf",
-    "src/index.ts 1198 43298caf06392f88d844d347ad7d105e54a7c88bf0ad0c6db95263dacd71c321",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 609 455ab1db4a799037450d46ed9eabbad5006d3afd5e6bac3009b301108e1a2a9f",
+    "src/index.ts 1607 5254b1c0e59a545c83bd7adfac8c7c637dfddda00ce75d98385d668077e4a2ca",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 
@@ -873,12 +1099,17 @@ Next steps:
 exports[`server init output > is unchanged for storage s3 1`] = `
 {
   "files": [
-    "package.json 608 0492e5b8eaeab1f08e0aeb43886ad71610e519135acf29b31519b625acd0419f",
-    "src/index.ts 1226 0409f7c07d1504dde3a74859838280a54d1d9dc7fe9a18f1783153abc904efce",
+    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "package.json 608 10fe11fad699f933a90f68feb8288d7654308eaff78fbd4358e8a42e862dbbe5",
+    "src/index.ts 1635 2f1c8dbb5ec715d495ae1255ecf74acc9b506bc6d6feb297f5dbb59ea9d33a9b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
-  "output": "Created src/index.ts
-Created package.json, tsconfig.json
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
 
 Scaffolded my-server in <tmp>/my-server
 

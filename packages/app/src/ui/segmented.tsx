@@ -1,10 +1,13 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { edgeFade } from "./edge-fade.ts";
 const segmentedRoot = css`
   /* segmented */
+  ${edgeFade}
+  position: relative;
   display: inline-flex;
-  padding: 2px;
-  gap: 2px;
+  padding: var(--space-1);
+  gap: var(--space-1);
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -17,16 +20,16 @@ const segmentedItem = css`
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  min-height: 34px;
-  padding: 0.2rem 0.7rem;
+  gap: var(--space-1);
+  min-height: calc(var(--control-md) - 2 * var(--space-1) - 2px);
+  padding: var(--space-1) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   white-space: nowrap;
   cursor: pointer;
   text-decoration: none;

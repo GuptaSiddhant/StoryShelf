@@ -157,6 +157,7 @@ const STORAGE_PACKAGES: readonly (readonly [string, NonNullable<DetectedAdapters
   ["@storyshelf/storage-azure", "azure"],
   ["@storyshelf/storage-gcs", "gcs"],
   ["@storyshelf/storage-s3", "s3"],
+  // Deprecated re-export of `@storyshelf/core/storage/local` (ADR 0049); still detected as local.
   ["@storyshelf/storage-local", "local"],
 ];
 
@@ -166,8 +167,8 @@ function detectStorage(deps: Set<string>): Pick<DetectedAdapters, "storage"> {
 }
 
 function detectGit(deps: Set<string>): Pick<DetectedAdapters, "git"> {
-  // Git hosts are built into the app (ADR 0049); the legacy package still counts for older projects.
-  return deps.has("@storyshelf/app") || deps.has("@storyshelf/notify-git") ? { git: "git" } : {};
+  // Git hosts are built into the app (ADR 0049).
+  return deps.has("@storyshelf/app") ? { git: "git" } : {};
 }
 
 function readGeneratedSources(dir: string): string {

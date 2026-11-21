@@ -4,6 +4,7 @@ import {
   generateGcpApp,
   generateGcpDatabase,
   generateGcpDns,
+  generateGcpGitAccess,
   generateGcpIdentity,
   generateGcpMain,
   generateGcpOutputs,
@@ -178,5 +179,23 @@ describe("GCP Terraform tfvars example", () => {
     expect(example).toContain("location");
     expect(example).toContain("domain_name");
     expect(example).toContain("identity_tenant");
+  });
+
+  it("takes git connections as Secret Manager references, never as values (ADR 0054)", () => {
+    const variables = generateGcpVariables();
+    const app = generateGcpApp();
+    const main = generateGcpMain();
+    for (const name of ["github_app_id", "github_app_private_key_secret", "gitlab_token_secret"]) {
+      expect(variables).toContain(`variable "${name}"`);
+    }
+    // The key and the token are secret_key_ref env entries; only the ids and the expiry are values.
+    expect(app).toContain("secret_key_ref");
+    expect(main).toContain("SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret");
+    expect(main).not.toMatch(/private_key\s*=\s*"/u);
+    expect(generateGcpSecrets()).not.toContain("GITHUB_APP");
+    // Read access is granted per referenced secret, not project-wide.
+    const access = generateGcpGitAccess();
+    expect(access).toContain("roles/secretmanager.secretAccessor");
+    expect(access).toContain("for_each  = local.git_secrets");
   });
 });

@@ -153,6 +153,89 @@ These rules come over from the packages as they are:
 - **For third parties:** they still write providers against the same contracts and pass them through
   the function form.
 
+## Amendment 2026-11-20: offered only when available (#1126)
+
+Owner, 2026-11-16: a project never shows an integration the server does not support or has turned
+off. Built-ins are still registered, but offered to projects only when available.
+
+- A notifier or design provider may declare `availability()`: `available`, or
+  `{ unavailable: reason }`. Absent means available. It is evaluated once at startup
+  (`offerIntegrations` in `resolveShelfOptions`); the app registers only available providers and
+  keeps a status for every kind.
+- The built-in `email` notifier is unavailable until a transport replaces it. Figma is available
+  (personal tokens); its OAuth button still needs the client id and secret. Git stays available
+  until ADR 0054's connections land, when it follows the server's connection (#1119).
+- `SHELF_INTEGRATIONS_DISABLED` (`integrationsFromEnv`) turns kinds off without code, for the
+  server image and the Fly demo. A built-in kind missing after resolution reads as turned off.
+- Project settings, the channel API and MCP offer only available kinds; creating one of another
+  kind answers 400 with the reason. A stored channel of such a kind is kept, hidden from its project
+  and not delivered to; the System page lists it with the reason. No schema change, no deletion.
+- The System page and the site-admin deep health list every integration as available,
+  unavailable (reason) or turned off. Site admins see one line in a project's settings in place of
+  what is missing; project admins see nothing.
+
+## Amendment 2026-11-21: the packaging rule and local storage (#1241)
+
+Owner, 2026-11-20 and 2026-11-21. `@storyshelf/storage-local` (146 lines, depends only on core,
+needed by almost every server) is built into core as `@storyshelf/core/storage/local`; the factory
+and options are unchanged, and core's `exports` map gains that one subpath. It adds no dependency.
+`@storyshelf/storage-local` stays for one minor release as a deprecated re-export with a notice,
+then is no longer published (a `Breaking:` changeset at removal). A scaffold from `server init`
+imports core and lists no storage package for local.
+
+The amendment also records the test for every later "fold into core or keep as a package" call.
+
+### The packaging rule
+
+1. **Core** holds what every server needs, plus built-in features whose own code is light. A
+   third-party dependency of such a feature is an optional peer of core, loaded only when the
+   feature is used: email uses `nodemailer`, images use `sharp`, and the database drivers are
+   optional peers of `@storyshelf/db` (#1242).
+2. **A separate package** is right when any of these holds:
+   - the concern is optional and its dependencies are heavy enough that they must never enter a
+     server or serverless bundle unused: cloud storage SDKs (`storage`, one optional peer per
+     subpath), the OpenTelemetry Node SDK (`observability`), the AI SDK (`ai`), the auth engine
+     (`auth`), Playwright (`runner`). Related backends with heavy SDKs share **one** package, one
+     subpath and one optional peer each, not a package per vendor;
+   - its version is a user-visible contract: the runner pins the browser, and the browser decides
+     the baselines;
+   - it runs in another runtime or process: the CLI, the Storybook addon, the MCP server;
+   - it is a layer core must not depend on: `app` (Hono);
+   - it is shared by core and the CLI, which must not depend on core: `affected`;
+   - it is **a layer core is built on**, with its own test infrastructure and no imports from core:
+     `db` (persistence: tables, dialects, migrations, drivers). This mirrors `app` and needs both
+     halves; code that only *could* be a lower layer stays in core.
+3. **Retiring.** A package folded into core is published as a deprecated re-export for **one minor
+   release**, then no longer published. The owner runs `npm deprecate` on it.
+4. **Built in does not mean closed.** The adapter interfaces (`StorageAdapter`, `CaptureRunner`,
+   notifier and design providers) stay the extension points. The database is the exception:
+   dialects are built into `@storyshelf/db`, so `DatabaseAdapter` stops being a third-party
+   extension point. A new SQL dialect is a contribution to `@storyshelf/db`; a new driver for an
+   existing dialect plugs in through its public driver entry point (#1242). The databases move
+   under #1242 once ADR 0041 task 5 lands; until then `db-{sqlite,postgres,mysql}` stay as they are.
+
+### Audit and target
+
+The audit of every package (2026-11-20) found these follow the rule: `core`, `app`, `cli`,
+`affected`, `auth`, `ai`, `mcp`, `observability`, `storybook-addon`. The rest change:
+
+- **`runner-playwright` becomes `@storyshelf/runner`** in 0.15.0 (#1295). It is the only runner once
+  Puppeteer is gone and stays separate because its version is a user-visible contract.
+- **`storage-{s3,gcs,azure}` become one `@storyshelf/storage`** (#1294) with `/s3`, `/gcs` and
+  `/azure` subpaths, each cloud SDK an optional peer that only its own subpath loads (the shape of
+  `@storyshelf/db`), plus `/local`, a re-export of core's built-in local storage, so every backend is
+  importable from one place. The implementation stays in core. The SDKs stay: they provide
+  credential chains (IRSA, workload identity, managed identity), signing and multipart uploads that
+  StoryShelf must not reimplement.
+- **`storage-local`** moves into core (this amendment), `db-{sqlite,postgres,mysql}` into one `db`
+  package (#1242), and `runner-puppeteer` is removed (deprecated in 0.14.0 by #1243, removed in
+  0.15.0 by #1244).
+- **Overdue:** the shims `notify-{git,chat,email}`, `design-figma` and `image` shipped as re-exports
+  in 0.13.0 and stop being published in 0.14.0 (#1245).
+
+The target is 12 packages: `core`, `app`, `cli`, `db`, `storage`, `runner`, `auth`, `ai`,
+`observability`, `mcp`, `affected`, `storybook-addon`.
+
 ## Alternatives considered
 
 - **Keep the packages (ADR 0014, ADR 0018).** Rejected: the SDK risk they guarded against is absent,

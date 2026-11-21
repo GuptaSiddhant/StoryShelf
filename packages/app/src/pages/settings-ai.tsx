@@ -74,7 +74,7 @@ export function renderSettingsAi(
     );
   }
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>AI insights</SectionTitle>

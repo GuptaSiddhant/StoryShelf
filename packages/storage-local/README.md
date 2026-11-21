@@ -1,42 +1,14 @@
-# @storyshelf/storage-local
+# @storyshelf/storage-local (deprecated)
 
-The default storage adapter for self-hosted StoryShelf: reads and writes blobs to the local filesystem under a data directory. One `docker run` to self-host.
-
-## Install
-
-```sh
-nub add @storyshelf/storage-local
-```
-
-or
-
-```sh
-npm install @storyshelf/storage-local
-```
-
-## Quick start
+**Deprecated.** Local filesystem storage is built into core. Import it from
+`@storyshelf/core/storage/local`; the factory and its options are unchanged.
 
 ```ts
+// before
 import { createLocalStorage } from "@storyshelf/storage-local";
-import { createShelfApp } from "@storyshelf/app";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-
-const storage = createLocalStorage("./data");
-const database = createSqliteDatabase("./data/shelf.db");
-
-const app = createShelfApp({ database, storage });
+// after
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 ```
 
-## API
-
-### `createLocalStorage(dataDir: string): StorageAdapter`
-
-Stores all blobs under the resolved `dataDir` (creating directories as needed). Paths are confined to the data directory — any path escaping it throws an error.
-
-The returned adapter implements every method of the `StorageAdapter` interface (`read`, `write`, `delete`, `exists`, `list(prefix)`).
-
-## How it fits in
-
-`storage-local` is the default `storage` option for `createShelfApp` in single-node deployments, storing screenshots, diff overlays, and storybook archives on disk. It implements the same `StorageAdapter` interface as `@storyshelf/storage-s3`, so moving to object storage later is a drop-in swap.
-
-See `docs/architecture.md` and ADR 0006.
+This package re-exports the core subpath for one minor release (ADR 0049), then is no longer
+published. Remove it from your `package.json` and keep `@storyshelf/core`.

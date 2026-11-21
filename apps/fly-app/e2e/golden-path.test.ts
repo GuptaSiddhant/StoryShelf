@@ -107,7 +107,9 @@ async function upload(buildDir: string, sha: string): Promise<string> {
     "--full",
   ];
   const { stdout } = await run(process.execPath, args);
-  const id = /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
+  const id =
+    /^\s*Build:\s+(?<id>[0-9A-Z]{26})\s*$/mu.exec(stdout)?.groups?.["id"] ??
+    /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
   if (!id) throw new Error(`no build id in CLI output: ${stdout}`);
   return id;
 }
@@ -243,10 +245,23 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
     );
   });
 
-  it("serves the private build's Storybook to the signed-in viewer only", async () => {
+  it("serves the demo's public build's Storybook to anyone, and keeps settings behind sign-in", async () => {
+    // The demo is public on purpose (`seed.sh` `set_demo_public`, #809): every branch's build opens
+    // without an account (`isPublicBuild`, ADR 0011), though the build's own `public` flag stays false.
+    const project = await api<{ publicBranchRegex: string | null }>(`/projects/${SLUG}`);
+    expect(project.publicBranchRegex).toBe(".*");
     expect((await api<BuildBody>(`/projects/${SLUG}/builds/${buildId}`)).public).toBe(false);
+
+    // Anonymous: the Storybook itself (its manager page), not the sign-in page or a redirect.
     const anonymous = await fetch(`${BASE}/_/${buildId}/`, { redirect: "manual" });
-    expect(anonymous.status).not.toBe(200);
+    expect(anonymous.status).toBe(200);
+    expect(await anonymous.text()).toContain("sb-manager");
+
+    // Still private: a project's settings need sign-in. `authGate` redirects a signed-out visitor
+    // to the login page for every page outside the published-Storybook routes.
+    const settings = await fetch(`${BASE}/projects/${SLUG}/settings`, { redirect: "manual" });
+    expect(settings.status).toBe(302);
+    expect(settings.headers.get("location")).toMatch(/^\/auth\/login\?return_to=/u);
 
     await page.goto(`${BASE}/projects/${SLUG}/builds/${buildId}`);
     await page.getByLabel("More build actions").click();

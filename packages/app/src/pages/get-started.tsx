@@ -38,7 +38,7 @@ const markerBase = css`
   height: 24px;
   border-radius: 50%;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   border: 2px solid var(--border);
   color: var(--text-secondary);
 `;
@@ -48,15 +48,15 @@ const markerCurrent = css`
   ${markerBase}
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-fg);
+  color: var(--accent-contrast);
 `;
 
 const markerDone = css`
   /* get-started-marker-done */
   ${markerBase}
-  background: var(--status-approved);
+  background: var(--status-approved-bg);
   border-color: var(--status-approved);
-  color: var(--accent-fg);
+  color: var(--status-approved-fg);
 `;
 
 type StepState = "pending" | "current" | "done";

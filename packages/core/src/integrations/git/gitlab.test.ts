@@ -38,6 +38,31 @@ describe("gitLabNotifier", () => {
     });
   });
 
+  it("addresses a pinned project by its numeric id, for statuses, notes and branch checks", async () => {
+    const calls = stubFetch((url) =>
+      Response.json(url.includes("/refs?") ? [{ type: "branch", name: "main" }] : []),
+    );
+    const pinned = adapter({ ...REPO, projectId: "4321" });
+    await pinned.setState({
+      channel,
+      target: { kind: "status", sha: "abc", context: "storyshelf/testing" },
+      state: "success",
+      url: "u",
+    });
+    await pinned.setState({
+      channel,
+      target: { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "m" },
+      state: "success",
+      url: "u",
+    });
+    expect(await pinned.commitOnBranch?.({ sha: "abc", branch: "main" })).toBe(true);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://gitlab.com/api/v4/projects/4321/statuses/abc",
+      "https://gitlab.com/api/v4/projects/4321/repository/commits/abc/merge_requests",
+      "https://gitlab.com/api/v4/projects/4321/repository/commits/abc/refs?type=branch&per_page=100&page=1",
+    ]);
+  });
+
   it("posts the commit status with the exact context as name and context", async () => {
     const calls = stubFetch(() => Response.json({}));
     await adapter(REPO).setState({

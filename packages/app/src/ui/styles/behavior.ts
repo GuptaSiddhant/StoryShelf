@@ -12,7 +12,7 @@ function htmxCss(): string {
     .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
     button.htmx-request, form.htmx-request button, [hx-post].htmx-request { pointer-events: none; opacity: .7; }
     form.htmx-request { opacity: .9; }
-    form.htmx-request button[type="submit"]::after { content: ""; width: .85em; height: .85em; margin-left: .4rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ss-spin .7s linear infinite; }
+    form.htmx-request button[type="submit"]::after { content: ""; width: .85em; height: .85em; margin-left: var(--space-2); border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ss-spin .7s linear infinite; }
     @keyframes ss-spin { to { transform: rotate(360deg); } }
     .skeleton { position: relative; overflow: hidden; background: var(--surface-muted); border-radius: var(--radius-sm); min-height: 1rem; }
     .skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: skeleton 1.4s infinite; }
@@ -23,15 +23,19 @@ function htmxCss(): string {
 
 function dataCss(): string {
   return `
-    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
     .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    @media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;
+    @media (max-width: 880px) { .grid--2 { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 480px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }`;
 }
 
 /** Truly global chrome rules (depend on ancestors outside any one subtree). */
 function chromeCss(): string {
   return `
+    @property --edge-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+    @property --edge-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+    @keyframes ss-edge-fade { 0% { --edge-fade-start: 0px; --edge-fade-end: 24px; } 8% { --edge-fade-start: 24px; --edge-fade-end: 24px; } 92% { --edge-fade-start: 24px; --edge-fade-end: 24px; } 100% { --edge-fade-start: 24px; --edge-fade-end: 0px; } }
     @media (min-width: 881px) { html[data-sidebar="rail"] { --sidebar-width: 68px; } }
     [data-theme-icon] { display: none; }
     [data-theme="light"] [data-theme-icon="light"], [data-theme="dark"] [data-theme-icon="dark"], [data-theme="system"] [data-theme-icon="system"] { display: inline-flex; }`;

@@ -9,6 +9,8 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationStatus } from "./integrations/availability.ts";
+import type { ShelfGitOptions } from "./integrations/git/connections/types.ts";
 import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
@@ -52,6 +54,14 @@ export interface BrandTheme {
   shadow?: string;
 }
 
+/** A secondary link on the sign-in page to something anyone may open without an account. */
+export interface AuthPublicLink {
+  /** An `https:` URL or a same-origin path (`/_/<slug>/`); nothing else is accepted. */
+  href: string;
+  /** Link text, e.g. "Browse the demo's Storybook without an account". */
+  label: string;
+}
+
 /** Text overrides for the auth (login) UI. */
 export interface AuthUiConfig {
   /** Page title, default "Sign in". */
@@ -71,6 +81,11 @@ export interface AuthUiConfig {
   ssoLabelTemplate?: string;
   /** Help text shown under the form. */
   helpText?: string;
+  /**
+   * A link under the form to public content (a public build's Storybook). It opens hosting only,
+   * never review (ADR 0011). Nothing renders when unset.
+   */
+  publicLink?: AuthPublicLink;
   /** Footer text shown at the bottom of the card. */
   footerText?: string;
 }
@@ -297,6 +312,14 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   ]),
 });
 
+/** An `https:` URL or a path on this server (one leading `/`, never `//`). */
+const PUBLIC_LINK_HREF = /^(?:https:\/\/[^\s]+|\/(?!\/)[^\s]*)$/u;
+
+const authPublicLinkSchema: z.ZodType<AuthPublicLink> = z.object({
+  href: z.string().regex(PUBLIC_LINK_HREF, "must be an https URL or a path starting with /"),
+  label: z.string().min(1),
+});
+
 const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   title: z.string().min(1).optional(),
   subtitle: z.string().optional(),
@@ -305,6 +328,7 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   submitLabel: z.string().min(1).optional(),
   ssoLabelTemplate: z.string().min(1).optional(),
   helpText: z.string().optional(),
+  publicLink: authPublicLinkSchema.optional(),
   footerText: z.string().optional(),
 });
 
@@ -633,6 +657,12 @@ export interface ShelfOptions {
   design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
+  /**
+   * Server-wide git connections and approved repository links managed by configuration (ADR 0054,
+   * decision 9): `githubApp(...)`, `gitlabGroup(...)` or `gitFromEnv(env)` from
+   * `@storyshelf/core/integrations`. A configured connection wins over a stored one with its id.
+   */
+  git?: ShelfGitOptions;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
@@ -659,8 +689,15 @@ export interface ResolvedNotificationsOptions extends Omit<
  * hand-built options object (tests, embedders) reads as "none".
  */
 export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  /** Design providers offered to projects: registered and available (issue #1126). */
   design?: DesignProvider[];
+  /** `notifiers` holds only available providers (issue #1126). */
   notifications?: ResolvedNotificationsOptions;
+  /**
+   * Every integration kind with its standing (available, unavailable with a reason, or turned off),
+   * for the System page and deep health. Absent on a hand-built options object.
+   */
+  integrations?: readonly IntegrationStatus[];
 }
 
 /**

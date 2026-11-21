@@ -78,6 +78,51 @@ provider "azurerm" {
 `;
 }
 
+/** Git connections (ADR 0054, decision 9): the App ID, and references to secrets, never values. */
+function gitVariables(): string {
+  return `
+# Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+# GitLab token are names of secrets you create in this stack's Key Vault outside Terraform
+# (az keyvault secret set), so their values never enter configuration or state. Empty keeps the
+# connection off.
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret_name" {
+  description = "Name of the Key Vault secret holding the GitHub App private key (PEM). Required with github_app_id."
+  type        = string
+  default     = ""
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3). Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret_name" {
+  description = "Name of the Key Vault secret holding a GitLab group or project access token (api scope). Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD); the System page warns 30 days before. Required with gitlab_token_secret_name."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
+}
+`;
+}
+
 export function generateAzureVariables(): string {
   return `${header()}variable "project" {
   description = "Project slug, used as a name prefix for all resources."
@@ -101,7 +146,8 @@ variable "entra_tenant_id" {
   type        = string
   default     = ""
 }
-`;
+
+${gitVariables()}`;
 }
 
 export function generateAzureMain(): string {
@@ -115,6 +161,18 @@ resource "azurerm_resource_group" "main" {
 locals {
   slug     = lower(var.project)
   alphanum = substr(replace(local.slug, "/[^a-z0-9]/", ""), 0, 16)
+
+  # Git connections: plain values, and Key Vault references read by the app's identity at start.
+  git_env = { for k, v in {
+    SHELF_GITHUB_APP_ID        = var.github_app_id
+    SHELF_GITHUB_API_URL       = var.github_api_url
+    SHELF_GITLAB_TOKEN_EXPIRES = var.gitlab_token_expires
+    SHELF_GITLAB_HOST          = var.gitlab_host
+  } : k => v if v != "" }
+  git_secrets = { for k, v in {
+    SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret_name
+    SHELF_GITLAB_TOKEN           = var.gitlab_token_secret_name
+  } : k => v if v != "" }
 }
 `;
 }
@@ -137,6 +195,47 @@ resource "azurerm_container_app_environment" "main" {
 `;
 }
 
+/** The identity and Key Vault secret references of the app (git-access.tf holds the identity). */
+function gitAppBlocks(): string {
+  return `  # Reads the git secrets from Key Vault (git-access.tf). Only added when one is configured.
+  dynamic "identity" {
+    for_each = length(local.git_secrets) > 0 ? [1] : []
+    content {
+      type         = "UserAssigned"
+      identity_ids = [azurerm_user_assigned_identity.git[0].id]
+    }
+  }
+
+  dynamic "secret" {
+    for_each = local.git_secrets
+    content {
+      name                = lower(replace(secret.key, "_", "-"))
+      key_vault_secret_id = "\${azurerm_key_vault.main.vault_uri}secrets/\${secret.value}"
+      identity            = azurerm_user_assigned_identity.git[0].id
+    }
+  }
+`;
+}
+
+/** The git connection's environment: plain values, and secrets by name. */
+function gitEnvBlocks(): string {
+  return `      dynamic "env" {
+        for_each = local.git_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.git_secrets
+        content {
+          name        = env.key
+          secret_name = lower(replace(env.key, "_", "-"))
+        }
+      }`;
+}
+
 export function generateAzureApp(): string {
   return `${header()}# App with external ingress. Image is a placeholder: push the
 # scaffolded Dockerfile to ACR and update it before applying. The same
@@ -148,6 +247,7 @@ resource "azurerm_container_app" "app" {
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 
+${gitAppBlocks()}
   template {
     min_replicas = 1
 
@@ -156,6 +256,8 @@ resource "azurerm_container_app" "app" {
       image  = "storyshelf:latest"
       cpu    = 2
       memory = "4Gi"
+
+${gitEnvBlocks()}
     }
   }
 
@@ -283,6 +385,24 @@ resource "azurerm_key_vault_secret" "db_password" {
 `;
 }
 
+/** The identity the app reads its git secrets with: Key Vault Secrets User on this stack's vault. */
+export function generateAzureGitAccess(): string {
+  return `${header()}resource "azurerm_user_assigned_identity" "git" {
+  count               = length(local.git_secrets) > 0 ? 1 : 0
+  name                = "\${local.slug}-git"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+}
+
+resource "azurerm_role_assignment" "git" {
+  count                = length(local.git_secrets) > 0 ? 1 : 0
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.git[0].principal_id
+}
+`;
+}
+
 export function generateAzureDns(): string {
   return `${header()}# DNS zone + verification TXT + app CNAME. Skipped entirely when
 # var.domain_name is empty. Hostname binding + managed TLS is a
@@ -362,6 +482,8 @@ function generateAzureEnvTable(): string {
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`entra_application_id\` / \`entra_tenant_id\` | \`OIDC_CLIENT_ID\` / \`OIDC_ISSUER\` (\`https://login.microsoftonline.com/{tenant}/v2.0\`) | \`auth\` (keycloak recipe) |
 | Key Vault entries \`SECRET\` / \`OIDC-CLIENT-SECRET\` / \`ADMIN-TOKEN\` | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
+| \`github_app_id\` + \`github_app_private_key_secret_name\` (optional) | \`SHELF_GITHUB_APP_ID\` / \`SHELF_GITHUB_APP_PRIVATE_KEY\` | server git connection (ADR 0054) |
+| \`gitlab_token_secret_name\` + \`gitlab_token_expires\` (optional) | \`SHELF_GITLAB_TOKEN\` / \`SHELF_GITLAB_TOKEN_EXPIRES\` | server git connection (ADR 0054) |
 `;
 }
 
@@ -436,6 +558,7 @@ const AZURE_FILES: ReadonlyArray<readonly [string, (options: AzureTerraformOptio
   ["terraform/storage.tf", () => generateAzureStorage()],
   ["terraform/identity.tf", () => generateAzureIdentity()],
   ["terraform/secrets.tf", () => generateAzureSecrets()],
+  ["terraform/git-access.tf", () => generateAzureGitAccess()],
   ["terraform/dns.tf", () => generateAzureDns()],
   ["terraform/outputs.tf", () => generateAzureOutputs()],
   ["terraform/terraform.tfvars.example", () => generateAzureTfvarsExample()],

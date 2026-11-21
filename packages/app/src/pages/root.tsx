@@ -8,17 +8,17 @@ const heroCard = css`
   /* hero-card */
   background: var(--surface-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 2rem 1.5rem;
+  padding: var(--space-8) var(--space-6);
   text-align: center;
 `;
 
 /** Landing hero title. Centering comes from the card. */
 const heroTitle = css`
   /* hero-title */
-  margin: 0 0 0.4rem;
-  font-size: 1.9rem;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl);
   letter-spacing: -0.02em;
 `;
 
@@ -27,7 +27,7 @@ const heroDesc = css`
   /* hero-desc */
   color: var(--text-secondary);
   max-width: 60ch;
-  margin: 0 auto 1rem;
+  margin: 0 auto var(--space-4);
 `;
 
 /** The welcome card: the pitch, the two entry buttons and the CLI tip. */
@@ -62,7 +62,7 @@ const Hero: FC = () => (
 
 /** The three steps of the product: capture, diff, review. */
 const Steps: FC = () => (
-  <div class="grid grid--3 mt-1">
+  <div class="grid grid--3">
     <Card>
       <SectionTitle level={3}>Capture</SectionTitle>
       <Meta>

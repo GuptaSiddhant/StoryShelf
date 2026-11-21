@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
  * (mounted at `/api/auth/*`) — never through `createSession`, which exists
  * only for interface conformance and fails loudly.
  */
+import { readOnlyAccountMatcher } from "@storyshelf/core/auth";
 import { HOST_SESSION_COOKIE, SESSION_COOKIE } from "@storyshelf/core/types";
 import { ulid } from "@storyshelf/core/utils";
 import { betterAuth } from "better-auth";
@@ -21,6 +22,8 @@ import {
   describeLoginMethods,
 } from "./engine/login-methods.ts";
 import { sendAuthMail } from "./engine/mail.ts";
+import { readOnlyEngineGuard } from "./engine/read-only.ts";
+import { assertAuthSecret, assertNoLibrarySecretOverride } from "./engine/secret.ts";
 import { SSO_MANAGEMENT_PATHS } from "./engine/sso.ts";
 import type { ShelfAuth, ShelfAuthInstance, ShelfAuthOptions } from "./engine/types.ts";
 
@@ -49,6 +52,9 @@ export type {
  */
 export function createShelfAuth(options: ShelfAuthOptions): ShelfAuth {
   const { db } = options;
+  // Never hand the library a missing or weak secret: it would fall back to its built-in default.
+  assertAuthSecret(options.secret);
+  assertNoLibrarySecretOverride();
   // Fail fast at boot (login descriptors and plugin paths are fixed at creation).
   describeLoginMethods(options);
   assertNoReservedEndpointCollision(options.plugins);
@@ -115,9 +121,22 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
       },
     },
     plugins: buildPlugins(options, db),
+    ...readOnlyHooks(options),
   });
   // Narrowed to the shelf surface: handler mounting plus session reads.
   return auth;
+}
+
+/** The `before` hook refusing read-only accounts (#1274); none when no account is read-only. */
+function readOnlyHooks(
+  options: ShelfAuthOptions,
+): { hooks: { before: ReturnType<typeof readOnlyEngineGuard> } } | Record<string, never> {
+  if ((options.readOnlyAccounts ?? []).length === 0) {
+    return {};
+  }
+  return {
+    hooks: { before: readOnlyEngineGuard(readOnlyAccountMatcher(options.readOnlyAccounts)) },
+  };
 }
 
 /** The slice of Better Auth's `advanced` options the shelf sets. */

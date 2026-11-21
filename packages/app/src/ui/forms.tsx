@@ -24,18 +24,18 @@ const fieldWrapInline = css`
 const fieldLabel = css`
   /* field-label */
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   font-size: var(--text-sm);
   & span[aria-hidden] {
-    color: var(--status-rejected);
+    color: var(--status-rejected-fg);
   }
 `;
 
 const fieldInput = css`
   /* field-input */
   width: 100%;
-  min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface-card);
@@ -52,14 +52,13 @@ const fieldInput = css`
   &:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--text-secondary) 45%, var(--border));
   }
-  &:focus {
-    outline: none;
+  &:focus-visible {
     border-color: var(--ring);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent);
   }
   &:disabled {
     background: var(--surface-muted);
     color: var(--text-secondary);
+    opacity: 1;
     cursor: not-allowed;
   }
 `;
@@ -68,9 +67,8 @@ const fieldInputError = css`
   /* field-input-error */
   ${fieldInput}
   border-color: var(--status-rejected);
-  &:focus {
+  &:focus-visible {
     border-color: var(--status-rejected);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-rejected) 25%, transparent);
   }
 `;
 
@@ -122,7 +120,7 @@ const fieldError = css`
   margin: 0;
   color: var(--status-rejected-fg);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 `;
 
 const formActions = css`
@@ -195,6 +193,8 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
 export const Field: FC<{
   label: string;
   name: string;
+  /** The element id when it must differ from the name (the same name in several option groups). */
+  id?: string;
   type?: string;
   value?: string;
   placeholder?: string;
@@ -212,6 +212,7 @@ export const Field: FC<{
 }> = ({
   label,
   name,
+  id,
   type = "text",
   value,
   placeholder,
@@ -227,15 +228,16 @@ export const Field: FC<{
   hint,
   autocomplete,
 }) => {
+  const domId = id ?? name;
   return (
     <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
-      <label class={fieldLabel} for={name}>
+      <label class={fieldLabel} for={domId}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
       <input
         class={error ? fieldInputError : fieldInput}
-        id={name}
+        id={domId}
         name={name}
         type={type}
         value={value}
@@ -248,10 +250,10 @@ export const Field: FC<{
         max={max}
         step={step}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={fieldDescribedBy(name, error, hint)}
+        aria-describedby={fieldDescribedBy(domId, error, hint)}
         autocomplete={autocomplete}
       />
-      <FieldAssistant name={name} error={error} hint={hint} />
+      <FieldAssistant name={domId} error={error} hint={hint} />
     </div>
   );
 };
@@ -261,9 +263,13 @@ const checkLabel = css`
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   font-size: var(--text-base);
   cursor: pointer;
+  &:has(input:disabled) {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
 `;
 
 const checkInput = css`
@@ -272,6 +278,11 @@ const checkInput = css`
   height: 1rem;
   accent-color: var(--accent);
   flex: none;
+  &:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    accent-color: var(--text-secondary);
+  }
 `;
 
 /** Inline checkbox row with an optional hint. */
@@ -379,7 +390,9 @@ export const SelectField: FC<{
   disabled?: boolean;
   required?: boolean;
   layout?: FieldLayout;
-}> = ({ label, name, value, options, hint, disabled, required, layout = "stack" }) => {
+  /** HTMX attributes for the select (`hx-get`, `hx-target`, …), for a field that re-renders others. */
+  hx?: Record<string, string>;
+}> = ({ label, name, value, options, hint, disabled, required, layout = "stack", hx }) => {
   return (
     <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
       <label class={fieldLabel} for={name}>
@@ -392,6 +405,7 @@ export const SelectField: FC<{
         disabled={disabled}
         required={required}
         aria-describedby={hint ? `${name}-hint` : undefined}
+        {...hx}
       >
         {options.map((opt) => (
           <option value={opt.value} selected={opt.value === value}>

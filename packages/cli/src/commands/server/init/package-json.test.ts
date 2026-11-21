@@ -38,9 +38,9 @@ describe("generatePackageJson", () => {
     expect(Object.keys(pkg().dependencies).toSorted()).toEqual([
       "@hono/node-server",
       "@storyshelf/app",
+      "@storyshelf/core",
       "@storyshelf/db-sqlite",
       "@storyshelf/runner-playwright",
-      "@storyshelf/storage-local",
     ]);
   });
 
@@ -53,6 +53,11 @@ describe("generatePackageJson", () => {
   it("falls back to 0.0.0 when the build did not define the version", () => {
     vi.stubGlobal("__PKG_VERSION__", null);
     expect(pkg().dependencies["@storyshelf/app"]).toBe("0.0.0");
+  });
+
+  it("pins @hono/node-server past GHSA-rmxm-3fg6-px4f", () => {
+    const { dependencies } = pkg({ database: "sqlite", storage: "local" });
+    expect(dependencies["@hono/node-server"]).toBe("^2.1.11");
   });
 
   it("runs entries with plain node and requires Node 24+", () => {
@@ -100,8 +105,10 @@ describe("generatePackageJson", () => {
     }
   });
 
-  it("adds the storage package the scaffold imports, local included", () => {
-    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeDefined();
+  it("adds the storage package the scaffold imports; local comes from core", () => {
+    const local = pkg({ storage: "local" }).dependencies;
+    expect(local["@storyshelf/storage-local"]).toBeUndefined();
+    expect(local["@storyshelf/core"]).toBeDefined();
     expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage-s3"]).toBeDefined();
     expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage-azure"]).toBeDefined();
     expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage-gcs"]).toBeDefined();
@@ -113,13 +120,14 @@ describe("generatePackageJson", () => {
     expect(pkg({ auth: "oauth" }).dependencies["@storyshelf/auth"]).toBeDefined();
   });
 
-  it("adds nodemailer and core only when SMTP is chosen", () => {
+  it("adds nodemailer only when SMTP is chosen, and core only for SMTP or local storage", () => {
     const { dependencies } = pkg({ notifications: true });
     expect(dependencies["nodemailer"]).toBeDefined();
     expect(dependencies["@storyshelf/core"]).toBeDefined();
-    const off = pkg({ notifications: false }).dependencies;
+    const off = pkg({ notifications: false, storage: "s3" }).dependencies;
     expect(off["nodemailer"]).toBeUndefined();
     expect(off["@storyshelf/core"]).toBeUndefined();
+    expect(pkg({ notifications: false }).dependencies["@storyshelf/core"]).toBeDefined();
   });
 
   it("adds the observability packages only when asked", () => {
@@ -143,6 +151,17 @@ describe("generatePackageJson", () => {
     expect(scripts["docker:run"]).toContain("docker run");
     expect(scripts["docker:up"]).toBeUndefined();
     expect(scripts["infra:plan"]).toBeUndefined();
+  });
+
+  it("forwards SECRET, and AUTH_PASSWORD for password auth, from the shell to docker:run", () => {
+    const open = pkg({ deployTarget: "docker", docker: true }).scripts["docker:run"];
+    const password = pkg({ deployTarget: "docker", docker: true, auth: "password" }).scripts[
+      "docker:run"
+    ];
+    expect(open).toMatch(/ -e SECRET /u);
+    expect(open).not.toContain("AUTH_PASSWORD");
+    expect(password).toMatch(/ -e SECRET -e AUTH_PASSWORD /u);
+    expect(`${open} ${password}`).not.toMatch(/SECRET=|change-me/u);
   });
 
   it("has compose scripts when the stack has more than one service", () => {

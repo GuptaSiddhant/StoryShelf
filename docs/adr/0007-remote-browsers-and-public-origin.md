@@ -38,12 +38,11 @@ deployment's public origin. Many platforms generate that URL, so an operator can
 
 ### 1. A runner declares everything it can render in one `browsers` list
 
-`createPlaywrightCaptureRunner` and `createPuppeteerCaptureRunner` take `browsers`: every target the
+`createPlaywrightCaptureRunner` takes `browsers`: every target the
 runner offers, local and remote. An entry is:
 
 - a bare engine, `"chromium"`: a local engine with the runner's defaults;
-- `local(engine, options)`: a local engine with options (Playwright `channel`, Puppeteer
-  `executablePath`);
+- `local(engine, options)`: a local engine with options (Playwright `channel`);
 - a **remote preset** (`playwrightServer`, `azurePlaywright`, `browserstack`, `cdp`, or generic
   `remote`), which expands to one or more targets.
 
@@ -60,8 +59,7 @@ target are visible rather than silently overwritten.
 - **No local engines:** a list with no bare or `local()` entries needs no installed browsers
   (decision 7).
 - **Remote mechanics:** Playwright uses `browserType.connect(endpoint, { headers, exposeNetwork })`
-  for its own protocol, or `chromium.connectOverCDP` for Chromium-only services; Puppeteer uses
-  `puppeteer.connect`. `connectOverCDP` is lower fidelity but safe because the target has its own
+  for its own protocol, or `chromium.connectOverCDP` for Chromium-only services. `connectOverCDP` is lower fidelity but safe because the target has its own
   baselines and fingerprint. Browser recycling opens a new session instead of relaunching; for a
   connected target that means release the old client and connect again, never `Browser.close`.
 - **Ownership is explicit:** a browser the run launched is closed; a browser it connected to is
@@ -135,7 +133,7 @@ fixed default, never from the OS, browser version or endpoint. Renaming starts f
 - **Playwright `connect` providers that support it** (Azure, self-hosted Playwright server): pass
   `exposeNetwork: "<loopback>"`; the remote browser's `127.0.0.1` requests route back through the
   connection to the host, so the static server works unchanged.
-- **Everyone else** (CDP-only, Puppeteer, tunnel-only providers): the runner gets a **signed URL** to
+- **Everyone else** (CDP-only, tunnel-only providers): the runner gets a **signed URL** to
   the build's published Storybook.
 
 **Shape.** The token is a path prefix because a Storybook loads `iframe.html` and assets by relative
@@ -211,15 +209,13 @@ without a confirmed origin no status is requested or delivered (ADR 0014, decisi
 ### 7. Local engines are declared and verified, and can be absent
 
 Declaring an engine does not prove it is installed, so the runner checks at startup without
-launching: Playwright asks for `executablePath()` and checks the file exists; Puppeteer checks its
-configured executable (`puppeteer-core` ships none). The result is per-target metadata, `ready` or
+launching: Playwright asks for `executablePath()` and checks the file exists. The result is per-target metadata, `ready` or
 `unavailable` with a reason, shown on the System page.
 
 - A project setting naming an unavailable target is refused at save with the reason.
 - The check cannot see missing system libraries. A launch that fails marks the target unavailable
   and fails the job at once with that error, not through crash isolation.
-- `chrome` is real Chrome. Playwright uses the `chrome` channel (`playwright install chrome`);
-  Puppeteer needs an `executablePath`, and a bare `"chrome"` without one fails at runner creation.
+- `chrome` is real Chrome. Playwright uses the `chrome` channel (`playwright install chrome`).
 
 With no local entries the host needs no browsers (`playwright-core` only), removing the largest
 capture-host load. Still local: diffing (ADR 0008), parameter extraction on the primary target,

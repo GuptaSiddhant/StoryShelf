@@ -37,7 +37,7 @@ The touched timing-sensitive files have a `test:flake` script in their package: 
 
 ### 2. Adapter contract tests
 
-Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), storage-local via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
+Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), local storage (core's `storage/local`) via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
 
 > Known environment limitation: `@libsql/client` (native binding ≤ 0.5.29)
 > segfaults at process teardown on current Node majors — even on a bare
@@ -98,6 +98,18 @@ Rules:
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
   instances booting). The unit test pins that PGlite never exposes the capability.
+- MySQL (`db-mysql/src/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
+  `buildReferenceContractSuite`, `retentionActivationContractSuite` and `retentionSkippedContractSuite`
+  only against a real MySQL 8 server, every party on its own pool, plus the mirrored race tests
+  (interrupted preparation, a writer in flight, two instances booting, a claim against preparation)
+  and a use of a hash racing a collector's claim. Gates: `LIVE_CLOUD=1`, `MYSQL_SCHEMA_MUTATION_TEST=1`
+  and `MYSQL_DATABASE_URL` (a user that may `CREATE DATABASE`: the skipped-build cases each get a
+  scratch database). CI runs it on every pull request that touches `packages/db-mysql/`,
+  `packages/core/src/test-helpers/` or `packages/core/src/adapters/database.ts` (job `mysql-lifecycle`,
+  a `mysql:8.0` service container), and the nightly MySQL job runs it with the rest of the live suite.
+  Removing the row locks or the named content locks fails it. The hermetic half
+  (`retention-activation.test.ts`) only refuses: MariaDB, TiDB, Vitess, MySQL other than 8, statement
+  binlogs, non-InnoDB tables, a single injected connection and the PlanetScale and TiDB presets.
 - The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
   "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
   own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
@@ -113,7 +125,7 @@ Rules:
   list limits (`clampListLimit`, max 1000).
 - Idempotency is asserted, not assumed: run `setup`, `teardown`, `migrate`,
   and `enqueue`-retry twice.
-- Indirect coverage allowed only for pure mappers (e.g. `notify-git`
+- Indirect coverage allowed only for pure mappers (e.g. the git integration
   `github-mapper.ts` precedent); everything else has a direct colocated suite.
 
 ### 3. Integration (vitest, CI-always)
@@ -125,7 +137,7 @@ Rules:
 - **Visual (all fixtures; PRs run `storybook-9` only when the change touches more than docs, the website, Markdown or fixtures 8 and 10; the nightly workflow runs 8, 9 and 10):** Runs the real capture pipeline (`@storyshelf/runner-playwright`) against a built Storybook fixture in `fixtures/storybook-8` (default, 7 stories), `fixtures/storybook-9`, and `fixtures/storybook-10` (each independent `pnpm` install, built on demand `pnpm install && pnpm run build-storybook`; `storybook-static/` is `.gitignored`). Override locally with `FIXTURE_DIR=fixtures/storybook-9`. Requires Playwright browsers (one-time provision: `npx -y playwright@1.63.0 install chromium`). Gated so `turbo test` stays browser-free.
 - **Interaction (`play`, only oldest):** When a project has `executePlay: true`, the same suite runs `play` functions before screenshots. Tested only against `fixtures/storybook-8` (oldest) unless a major changes the `play` channel — then add a single `play` smoke for that major. Verified: `BlockingFailure` → whole build `failed`, `FlakyTag`/`FlakyParam` (`flaky-test`) → non-blocking `reviewing` with warning, `Disabled` (`skip`/`disableSnapshot`) → not counted.
 
-- **Settled signalling and `.test()` runs (`settle.integration.test.ts` in both runners):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do. Puppeteer: set `PUPPETEER_EXECUTABLE_PATH`.
+- **Settled signalling and `.test()` runs (`settle.integration.test.ts` in the Playwright runner):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do.
 
 - **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `STORYSHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook) tested in Chromium against the production image the Fly dry run already boots and seeds. It adds no server or seed of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SECRET` and a confirmed `PUBLIC_BASE_URL`; after the normal seed (`seed.sh` is unchanged: it seeds the live demo) the spec, in the seeded `demo-design-system` project, creates a `git-log` channel and uploads a copy of the built `storybook-9` fixture with one story repainted by a CSS patch to a feature branch with the workspace CLI; waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/server.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in viewer; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
 
@@ -158,7 +170,7 @@ Rules:
 `scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
 
 ```sh
-nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/storage-local' --filter='@storyshelf/runner-playwright'
+nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/runner-playwright'
 (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
 nub run bench                      # warm-up run (dropped), then the median of 3
 nub run bench -- --runs 5 --out .tmp/bench.json
@@ -191,6 +203,21 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot`/`delay` variants). `storybook-static/` is built on demand, not committed.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.
+
+## Dependency audit (#47)
+
+`.github/workflows/audit.yml` runs weekly (Monday 06:17 UTC) and on demand (`workflow_dispatch`), one matrix leg per lockfile: `workspace` (`nub.lock`) and `storybook-8`, `storybook-9`, `storybook-10` (the fixtures' own pnpm lockfiles). It has `permissions: contents: read`, no secrets, and no other workflow depends on it, so a red run blocks no merge. It never upgrades, commits or publishes; a failing run is the notification.
+
+`scripts/audit-check.mjs` does the work. `nub audit` reads only the root importer (182 of the lockfile's 1581 packages), so the workspace is audited as `pnpm audit` over a copy of `nub.lock` (pnpm's lockfile format) and the workspace manifests, staged in `.tmp/`; the fixtures run `pnpm audit` in place. It reports advisory ids, packages, versions and advisory links only. A leg fails when:
+
+- an advisory is not a tracked exception for that target;
+- an exception is past its `reviewBy` date;
+- `scripts/audit-exceptions.json` is malformed, or an entry is missing from SECURITY.md, "Known advisories";
+- the audit could not run (registry error, no report). The exit code of `pnpm audit` is not the signal, because it exits 1 whenever it finds anything.
+
+An exception that matches nothing is a notice in the run summary; remove it once the fix is confirmed. The owner alone adds an exception or moves a date, with the reason in SECURITY.md and the tracking issue (#335).
+
+Run it locally with `node scripts/audit-check.mjs` (all targets), `--target storybook-9` for one, and `--today YYYY-MM-DD` to check how an expiry behaves. Its tests (`scripts/audit-check.test.mjs`, `node --test`) run in the `ci.yml` lint step and need no network.
 
 ## Live cloud tests (gated: `LIVE_CLOUD=1`)
 
@@ -313,3 +340,26 @@ timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -pp
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
+
+## Previous-release database job (ADR 0053, decision 8)
+
+`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file, the
+job queue, its consumer or an enqueue path (the `schema` output of the `changes` job), for SQLite
+and Postgres. `scripts/previous-release.sh
+<dialect>` installs the newest `v*` release from npm, migrates an empty database with it and
+seeds a project, migrates the same database with the checkout as the next minor, then starts the
+published release on it and smokes it (health, project list, a write, a read-back, the root page).
+The release must skip its migrations and leave `schema_meta` alone. Postgres also runs the release's
+own `postgres.live.test.ts` from a checkout of its tag.
+
+Step 5 is the mixed-queue test. The checkout enqueues one job of every kind through its own enqueue
+paths, a repository link's `notify` job at payload version 2 among them
+(`scripts/previous-release/mixed-queue-current.ts`). The published release's own queues and
+consumers then run alone for a while, as after a rollback (`mixed-queue-previous.mjs`; handlers
+keep that release's declarations, and `run` only records). They must run every v1 job and hand
+each newer payload back unrun with no attempt spent. Next they run beside the checkout's consumers
+on a second batch, as during a rolling deploy. Every job must end `done`, run exactly once, and
+each newer payload must run on the checkout. A kind added to `CaptureJobKind` and not enqueued
+there fails the typecheck. To reproduce: `DATABASE_URL=… bash scripts/previous-release.sh postgres`
+(`RUN_TAG_SUITES=0` skips step 4, `RUN_MIXED_QUEUE=0` step 5). MySQL (nightly) is not part of it
+yet.

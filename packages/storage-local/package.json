@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/storage-local",
-  "version": "0.13.0",
-  "description": "Local filesystem storage adapter for StoryShelf.",
+  "version": "0.14.0",
+  "description": "Deprecated: local storage is built into @storyshelf/core/storage/local. A re-export kept for one minor release.",
   "keywords": [
     "filesystem",
     "self-hosted",

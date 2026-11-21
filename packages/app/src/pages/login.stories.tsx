@@ -46,3 +46,17 @@ export const WrongPassword = pageStory(() =>
 );
 
 export const NoMethodsConfigured = pageStory(() => renderLoginPage({ engineMethods: [] }));
+
+export const WithPublicLink = pageStory(() => renderLoginPage({ engineMethods: [password] }), {
+  store: {
+    ui: {
+      auth: {
+        publicLink: {
+          href: "/_/demo-design-system/",
+          label: "Browse the demo's Storybook without an account",
+        },
+        helpText: "Reviewing builds and diffs needs an account.",
+      },
+    },
+  },
+});

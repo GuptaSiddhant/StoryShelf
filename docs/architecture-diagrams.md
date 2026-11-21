@@ -84,7 +84,7 @@ flowchart TB
     end
 
     subgraph StoreAdapters["Storage Adapters"]
-        slocal["@storyshelf/storage-local\nfilesystem"]
+        slocal["@storyshelf/core/storage/local\nfilesystem"]
         ss3["@storyshelf/storage-s3\nAWS S3 / R2 / MinIO"]
     end
 
@@ -98,7 +98,7 @@ flowchart TB
     end
 
     subgraph GitAdapters["Git Notifiers"]
-        ghub["@storyshelf/notify-git\nGitHub / GitLab / git-log (state delivery)"]
+        ghub["core/integrations/git\nGitHub / GitLab / git-log (state delivery)"]
     end
 
     subgraph Apps["Apps (deployables)"]
@@ -763,7 +763,7 @@ flowchart TB
         Node["Node 24+ — Hono server<br/>node src/index.ts"]
         PW["Chromium (Playwright) — in-process capture"]
         SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db-sqlite"]
-        FS["Filesystem — @storyshelf/storage-local<br/>VOLUME /app/data"]
+        FS["Filesystem — @storyshelf/core/storage/local<br/>VOLUME /app/data"]
         Queue2["Database queue<br/>concurrency 2"]
     end
 

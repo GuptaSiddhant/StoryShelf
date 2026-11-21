@@ -490,6 +490,60 @@ function focusPart(): string {
     });`;
 }
 
+/**
+ * Dialogs and option groups (ADR 0012, decision 10). A `[data-dialog-open]` link is a real link
+ * that HTMX fetches into the dialog body; once the body is swapped the dialog opens with
+ * `showModal()` (Escape and focus return are native). A close button, a click on the backdrop and
+ * the `closeDialog` event (`HX-Trigger`) close it. Groups of unselected options are disabled.
+ */
+function dialogPart(): string {
+  return `
+    var dialogOpener=null;
+    document.addEventListener('click',function(e){
+      var t=e.target instanceof Element ? e.target : null;
+      if(!t) return;
+      var opener=t.closest('[data-dialog-open]');
+      if(opener) dialogOpener=opener;
+      var close=t.closest('[data-dialog-close]');
+      if(close){ var d=close.closest('dialog'); if(d&&d.close) d.close(); return; }
+      if(t.tagName==='DIALOG'&&t.hasAttribute('data-dialog')&&t.close) t.close();
+    });
+    document.addEventListener('htmx:afterSwap',function(e){
+      var d=e.target instanceof Element ? e.target.closest('dialog[data-dialog]') : null;
+      if(d&&!d.open&&d.showModal){ d.showModal(); if(window.__ssInit) window.__ssInit(); }
+    });
+    document.addEventListener('closeDialog',function(){
+      document.querySelectorAll('dialog[data-dialog][open]').forEach(function(d){ d.close(); });
+      if(dialogOpener&&dialogOpener.isConnected) try{ dialogOpener.focus(); }catch(_){}
+    });
+    function syncOptionGroups(){
+      document.querySelectorAll('[data-option-fields]').forEach(function(root){
+        var checked=root.querySelector('input[data-option-choice]:checked');
+        root.querySelectorAll('fieldset[data-option-group]').forEach(function(g){
+          g.disabled=!checked||g.getAttribute('data-option-group')!==checked.value;
+        });
+      });
+    }
+    document.addEventListener('change',function(e){
+      if(e.target instanceof Element&&e.target.matches('input[data-option-choice]')) syncOptionGroups();
+    });
+    inits.push(syncOptionGroups);`;
+}
+
+/** A scrolling tab row opens with its current tab in view (a phone cuts the row; #1133). */
+function scrollActivePart(): string {
+  return `
+    function scrollActive(){
+      document.querySelectorAll('[data-scroll-active]').forEach(function(row){
+        var cur=row.querySelector('[aria-current]');
+        if(cur && row.scrollWidth>row.clientWidth){
+          row.scrollLeft=cur.offsetLeft-(row.clientWidth-cur.offsetWidth)/2;
+        }
+      });
+    }
+    inits.push(scrollActive);`;
+}
+
 /** Page-end script wiring up the shell's interactive behavior (idempotent). */
 export function clientScript(): string {
   const parts = [
@@ -502,6 +556,7 @@ export function clientScript(): string {
     dropdownPart(),
     toastPart(),
     formPart(),
+    dialogPart(),
     copyPart(),
     filterPart(),
     previewPart(),
@@ -509,6 +564,7 @@ export function clientScript(): string {
     previewNoticePart(),
     loadingPart(),
     focusPart(),
+    scrollActivePart(),
     reviewScript(),
   ];
   return `

@@ -42,8 +42,8 @@ const DB_PACKAGE: Record<DatabaseChoice, string> = {
   tidb: "@storyshelf/db-mysql",
 };
 
-const STORAGE_PACKAGE: Record<StorageChoice, string> = {
-  local: "@storyshelf/storage-local",
+/** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
+const STORAGE_PACKAGE: Record<Exclude<StorageChoice, "local">, string> = {
   s3: "@storyshelf/storage-s3",
   azure: "@storyshelf/storage-azure",
   gcs: "@storyshelf/storage-gcs",
@@ -78,7 +78,8 @@ function ownPackages(names: readonly string[]): Record<string, string> {
 /** The app, the database package and, with observability or SMTP, the packages those add. */
 function coreNames(answers: Answers): string[] {
   const names = ["@storyshelf/app", DB_PACKAGE[answers.database]];
-  const withCore = wantsObservability(answers) || wantsNotifications(answers);
+  const withCore =
+    wantsObservability(answers) || wantsNotifications(answers) || answers.storage === "local";
   return [
     ...names,
     ...(withCore ? ["@storyshelf/core"] : []),
@@ -90,7 +91,7 @@ function coreNames(answers: Answers): string[] {
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
   return [
-    STORAGE_PACKAGE[answers.storage],
+    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
     "@storyshelf/runner-playwright",
     ...(auth === null ? [] : [auth]),
   ];
@@ -99,7 +100,7 @@ function featureNames(answers: Answers): string[] {
 function buildDeps(answers: Answers): Record<string, string> {
   const sdk = DB_SDK[answers.database];
   return {
-    "@hono/node-server": "^1.17.0",
+    "@hono/node-server": "^2.1.11",
     ...ownPackages(coreNames(answers)),
     ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),
@@ -126,9 +127,12 @@ function dockerScripts(answers: Answers): Record<string, string> {
       "docker:logs": "docker compose logs -f",
     };
   }
+  // Forward the operator's SECRET (and AUTH_PASSWORD) from the shell: a literal here would be
+  // shorter than 32 characters, and the server refuses to start with it.
+  const env = answers.auth === "password" ? "-e SECRET -e AUTH_PASSWORD" : "-e SECRET";
   return {
     "docker:build": `docker build -t ${answers.name} .`,
-    "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data -e SECRET=change-me ${answers.name}`,
+    "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data ${env} ${answers.name}`,
   };
 }
 

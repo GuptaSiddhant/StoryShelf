@@ -96,11 +96,11 @@ try {
   const baseAssets = assetNames(base);
   // `startApp` returns the storage through the models only; read through the data dir instead.
   const { createLocalStorage } = await import(
-    new URL(`file://${join(root, "packages/storage-local/dist/index.mjs")}`).href
+    new URL(`file://${join(root, "packages/core/dist/storage/local.mjs")}`).href
   );
   system.storage = createLocalStorage(system.dir);
 
-  const baseline = await capture(system, base, "sha-0");
+  const baseline = await capture(system, base, "0000000");
   const approved = await fetch(
     `${system.base}/api/v1/projects/bench/builds/${baseline.id}/approve-all`,
     { method: "POST", headers: { authorization: "Bearer bench-admin-token" } },
@@ -110,7 +110,7 @@ try {
 
   report.unchangedRepeats = [];
   for (let at = 1; at <= repeats; at += 1) {
-    const next = await capture(system, base, `sha-u${at}`);
+    const next = await capture(system, base, `a${String(at).padStart(6, "0")}`);
     report.unchangedRepeats.push(compare(baseline, next, null));
   }
 
@@ -128,7 +128,7 @@ try {
   for (const [name, edit] of Object.entries(edits)) {
     const dir = variant(name, edit);
     const changedAssets = [...assetNames(dir)].filter((asset) => !baseAssets.has(asset));
-    const next = await capture(system, dir, `sha-${name}`);
+    const next = await capture(system, dir, sha(name).slice(0, 7));
     report.edits[name] = { changedAssets, ...compare(baseline, next, importers) };
   }
   report.importersOfEditedFile = [...importers];

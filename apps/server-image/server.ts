@@ -3,8 +3,14 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import {
+  createEmailNotifier,
+  gitFromEnv,
+  integrationsFromEnv,
+  smtpPresetFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
@@ -13,28 +19,46 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * The StoryShelf product image's server (`docker run ghcr.io/guptasiddhant/storyshelf`).
  *
  * Everything comes from the environment: `DATABASE_URL` (SQLite on `/data` when unset), `AWS_BUCKET`
- * (local storage on `/data` when unset), `SECRET`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`,
+ * (local storage on `/data` when unset), `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it),
+ * `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
+ * `SHELF_GITHUB_APP_PRIVATE_KEY[_FILE]`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`,
+ * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
- * unless set) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Bundled by
- * rolldown (`rolldown.config.ts`).
+ * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
+ * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
+ * missing or short secret stops the server. Bundled by rolldown (`rolldown.config.ts`).
  */
 import { mkdirSync } from "node:fs";
 import {
+  authFromEnv,
   browsersFromEnv,
   captureEnabled,
   databaseFromEnv,
+  describeBootFailure,
+  isLoopback,
   nonEmpty,
+  unverifiedDatabaseTls,
   storageFromEnv,
+  storybookHostingFromEnv,
 } from "./env.ts";
 
 const env = process.env;
 const dataDir = env["DATA_DIR"] ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
+const hostname = "0.0.0.0";
 const secret = nonEmpty(env["SECRET"]);
-const authPassword = nonEmpty(env["AUTH_PASSWORD"]);
-const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
 const publicBaseUrl = nonEmpty(env["PUBLIC_BASE_URL"]);
 const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
+
+// Every refusal below throws before the server listens. Node would print the throwing source line
+// and a bundle stack, so a refusal prints only its reason (naming the variable, never its value);
+// any other error still prints its stack.
+process.on("uncaughtException", (error) => {
+  process.stderr.write(describeBootFailure(error));
+  process.exit(1);
+});
+const imageAuth = authFromEnv(env);
+const storybookHosting = storybookHostingFromEnv(env);
 
 mkdirSync(dataDir, { recursive: true });
 const { database, log: databaseLog } = databaseFromEnv(env, dataDir);
@@ -42,60 +66,94 @@ const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
+if (unverifiedDatabaseTls(env)) {
+  shelfLogger.warn(
+    { sslmode: "unverified" },
+    "DATABASE_URL asks for TLS without checking the database certificate; set DATABASE_CA (or DATABASE_CA_FILE) and sslmode=verify-full",
+  );
+}
 
 // Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
+// SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
+const integrations = integrationsFromEnv(env);
+// Git connections from the environment (ADR 0054, decision 9): a half-set one stops the server here,
+// naming the variable and never its value. The key and the token are read once and never logged.
+const git = gitFromEnv(env);
+shelfLogger.info(
+  {
+    gitConnections: (git.connections ?? []).map((connection) => connection.id),
+    gitLinks: git.links?.length ?? 0,
+  },
+  "git connections",
+);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
+
+// Sign-in first: a short SECRET throws here, before anything listens.
+const auth =
+  imageAuth.mode === "password"
+    ? createShelfAuth({
+        db: database,
+        secret: imageAuth.secret,
+        baseURL: publicBaseUrl ?? `http://localhost:${port}`,
+        passkeys: {},
+        emailSender,
+        fromEmail: env["SMTP_FROM"],
+        onAuthSystemEvent: createAuthSystemHook(),
+        logger: shelfLogger,
+        // Shared accounts that sign in and read but never write (#1274), comma-separated emails.
+        readOnlyAccounts: parseReadOnlyAccounts(env["SHELF_READ_ONLY_ACCOUNTS"]),
+      }).adapter
+    : undefined;
 
 const app = createShelfApp({
   database,
   storage,
   ...(testing ? { testing } : {}),
+  design: integrations.design,
+  git,
   notifications: {
     notifiers: (builtIn) =>
-      emailSender
-        ? builtIn.map((provider) =>
-            provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
-              : provider,
-          )
-        : builtIn,
+      integrations.notifiers(
+        emailSender
+          ? builtIn.map((provider) =>
+              provider.metadata.kind === "email"
+                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                : provider,
+            )
+          : builtIn,
+      ),
   },
-  auth:
-    authPassword && secret
-      ? createShelfAuth({
-          db: database,
-          secret,
-          baseURL: publicBaseUrl ?? `http://localhost:${port}`,
-          passkeys: {},
-          emailSender,
-          fromEmail: env["SMTP_FROM"],
-          onAuthSystemEvent: createAuthSystemHook(),
-          logger: shelfLogger,
-        }).adapter
-      : undefined,
+  ...(auth ? { auth } : {}),
   logger: shelfLogger,
   observability,
   config: {
     secret,
+    // Rotation (guides/deployment/secret-rotation): the old key decrypts until credentials move.
+    previousSecret: nonEmpty(env["SECRET_PREVIOUS"]),
+    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
     adminToken: env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"],
     publicBaseUrl,
+    ...(storybookHosting === undefined ? {} : { storybookHosting }),
     ...(trustProxy === undefined ? {} : { trustProxy }),
     scratchDir: dataDir,
   },
 });
 
+// A failed boot check (auth secret, AI, images, adapters) stops the server: it never listens.
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+if (imageAuth.mode === "password") {
+  await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });
+  logger.info({ email: imageAuth.email }, "Local admin login enabled from AUTH_PASSWORD");
+} else if (!isLoopback(hostname)) {
+  logger.warn({ hostname }, "SHELF_AUTH=none on a non-loopback address: every route is open");
 }
 
-const server = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
+const server = serve({ fetch: app.fetch, port, hostname }, () => {
   logger.info({ port, dataDir, capture: testing !== undefined }, "StoryShelf listening");
 });
 

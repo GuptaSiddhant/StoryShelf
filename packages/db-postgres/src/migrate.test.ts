@@ -217,6 +217,7 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       ALTER TABLE notification_channels DROP COLUMN last_error;
       ALTER TABLE notification_channels DROP COLUMN last_error_at;
       ALTER TABLE notification_channels DROP COLUMN last_delivered_at;
+      ALTER TABLE git_repository_links DROP COLUMN last_delivered_at;
     `);
 
     await runMigrations(run);
@@ -244,6 +245,7 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       WHERE (table_name = 'snapshots' AND column_name IN ('duration_ms', 'a11y_violations'))
          OR (table_name = 'comments' AND column_name IN ('story_id', 'mentions', 'kind', 'resolved_at', 'resolved_by'))
          OR (table_name = 'notification_channels' AND column_name IN ('last_error', 'last_error_at', 'last_delivered_at'))
+         OR (table_name = 'git_repository_links' AND column_name = 'last_delivered_at')
       ORDER BY table_name, column_name
     `);
     expect(columns.rows.map((row) => `${row.table_name}.${row.column_name}`)).toEqual([
@@ -252,6 +254,7 @@ describe("runMigrations: review, a11y, comment and notification columns", () => 
       "comments.resolved_at",
       "comments.resolved_by",
       "comments.story_id",
+      "git_repository_links.last_delivered_at",
       "notification_channels.last_delivered_at",
       "notification_channels.last_error",
       "notification_channels.last_error_at",

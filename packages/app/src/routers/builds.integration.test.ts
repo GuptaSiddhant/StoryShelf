@@ -149,6 +149,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   interface CreatedBody {
     build: Build;
     uploadUrl: string;
+    buildUrl: string;
     testing: boolean;
   }
 
@@ -165,7 +166,7 @@ describe("streaming build upload (JSON + PUT)", () => {
   }
 
   const defaultPayload: Record<string, unknown> = {
-    gitSha: "sha-1",
+    gitSha: "1111111",
     gitBranch: "main",
     message: "hello",
     labels: [{ key: "pr", value: "7" }],
@@ -188,13 +189,14 @@ describe("streaming build upload (JSON + PUT)", () => {
     const { db, storage, app } = await setupSeeded();
     const created = await createViaJson(app, defaultPayload);
 
-    expect(created.build.gitSha).toBe("sha-1");
+    expect(created.build.gitSha).toBe("1111111");
     expect(created.build.status).toBe("pending");
     // setupSeeded boots without `testing`: the response says no checks will run.
     expect(created.testing).toBe(false);
     expect(created.uploadUrl).toBe(
       `/api/v1/projects/stream-project/builds/${created.build.id}/zip`,
     );
+    expect(created.buildUrl).toBe(`/projects/stream-project/builds/${created.build.id}/diff`);
     expect(await storage.exists(storybookZipPath("p1", created.build.id))).toBe(false);
     const labels = await new LabelModel(db).listForBuild(created.build.id);
     expect(labels.map((label) => `${label.typeKey}=${label.value}`)).toEqual(["pr=7"]);
@@ -254,6 +256,37 @@ describe("streaming build upload (JSON + PUT)", () => {
     });
     expect(response.status).toBe(400);
   });
+
+  it.each([
+    ["`]@bob"],
+    ["abc123"],
+    ["a".repeat(65)],
+    ["abc1234 "],
+    ["local-"],
+    ["local-`]@bob"],
+    ["sha-1"],
+  ])("rejects the commit id %j with 400", async (gitSha) => {
+    const { app } = await setupSeeded();
+    const response = await app.request("/api/v1/projects/stream-project/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ gitSha, gitBranch: "main" }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it.each([["abcdef0"], ["ABCDEF0123456789"], ["a".repeat(64)], ["local-0a1b2c3d4e5f"]])(
+    "accepts the commit id %j",
+    async (gitSha) => {
+      const { app } = await setupSeeded();
+      const response = await app.request("/api/v1/projects/stream-project/builds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gitSha, gitBranch: "main" }),
+      });
+      expect(response.status).toBe(202);
+    },
+  );
 
   it("rejects PUT for unknown builds with 404", async () => {
     const { app } = await setupSeeded();
@@ -335,7 +368,7 @@ describe("affected capture", () => {
 
   it("returns a null baseline for the first build on a branch", async () => {
     const { app } = await setupApp();
-    const created = await createAffectedBuild(app, "sha-1");
+    const created = await createAffectedBuild(app, "1111111");
     expect(created.baselineSha).toBeNull();
     expect(created.build.affectedOnly).toBe(true);
     expect(created.testing).toBe(true);
@@ -343,10 +376,10 @@ describe("affected capture", () => {
 
   it("returns the prior approved revision as baseline for the next build", async () => {
     const { app, db } = await setupApp();
-    const first = await createAffectedBuild(app, "sha-1");
+    const first = await createAffectedBuild(app, "1111111");
     await new BuildModel(db).update(first.build.id, { status: "approved" });
-    const second = await createAffectedBuild(app, "sha-2");
-    expect(second.baselineSha).toBe("sha-1");
+    const second = await createAffectedBuild(app, "2222222");
+    expect(second.baselineSha).toBe("1111111");
   });
 
   /** Create a build on `main` that ends in `status`, created at a fixed, increasing time. */
@@ -367,9 +400,9 @@ describe("affected capture", () => {
       "passes over a %s build for the newest approved one before it",
       async (status) => {
         const ctx = await setupApp();
-        await earlier(ctx, "sha-approved", "approved", 1);
-        await earlier(ctx, "sha-other", status, 2);
-        expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBe("sha-approved");
+        await earlier(ctx, "aaaaaaa", "approved", 1);
+        await earlier(ctx, "bbbbbbb", status, 2);
+        expect((await createAffectedBuild(ctx.app, "ccccccc")).baselineSha).toBe("aaaaaaa");
       },
     );
 
@@ -377,23 +410,23 @@ describe("affected capture", () => {
       "falls back to a full capture when the only earlier build is %s",
       async (status) => {
         const ctx = await setupApp();
-        await earlier(ctx, "sha-other", status, 1);
-        expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBeNull();
+        await earlier(ctx, "bbbbbbb", status, 1);
+        expect((await createAffectedBuild(ctx.app, "ccccccc")).baselineSha).toBeNull();
       },
     );
 
     it("uses the newest approved build, and never the build's own sha", async () => {
       const ctx = await setupApp();
-      await earlier(ctx, "sha-old", "approved", 1);
-      await earlier(ctx, "sha-new", "approved", 2);
-      await earlier(ctx, "sha-next", "approved", 3);
-      expect((await createAffectedBuild(ctx.app, "sha-next")).baselineSha).toBe("sha-new");
+      await earlier(ctx, "ddddddd", "approved", 1);
+      await earlier(ctx, "eeeeeee", "approved", 2);
+      await earlier(ctx, "ccccccc", "approved", 3);
+      expect((await createAffectedBuild(ctx.app, "ccccccc")).baselineSha).toBe("eeeeeee");
     });
   });
 
   it("records the affected computation for capture", async () => {
     const { db, app } = await setupApp();
-    const created = await createAffectedBuild(app, "sha-1");
+    const created = await createAffectedBuild(app, "1111111");
     const response = await app.request(
       `/api/v1/projects/affected-project/builds/${created.build.id}/affected`,
       {
@@ -415,7 +448,7 @@ describe("affected capture", () => {
 
   it("records package usage and replaces it on re-report", async () => {
     const { db, app } = await setupApp();
-    const created = await createAffectedBuild(app, "sha-1");
+    const created = await createAffectedBuild(app, "1111111");
     const post = async (usage: unknown[]) =>
       await app.request(`/api/v1/projects/affected-project/builds/${created.build.id}/usage`, {
         method: "POST",
@@ -439,7 +472,7 @@ describe("affected capture", () => {
 
   it("rejects malformed usage and unknown builds", async () => {
     const { app } = await setupApp();
-    const created = await createAffectedBuild(app, "sha-1");
+    const created = await createAffectedBuild(app, "1111111");
     const bad = await app.request(
       `/api/v1/projects/affected-project/builds/${created.build.id}/usage`,
       {
