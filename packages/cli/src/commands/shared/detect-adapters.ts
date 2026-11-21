@@ -157,8 +157,6 @@ const STORAGE_PACKAGES: readonly (readonly [string, NonNullable<DetectedAdapters
   ["@storyshelf/storage-azure", "azure"],
   ["@storyshelf/storage-gcs", "gcs"],
   ["@storyshelf/storage-s3", "s3"],
-  // Deprecated re-export of `@storyshelf/core/storage/local` (ADR 0049); still detected as local.
-  ["@storyshelf/storage-local", "local"],
 ];
 
 function detectStorage(deps: Set<string>): Pick<DetectedAdapters, "storage"> {

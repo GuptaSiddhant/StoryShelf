@@ -180,6 +180,17 @@ It uploads the fixture with the built CLI three times (first, unchanged, one ass
 
 - **Storage:** bytes and objects after each upload and its capture, split into Storybook files (`content/`), per-build zips, screenshots and metadata.
 - **Capture:** wall time from upload to a finished build, the orchestrator's `timed()` sums (`db`, `storage`, `capture.extract`, `capture.render`, `capture.persist`) and render time per screenshot. Navigation, settle, screenshot and diff are inside `capture.render`: nothing records them separately yet.
+
+### The `schema-break` label
+
+Until 2027-01-01 a contract step (drop, rename, `NOT NULL`, unique index, narrowing), a new job kind
+or a new status value may ship in the release that needs it (ADR 0053 amendment, 2026-11-21). The
+job above would fail on such a change by design, so a pull request labelled `schema-break` skips it.
+The label is read when `ci.yml` runs (opened, new push), so add it before the push that needs it.
+`scripts/changeset-check.mjs` then requires a changeset that starts with `Breaking:` and whose body
+has a `Schema: <the contract step>` line (`Schema: none` does not count), so the release notes say
+the upgrade is stop-the-world. Without the label the job runs as before and still catches accidental
+breaks. The rule is tested in `scripts/changeset-lib.test.mjs` (`checkSchemaBreak`).
 - **Database:** queries between the build turning `capturing` and the `capture timings` log, by method, with the slowest. `transact` counts as one call; the statements inside it are not counted.
 - **Published serving:** storage calls (`exists`, `read`, `readStream`) and wall time to load `/_/<buildId>/` and one story's `iframe.html` in Chromium until the network is idle.
 - **App pages:** response bytes and time for the project, build and component pages.
