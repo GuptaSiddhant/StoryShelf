@@ -73,7 +73,5 @@ export {
 export { publicNetworkForTests } from "./public-network.ts";
 export { describeSchemaLevelContract, type SchemaLevelHarness } from "./schema-level-contract.ts";
 
-/** Spike #800 (ADR 0041): the neutral schema layer, for the adapters' table factories. */
-export * as neutralSchema from "../db/index.ts";
 export { compareDdlShapes } from "./ddl-diff.ts";
 export { ddlShape, type DdlShape, type ShapeDialect } from "./ddl-shape.ts";

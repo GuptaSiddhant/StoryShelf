@@ -21,6 +21,7 @@ const config = libConfig({
   logger: "./src/logger.ts",
   capture: "./src/capture/index.ts",
   config: "./src/config.ts",
+  db: "./src/db/index.ts",
   diff: "./src/diff/index.ts",
   "diff/worker": "./src/diff/worker.ts",
   models: "./src/models/index.ts",

@@ -94,6 +94,10 @@
       "source": "./src/config.ts",
       "default": "./dist/config.mjs"
     },
+    "./db": {
+      "source": "./src/db/index.ts",
+      "default": "./dist/db.mjs"
+    },
     "./diff": {
       "source": "./src/diff/index.ts",
       "default": "./dist/diff.mjs"
@@ -182,6 +186,7 @@
       "./auth": "./dist/auth.mjs",
       "./capture": "./dist/capture.mjs",
       "./config": "./dist/config.mjs",
+      "./db": "./dist/db.mjs",
       "./diff": "./dist/diff.mjs",
       "./insights": "./dist/insights.mjs",
       "./integrations": "./dist/integrations.mjs",

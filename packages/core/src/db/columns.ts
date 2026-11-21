@@ -81,6 +81,14 @@ export class NeutralColumn<
     return new NeutralColumn({ ...this.spec, defaultValue: value });
   }
 
+  /** The default of a `json<T>` column, stored as its JSON text (`DEFAULT '{}'`). */
+  defaultJson(value: TData): NeutralColumn<TData, TNotNull, true> {
+    if (this.spec.kind !== "json") {
+      throw new Error(`defaultJson on ${this.spec.kind} column ${this.spec.name}`);
+    }
+    return new NeutralColumn({ ...this.spec, defaultValue: JSON.stringify(value) });
+  }
+
   references(
     table: string,
     column: string,
@@ -138,7 +146,10 @@ export function timestamp(name: string): NeutralColumn<string> {
   return new NeutralColumn(columnSpec("timestamp", name));
 }
 
-/** A JSON document stored as text and parsed on read. */
+/**
+ * A JSON document stored as `TEXT` in every dialect: written with `JSON.stringify`, parsed on read
+ * (`jsonCodec`), so the row type is `T`. Its default comes from `defaultJson`, not `default`.
+ */
 export function json<T>(name: string): NeutralColumn<T> {
   return new NeutralColumn(columnSpec("json", name));
 }

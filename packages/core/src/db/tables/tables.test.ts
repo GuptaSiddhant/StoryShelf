@@ -8,7 +8,7 @@ import type { Build } from "../../schema/build.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { User } from "../../schema/user.ts";
 import type { InferRow } from "../define-table.ts";
-import { builds, buildLabels, labelTypes, SPIKE_TABLES, users } from "./index.ts";
+import { builds, buildLabels, labelTypes, NEUTRAL_TABLES, users } from "./index.ts";
 
 describe("spike tables", () => {
   it("match the core label rows exactly", () => {
@@ -32,7 +32,7 @@ describe("spike tables", () => {
   });
 
   it("list every table parents first", () => {
-    const names = SPIKE_TABLES.map((table) => table.name);
+    const names = NEUTRAL_TABLES.map((table) => table.name);
     expect(names.indexOf("builds")).toBeLessThan(names.indexOf("build_labels"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("builds"));
     expect(new Set(names).size).toBe(8);

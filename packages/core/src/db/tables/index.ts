@@ -1,4 +1,4 @@
-/** The neutral tables of spike #800. */
+/** The tables defined once in core (ADR 0041); the rest are still hand-written per dialect. */
 import {
   buildContentReleases,
   buildDeletions,
@@ -20,8 +20,8 @@ export {
   users,
 };
 
-/** Every spike table, parents before children, for `buildAll`. */
-export const SPIKE_TABLES = [
+/** Every neutral table, parents before children, for `buildAll`. */
+export const NEUTRAL_TABLES = [
   users,
   builds,
   labelTypes,

@@ -6,6 +6,7 @@ import {
   applyFlags,
   buildAll,
   foreignKeysOf,
+  jsonCodec,
   referencedColumn,
   resolverOf,
   type ModifiableBuilder,
@@ -28,6 +29,14 @@ function recorder(): ModifiableBuilder & { calls: string[] } {
 }
 
 describe("dialect kit", () => {
+  it("writes json<T> as JSON text and parses it on read", () => {
+    expect(jsonCodec.toDriver({ a: [1, "b"] })).toBe('{"a":[1,"b"]}');
+    expect(jsonCodec.fromDriver('{"a":[1,"b"]}')).toEqual({ a: [1, "b"] });
+    expect(jsonCodec.fromDriver('"x"')).toBe("x");
+    // A driver that already parsed the value (a JSON-typed column) passes it through.
+    expect(jsonCodec.fromDriver({ a: 1 })).toEqual({ a: 1 });
+  });
+
   it("applies only the flags a column sets", () => {
     const plain = recorder();
     applyFlags(plain, text("a").spec, "u");

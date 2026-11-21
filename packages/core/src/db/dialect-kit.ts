@@ -53,6 +53,20 @@ export function applyFlags<TBuilder extends ModifiableBuilder>(
   return builder;
 }
 
+/**
+ * How a `json<T>` column crosses the driver: JSON text in every dialect (no native JSON type, so
+ * the DDL stays `TEXT`). A driver that already parsed the value (a JSON-typed column read through
+ * a raw query) passes it through.
+ */
+export const jsonCodec = {
+  toDriver(value: unknown): string {
+    return JSON.stringify(value);
+  },
+  fromDriver(value: unknown): unknown {
+    return typeof value === "string" ? (JSON.parse(value) as unknown) : value;
+  },
+} as const;
+
 /** Looks up a table already built for this dialect (neutral or still hand-written) by SQL name. */
 export type TableResolver = (name: string) => Table;
 

@@ -1,13 +1,15 @@
 /**
  * MySQL table factory (ADR 0041 decision 2; spike #800): builds a Drizzle `mysqlTable` from a
- * neutral table. Not used by the adapter yet; `schema/` and `ddl.ts` stay authoritative.
+ * neutral table. Tables not yet
+ * defined in core stay hand-written in `schema/` and `ddl.ts`.
  */
-import { neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import * as ns from "@storyshelf/core/db";
 import type { BuildColumns } from "drizzle-orm";
 import {
   bigint,
   boolean,
   check,
+  customType,
   foreignKey,
   index,
   int,
@@ -44,9 +46,12 @@ function bounded(spec: ns.ColumnSpec): ns.ModifiableBuilder {
   return varchar(spec.name, { length: spec.length });
 }
 
-const refuseJson = (spec: ns.ColumnSpec): never => {
-  throw new Error(`json<T> column ${spec.name}: not mapped until a table needs it`);
-};
+/** A `json<T>` column: `TEXT` holding the JSON, encoded and parsed by `ns.jsonCodec`. */
+const jsonText = customType<{ data: unknown; driverData: string }>({
+  dataType: () => "text",
+  toDriver: (value) => ns.jsonCodec.toDriver(value),
+  fromDriver: (value) => ns.jsonCodec.fromDriver(value),
+});
 const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuilder> = {
   id: bounded,
   key: bounded,
@@ -56,7 +61,7 @@ const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuild
   bigint: (spec) => bigint(spec.name, { mode: "number" }),
   bool: (spec) => boolean(spec.name),
   timestamp: (spec) => datetime(spec.name, { mode: "string", fsp: 3 }),
-  json: refuseJson,
+  json: (spec) => jsonText(spec.name),
 };
 
 /** MySQL has no partial indexes: a neutral `where` is not expressible here. */
@@ -74,6 +79,24 @@ const names: ns.ConstraintNames = {
   foreignKey: (table, column) => `fk_${table}_${column}`,
 };
 
+/**
+ * A column with its flags. MySQL 8 (and TiDB, PlanetScale) gives a `TEXT` column no literal
+ * default, so a `json<T>` default is applied by Drizzle on insert (`$defaultFn`) and the DDL has
+ * none, as `ddl.ts` writes it.
+ */
+function mysqlColumn(spec: ns.ColumnSpec): ns.ModifiableBuilder {
+  const builder = COLUMNS[spec.kind](spec);
+  if (spec.kind !== "json" || spec.defaultValue === undefined) {
+    return ns.applyFlags(builder, spec, spec.name);
+  }
+  const { defaultValue, ...rest } = spec;
+  const flagged = ns.applyFlags(builder, rest, spec.name) as ns.ModifiableBuilder & {
+    $defaultFn(fn: () => unknown): unknown;
+  };
+  flagged.$defaultFn(() => ns.jsonCodec.fromDriver(defaultValue));
+  return flagged;
+}
+
 /** Build the MySQL table of a neutral table. `resolve` finds referenced tables by SQL name. */
 export function mysqlTableOf<T extends ns.NeutralTable>(
   table: T,
@@ -81,10 +104,7 @@ export function mysqlTableOf<T extends ns.NeutralTable>(
 ): MySqlTableOf<T> {
   refusePartialIndexes(table);
   const columns = Object.fromEntries(
-    Object.entries(table.columns).map(([key, column]) => [
-      key,
-      ns.applyFlags(COLUMNS[column.spec.kind](column.spec), column.spec, column.spec.name),
-    ]),
+    Object.entries(table.columns).map(([key, column]) => [key, mysqlColumn(column.spec)]),
   );
   return mysqlTable(
     table.name,
