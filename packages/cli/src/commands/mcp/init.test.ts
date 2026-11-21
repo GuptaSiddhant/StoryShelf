@@ -39,9 +39,9 @@ async function init(answers: Record<string, unknown>): Promise<string> {
 describe("runMcpInit", () => {
   it("scaffolds a stdio project with a Claude Code config and no token", async () => {
     const dir = await init({ transport: "stdio", docker: false });
-    expect(readFileSync(join(dir, "src", "index.ts"), "utf8")).toContain(
-      `import "@storyshelf/mcp"`,
-    );
+    const entry = readFileSync(join(dir, "src", "index.ts"), "utf8");
+    expect(entry).not.toContain(`import "@storyshelf/mcp"`);
+    expect(entry).toContain("storyshelf-mcp");
     const config = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf8")) as {
       mcpServers: { storyshelf: { command: string; env: Record<string, string> } };
     };
@@ -50,8 +50,10 @@ describe("runMcpInit", () => {
     expect(readFileSync(join(dir, ".env.example"), "utf8")).toContain("STORYSHELF_TOKEN=\n");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
+      scripts: Record<string, string>;
     };
     expect(pkg.dependencies["@storyshelf/mcp"]).toBeDefined();
+    expect(pkg.scripts["start"]).toBe("storyshelf-mcp");
     expect(existsSync(join(dir, "Dockerfile"))).toBe(false);
   });
 

@@ -96,7 +96,7 @@ try {
   const baseAssets = assetNames(base);
   // `startApp` returns the storage through the models only; read through the data dir instead.
   const { createLocalStorage } = await import(
-    new URL(`file://${join(root, "packages/storage-local/dist/index.mjs")}`).href
+    new URL(`file://${join(root, "packages/core/dist/storage/local.mjs")}`).href
   );
   system.storage = createLocalStorage(system.dir);
 

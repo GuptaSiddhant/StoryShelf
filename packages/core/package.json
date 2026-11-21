@@ -138,6 +138,10 @@
       "source": "./src/schema/index.ts",
       "default": "./dist/schema.mjs"
     },
+    "./storage/local": {
+      "source": "./src/storage/local/index.ts",
+      "default": "./dist/storage/local.mjs"
+    },
     "./telemetry": {
       "source": "./src/telemetry/index.ts",
       "default": "./dist/telemetry.mjs"
@@ -189,6 +193,7 @@
       "./paths": "./dist/paths.mjs",
       "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
+      "./storage/local": "./dist/storage/local.mjs",
       "./telemetry": "./dist/telemetry.mjs",
       "./test-helpers": "./dist/test-helpers.mjs",
       "./types": "./dist/types.mjs",
@@ -245,13 +250,17 @@
   },
   "peerDependencies": {
     "nodemailer": "^10.2.1",
-    "sharp": ">=0.34.0"
+    "sharp": ">=0.34.0",
+    "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "nodemailer": {
       "optional": true
     },
     "sharp": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

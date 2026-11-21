@@ -39,6 +39,8 @@ export const BUNDLES = [
     about:
       "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
     groups: ["Deploy & operate"],
+    // A long page for adapter authors, still one link away in llms.txt: the budget leaves no room.
+    exclude: ["/guides/custom-adapters/"],
     budget: 25_000,
   },
   {

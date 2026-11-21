@@ -19,7 +19,7 @@ npm install @storyshelf/db-sqlite
 ```ts
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createShelfApp } from "@storyshelf/app";
-import { createLocalStorage } from "@storyshelf/storage-local";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 
 const database = createSqliteDatabase("./data/shelf.db");
 

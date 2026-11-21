@@ -11,6 +11,7 @@ import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/a
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe } from "../credentials.ts";
 import { getStore, testingEnabled } from "../store.ts";
+import { targetStates } from "../targets.ts";
 import { collectHealthReport, type AdapterState } from "./health-report.ts";
 import { collectStatusRows, type StatusRow } from "./health-status.ts";
 import { requireSiteAdmin } from "./helpers.ts";
@@ -61,6 +62,8 @@ export interface ReadinessBody {
   statuses: StatusRow[];
   /** Every integration's standing; informational, it never changes `status`. */
   integrations: IntegrationReport[];
+  /** Each capture target as `ok` or `unreachable` (a launch or connect failure with no success since); informational, it never changes `status`. */
+  targets: Record<string, "ok" | "unreachable">;
 }
 
 /** Register `GET /api/v1/health` (open liveness) and `POST` (authed deep readiness). */
@@ -109,6 +112,7 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
       adapters,
       statuses: report.statuses,
       integrations,
+      targets: await targetStates(),
     };
     c.header("Cache-Control", "no-store");
     return c.json(body, body.status === "ok" ? 200 : 503);

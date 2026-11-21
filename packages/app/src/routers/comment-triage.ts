@@ -34,6 +34,11 @@ export async function resolveTriager(
 
 /** Whether the signed-in user is the author of `build` (their email is the build's git author). */
 export function isBuildAuthor(build: Pick<Build, "authorEmail">): boolean {
-  const email = getStore().user?.email?.toLowerCase();
+  const { user } = getStore();
+  // A read-only shared account (#1274) triages nothing, even a build that names its email.
+  if (user?.readOnly === true) {
+    return false;
+  }
+  const email = user?.email?.toLowerCase();
   return email !== undefined && email === build.authorEmail?.toLowerCase();
 }

@@ -1,6 +1,6 @@
 // Entry of `migrate-to-s3.sh`: copies the volume's storage tree to the bucket named by the app's
 // own S3 environment (`AWS_BUCKET`, `AWS_*`), through the same adapters the server uses.
-import { createLocalStorage } from "@storyshelf/storage-local";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { migrateStorage } from "./migrate.ts";
 import { storageFromEnv } from "./storage.ts";
 
