@@ -40,12 +40,14 @@ export const BUNDLES = [
     about:
       "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
     groups: ["Deploy & operate"],
-    // A one-off migration guide and the three per-cloud pages (module inputs, permissions, costs), one link away in llms.txt: the budget leaves no room.
+    // A one-off migration guide, the three per-cloud pages (module inputs, permissions, costs) and a
+    // long page for adapter authors, each one link away in llms.txt: the budget leaves no room.
     exclude: [
       "/guides/deployment/migrate-terraform/",
       "/guides/deployment/aws/",
       "/guides/deployment/gcp/",
       "/guides/deployment/azure/",
+      "/guides/custom-adapters/",
     ],
     budget: 25_000,
   },

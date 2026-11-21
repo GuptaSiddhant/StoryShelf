@@ -25,7 +25,8 @@ export async function inheritedA11yJson(
   return JSON.stringify([baselineNote(build?.gitSha ?? UNKNOWN_SHA), ...findings]);
 }
 
-function parseList(stored: string | null | undefined): string[] {
+/** The string entries of a stored JSON list; empty when absent or malformed. */
+export function parseList(stored: string | null | undefined): string[] {
   if (!stored) return [];
   try {
     const parsed: unknown = JSON.parse(stored);
