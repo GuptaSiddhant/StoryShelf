@@ -144,6 +144,10 @@ So a first deploy needs no redeploy to learn its URL: open **System** once and c
 
 **Authentication is the one exception.** The OAuth callback URLs (`/connections/<service>/callback`) and the `/.well-known/openid-configuration` helper are interactive and belong to the request in front of them, so they use the confirmed origin when there is one and otherwise the address the request itself came in on. Nothing that outlives the request (a link in an email or status, a signed URL) ever does. Pin `PUBLIC_BASE_URL` when a custom domain fronts the app.
 
+### Your own adapters
+
+`database`, `storage`, `testing.runner`, `notifications.notifiers` and `design` take adapters, and none of them has to be a built-in. [Write your own adapter](/guides/custom-adapters/) shows the contract, two tested examples and how to package one.
+
 ## Validation
 
 File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly` or `buildStats`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.

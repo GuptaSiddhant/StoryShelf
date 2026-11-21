@@ -57,6 +57,12 @@ export interface ShelfAuthOptions {
   /** Session lifetime in days. Defaults to 7 (current parity). */
   sessionExpiresInDays?: number;
   /**
+   * The engine's own request limiter (per client, keyed by the `x-forwarded-for` header the app
+   * sets from its client-IP resolver). Defaults to on in production and off elsewhere; tests set
+   * `enabled: true` to exercise it.
+   */
+  rateLimit?: { enabled: boolean };
+  /**
    * Emails of shared read-only accounts (compared case-insensitively), e.g. a demo account whose
    * password is published. Such an account may sign in, sign out and read; every write it attempts
    * is refused with a 403, by the engine's own endpoints and by the app. Configured here, never in
