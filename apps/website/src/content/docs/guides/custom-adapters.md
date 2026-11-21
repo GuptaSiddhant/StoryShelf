@@ -86,6 +86,7 @@ Do not add `ky`, `ofetch` or an SDK for a plain HTTP API.
 This adapter stores objects on an HTTP key-value service: `PUT`, `GET`, `HEAD` and `DELETE` on `/v1/objects/<key>`, a listing at `/v1/objects?prefix=`, and values carried as base64 in JSON. It is small, but it is a complete `StorageAdapter`.
 
 ```ts title="kv-storage.ts"
+import type { AdapterHealth, AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Logger } from "@storyshelf/core/logger";
 import { HttpError, httpJson, httpStatus, httpText } from "@storyshelf/core/utils";
@@ -103,89 +104,103 @@ export interface KvStorageOptions {
 
 /** Storage on a small HTTP key-value service (`/v1/objects/<key>`), values sent as base64 JSON. */
 export function createKvStorage(options: KvStorageOptions): StorageAdapter {
+  const api = createKvApi(options);
+  return {
+    metadata: { name: "Key-value storage", version: "0.0.0", kind: "kv-http", category: "storage" },
+    setLogger: api.bindLogger,
+    lifecycle: kvLifecycle(api),
+    ...kvObjects(api),
+  };
+}
+
+/** What every request needs: URLs, the auth header and the current logger. */
+interface KvApi {
+  base: string;
+  objectUrl(path: string): string;
+  request(): { headers: Record<string, string>; logger: Logger | undefined };
+  bindLogger(bound: Logger): void;
+}
+
+function createKvApi(options: KvStorageOptions): KvApi {
   const base = options.baseUrl.replace(/\/+$/u, "");
   const headers = { authorization: `Bearer ${options.token}` };
   let logger = options.logger?.child({ component: "storage-kv" });
-  const objectUrl = (path: string): string =>
-    `${base}/v1/objects/${encodeURIComponent(safe(path))}`;
-  const request = (): { headers: Record<string, string>; logger: Logger | undefined } => ({
-    headers,
-    logger,
-  });
-
-  async function read(path: string): Promise<Buffer> {
-    // A missing object is a 404 `HttpError`, which rejects: that is the contract.
-    const body = await httpJson<{ data: string }>(objectUrl(path), request());
-    return Buffer.from(body.data, "base64");
-  }
-
-  async function exists(path: string): Promise<boolean> {
-    try {
-      await httpStatus(objectUrl(path), { ...request(), method: "HEAD" });
-      return true;
-    } catch (error) {
-      if (isNotFound(error)) return false;
-      throw error;
-    }
-  }
-
   return {
-    metadata: {
-      name: "Key-value storage",
-      version: "0.0.0",
-      kind: "kv-http",
-      category: "storage",
-    },
-    setLogger(bound): void {
+    base,
+    objectUrl: (path) => `${base}/v1/objects/${encodeURIComponent(safe(path))}`,
+    request: () => ({ headers, logger }),
+    bindLogger(bound): void {
       logger = (options.logger ?? bound).child({ component: "storage-kv" });
     },
-    lifecycle: {
-      async setup(): Promise<void> {
-        new URL(base); // throws on a malformed URL, so a bad config fails at startup
-      },
-      async health() {
-        try {
-          await httpStatus(`${base}/v1/health`, { ...request(), retries: 1 });
-          return { ok: true };
-        } catch {
-          return { ok: false, detail: "key-value service unreachable" };
-        }
-      },
-      async teardown(): Promise<void> {
-        // Nothing is held open, so a second call is as harmless as the first.
-      },
+  };
+}
+
+/** All three hooks or none; each is safe to call twice. */
+function kvLifecycle(api: KvApi): AdapterLifecycle {
+  return {
+    setup(): Promise<void> {
+      // A malformed URL fails at startup, not on the first upload.
+      if (!URL.canParse(api.base)) return Promise.reject(new Error("baseUrl is not a valid URL"));
+      return Promise.resolve();
     },
-    read,
-    exists,
-    async write(path, data): Promise<void> {
-      const json = { data: data.toString("base64") };
-      await httpText(objectUrl(path), { ...request(), method: "PUT", json });
-    },
-    async delete(path): Promise<void> {
+    async health(): Promise<AdapterHealth> {
       try {
-        await httpText(objectUrl(path), { ...request(), method: "DELETE" });
-      } catch (error) {
-        if (!isNotFound(error)) throw error; // deleting what is not there succeeds
+        await httpStatus(`${api.base}/v1/health`, { ...api.request(), retries: 1 });
+        return { ok: true };
+      } catch {
+        return { ok: false, detail: "key-value service unreachable" }; // never the thrown error
       }
     },
+    teardown: () => Promise.resolve(), // nothing is held open
+  };
+}
+
+/** The seven object operations of a `StorageAdapter`. */
+function kvObjects(api: KvApi): Omit<StorageAdapter, "metadata" | "lifecycle" | "setLogger"> {
+  const read = async (path: string): Promise<Buffer> => {
+    // A missing object is a 404 `HttpError`, which rejects: that is the contract.
+    const body = await httpJson<{ data: string }>(api.objectUrl(path), api.request());
+    return Buffer.from(body.data, "base64");
+  };
+  const write = async (path: string, data: Buffer): Promise<void> => {
+    const json = { data: data.toString("base64") };
+    await httpText(api.objectUrl(path), { ...api.request(), method: "PUT", json });
+  };
+  return {
+    read,
+    write,
+    exists: async (path) => await existsAt(api, path),
+    delete: async (path) => await deleteAt(api, path),
     async list(prefix): Promise<string[]> {
-      const query = encodeURIComponent(prefix);
-      const body = await httpJson<{ keys: string[] }>(
-        `${base}/v1/objects?prefix=${query}`,
-        request(),
-      );
-      return body.keys;
+      const url = `${api.base}/v1/objects?prefix=${encodeURIComponent(prefix)}`;
+      return (await httpJson<{ keys: string[] }>(url, api.request())).keys;
     },
     async writeStream(path, stream): Promise<void> {
       // Collect first: a stream that fails midway never reaches `write`, so no partial object.
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
-      await this.write(path, Buffer.concat(chunks));
+      await write(path, Buffer.concat(chunks));
     },
-    async readStream(path): Promise<Readable> {
-      return Readable.from([await read(path)]);
-    },
+    readStream: async (path) => Readable.from([await read(path)]),
   };
+}
+
+async function existsAt(api: KvApi, path: string): Promise<boolean> {
+  try {
+    await httpStatus(api.objectUrl(path), { ...api.request(), method: "HEAD" });
+    return true;
+  } catch (error) {
+    if (isNotFound(error)) return false;
+    throw error;
+  }
+}
+
+async function deleteAt(api: KvApi, path: string): Promise<void> {
+  try {
+    await httpText(api.objectUrl(path), { ...api.request(), method: "DELETE" });
+  } catch (error) {
+    if (!isNotFound(error)) throw error; // deleting what is not there succeeds
+  }
 }
 
 function isNotFound(error: unknown): boolean {
@@ -217,31 +232,42 @@ Points worth copying:
 /** An in-memory stand-in for the key-value service, installed as `fetch` in tests. */
 export function fakeKvService(token: string): typeof fetch {
   const objects = new Map<string, string>();
-  return async (input, init) => {
+  return (input, init) => {
     const url = new URL(String(input));
-    const headers = new Headers(init?.headers);
-    const method = init?.method ?? "GET";
-    if (headers.get("authorization") !== `Bearer ${token}`)
-      return new Response("denied", { status: 401 });
-    if (url.pathname === "/v1/health") return new Response("ok");
-    if (url.pathname === "/v1/objects") {
-      const prefix = url.searchParams.get("prefix") ?? "";
-      const keys = [...objects.keys()].filter((key) => key.startsWith(prefix)).toSorted();
-      return Response.json({ keys });
-    }
-    const key = decodeURIComponent(url.pathname.slice("/v1/objects/".length));
-    if (method === "PUT") {
-      objects.set(key, (JSON.parse(String(init?.body)) as { data: string }).data);
-      return new Response("stored");
-    }
-    const data = objects.get(key);
-    if (data === undefined) return new Response("not found", { status: 404 });
-    if (method === "DELETE") {
-      objects.delete(key);
-      return new Response("deleted");
-    }
-    return method === "HEAD" ? new Response(null) : Response.json({ data });
+    const authorized = new Headers(init?.headers).get("authorization") === `Bearer ${token}`;
+    return Promise.resolve(authorized ? respond(objects, url, init) : deny());
   };
+}
+
+function deny(): Response {
+  return new Response("denied", { status: 401 });
+}
+
+function respond(objects: Map<string, string>, url: URL, init?: RequestInit): Response {
+  if (url.pathname === "/v1/health") return new Response("ok");
+  if (url.pathname === "/v1/objects") {
+    const prefix = url.searchParams.get("prefix") ?? "";
+    return Response.json({
+      keys: [...objects.keys()].filter((k) => k.startsWith(prefix)).toSorted(),
+    });
+  }
+  return respondToObject(
+    objects,
+    decodeURIComponent(url.pathname.slice("/v1/objects/".length)),
+    init,
+  );
+}
+
+function respondToObject(objects: Map<string, string>, key: string, init?: RequestInit): Response {
+  const method = init?.method ?? "GET";
+  if (method === "PUT") {
+    objects.set(key, (JSON.parse(String(init?.body)) as { data: string }).data);
+    return new Response("stored");
+  }
+  const data = objects.get(key);
+  if (data === undefined) return new Response("not found", { status: 404 });
+  if (method === "DELETE") objects.delete(key);
+  return method === "GET" ? Response.json({ data }) : new Response(null);
 }
 ```
 
@@ -413,13 +439,13 @@ Test one with `stateNotifierContractSuite(label, make, validConfig)`. It runs th
 Storage is a value. Notifiers go in `notifications.notifiers`, as an array (exactly these) or a function that receives the built-ins:
 
 ```ts title="wire.ts"
-import { createShelfApp } from "@storyshelf/app";
+import { createShelfApp, type ShelfApp } from "@storyshelf/app";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createKvStorage } from "./kv-storage.ts";
 import { jsonWebhookNotifier } from "./webhook-notifier.ts";
 
 /** Compose a shelf from a database adapter plus the two custom adapters. */
-export function createShelf(database: DatabaseAdapter, kvToken: string) {
+export function createShelf(database: DatabaseAdapter, kvToken: string): ShelfApp {
   return createShelfApp({
     database,
     storage: createKvStorage({ baseUrl: "https://kv.internal.example.com", token: kvToken }),
