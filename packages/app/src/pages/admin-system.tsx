@@ -28,7 +28,7 @@ import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-
 import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
 import { RuntimeStatusCard } from "./admin-system-status.tsx";
-import { CaptureTargetsCard } from "./admin-system-targets.tsx";
+import { CaptureTargetsCard, type UnreachableView } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { RetentionPausedNotice } from "./retention-paused.tsx";
 /** Data for the site-admin System page (adapters, health, safe config). */
@@ -50,6 +50,8 @@ export interface AdminSystemData {
   capture?: CaptureHostSummary | null;
   /** The browsers the capture runner offers (ADR 0007); omitted without a runner list. */
   targets?: readonly RunnerTarget[] | undefined;
+  /** Targets that failed to launch or connect since they last rendered; absent when none. */
+  unreachable?: ReadonlyMap<string, UnreachableView> | undefined;
   /** The public origin and where it came from; omitted when the store has no resolver. */
   publicOrigin?: PublicOriginView | undefined;
   /** Notifiers are wired but no public origin resolves, so nothing is sent (ADR 0014, decision 11). */
@@ -329,7 +331,7 @@ function TestingNotice(props: {
 function CaptureCards(props: {
   data: AdminSystemData;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { publicOrigin, targets } = props.data;
+  const { publicOrigin, targets, unreachable } = props.data;
   return (
     <>
       {publicOrigin ? (
@@ -339,7 +341,7 @@ function CaptureCards(props: {
       ) : null}
       {targets && targets.length > 0 ? (
         <div>
-          <CaptureTargetsCard targets={targets} />
+          <CaptureTargetsCard targets={targets} unreachable={unreachable} />
         </div>
       ) : null}
     </>
