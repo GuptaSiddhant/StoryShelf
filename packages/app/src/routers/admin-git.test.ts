@@ -349,7 +349,10 @@ describe("repository link requests", () => {
   it("approves a covered link and pins the repository id", async () => {
     const { browser, link, db } = await seedLink();
     stubHost({ "/api/v4/projects/": { id: 4242 } });
-    expect((await browser.post(`/admin/git/links/${link.id}/approve`, {})).status).toBe(302);
+    expect(
+      (await browser.post(`/admin/git/links/${link.id}/approve`, { updatedAt: link.updatedAt }))
+        .status,
+    ).toBe(302);
     expect(await new GitRepositoryLinkModel(db).get(link.id)).toMatchObject({
       state: "approved",
       hostRepositoryId: "4242",
@@ -358,10 +361,36 @@ describe("repository link requests", () => {
     expect((await browser.get(`/admin/git/links/${link.id}/approve`)).status).toBe(404);
   });
 
+  it("approves nothing when the link was edited after the dialog was rendered", async () => {
+    const { browser, link, db } = await seedLink();
+    stubHost({ "/api/v4/projects/": { id: 4242 } });
+    const links = new GitRepositoryLinkModel(db);
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 5000 });
+    await links.change(link.id, { repo: "payments" });
+    vi.useRealTimers();
+    const moved = await browser.post(`/admin/git/links/${link.id}/approve`, {
+      updatedAt: link.updatedAt,
+    });
+    expect(moved.status).toBe(302);
+    expect(await links.get(link.id)).toMatchObject({ state: "pending", repo: "payments" });
+    const missing = await browser.post(`/admin/git/links/${link.id}/approve`, {});
+    expect(missing.status).toBe(302);
+    expect((await links.get(link.id))?.state).toBe("pending");
+  });
+
+  it("carries the row's updatedAt in the approve dialog", async () => {
+    const { browser, link } = await seedLink();
+    stubHost({ "/api/v4/projects/": { id: 4242 } });
+    const body = await (await browser.get(`/admin/git/links/${link.id}/approve`)).text();
+    expect(body).toContain(`name="updatedAt" value="${link.updatedAt}"`);
+  });
+
   it("keeps a link the connection does not cover pending", async () => {
     const { browser, link, db } = await seedLink();
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("", { status: 404 }));
-    const refused = await browser.post(`/admin/git/links/${link.id}/approve`, {});
+    const refused = await browser.post(`/admin/git/links/${link.id}/approve`, {
+      updatedAt: link.updatedAt,
+    });
     expect(refused.status).toBe(409);
     expect(await refused.text()).toContain("Not covered");
     expect((await new GitRepositoryLinkModel(db).get(link.id))?.state).toBe("pending");

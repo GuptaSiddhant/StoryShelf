@@ -48,7 +48,7 @@ async function seed({
     await app.request("/api/v1/projects/web/builds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gitSha: "new-sha", gitBranch: "feature/x", supersedes }),
+      body: JSON.stringify({ gitSha: "ae10000", gitBranch: "feature/x", supersedes }),
     });
   const statusOf = async (id: string) => (await new BuildModel(db).get(id))?.status;
   return { app, db, project, build, create, statusOf };
@@ -57,16 +57,16 @@ async function seed({
 describe("GET /builds/in-flight", () => {
   it("lists only the branch's cancellable builds", async () => {
     const { app, build } = await seed();
-    const pending = await build("a1");
-    const capturing = await build("a2", "feature/x", "capturing");
+    const pending = await build("a100001");
+    const capturing = await build("a200002", "feature/x", "capturing");
     await build("a3", "feature/x", "reviewing");
     await build("a4", "other");
     const response = await app.request("/api/v1/projects/web/builds/in-flight?branch=feature/x");
     expect(response.status).toBe(200);
     const body = (await response.json()) as { id: string; sha: string }[];
     expect(body.toSorted((a, b) => a.sha.localeCompare(b.sha))).toEqual([
-      { id: pending.id, sha: "a1" },
-      { id: capturing.id, sha: "a2" },
+      { id: pending.id, sha: "a100001" },
+      { id: capturing.id, sha: "a200002" },
     ]);
   });
 
@@ -85,7 +85,7 @@ describe("GET /builds/in-flight", () => {
 describe("POST /builds with supersedes", () => {
   it("cancels the older in-flight builds when the option and the setting are on", async () => {
     const { build, create, statusOf } = await seed();
-    const older = await build("a1");
+    const older = await build("a100001");
     const response = await create([older.id]);
     expect(response.status).toBe(202);
     expect(await statusOf(older.id)).toBe("cancelled");
@@ -93,14 +93,14 @@ describe("POST /builds with supersedes", () => {
 
   it("cancels nothing when the project setting is off", async () => {
     const { build, create, statusOf } = await seed({ cancelSuperseded: false });
-    const older = await build("a1");
+    const older = await build("a100001");
     expect((await create([older.id])).status).toBe(202);
     expect(await statusOf(older.id)).toBe("pending");
   });
 
   it("cancels nothing when the server option is off (the default)", async () => {
     const { build, create, statusOf } = await seed({ supersedeOnCreate: false });
-    const older = await build("a1");
+    const older = await build("a100001");
     expect((await create([older.id])).status).toBe(202);
     expect(await statusOf(older.id)).toBe("pending");
   });

@@ -50,7 +50,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
     <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
 
-    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example` and a README, then prints the next steps:
+    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example`, a README and Docker files, then prints the next steps:
 
     ```sh
     cd my-storyshelf
@@ -87,7 +87,24 @@ From your Storybook project, run the command from the card:
   args="upload --url http://localhost:3000 --slug my-design-system"
 />
 
-Set the token first: `STORYSHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline.
+Set the token first: `STORYSHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
+
+```text
+==> Creating build
+--> Created build (0.1s)
+==> Uploading Storybook
+Uploading 26 of 32 files (the server has the rest)
+--> Uploaded Storybook (0.1s)
+Summary
+  Files:    32
+  Size:     4.8 MiB
+  Stories:  full capture (24 stories)
+  Build:    01M7YHNPPVYK1EGAKNAC3APM01
+  Time:     5.3s
+View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNPPVYK1EGAKNAC3APM01/diff
+```
+
+Add `--wait` to follow the build until it is captured; the exit code says how it ended (see [Gating CI with `--wait`](/guides/cli/client/#gating-ci-with---wait)).
 
 <Aside type="tip">
   To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `STORYSHELF_TOKEN` (a CI secret), never in the file. See [CI setup](/guides/ci/) for a pipeline.
@@ -114,6 +131,7 @@ When every change is decided, the build's status check goes green and you can me
 - [CI setup](/guides/ci/) and the [merge gate](/guides/merge-gate/): make the check required.
 - [Project settings](/guides/project-settings/): thresholds, viewports, labels, members and tokens.
 - [Deployment](/guides/deployment/): take the server beyond localhost.
+- [Upgrading guide](/guides/upgrading/): coming from 0.13 or 0.14? The changes that need action.
 - [Troubleshooting](/guides/troubleshooting/) and [Upgrading and support](/guides/support/): what to check first, and where to ask.
 - [Set up with an AI agent](/guides/ai-agent-setup/): let a coding agent do these steps.
 - [StoryShelf vs Chromatic](/guides/chromatic-comparison/): a factual feature and hosting comparison.

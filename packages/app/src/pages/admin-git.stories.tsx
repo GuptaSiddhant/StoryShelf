@@ -90,6 +90,7 @@ const pending: GitLinkRequestView = {
   connectionName: "Acme StoryShelf",
   reason: null,
   requestedAt: "2026-11-20T10:00:00.000Z",
+  updatedAt: "2026-11-20T10:00:00.000Z",
 };
 
 const broken: GitLinkRequestView = {
