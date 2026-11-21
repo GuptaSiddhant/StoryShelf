@@ -120,6 +120,7 @@ describe("earlier builds", () => {
       (_, i) => `sha${String(i).padStart(4, "0")}`,
     );
     for (const sha of shas) {
+      // eslint-disable-next-line no-await-in-loop -- each build is created after the one before it
       ids.push(await approvedBefore(w, sha));
     }
     await approvedBefore(w, "other00", "other-branch");

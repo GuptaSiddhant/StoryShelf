@@ -32,7 +32,7 @@ const STATE_BY_STATUS: Readonly<Record<string, string>> = {
 };
 
 /** Statuses whose published index is final, so a comparison with the baseline says something. */
-const COMPARABLE: readonly BuildStatus[] = ["reviewing", "approved", "rejected"];
+const COMPARABLE: ReadonlySet<BuildStatus> = new Set(["reviewing", "approved", "rejected"]);
 
 type Where = { build: Build; project: Project };
 
@@ -66,6 +66,24 @@ function storiesOf(entries: readonly CatalogEntry[]): Map<string, string> {
   );
 }
 
+/** The baseline's and this build's catalog entries; null while either cannot be read. */
+async function entriesOf(
+  deps: BuildStateDeps,
+  where: Where,
+): Promise<{ was: CatalogEntry[]; now: CatalogEntry[] } | null> {
+  const { build, project } = where;
+  const { storage } = deps;
+  const baseline = storage === undefined ? null : await baselineBuildOf(deps, where);
+  if (storage === undefined || baseline === null) {
+    return null;
+  }
+  const [was, now] = await Promise.all([
+    readCatalog(storage, project.id, baseline.id),
+    readCatalog(storage, project.id, build.id),
+  ]);
+  return was === null || now === null ? null : { was: was.entries, now: now.entries };
+}
+
 /**
  * `Title / Name` of the stories the baseline's index had and this build's lacks, by story id. Left
  * out (undefined) while either index cannot be read, so a missing file never reads as every story gone.
@@ -74,20 +92,15 @@ export async function removedStoriesOf(
   deps: BuildStateDeps,
   where: Where,
 ): Promise<string[] | undefined> {
-  const { build, project } = where;
-  if (!COMPARABLE.includes(build.status)) {
+  if (!COMPARABLE.has(where.build.status)) {
     return undefined;
   }
-  const baseline = await baselineBuildOf(deps, where);
-  const [was, now] = await Promise.all([
-    baseline === null ? null : readCatalog(deps.storage, project.id, baseline.id),
-    readCatalog(deps.storage, project.id, build.id),
-  ]);
-  if (was === null || now === null) {
+  const entries = await entriesOf(deps, where);
+  if (entries === null) {
     return undefined;
   }
-  const present = storiesOf(now.entries);
-  const removed = [...storiesOf(was.entries)].filter(([id]) => !present.has(id));
+  const present = storiesOf(entries.now);
+  const removed = [...storiesOf(entries.was)].filter(([id]) => !present.has(id));
   return removed.slice(0, REMOVED_READ).map(([, title]) => title);
 }
 
