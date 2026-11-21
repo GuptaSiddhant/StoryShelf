@@ -75,7 +75,7 @@ Setting only half of a connection, or both a secret and its `_FILE`, stops the s
 
 What StoryShelf reads is fixed and small: which pull request contains a commit, the pull request's own comments (to find its own), which installation covers a repository, the repository's numeric ID, and whether a commit is on the default branch. **It never reads your code, diffs or files**: captures come from the Storybook you upload, not from the git host. GitHub has no narrower permission for the branch check than **Contents: Read-only**, so the App requests it and only the comparison's status is read. Posting is limited by the permissions you give the connection: **Checks: Read and write** is required for the gate; **Pull requests** and **Commit statuses** write are optional.
 
-The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a Key Vault secret name on Azure. The key never appears in Terraform variables or state.
+The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a versionless Key Vault secret id on Azure (the app's identity reads that stack's vault). The key never appears in Terraform variables or state.
 
 ## 2. Upload the PR head commit
 
