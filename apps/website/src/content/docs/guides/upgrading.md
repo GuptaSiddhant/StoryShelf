@@ -15,7 +15,25 @@ Before any upgrade, [back up](/guides/backup-restore/) the database and the stor
 
 **Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use `@storyshelf/runner-playwright`, nothing changes.
 
-0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](/packages/runner-puppeteer/#switching-from-puppeteer-to-playwright).
+0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright).
+
+### Switching from Puppeteer to Playwright
+
+Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0.15.0.
+
+1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
+2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
+3. Map the options:
+
+| Puppeteer                                                                               | Playwright                                                                                                                              |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `executablePath` for a system Chrome, or `local("chrome", { executablePath })`          | `local("chrome", { channel: "chrome" })` (bare `"chrome"` uses the same channel; `chrome-beta` and `msedge` also work)                  |
+| `executablePath` for any other Chromium                                                 | No path option: `playwright install chromium` and the bare `"chromium"` target                                                          |
+| `args` (launch flags)                                                                   | No equivalent option                                                                                                                    |
+| `cdp({ name, endpoint, headers, sessions })` from `@storyshelf/runner-puppeteer/remote` | `remote({ name, protocol: "cdp", reach: "url", sessions, connect: { endpoint, headers } })` from `@storyshelf/runner-playwright/remote` |
+| `concurrency`, `navigationTimeoutMs`, `recycleBrowserEvery`, `reusePages`               | The same options on `createPlaywrightCaptureRunner`                                                                                     |
+
+4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.
 
 ### Nothing else is pending
 
@@ -50,7 +68,7 @@ Sign-in is now on by default and a missing variable never turns it off. The imag
 The runner now requires `puppeteer-core` `^25` (it was `^24`) and passes remote-connection headers as `wsOptions.headers`. Puppeteer 24 is no longer supported. The runner is also deprecated in this release: it logs one warning when the host binds its logger, gets fixes only, and is removed in [0.15.0](#nothing-else-is-pending).
 
 1. Either install `puppeteer-core@^25` next to the runner to stay on it for now, or
-2. switch to Playwright now, following [Switching from Puppeteer to Playwright](/packages/runner-puppeteer/#switching-from-puppeteer-to-playwright). That section also covers the one new baseline you should expect.
+2. switch to Playwright now, following [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright). That section also covers the one new baseline you should expect.
 
 ### Git connections are set up by the operator
 

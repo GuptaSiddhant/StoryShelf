@@ -263,7 +263,7 @@ export default defineConfig({
               "storage-azure",
               "storage-gcs",
             ]),
-            packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
+            packageGroup("Capture runners", ["runner-playwright"]),
           ],
         },
       ],
