@@ -8,6 +8,7 @@
  *
  *  1. pack every public package (manifests rewritten as the release does, then restored),
  *     and check each archive holds every export and bin target (#1265),
+ *     and that `@storyshelf/app/node` imports from the installed scaffold with no side effects (#394),
  *  2. install the CLI from its tarball in an empty directory outside this checkout,
  *  3. run the default `storyshelf server init` (answers: all defaults, so local accounts),
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
@@ -119,6 +120,21 @@ function assertArchives(tarballs) {
     },
   );
   console.log(output.trim().split("\n").slice(-20).join("\n"));
+}
+
+/**
+ * `@storyshelf/app/node` resolves from the installed tarball and is pure at import (#394): no
+ * signal handler and nothing keeping the process alive, so the probe exits by itself.
+ */
+function assertNodeHost(project) {
+  const probe = [
+    'const before = process.listenerCount("SIGTERM") + process.listenerCount("SIGINT");',
+    'const host = await import("@storyshelf/app/node");',
+    'if (typeof host.startServer !== "function") throw new Error("no startServer export");',
+    'if (process.listenerCount("SIGTERM") + process.listenerCount("SIGINT") !== before) throw new Error("signal handlers at import");',
+  ].join("\n");
+  run(process.execPath, ["--input-type=module", "-e", probe], { cwd: project, timeout: 30_000 });
+  log("@storyshelf/app/node resolves from the tarball, with no side effects at import");
 }
 
 /** A free TCP port. */
@@ -248,6 +264,7 @@ async function installFromTarballs(scratch, tarballs) {
   assertCleanInstall(
     run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project, merge: true }),
   );
+  assertNodeHost(project);
   return { cli, project };
 }
 

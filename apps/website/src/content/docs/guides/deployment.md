@@ -112,13 +112,13 @@ The GCP and Azure modules ([GCP](/guides/deployment/gcp/), [Azure](/guides/deplo
 
 ### Shutdown
 
-A deploy or a scale-down sends SIGTERM. The app stops taking jobs and drains running captures for `SHELF_SHUTDOWN_GRACE_SECONDS`, then hands the rest back to the queue, so a restart does not cost an attempt. Keep the value below the platform's stop window, because a process killed anyway loses its lease and counts an attempt:
+A deploy or a scale-down sends SIGTERM. The server stops accepting requests, lets the ones in flight finish, stops taking jobs and drains running captures, then hands the rest back to the queue, so a restart does not cost an attempt. `SHELF_SHUTDOWN_GRACE_SECONDS` bounds the whole shutdown, and the process exits when it ends; unset, the bound is 30 seconds (3 on Fly). Keep the value below the platform's stop window, because a process killed anyway loses its lease and counts an attempt. A server you write yourself gets the same shutdown from [`startServer`](/packages/app/#node-host) (`shutdownTimeoutMs`):
 
-| Platform             | SIGTERM window                                                            | `SHELF_SHUTDOWN_GRACE_SECONDS`                                 |
-| -------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| AWS ECS Fargate      | `stopTimeout`, up to 120 seconds                                          | The module sets 30, and `stopTimeout` to the grace plus 10     |
-| Google Cloud Run     | 10 seconds, not configurable                                              | 1 to 9, default 8 (the process exits 1 second after the drain) |
-| Azure Container Apps | The termination grace, which the module sets to the grace plus 10 seconds | 30                                                             |
+| Platform             | SIGTERM window                                                            | `SHELF_SHUTDOWN_GRACE_SECONDS`                               |
+| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| AWS ECS Fargate      | `stopTimeout`, up to 120 seconds                                          | The module sets 30, and `stopTimeout` to the grace plus 10   |
+| Google Cloud Run     | 10 seconds, not configurable                                              | 1 to 8, default 8 (the process exits when the shutdown ends) |
+| Azure Container Apps | The termination grace, which the module sets to the grace plus 10 seconds | 30                                                           |
 
 **The symptom** is builds that stay `pending` or `capturing`, and jobs on the **Compute jobs** page that look running, until someone opens the app, when they move for a while and then stall again. See [Troubleshooting](/guides/troubleshooting/#capture).
 

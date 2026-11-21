@@ -53,6 +53,33 @@ describe("check-packed-archives", () => {
   });
 });
 
+/** A packed `@storyshelf/app` manifest with these exports. */
+const app = (exports) => ({ name: "@storyshelf/app", exports });
+
+describe("check-packed-archives required subpaths", () => {
+  it("requires @storyshelf/app to export ./node, packed", () => {
+    const problems = checkArchive(app({ ".": "./dist/index.mjs" }), files);
+    assert.deepEqual(problems, [
+      "exports ./node is missing (consumers import @storyshelf/app/node)",
+    ]);
+    const unpacked = checkArchive(
+      app({ ".": "./dist/index.mjs", "./node": "./dist/node.mjs" }),
+      files,
+    );
+    assert.match(
+      unpacked.join("\n"),
+      /exports \.\/node -> \.\/dist\/node\.mjs is not in the tarball/u,
+    );
+    assert.deepEqual(
+      checkArchive(app({ ".": "./dist/index.mjs", "./node": "./dist/node.mjs" }), [
+        ...files,
+        "dist/node.mjs",
+      ]),
+      [],
+    );
+  });
+});
+
 describe("materialize-exports", () => {
   const pkg = {
     name: "a",

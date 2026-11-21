@@ -34,11 +34,16 @@
       "source": "./src/index.tsx",
       "default": "./dist/index.mjs"
     },
+    "./node": {
+      "source": "./src/node/index.ts",
+      "default": "./dist/node.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./node": "./dist/node.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -60,6 +65,7 @@
     "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts src/routers/published-compression.test.ts"
   },
   "dependencies": {
+    "@hono/node-server": "catalog:",
     "@hono/otel": "catalog:",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
