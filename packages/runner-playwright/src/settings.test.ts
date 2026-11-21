@@ -26,8 +26,8 @@ describe("resolveSettings from the environment", () => {
     ["", undefined],
     ["abc", undefined],
     ["-3", undefined],
-  ])("reads STORYSHELF_CAPTURE_CONCURRENCY=%j as %j", (raw, expected) => {
-    expect(settingsFor({ STORYSHELF_CAPTURE_CONCURRENCY: raw }).concurrency).toBe(expected);
+  ])("reads SHELF_CAPTURE_CONCURRENCY=%j as %j", (raw, expected) => {
+    expect(settingsFor({ SHELF_CAPTURE_CONCURRENCY: raw }).concurrency).toBe(expected);
   });
 
   it.each([
@@ -35,19 +35,15 @@ describe("resolveSettings from the environment", () => {
     ["25", 25],
     ["", undefined],
     ["x", undefined],
-  ])("reads STORYSHELF_BROWSER_RECYCLE_EVERY=%j as %j", (raw, expected) => {
-    expect(settingsFor({ STORYSHELF_BROWSER_RECYCLE_EVERY: raw }).recycleBrowserEvery).toBe(
-      expected,
-    );
+  ])("reads SHELF_BROWSER_RECYCLE_EVERY=%j as %j", (raw, expected) => {
+    expect(settingsFor({ SHELF_BROWSER_RECYCLE_EVERY: raw }).recycleBrowserEvery).toBe(expected);
   });
 
-  it("reads STORYSHELF_NAVIGATION_TIMEOUT_MS, else a detected default", () => {
-    expect(settingsFor({ STORYSHELF_NAVIGATION_TIMEOUT_MS: "9000" }).navigationTimeoutMs).toBe(
-      9000,
+  it("reads SHELF_NAVIGATION_TIMEOUT_MS, else a detected default", () => {
+    expect(settingsFor({ SHELF_NAVIGATION_TIMEOUT_MS: "9000" }).navigationTimeoutMs).toBe(9000);
+    expect(settingsFor({ SHELF_NAVIGATION_TIMEOUT_MS: "x" }).navigationTimeoutMs).toBeGreaterThan(
+      0,
     );
-    expect(
-      settingsFor({ STORYSHELF_NAVIGATION_TIMEOUT_MS: "x" }).navigationTimeoutMs,
-    ).toBeGreaterThan(0);
   });
 
   it.each([
@@ -56,26 +52,26 @@ describe("resolveSettings from the environment", () => {
     ["", true],
     ["0", false],
     ["false", false],
-  ])("reads STORYSHELF_REUSE_PAGES=%j as %j", (raw, expected) => {
-    expect(settingsFor({ STORYSHELF_REUSE_PAGES: raw }).reusePages).toBe(expected);
+  ])("reads SHELF_REUSE_PAGES=%j as %j", (raw, expected) => {
+    expect(settingsFor({ SHELF_REUSE_PAGES: raw }).reusePages).toBe(expected);
   });
 });
 
 describe("resolveSettings options", () => {
   it("reuses pages by default", () => {
     // Stub first so the original value is restored afterwards, then leave it truly unset.
-    vi.stubEnv("STORYSHELF_REUSE_PAGES", "1");
-    delete process.env["STORYSHELF_REUSE_PAGES"];
+    vi.stubEnv("SHELF_REUSE_PAGES", "1");
+    delete process.env["SHELF_REUSE_PAGES"];
     expect(settingsFor({}).reusePages).toBe(true);
   });
 
   it("prefers an explicit option over the environment, an explicit false included", () => {
     const settings = settingsFor(
       {
-        STORYSHELF_CAPTURE_CONCURRENCY: "8",
-        STORYSHELF_NAVIGATION_TIMEOUT_MS: "9000",
-        STORYSHELF_BROWSER_RECYCLE_EVERY: "25",
-        STORYSHELF_REUSE_PAGES: "1",
+        SHELF_CAPTURE_CONCURRENCY: "8",
+        SHELF_NAVIGATION_TIMEOUT_MS: "9000",
+        SHELF_BROWSER_RECYCLE_EVERY: "25",
+        SHELF_REUSE_PAGES: "1",
       },
       { concurrency: 2, navigationTimeoutMs: 1234, recycleBrowserEvery: 0, reusePages: false },
     );

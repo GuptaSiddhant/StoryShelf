@@ -25,12 +25,12 @@ describe("resolveObservabilityConfig", () => {
     expect(config.enabled).toBe(false);
   });
 
-  it("supports explicit STORYSHELF_OTEL_ENABLED", () => {
-    expect(resolveObservabilityConfig({ STORYSHELF_OTEL_ENABLED: "true" }).enabled).toBe(true);
+  it("supports explicit SHELF_OTEL_ENABLED", () => {
+    expect(resolveObservabilityConfig({ SHELF_OTEL_ENABLED: "true" }).enabled).toBe(true);
     expect(
       resolveObservabilityConfig({
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
-        STORYSHELF_OTEL_ENABLED: "false",
+        SHELF_OTEL_ENABLED: "false",
       }).enabled,
     ).toBe(false);
   });
@@ -41,7 +41,7 @@ describe("resolveObservabilityConfig", () => {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
         OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer abc, x-tenant = t1",
         OTEL_SERVICE_NAME: "shelf-prod",
-        STORYSHELF_OTEL_METRICS_INTERVAL_MS: "15000",
+        SHELF_OTEL_METRICS_INTERVAL_MS: "15000",
       },
       "1.2.3",
     );
@@ -55,7 +55,7 @@ describe("resolveObservabilityConfig", () => {
     const config = resolveObservabilityConfig({
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
       OTEL_EXPORTER_OTLP_HEADERS: "no-equals-here",
-      STORYSHELF_OTEL_METRICS_INTERVAL_MS: "banana",
+      SHELF_OTEL_METRICS_INTERVAL_MS: "banana",
     });
     expect(config.headers).toBeUndefined();
     expect(config.metricsIntervalMs).toBe(60_000);
