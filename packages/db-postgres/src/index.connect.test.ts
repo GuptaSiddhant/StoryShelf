@@ -52,7 +52,7 @@ describe("createPostgresDatabase from a connection string", () => {
     const client = { unsafe: vi.fn(), end: vi.fn() } as never;
     createPostgresDatabase({ client, url: "postgres://ignored/db" });
     expect(postgresMock).not.toHaveBeenCalled();
-    expect(drizzleMock).toHaveBeenCalledWith(client, expect.any(Object));
+    expect(drizzleMock).toHaveBeenCalledWith({ client });
   });
 
   it("refuses an empty connection string without a client", () => {

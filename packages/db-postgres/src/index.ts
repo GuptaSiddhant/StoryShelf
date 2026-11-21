@@ -76,7 +76,7 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
   const client = openClient(options);
 
   // oxlint-disable-next-line typescript/no-unsafe-argument -- postgres instance may be from isolated store vs workspace
-  const db = drizzle(client as never, { schema });
+  const db = drizzle({ client: client as never });
   const retention: RetentionActivation = {};
 
   const adapter = createDrizzlePgAdapter(db, {

@@ -1,10 +1,9 @@
 /** Connections for the lifecycle: one short write transaction per operation, serialized by SQLite. */
 import type { TxStore } from "@storyshelf/core/adapter/database";
-import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDrizzleAdapter } from "./drizzle-factory.ts";
-import { createCallback } from "./index.ts";
+import { drizzleOver } from "./proxy-executors.ts";
 import { schema } from "./schema/index.ts";
 
 export async function open(path: string, onContention?: () => void): Promise<DatabaseSync> {
@@ -42,17 +41,21 @@ async function acquireWrite(db: DatabaseSync, onContention?: () => void): Promis
 }
 
 export function transactionStore(db: DatabaseSync): TxStore {
-  return createDrizzleAdapter(drizzle(createCallback(db), { schema }), {
-    metadata: {
-      name: "SQLite lifecycle transaction",
-      version: "0",
-      kind: "sqlite",
-      category: "database",
+  return createDrizzleAdapter(
+    drizzleOver(db),
+    {
+      metadata: {
+        name: "SQLite lifecycle transaction",
+        version: "0",
+        kind: "sqlite",
+        category: "database",
+      },
+      tables: schema,
+      migrate: () => {},
+      close: () => {},
     },
-    tables: schema,
-    migrate: () => {},
-    close: () => {},
-  });
+    { rawRows: "arrays" },
+  );
 }
 
 export async function inTransaction<T>(

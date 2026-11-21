@@ -40,7 +40,7 @@ export interface NeonHttpDatabaseOptions {
  */
 export function createNeonHttpDatabase(options: NeonHttpDatabaseOptions): DatabaseAdapter {
   const { sql } = resolveClient(options);
-  const db = drizzle(sql, { schema });
+  const db = drizzle({ client: sql });
 
   return createDrizzlePgAdapter(db, {
     metadata: {

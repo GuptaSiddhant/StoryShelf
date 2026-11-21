@@ -11,7 +11,6 @@ import type { TxStore } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/mysql2";
 import { transactionStore } from "./drizzle-factory-mysql.ts";
 import { toMySqlDateTime } from "./schema/datetime.ts";
-import { schema } from "./schema/index.ts";
 
 /** One row, keyed by column name. */
 export type Row = Record<string, unknown>;
@@ -91,7 +90,7 @@ export async function transaction<R>(
   try {
     const result = await fn({
       ...statementsOn(connection),
-      store: transactionStore(drizzle(connection as never, { schema, mode: "default" })),
+      store: transactionStore(drizzle({ client: connection as never })),
     });
     await connection.query("COMMIT");
     return result;

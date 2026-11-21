@@ -12,6 +12,7 @@ import type {
   ListOptions,
   TxStore,
 } from "@storyshelf/core/adapter/database";
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import {
@@ -23,6 +24,7 @@ import {
   updateOne,
   updateWhereOne,
   type DrizzleLike,
+  type RawRows,
 } from "./drizzle-crud.ts";
 import { buildLifecycle } from "./drizzle-lifecycle.ts";
 import { createNestingGuard } from "./nesting-guard.ts";
@@ -38,6 +40,11 @@ export interface DrizzleAdapterBehavior {
    * Off for drivers with a connection per transaction (Turso, D1) and for lifecycle transaction handles.
    */
   isolateStatements?: boolean;
+  /**
+   * The rows a raw `all` answers: `objects` (the default, as better-sqlite3, Bun, Turso and D1
+   * answer) or `arrays`, which the `node:sqlite` adapter has always answered.
+   */
+  rawRows?: RawRows;
 }
 
 export function createDrizzleAdapter(
@@ -55,35 +62,37 @@ export function createDrizzleAdapter(
     lifecycle: buildLifecycle(options),
     insert: async <T extends AnySQLiteTable>(
       table: T,
-      values: T["$inferInsert"],
-    ): Promise<T["$inferSelect"]> => await insertOne(drizzle, table, values),
+      values: InferInsertModel<T>,
+    ): Promise<InferSelectModel<T>> => await insertOne(drizzle, table, values),
     update: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
-      // Homomorphic equivalent of Partial<T["$inferInsert"]>; written out so
+      // Homomorphic equivalent of Partial<InferInsertModel<T>>; written out so
       // the type stays deferred instead of resolving to `{}` under generics.
-      values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
-    ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
+      values: { [K in keyof InferInsertModel<T>]?: InferInsertModel<T>[K] },
+    ): Promise<InferSelectModel<T>> => await updateOne(drizzle, table, id, values),
     updateWhere: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
-      values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
+      values: { [K in keyof InferInsertModel<T>]?: InferInsertModel<T>[K] },
       where: SQL,
-    ): Promise<T["$inferSelect"] | null> => await updateWhereOne(drizzle, table, id, values, where),
+    ): Promise<InferSelectModel<T> | null> =>
+      await updateWhereOne(drizzle, table, id, values, where),
     get: async <T extends AnySQLiteTable>(
       table: T,
       id: string,
-    ): Promise<T["$inferSelect"] | null> => await getOne(drizzle, table, id),
+    ): Promise<InferSelectModel<T> | null> => await getOne(drizzle, table, id),
     remove: async (table: AnySQLiteTable, id: string): Promise<void> => {
       await removeOne(drizzle, table, id);
     },
     list: async <T extends AnySQLiteTable>(
       table: T,
       opts: ListOptions = {},
-    ): Promise<T["$inferSelect"][]> => await listMany(drizzle, table, opts),
+    ): Promise<InferSelectModel<T>[]> => await listMany(drizzle, table, opts),
     count: async (table: AnySQLiteTable, where?: SQL): Promise<number> =>
       await drizzle.$count(table, where),
-    all: async <T>(query: SQL): Promise<T[]> => await drizzle.all(query),
+    all: async <T>(query: SQL): Promise<T[]> =>
+      await drizzle.all<T>(query, behavior.rawRows ?? "objects"),
     transact: async <R>(fn: (tx: TxStore) => Promise<R>): Promise<R> =>
       await mutex.run(
         async () =>

@@ -1,5 +1,6 @@
-import { BuildModel, LabelModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel, LabelModel } from "@storyshelf/core/models";
 import type { Build, LabelType, Project } from "@storyshelf/core/schema";
+import { visibleProjects } from "../project-visibility.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -154,7 +155,7 @@ export async function renderLabelDetailPage(
   key: string,
   value: string,
 ): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await visibleProjects();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
@@ -222,7 +223,7 @@ function LabelTypesTable(props: { labelTypes: LabelType[] }): ReturnType<typeof 
 
 /** Label types overview page (architecture.md `GET /projects/:slug/labels`). */
 export async function renderLabelsPage(slug: string): Promise<RenderedContent | null> {
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await visibleProjects();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;

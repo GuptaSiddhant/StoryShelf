@@ -1,8 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
-import { drizzle, type AsyncRemoteCallback } from "drizzle-orm/sqlite-proxy";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { setTimeout as delay } from "node:timers/promises";
+import { DatabaseSync } from "node:sqlite";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { commentsRebuildStatements } from "./comments-rebuild.ts";
 import { DDL, IDENTITY_STATEMENTS, tableColumns } from "./ddl.ts";
@@ -18,6 +16,7 @@ import {
   toleratedFor,
 } from "./migration-errors.ts";
 import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
+import { BUSY_WAIT_MS, drizzleOver } from "./proxy-executors.ts";
 import {
   activateRetention,
   attachRetention,
@@ -26,6 +25,8 @@ import {
 import { assertReviewSchema } from "./review-schema-check.ts";
 import { schema } from "./schema/index.ts";
 import { parseTableInfo, type TableColumns } from "./table-info.ts";
+
+export { BUSY_WAIT_MS } from "./proxy-executors.ts";
 
 declare const __PKG_VERSION__: string | undefined;
 
@@ -45,8 +46,7 @@ export function createSqliteDatabase(
   applyConnectionPragmas((sql) => {
     sqlite.exec(sql);
   }, options);
-  const callback = createCallback(sqlite, BUSY_WAIT_MS);
-  const db = drizzle(callback, { schema });
+  const db = drizzleOver(sqlite, BUSY_WAIT_MS);
   const retention: RetentionActivation = {};
 
   const adapter = createDrizzleAdapter(
@@ -63,7 +63,7 @@ export function createSqliteDatabase(
       migrate: async ({ logger, release }) => {
         await migrateGated(sqlite, logger, release);
         await activateRetention(path, retention);
-        // From here the callback waits for a lock without blocking the event loop (`createCallback`).
+        // From here a statement waits for a lock without blocking the event loop (`createExecutors`).
         sqlite.exec("PRAGMA busy_timeout = 0");
       },
       close: () => {
@@ -73,8 +73,9 @@ export function createSqliteDatabase(
         sqlite.prepare("SELECT 1").get();
       },
     },
-    // One connection: plain statements take their turn behind an open transaction.
-    { isolateStatements: true },
+    // One connection: plain statements take their turn behind an open transaction. Raw reads
+    // answer arrays, as this adapter always has.
+    { isolateStatements: true, rawRows: "arrays" },
   );
   return attachRetention(adapter, retention);
 }
@@ -96,66 +97,6 @@ const BUILDS_LIST_INDEXES = [
   "CREATE INDEX IF NOT EXISTS builds_project_branch_created_idx ON builds (project_id, git_branch, created_at)",
   "DROP INDEX IF EXISTS builds_git_branch_idx",
 ];
-
-type ProxyMethod = "run" | "all" | "values" | "get";
-
-/**
- * Execute one Drizzle statement against DatabaseSync, returning proxy-shaped rows.
- * Drizzle builds the SQL and params; only the transport is hand-written.
- * `values` shares the `all` shape (array rows); the factory never emits it.
- * Note: for `get`, the proxy passes `result.rows` straight to the row mapper,
- * so `rows` is the single row (or undefined on a miss) — not a one-row array.
- */
-function executeStatement(
-  sqlite: DatabaseSync,
-  sql: string,
-  params: unknown[],
-  method: ProxyMethod,
-): { rows: unknown } {
-  const stmt = sqlite.prepare(sql);
-  // Single contained cast: Drizzle's params are SQLite scalars by construction.
-  // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- tsc requires the narrowing; the rule misfires on the variadic overloads
-  const args = params as SQLInputValue[];
-  if (method === "run") {
-    stmt.run(...args);
-    return { rows: [] };
-  }
-  if (method === "get") {
-    return { rows: stmt.get(...args) };
-  }
-  return { rows: stmt.all(...args) };
-}
-
-/** How long a statement waits for another connection's write lock (the old `busy_timeout`). */
-export const BUSY_WAIT_MS = 5000;
-const BUSY_POLL_MS = 10;
-
-/**
- * The statement transport. With `busyWaitMs` > 0 a statement that finds the file locked by another
- * connection waits with the event loop free, and tries again: SQLite's own `busy_timeout` sleeps
- * the thread, and the holder (the reference lifecycle's connection, whose callback awaits) can
- * only commit from this same loop, so a blocking wait could only end in "database is locked".
- */
-export function createCallback(sqlite: DatabaseSync, busyWaitMs = 0): AsyncRemoteCallback {
-  const callback = (async (sql: string, params: unknown[], method: ProxyMethod) => {
-    await Promise.resolve();
-    const deadline = Date.now() + busyWaitMs;
-    while (true) {
-      try {
-        return executeStatement(sqlite, sql, params, method);
-      } catch (error) {
-        if (!isBusy(error) || Date.now() >= deadline) throw error;
-        // oxlint-disable-next-line eslint/no-await-in-loop -- wait for the competing writer to finish
-        await delay(BUSY_POLL_MS);
-      }
-    }
-  }) as AsyncRemoteCallback;
-  return callback;
-}
-
-function isBusy(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("database is locked");
-}
 
 function migrateCommentsTable(sqlite: DatabaseSync): void {
   // The connection opens with `returnArrays`: a row is `[sql]`, not `{ sql }`. (Reading it as an

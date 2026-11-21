@@ -10,6 +10,7 @@ function deps(over: Partial<DemoViewerDeps> = {}): DemoViewerDeps {
     projectId: vi.fn(async () => "p1"),
     isMember: vi.fn(async () => false),
     addViewer: vi.fn(async () => {}),
+    ensureSiteMember: vi.fn(async () => false),
     ...over,
   };
 }
@@ -21,6 +22,7 @@ describe("ensureDemoViewer", () => {
       userCreated: false,
       memberAdded: false,
       credentialSet: false,
+      roleFixed: false,
     });
     expect(d.findUserId).not.toHaveBeenCalled();
   });
@@ -31,6 +33,7 @@ describe("ensureDemoViewer", () => {
       userCreated: true,
       memberAdded: true,
       credentialSet: false,
+      roleFixed: false,
     });
     expect(d.createUser).toHaveBeenCalledWith(DEMO_VIEWER_EMAIL, "a-long-password");
     expect(d.projectId).toHaveBeenCalledWith(DEMO_PROJECT_SLUG);
@@ -43,6 +46,7 @@ describe("ensureDemoViewer", () => {
       userCreated: false,
       memberAdded: false,
       credentialSet: false,
+      roleFixed: false,
     });
     expect(d.createUser).not.toHaveBeenCalled();
     expect(d.addViewer).not.toHaveBeenCalled();
@@ -54,6 +58,7 @@ describe("ensureDemoViewer", () => {
       userCreated: true,
       memberAdded: false,
       credentialSet: false,
+      roleFixed: false,
     });
     expect(d.addViewer).not.toHaveBeenCalled();
   });
@@ -68,10 +73,27 @@ describe("ensureDemoViewer", () => {
       userCreated: false,
       memberAdded: false,
       credentialSet: true,
+      roleFixed: false,
     });
     expect(staged.createUser).toHaveBeenCalledWith(DEMO_VIEWER_EMAIL, "a-long-password");
     const complete = deps({ findUserId: async () => "u1", isMember: async () => true });
     await ensureDemoViewer(complete, "a-long-password");
     expect(complete.createUser).not.toHaveBeenCalled();
+  });
+
+  it("sets an existing account with another site role back to member", async () => {
+    const d = deps({
+      findUserId: async () => "u1",
+      isMember: async () => true,
+      ensureSiteMember: vi.fn(async () => true),
+    });
+    expect(await ensureDemoViewer(d, "a-long-password")).toEqual({
+      userCreated: false,
+      memberAdded: false,
+      credentialSet: false,
+      roleFixed: true,
+    });
+    expect(d.ensureSiteMember).toHaveBeenCalledWith("u1");
+    expect(d.createUser).not.toHaveBeenCalled();
   });
 });

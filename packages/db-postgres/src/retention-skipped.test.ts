@@ -5,7 +5,6 @@ import { drizzle } from "drizzle-orm/pglite";
 import { vi } from "vitest";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPgliteDatabase } from "./pglite.ts";
-import { schema } from "./schema/index.ts";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 
@@ -16,7 +15,7 @@ retentionSkippedContractSuite("pglite", async (use) => {
   try {
     const adapter = createPgliteDatabase({ client });
     await adapter.lifecycle?.setup({ config: {}, logger: createShelfLogger({ level: "silent" }) });
-    const lifecycle = createBuildReferenceLifecycle(drizzle(client, { schema }));
+    const lifecycle = createBuildReferenceLifecycle(drizzle({ client }));
     await use({ ...adapter, buildReferenceLifecycle: lifecycle });
   } finally {
     await client.close();

@@ -17,7 +17,7 @@ import { schema } from "./schema/index.ts";
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 const now = "2026-01-01T00:00:00.000Z";
 const client = new PGlite();
-const db = drizzle(client, { schema });
+const db = drizzle({ client });
 const lifecycle = createBuildReferenceLifecycle(db);
 
 beforeAll(async () => {
