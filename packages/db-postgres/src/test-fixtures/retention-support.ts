@@ -7,6 +7,7 @@ import type {
 import { sql, type InferInsertModel } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { expect } from "vitest";
+import { baselines } from "../schema/baseline.ts";
 import { schema } from "../schema/index.ts";
 
 export const now = "2026-01-01T00:00:00.000Z";
@@ -223,7 +224,7 @@ export function baselineInsert(row: {
   storyId?: string;
   sourceBuildId?: string | null;
   snapshotId?: string | null;
-}): InferInsertModel<typeof schema.baselines> {
+}): InferInsertModel<typeof baselines> {
   return {
     ...baselineRow,
     storyId: row.storyId ?? row.id,

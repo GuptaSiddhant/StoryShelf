@@ -20,7 +20,7 @@ import {
   type PgTextBuilder,
 } from "drizzle-orm/pg-core";
 
-type Base = PgTextBuilder<[string, ...string[]]>;
+type Base = PgTextBuilder;
 
 /** The Drizzle table a neutral table builds; its `$inferSelect` is `InferRow` of the neutral one. */
 export type PgTableOf<T extends ns.NeutralTable> = PgTableWithColumns<{
@@ -76,5 +76,5 @@ export function pgTableOf<T extends ns.NeutralTable>(
     table.name,
     columns as never,
     (built) => ns.tableExtras({ table, columns: built, resolve, builders, names }) as never,
-  ) as unknown as PgTableOf<T>;
+  );
 }
