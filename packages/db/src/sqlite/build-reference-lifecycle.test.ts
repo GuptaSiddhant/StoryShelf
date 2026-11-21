@@ -220,7 +220,7 @@ retentionActivationContractSuite("SQLite", async (run) => {
 });
 
 async function startContendingClaim(path: string): Promise<PromiseLike<unknown[]>[]> {
-  const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
+  const script = `import('./src/sqlite/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
     const { writeFileSync } = await import('node:fs');
     const result = await createBuildReferenceLifecycle(process.argv[1], () => writeFileSync(process.argv[1] + '.approval-blocked', 'blocked')).claimDeletion('p', 'two');
     writeFileSync(process.argv[1] + '.approval-result', result);
@@ -255,7 +255,7 @@ describe("SQLite reference lifecycle primitive", () => {
           createdAt: now,
           updatedAt: now,
         });
-        const script = `import('./src/build-reference-lifecycle.ts').then(async ({ prepareBaselineReferences }) => {
+        const script = `import('./src/sqlite/build-reference-lifecycle.ts').then(async ({ prepareBaselineReferences }) => {
           const { writeFileSync } = await import('node:fs');
           await prepareBaselineReferences(process.argv[1], async () => {
             writeFileSync(process.argv[1] + '.prepared', 'uncommitted');
@@ -632,7 +632,7 @@ describe("SQLite reference lifecycle primitive", () => {
       let errors = "";
       let exited: Promise<unknown[]> | undefined;
       await replaceFenced(lifecycle, owner, ["one"], async () => {
-        const script = `import('./src/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
+        const script = `import('./src/sqlite/build-reference-lifecycle.ts').then(async ({ createBuildReferenceLifecycle }) => {
           const { writeFileSync } = await import('node:fs');
           const result = await createBuildReferenceLifecycle(process.argv[1], () => writeFileSync(process.argv[1] + '.ready', 'blocked')).claimDeletion('p', 'one');
           await import('node:fs').then(({ writeFileSync }) => writeFileSync(process.argv[1] + '.result', result));
