@@ -20,10 +20,10 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 <Aside type="caution" title="Three values you must set">
   The server starts with sign-in on and refuses to start without these.
 
-  - `SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
-  - `PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
-  - `AUTH_PASSWORD`: the first admin's password, at least 12 characters.
-</Aside>
+- `SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
+- `PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
+- `AUTH_PASSWORD`: the first admin's password, at least 12 characters.
+  </Aside>
 
 ## 1. Start the server
 
@@ -114,6 +114,7 @@ When every change is decided, the build's status check goes green and you can me
 - [CI setup](/guides/ci/) and the [merge gate](/guides/merge-gate/): make the check required.
 - [Project settings](/guides/project-settings/): thresholds, viewports, labels, members and tokens.
 - [Deployment](/guides/deployment/): take the server beyond localhost.
+- [Upgrading guide](/guides/upgrading/): coming from 0.13 or 0.14? The changes that need action.
 - [Troubleshooting](/guides/troubleshooting/) and [Upgrading and support](/guides/support/): what to check first, and where to ask.
 - [Set up with an AI agent](/guides/ai-agent-setup/): let a coding agent do these steps.
 - [StoryShelf vs Chromatic](/guides/chromatic-comparison/): a factual feature and hosting comparison.
