@@ -105,6 +105,7 @@ export function ApproveLinkBody(props: {
         hx-target={target}
       >
         {csrfField()}
+        <input type="hidden" name="updatedAt" value={link.updatedAt} />
         <FormActions>
           <Button variant="secondary" data-dialog-close>
             Cancel
