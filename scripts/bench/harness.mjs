@@ -31,7 +31,7 @@ export async function startApp(dir) {
     load("node_modules/@hono/node-server/dist/index.mjs"),
     load("packages/app/dist/index.mjs"),
     load("packages/db-sqlite/dist/index.mjs"),
-    load("packages/storage-local/dist/index.mjs"),
+    load("packages/core/dist/storage/local.mjs"),
     load("packages/runner-playwright/dist/index.mjs"),
     load("packages/core/dist/models.mjs"),
   ]);

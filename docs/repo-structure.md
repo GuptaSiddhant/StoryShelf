@@ -48,6 +48,7 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
+- `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; `packages/storage-local` is a deprecated re-export for one minor release (ADR 0049 amendment 2026-11-21).
 - `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
   `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
   storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from

@@ -118,8 +118,8 @@ View the build: https://shelf.example.com/…
 ```
 
 - **`Build created: <id>` is gone from a current server.** The last line is now `View the build: <url>`. The old line appears only when the server predates the `buildUrl` field in the create-build answer. A script that greps for `Build created:` finds nothing against a current server.
-- **Read the id from the `Build:` row.** For example `grep -oE '^ *Build: +[0-9A-Z]{26}'`, as the repository's own [Storybook upload workflow](https://github.com/GuptaSiddhant/StoryShelf/blob/main/.github/workflows/app-storybook.yml) does.
-- **There is no `--json` option in 0.14.0.** Until one ships, match the `Build:` row, or use `--wait` and its exit codes (next section) when all you need is the verdict.
+- **Read the id with `--json`.** `storyshelf upload --json` prints `{ "buildId", "url", "status", "skipped" }` on stdout and every other message on stderr, so `npx storyshelf upload … --json | jq -r .buildId` replaces the grep. On GitHub Actions the upload step also sets the `build-id` and `build-url` outputs, so a later step reads `steps.<id>.outputs.build-id`. See [Machine-readable output](/guides/cli/client/#machine-readable-output).
+- **On 0.14.0 and earlier there is no `--json`.** Match the `Build:` row instead, for example `grep -oE '^ *Build: +[0-9A-Z]{26}'`, or use `--wait` and its exit codes (next section) when all you need is the verdict.
 
 ### `storyshelf upload --wait` follows the build
 
@@ -153,7 +153,7 @@ A CI step fails on any non-zero exit, so decide what `2` should mean for your pi
 - **`storyshelf create`** on a server with sign-in on creates the project but no longer mints a token that cannot upload. It prints the project's page, where **Get your first build** creates one.
 - **`SHELF_STORYBOOK_HOSTING=sandboxed`** is available to the image. Unset or `trusted` keeps today's behaviour; any other value stops boot. See [Security](/guides/security/).
 - **Times in the app** render in UTC and English, not in the server's time zone.
-- **A scaffold from an older `server init`** that fails with `ERR_MODULE_NOT_FOUND` for `@storyshelf/storage-local` needs that package added to its `package.json`.
+- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. The old package re-exports it for one minor release, then is no longer published.
 
 ## Related
 

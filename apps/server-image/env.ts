@@ -1,6 +1,7 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
@@ -9,7 +10,6 @@ import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { azurePlaywright } from "@storyshelf/runner-playwright/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
 import { readFileSync } from "node:fs";

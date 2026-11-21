@@ -1,7 +1,7 @@
 /** Which object storage the Fly demo uses, chosen from its environment. */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 
 /** What the boot log says about the storage in use: never a bucket, a key or a credential. */

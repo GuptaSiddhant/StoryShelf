@@ -171,9 +171,6 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../../packages/runner-playwright
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       nodemailer:
         specifier: ^10.2.1
         version: 10.2.1
@@ -229,9 +226,6 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../../packages/runner-playwright
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       '@storyshelf/storage-s3':
         specifier: workspace:*
         version: link:../../packages/storage-s3
@@ -262,7 +256,7 @@ importers:
     dependencies:
       '@aws-sdk/rds-signer':
         specifier: ^3.0.0
-        version: 3.1168.0
+        version: 3.1173.0
       '@hono/node-server':
         specifier: 'catalog:'
         version: 1.19.17(hono@4.13.14)
@@ -296,9 +290,6 @@ importers:
       '@storyshelf/storage-gcs':
         specifier: workspace:*
         version: link:../../packages/storage-gcs
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       '@storyshelf/storage-s3':
         specifier: workspace:*
         version: link:../../packages/storage-s3
@@ -771,7 +762,7 @@ importers:
         version: 4.1.12(vitest@5.0.5)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 0.31.11(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
+        version: 0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -820,7 +811,7 @@ importers:
         version: 4.1.12(vitest@5.0.5)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 0.31.11(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9)
+        version: 0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -866,7 +857,7 @@ importers:
         version: 12.11.1
       drizzle-kit:
         specifier: 'catalog:'
-        version: 0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9)
+        version: 0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -1011,9 +1002,6 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../storage-local
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -1470,8 +1458,8 @@ packages:
     resolution: {integrity: sha512-duLeE3xlf0viHeH+1RM4z5duR3b32BCZTWVMu+MbxFPjQBxy7hmIGEqt5hekuFPRuXoyhMovjNl+PNNsb5oiGQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/credential-providers@3.1168.0':
-    resolution: {integrity: sha512-6EcK9b/n2t0xifguAieNoOkDvszaH3cH2uzw0BHDnsqD7df09cirTY/fSTKvLAZsIDqG9r8thAHiTHnT2U0mlQ==}
+  '@aws-sdk/credential-providers@3.1173.0':
+    resolution: {integrity: sha512-lmOiI3yN6Xf3Dekr27l4t5QyoszOzmUsy98nzP5S9E9nuBV0BJYr8DZQ9UyBcl5hQZ6u6b47/kAucQQm1ZtJQw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/lib-storage@3.700.0':
@@ -1492,8 +1480,8 @@ packages:
     resolution: {integrity: sha512-acHTTzMB13CU6dU4sxABYExMI3PQM2zStWH2MiUwJp/7QKTrLg2f7mbzSXoegW2kYOk2tdqQYagsZrWB8Xv7eA==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/rds-signer@3.1168.0':
-    resolution: {integrity: sha512-ttkFbKhShKk4V1BDwfh+YILGi7tbB5dSk+4emTRKO6djIZGap6IOx8K0COX72pV0UL3HL45kG8deGdbVinjn7Q==}
+  '@aws-sdk/rds-signer@3.1173.0':
+    resolution: {integrity: sha512-0b68u+UnjhOmm/q09+mAFpHT55+xEf80cQhsFgrDE0Yp0hDUfygS2KrFXaQ9zM2DqymBQhdv/RzL0JTHUd4C4A==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/signature-v4-multi-region@3.996.49':
@@ -3896,8 +3884,8 @@ packages:
     resolution: {integrity: sha512-97imTcCyiPd8k0e9+ts/Sp0W65Dn9Ti357J7M09Ov4tI8Q1JDJVFSoAJtjEVKqfHEr3Pdo2jfolqKCaaiszH0g==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/core@3.40.0':
-    resolution: {integrity: sha512-DssGno52pzZ5m6RlDtyKuBIpZNPg9pqgs0CnNDKz9IatxCsmvNmJNn5Zn6rf77MthZo9wf89OvZFhTY/RwxhxQ==}
+  '@smithy/core@3.41.0':
+    resolution: {integrity: sha512-fuZ34H1uizS3WgcX9VXG7Uy8od5A5/kCc+CR3NkHLNm2H/BE9AUHG02VIdu8ZB7FYhLqsr/RZbqAoXuOCg/Oxg==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/credential-provider-imds@4.5.2':
@@ -8836,7 +8824,7 @@ snapshots:
       '@aws-sdk/types': 3.975.1
       '@aws-sdk/xml-builder': 3.972.43
       '@aws/lambda-invoke-store': 0.3.0
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/signature-v4': 5.7.5
       '@smithy/types': 4.20.0
       bowser: 2.15.0
@@ -8846,7 +8834,7 @@ snapshots:
     dependencies:
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -8862,7 +8850,7 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -8880,7 +8868,7 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/fetch-http-handler': 5.8.1
       '@smithy/node-http-handler': 4.14.2
       '@smithy/types': 4.20.0
@@ -8913,7 +8901,7 @@ snapshots:
       '@aws-sdk/credential-provider-web-identity': 3.972.90
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/credential-provider-imds': 4.5.2
       '@smithy/types': 4.20.0
       tslib: 2.8.1
@@ -8932,7 +8920,7 @@ snapshots:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -8959,7 +8947,7 @@ snapshots:
       '@aws-sdk/credential-provider-sso': 3.973.28
       '@aws-sdk/credential-provider-web-identity': 3.972.90
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/credential-provider-imds': 4.5.2
       '@smithy/types': 4.20.0
       tslib: 2.8.1
@@ -8976,7 +8964,7 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -8996,7 +8984,7 @@ snapshots:
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/token-providers': 3.1166.0
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -9014,11 +9002,11 @@ snapshots:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
-  '@aws-sdk/credential-providers@3.1168.0':
+  '@aws-sdk/credential-providers@3.1173.0':
     dependencies:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/credential-provider-cognito-identity': 3.972.83
@@ -9032,7 +9020,7 @@ snapshots:
       '@aws-sdk/credential-provider-web-identity': 3.972.90
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/credential-provider-imds': 4.5.2
       '@smithy/types': 4.20.0
       tslib: 2.8.1
@@ -9073,17 +9061,17 @@ snapshots:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/signature-v4-multi-region': 3.996.52
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/fetch-http-handler': 5.8.1
       '@smithy/node-http-handler': 4.14.2
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
-  '@aws-sdk/rds-signer@3.1168.0':
+  '@aws-sdk/rds-signer@3.1173.0':
     dependencies:
       '@aws-sdk/core': 3.981.0
-      '@aws-sdk/credential-providers': 3.1168.0
-      '@smithy/core': 3.40.0
+      '@aws-sdk/credential-providers': 3.1173.0
+      '@smithy/core': 3.41.0
       '@smithy/signature-v4': 5.7.5
       '@smithy/types': 4.20.0
       tslib: 2.8.1
@@ -9116,7 +9104,7 @@ snapshots:
       '@aws-sdk/core': 3.981.0
       '@aws-sdk/nested-clients': 3.998.3
       '@aws-sdk/types': 3.975.1
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -11064,7 +11052,7 @@ snapshots:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
 
-  '@smithy/core@3.40.0':
+  '@smithy/core@3.41.0':
     dependencies:
       '@smithy/types': 4.20.0
       tslib: 2.8.1
@@ -11091,7 +11079,7 @@ snapshots:
 
   '@smithy/fetch-http-handler@5.8.1':
     dependencies:
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -11143,7 +11131,7 @@ snapshots:
 
   '@smithy/node-http-handler@4.14.2':
     dependencies:
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -11181,7 +11169,7 @@ snapshots:
 
   '@smithy/signature-v4@5.7.5':
     dependencies:
-      '@smithy/core': 3.40.0
+      '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
       tslib: 2.8.1
 
@@ -12665,7 +12653,7 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 5.0.3
 
-  drizzle-kit@0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9):
+  drizzle-kit@0.31.11(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9):
     dependencies:
       '@drizzle-team/brocli': 0.10.2
       '@esbuild-kit/esm-loader': 2.6.5
@@ -12675,43 +12663,11 @@ snapshots:
       '@electric-sql/pglite': 0.5.12
       '@libsql/client': 0.18.0
       '@neondatabase/serverless': 1.2.0
+      '@planetscale/database': 1.20.2
       '@vercel/postgres': 0.10.0
       better-sqlite3: 12.11.1
       drizzle-orm: 0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
-      pg: 8.23.1
-      postgres: 3.4.9
-    transitivePeerDependencies:
-      - pnpapi
-
-  drizzle-kit@0.31.11(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@vercel/postgres@0.10.0)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9):
-    dependencies:
-      '@drizzle-team/brocli': 0.10.2
-      '@esbuild-kit/esm-loader': 2.6.5
-      esbuild: 0.25.12
-      tsx: 4.23.15
-    optionalDependencies:
-      '@electric-sql/pglite': 0.5.12
-      '@neondatabase/serverless': 1.2.0
-      '@planetscale/database': 1.20.2
-      '@vercel/postgres': 0.10.0
-      drizzle-orm: 0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       mysql2: 3.24.6(@types/node@26.6.5)
-      pg: 8.23.1
-      postgres: 3.4.9
-    transitivePeerDependencies:
-      - pnpapi
-
-  drizzle-kit@0.31.11(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9):
-    dependencies:
-      '@drizzle-team/brocli': 0.10.2
-      '@esbuild-kit/esm-loader': 2.6.5
-      esbuild: 0.25.12
-      tsx: 4.23.15
-    optionalDependencies:
-      '@electric-sql/pglite': 0.5.12
-      '@neondatabase/serverless': 1.2.0
-      '@vercel/postgres': 0.10.0
-      drizzle-orm: 0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
       pg: 8.23.1
       postgres: 3.4.9
     transitivePeerDependencies:
