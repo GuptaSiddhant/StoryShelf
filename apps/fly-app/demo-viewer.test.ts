@@ -6,6 +6,7 @@ function deps(over: Partial<DemoViewerDeps> = {}): DemoViewerDeps {
   return {
     findUserId: vi.fn(async () => null),
     createUser: vi.fn(async () => "u1"),
+    hasCredential: vi.fn(async () => true),
     projectId: vi.fn(async () => "p1"),
     isMember: vi.fn(async () => false),
     addViewer: vi.fn(async () => {}),
@@ -19,6 +20,7 @@ describe("ensureDemoViewer", () => {
     expect(await ensureDemoViewer(d, "")).toEqual({
       userCreated: false,
       memberAdded: false,
+      credentialSet: false,
     });
     expect(d.findUserId).not.toHaveBeenCalled();
   });
@@ -28,6 +30,7 @@ describe("ensureDemoViewer", () => {
     expect(await ensureDemoViewer(d, "a-long-password")).toEqual({
       userCreated: true,
       memberAdded: true,
+      credentialSet: false,
     });
     expect(d.createUser).toHaveBeenCalledWith(DEMO_VIEWER_EMAIL, "a-long-password");
     expect(d.projectId).toHaveBeenCalledWith(DEMO_PROJECT_SLUG);
@@ -39,6 +42,7 @@ describe("ensureDemoViewer", () => {
     expect(await ensureDemoViewer(d, "a-long-password")).toEqual({
       userCreated: false,
       memberAdded: false,
+      credentialSet: false,
     });
     expect(d.createUser).not.toHaveBeenCalled();
     expect(d.addViewer).not.toHaveBeenCalled();
@@ -49,7 +53,25 @@ describe("ensureDemoViewer", () => {
     expect(await ensureDemoViewer(d, "a-long-password")).toEqual({
       userCreated: true,
       memberAdded: false,
+      credentialSet: false,
     });
     expect(d.addViewer).not.toHaveBeenCalled();
+  });
+
+  it("sets the password of an existing user that has none, and leaves a complete one alone", async () => {
+    const staged = deps({
+      findUserId: async () => "u1",
+      hasCredential: async () => false,
+      isMember: async () => true,
+    });
+    expect(await ensureDemoViewer(staged, "a-long-password")).toEqual({
+      userCreated: false,
+      memberAdded: false,
+      credentialSet: true,
+    });
+    expect(staged.createUser).toHaveBeenCalledWith(DEMO_VIEWER_EMAIL, "a-long-password");
+    const complete = deps({ findUserId: async () => "u1", isMember: async () => true });
+    await ensureDemoViewer(complete, "a-long-password");
+    expect(complete.createUser).not.toHaveBeenCalled();
   });
 });

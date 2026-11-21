@@ -163,7 +163,7 @@ describe("buildCommentMarkdown: testing on", () => {
 
       [**Review changes →**](https://s/diff) · [Approve on StoryShelf](https://s/diff) · [Storybook](https://s/sb/b1/index.html) · [Build](https://s/build)
 
-      **❌ 1 failing Storybook test** (blocks the merge)
+      **❌ 1 failing Storybook test** (blocks the merge unless its story is marked flaky)
       - Form / Submit
 
       | Story | Target | Change | |
