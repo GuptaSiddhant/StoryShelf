@@ -66,7 +66,7 @@ describe("createInstrumentedDatabase", () => {
     const fake = createFakeDb();
     const condition = {} as SQL;
     const update = vi.fn(fake.updateWhere);
-    fake.updateWhere = update;
+    fake.updateWhere = update as unknown as typeof fake.updateWhere;
     const db = createInstrumentedDatabase(fake);
     expect(await db.updateWhere(fakeTable, "row-1", { count: 3 }, condition)).toEqual({
       id: "row-1",
