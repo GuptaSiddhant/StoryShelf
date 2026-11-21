@@ -57,6 +57,8 @@ export interface GitLinkRequestView {
   connectionName: string;
   reason: string | null;
   requestedAt: string;
+  /** The row's last change: the approve dialog posts it back, so a link edited meanwhile is refused. */
+  updatedAt: string;
 }
 
 /** Data of the System → Git page. */

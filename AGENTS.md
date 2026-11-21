@@ -3,7 +3,7 @@
 Guidance for AI agents (and humans) working in the StoryShelf monorepo.
 
 StoryShelf is a self-hosted visual-testing platform for Storybook (a Chromatic alternative): upload
-a built Storybook, render stories server-side with Playwright/Puppeteer, pixel-diff against per-branch
+a built Storybook, render stories server-side with Playwright, pixel-diff against per-branch
 baselines, then review and approve. `docs/architecture/` is the current-state spec;
 `docs/repo-structure.md` is the spatial index; `docs/adr/` records decisions.
 
@@ -55,7 +55,6 @@ Real-browser suite (gated; `turbo test` stays hermetic):
 npx -y playwright@1.63.0 install chromium   # one-time browser install
 (cd packages/runner-playwright && nub run test:integration)
 (cd packages/runner-playwright && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
-# Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
 ```
 
 CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
@@ -69,7 +68,7 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-{playwright,puppeteer}` (puppeteer deprecated),
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-playwright`,
   `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
@@ -167,10 +166,9 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `RenderedSnapshot.a11y`; they are stored in `snapshots.a11y_violations` and read only through
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
   a finding. Never change a status, failure set or git state because of a11y results.
-- **Settling and Storybook tests.** Runners wait for Storybook's own events through the public
-  `Channel.on` (`packages/runner-*/src/settle.ts`), falling back to `delay ?? 500`. Puppeteer is
-  deprecated and gets fixes only until it is removed in 0.15.0 (ADR 0001, amendment 2026-11-20), so the two
-  `settle.ts` copies no longer have to match and new capture features go into Playwright only. `projects.run_tests` (default off) runs `subtype: "test"` entries through
+- **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
+  `Channel.on` (`packages/runner-playwright/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
+  the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through
   `runProjectTests`/`CaptureRunner.runTests`; results are stored once as JSON in
   `builds.test_results` (`BuildModel.setTestResults`). A failing test is a blocking failure; never
   render a test entry as a story or add a test table.

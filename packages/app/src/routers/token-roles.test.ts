@@ -70,7 +70,7 @@ async function mint(
   });
 }
 
-const BUILD_BODY = JSON.stringify({ gitSha: "sha-1", gitBranch: "main" });
+const BUILD_BODY = JSON.stringify({ gitSha: "1111111", gitBranch: "main" });
 
 describe("bearer token permissions", () => {
   it("resolves a developer token to developer access", async () => {

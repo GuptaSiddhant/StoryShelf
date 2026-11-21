@@ -13,7 +13,7 @@ export const SIZING_DEFAULTS = {
   whitespaceThreshold: 0.6,
 } as const;
 
-/** Bounding box of #storybook-root as returned by Playwright/Puppeteer. */
+/** Bounding box of #storybook-root as returned by Playwright. */
 export interface BoundingBox {
   x: number;
   y: number;
