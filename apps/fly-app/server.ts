@@ -35,6 +35,8 @@ import { createCaptureRunner } from "@storyshelf/runner";
  */
 import { mkdirSync } from "node:fs";
 import { aiFromEnv, aiLogFields } from "./ai.ts";
+import { databaseDeps } from "./demo-viewer-db.ts";
+import { ensureDemoViewer } from "./demo-viewer.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
 import { exitBy, shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
@@ -216,6 +218,24 @@ const logger = app.lifecycle.logger;
 if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
   logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+}
+
+// The demo's one read-only account (#1275). The password is the Fly secret; it is never logged.
+// Retried each minute because `storyshelf-ui` is created by the first upload, which can come
+// after this boot; every run is idempotent and cheap.
+async function provisionDemoViewer(): Promise<void> {
+  try {
+    const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
+    if (done.userCreated || done.memberAdded) logger.info(done, "Demo viewer provisioned");
+  } catch (err) {
+    logger.error({ err }, "Demo viewer provisioning failed");
+  }
+}
+if (authPassword && env["SHELF_DEMO_VIEWER_PASSWORD"]) {
+  await provisionDemoViewer();
+  setInterval(() => {
+    provisionDemoViewer().catch(() => {}); // Intentionally empty — it logs its own errors
+  }, 60_000).unref();
 }
 
 const server = serve({ fetch: app.fetch, port }, () => {

@@ -25,9 +25,9 @@ With Puppeteer gone there is one runner, so it has the plain name. Nothing else 
 
 1. Replace the dependency: remove `@storyshelf/runner-playwright` and add `@storyshelf/runner`.
 2. Change the imports: `@storyshelf/runner-playwright` becomes `@storyshelf/runner`, and `@storyshelf/runner-playwright/remote` becomes `@storyshelf/runner/remote`.
-3. Optionally rename the factory: `createPlaywrightCaptureRunner` is now `createCaptureRunner`. The old name still works as a deprecated alias.
+3. Rename the factory: `createPlaywrightCaptureRunner` is now `createCaptureRunner`.
 
-`@storyshelf/runner-playwright` 0.15.0 only re-exports `@storyshelf/runner` (every subpath), so a server that changes nothing keeps working for one minor release. It retires after 0.16.0, so change your imports before then.
+There is no alias and no re-export: `@storyshelf/runner-playwright` is not published again, and the owner deprecates the npm package with a message naming the new one.
 
 ### Switching from Puppeteer to Playwright
 

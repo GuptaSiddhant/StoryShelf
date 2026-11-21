@@ -12,6 +12,7 @@ import { renderLoginPage } from "../pages/login.tsx";
 import { getStore } from "../store.ts";
 import { loginFailureOf } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
+import { requestForEngine, setEngineClient } from "./engine-client.ts";
 import { publicMessage } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { safeReturnPath } from "./oauth-state.ts";
@@ -59,6 +60,7 @@ async function forwardEngineRequest(
       headers.set(name, value);
     }
   }
+  setEngineClient(c, headers);
   if (method === "POST") {
     headers.set("content-type", "application/json");
   }
@@ -348,7 +350,7 @@ async function handleInviteAccept(c: Context, engine: Auth): Promise<Response> {
 
 /** Register the engine mount and descriptor-driven login routes. */
 export function registerEngineAuth(app: ShelfRouter, engine: Auth): void {
-  app.all("/api/auth/*", async (c) => await engine.handler(c.req.raw));
+  app.all("/api/auth/*", async (c) => await engine.handler(requestForEngine(c)));
 
   app.get("/auth/login", async (c) => {
     const returnTo = returnToOf(c.req.query(RETURN_FIELD));
