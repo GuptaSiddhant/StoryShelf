@@ -11,8 +11,8 @@ import {
 const SECRET_VALUE = "s".repeat(40);
 const OTHER_VALUE = "o".repeat(40);
 
-function logger(): { warn: ReturnType<typeof vi.fn> } {
-  return { warn: vi.fn() };
+function logger() {
+  return { warn: vi.fn<(details: object, message: string) => void>() };
 }
 
 describe("readSetting", () => {

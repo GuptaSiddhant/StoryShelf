@@ -301,7 +301,7 @@ async function syncStorybookMeta(
   const { synced, notFound } = await runTokenLoop(url, slug, metaToSync, tokens);
   if (!synced && notFound) {
     printError(
-      `Project "${slug}" does not exist on ${url} — run \`storyshelf create --url ${url} --name <name> --token $STORYSHELF_ADMIN_TOKEN\` first`,
+      `Project "${slug}" does not exist on ${url} — run \`storyshelf create --url ${url} --name <name> --token $SHELF_ADMIN_TOKEN\` first`,
     );
     process.exitCode = 1;
   }

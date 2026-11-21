@@ -7,7 +7,7 @@ exports[`server init output > is unchanged for auth oauth 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 735 07916ac878e950ee313f1e69264971796408fb90ab9f383fb26363265ec95937",
     "package.json 635 64e640df2b51653eb67d2f3fa627ff27e4e16390de732c267fb22ecdbc3b4c43",
-    "src/index.ts 2267 f02cafe2122731226a5497aa816ed3f073cacd82f84433c923a63e03ae9f1e65",
+    "src/index.ts 2262 759a59e1d13907e80ea9e1340c0a8482da96e91523615c36725c5ce3d3d6c8e2",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -35,7 +35,7 @@ exports[`server init output > is unchanged for auth password 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 895 859846050ec24aa3d5f7323a756371c107aeb3265cdabd1ac902213ae65ec6f8",
     "package.json 635 64e640df2b51653eb67d2f3fa627ff27e4e16390de732c267fb22ecdbc3b4c43",
-    "src/index.ts 2334 dd1901017899160e9d6d62668ec7bf8a95b1ff20b23a372334bb317d2960831a",
+    "src/index.ts 2329 6c2bc13513165fc3d75043e8a11e58039c23a72dfcf4509678613c3db7103aa2",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -65,7 +65,7 @@ exports[`server init output > is unchanged for database better-sqlite3 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 635 9fbf30aacd02adf76368efdd1d213968343b4b59e19f52cdb2deb51817c216c7",
-    "src/index.ts 1654 49c630489f72d9381a31fd724f63ecd9ee127fab3aa0d517de820651b6535dd9",
+    "src/index.ts 1649 f43d8fe5a3ac12a37cc4ff911887fc6fd2f5e41ea1a747b402d215bade63008a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -90,7 +90,7 @@ exports[`server init output > is unchanged for database bun-sqlite 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
-    "src/index.ts 1642 1817ffa3dd90b306067d967d765bb5811b44d49b06bd06a04849c648ab4b2a48",
+    "src/index.ts 1637 8fd921c953f9934cc7982dc14cd52983008784486cd1918896f066b9edca9663",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -115,7 +115,7 @@ exports[`server init output > is unchanged for database d1 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
-    "src/index.ts 1778 a04d38e5904444668f73561d16851f0c9edbe688915dd9cc8008eb368d06c96a",
+    "src/index.ts 1773 a681101a4b284840051aef1794fa400f04a473257a149e954117fa867e2ff12c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -140,7 +140,7 @@ exports[`server init output > is unchanged for database mysql 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 625 0ccd166d7d8dd2ee5cf0ac6b07d0d21d3a6c8ab56d5e05e7a7d5038388840a26",
-    "src/index.ts 1840 0317123fadfd726006cf085755c1c1cd5908f1ffefcfbec702ec198176d5cc52",
+    "src/index.ts 1835 8251563df2d656261372881ce58abf1ecc718859e1e4c9d002ca357da11d7071",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -167,7 +167,7 @@ exports[`server init output > is unchanged for database neon 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 646 64f385779cb158d51ba9b6a8601cccc0d717026959c8f292ee65873a162a596b",
-    "src/index.ts 1846 dd99ce5d23d79bf6de95671290321156ef62fd70d4aaa0747aa58adbac14c87a",
+    "src/index.ts 1841 c641c58df949e7cea7699c22f34be9df3b5a3bd548fa8a444eb282cb50b8b7a4",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -194,7 +194,7 @@ exports[`server init output > is unchanged for database neon-http 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 646 64f385779cb158d51ba9b6a8601cccc0d717026959c8f292ee65873a162a596b",
-    "src/index.ts 1859 e56e826c3c8bfe164698052ae5aab56d13dc4b013b73a9e5cf647078795c7d68",
+    "src/index.ts 1854 8ac7f6d774e972553eec24e03fc13bda69d3b20bc6403c9b171a13fff70d1fe2",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -221,7 +221,7 @@ exports[`server init output > is unchanged for database pg 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 624 b340cdfc7d9785d8a9ef1ba0caa5966a8d777dae307517a7f47ba56d7cc41dd1",
-    "src/index.ts 1840 ece1108dae7b029728dee30eb12a55bb5477f23b3c65e1df3f88b38d98d0b6ad",
+    "src/index.ts 1835 ec7a5afd2d56afc73ce14ca8b31eafb458d7ec033c277f165d786bbe0743701e",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -248,7 +248,7 @@ exports[`server init output > is unchanged for database pglite 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 642 e04cc6cb1c8daa239a82cdaf495f4d7f84fe2e39daf50c778d60985bfc2a28ce",
-    "src/index.ts 1603 b4fe8e57601a1eff4d84f8265012706c71c2c892bd0de21b49ed16f79096c3e4",
+    "src/index.ts 1598 5cbd0640074043d8ea1b4dd91330267c749cda5a85bfd3689fad942c94176ee8",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -273,7 +273,7 @@ exports[`server init output > is unchanged for database planetscale 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 641 50210861da8d203cb6a77f699f8fe56d33f2ac51416edbda0123aaebe79fd8ce",
-    "src/index.ts 1864 e0b70a5433100bfce366a4f95361577343517b460a78b900a94a05f503a44326",
+    "src/index.ts 1859 ee516692ba665e0ce958c47e03539a834e327a782805b4db84bc83dad3c9d140",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -300,7 +300,7 @@ exports[`server init output > is unchanged for database postgres 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 604 6a1c8b16f91b3a9c7e9f69629744cdfdab83d80cad4e76e87e909b40e4fc05f9",
-    "src/index.ts 1849 f9fb943c2453dae7da46709a8609e1d7f49c166c191d299c6564e395d43bf92f",
+    "src/index.ts 1844 6cc29c77c6ba803f3b1c1f1078df61abb1c4f94b5032137238a0b6c41351e38d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -327,7 +327,7 @@ exports[`server init output > is unchanged for database sqlite 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
-    "src/index.ts 1615 bd819b43951511d2f12c1b1f38a785e835512f1e9e44f1721847e922f35d3c3b",
+    "src/index.ts 1610 1e8c725a3812e22f1aca929f4be7aeb84cbf6a65f244d93b937fe099dc388109",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -352,7 +352,7 @@ exports[`server init output > is unchanged for database tidb 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 640 be4070a39c2469910ab67c6ac34d22391aa664f4cf921be00b33ad29253d7da3",
-    "src/index.ts 1843 142c5b85850c22b2fc4cb50d35ed2baea3ac034f3e1a4586a5f7d3e1f4477876",
+    "src/index.ts 1838 9f6d44322646ece4ff062eb9e28081dffc9291f3b09e03349df11893b057139f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -379,7 +379,7 @@ exports[`server init output > is unchanged for database turso 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 635 e9f8e1d4a91ca09c84b7866384ed28b3bf6b05865d7e7d8000123b9151743bc5",
-    "src/index.ts 1679 06b4336ff141f13166b9afe9d779561809beecb0ade168572d37fd988cd49dd3",
+    "src/index.ts 1674 e5b6657552481d1eafd002f8061cd74a3272debaaaf953cffe6fdac8fd871a55",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -404,7 +404,7 @@ exports[`server init output > is unchanged for database vercel 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 639 1e539afab7e92d08d0381abe5cee5acd781a97f3c8da5cebb0b200329560abef",
-    "src/index.ts 1603 aa10e4d439c9b96cb9861b73245a32e73460b3aea2bacf39911a482cc6e80131",
+    "src/index.ts 1598 b4008ab9a4cf04c836549a2212d7833a50e035358b41ecd882a25bc1148e5b64",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -429,7 +429,7 @@ exports[`server init output > is unchanged for design 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
-    "src/index.ts 1615 bd819b43951511d2f12c1b1f38a785e835512f1e9e44f1721847e922f35d3c3b",
+    "src/index.ts 1610 1e8c725a3812e22f1aca929f4be7aeb84cbf6a65f244d93b937fe099dc388109",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -456,7 +456,7 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
     "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 776 b219814c8015a2b2eede74edc4555dee1de7246056a24f5115e65508010f0ad8",
-    "src/index.ts 1840 0317123fadfd726006cf085755c1c1cd5908f1ffefcfbec702ec198176d5cc52",
+    "src/index.ts 1835 8251563df2d656261372881ce58abf1ecc718859e1e4c9d002ca357da11d7071",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -485,7 +485,7 @@ exports[`server init output > is unchanged for docker single container 1`] = `
     "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 753 b58b309f25a63d6d5dbac88707e3a526fd96bf4f697e39367859d9d7a6620b03",
-    "src/index.ts 1615 bd819b43951511d2f12c1b1f38a785e835512f1e9e44f1721847e922f35d3c3b",
+    "src/index.ts 1610 1e8c725a3812e22f1aca929f4be7aeb84cbf6a65f244d93b937fe099dc388109",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -515,7 +515,7 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "compose.yaml 900 4675c1ee9d583dba51e01568ec61a137851db3c9f0dfb2decc8bab2c0955a36c",
     "package.json 781 7d195c1af0b00d35ef48ec6e6f1dfecabf79a35f213436d4630279a5f4085762",
-    "src/index.ts 1849 f9fb943c2453dae7da46709a8609e1d7f49c166c191d299c6564e395d43bf92f",
+    "src/index.ts 1844 6cc29c77c6ba803f3b1c1f1078df61abb1c4f94b5032137238a0b6c41351e38d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -543,7 +543,7 @@ exports[`server init output > is unchanged for everything on 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 944 cde6b4d86a53e3167ae734764ae6841eca83361943545b777d8c26c2f0e154ec",
     "package.json 748 7c512d89bb3085d21d39d7f8a4d106418f577a6209f5756ee4e920be1531a50e",
-    "src/index.ts 3567 03d35ff6e1acc3ea50f30bcd021faf7fef26744773ba625108b9faca02336855",
+    "src/index.ts 3562 5889d55e4a107e159b7fdbc3fe43521083fa222e786401eea0a00127f4409a4a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -574,7 +574,7 @@ exports[`server init output > is unchanged for git on 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 602 9dbde99d95ef1bfc187a4de17bd2b31d5d465340a09c6a52ee181ca3f18fd0a1",
-    "src/index.ts 1615 bd819b43951511d2f12c1b1f38a785e835512f1e9e44f1721847e922f35d3c3b",
+    "src/index.ts 1610 1e8c725a3812e22f1aca929f4be7aeb84cbf6a65f244d93b937fe099dc388109",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -601,7 +601,7 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
     "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 753 b58b309f25a63d6d5dbac88707e3a526fd96bf4f697e39367859d9d7a6620b03",
-    "src/index.ts 1615 bd819b43951511d2f12c1b1f38a785e835512f1e9e44f1721847e922f35d3c3b",
+    "src/index.ts 1610 1e8c725a3812e22f1aca929f4be7aeb84cbf6a65f244d93b937fe099dc388109",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -628,7 +628,7 @@ exports[`server init output > is unchanged for local with advanced adapters 1`] 
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 640 be4070a39c2469910ab67c6ac34d22391aa664f4cf921be00b33ad29253d7da3",
-    "src/index.ts 1843 142c5b85850c22b2fc4cb50d35ed2baea3ac034f3e1a4586a5f7d3e1f4477876",
+    "src/index.ts 1838 9f6d44322646ece4ff062eb9e28081dffc9291f3b09e03349df11893b057139f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -655,7 +655,7 @@ exports[`server init output > is unchanged for notifications 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 632 6089a5f728f1ea46b56a7ebd7d3322d28d72b86dd3fa9bcbf8c84541c01f33f4",
-    "src/index.ts 2226 a3e6f7b00f02cfdb0ad86c805b32b2925b80095a56dffa6f6bc42e5d4491c67e",
+    "src/index.ts 2221 be2d89c116a50e0bc5a8ccf57f80a696082b004138e875ee3112f85c56f5c057",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -680,7 +680,7 @@ exports[`server init output > is unchanged for notifications with oauth 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 735 07916ac878e950ee313f1e69264971796408fb90ab9f383fb26363265ec95937",
     "package.json 665 897b1ae040590f39e807c9d13914e42d81c9aed3a46e0731d88167f29ae765fa",
-    "src/index.ts 3008 725b488a7a024fa6405f6cde8b950173a73ffd228ee8754f4969d7b887050b1d",
+    "src/index.ts 3003 42cfece765ec1e76bd1ba106f2efaf7e84b9fa7d369156664cd326bf8c62b38e",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -708,7 +708,7 @@ exports[`server init output > is unchanged for notifications with password auth 
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 895 859846050ec24aa3d5f7323a756371c107aeb3265cdabd1ac902213ae65ec6f8",
     "package.json 665 897b1ae040590f39e807c9d13914e42d81c9aed3a46e0731d88167f29ae765fa",
-    "src/index.ts 3075 2250bf792c5ae1cc7667a82afbb35aecc113b9a6f78947830861e06550055551",
+    "src/index.ts 3070 ad6d69c8d6dde2999e9f96b5a38b989194f68c2402d5acffaaabfcf457e68891",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -738,7 +738,7 @@ exports[`server init output > is unchanged for observability 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 644 fc73577c5a7b7c603c1da91e9c77fe0a25dcae3900b53d1dcfe04df271c81a6e",
-    "src/index.ts 2021 00d852acab9609b36df349047360cc888e6e64a675c553129ef0815804e8f323",
+    "src/index.ts 2016 42649d5f0d99376b6315c82033dd82e0cf49fd34ad3658cdaacdf439b5a714aa",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -763,7 +763,7 @@ exports[`server init output > is unchanged for storage azure 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 611 8d701b2082ebb49eccc5e86a4356d8f3fc30ad4a5a68bc8a429aa164a1da4340",
-    "src/index.ts 1691 2a70f0b20e0ca7852aabcd321af447f6fed5e92633ced8b991f3050ecf535bd7",
+    "src/index.ts 1686 40e17c0742d6e1eccf2077a01ef03c3195ac0a804850855eade35db947943ed2",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -788,7 +788,7 @@ exports[`server init output > is unchanged for storage gcs 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 609 455ab1db4a799037450d46ed9eabbad5006d3afd5e6bac3009b301108e1a2a9f",
-    "src/index.ts 1638 0f87683a74090c6587d3527ad0bd073a8a5f383b92c1bb2e86fd48238673045e",
+    "src/index.ts 1633 6f8c0998d361c01ce3eaae24fb6cb12894735309ca5879ec8cbfb0b432f17175",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -813,7 +813,7 @@ exports[`server init output > is unchanged for storage s3 1`] = `
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 608 10fe11fad699f933a90f68feb8288d7654308eaff78fbd4358e8a42e862dbbe5",
-    "src/index.ts 1666 e99ec845130524ba8c423ca21c3884b345f24c706282c351392bb2e9901875df",
+    "src/index.ts 1661 b2a748550ce1bb0c11dceacb14465af3d5f53dca2ac6e92b5cad011214d3a4c2",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project

@@ -81,7 +81,7 @@ The core CI flow in three calls:
      -H "Content-Type: application/json" \
      -d "{\"gitSha\":\"$GITHUB_SHA\",\"gitBranch\":\"$GITHUB_REF_NAME\"}")
    UPLOAD_URL=$(echo "$CREATE" | jq -r .uploadUrl)
-   curl -sS --fail-with-body -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
+   curl -sS --fail-with-body -X PUT "$SHELF_URL$UPLOAD_URL" \
      -H "Authorization: Bearer $SHELF_TOKEN" \
      -H "Content-Type: application/zip" \
      --data-binary @storybook-static.zip

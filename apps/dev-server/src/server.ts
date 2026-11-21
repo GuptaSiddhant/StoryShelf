@@ -43,6 +43,7 @@ if (legacy.length > 0) {
 // boot here; each old name in use is logged once the logger exists.
 renamedSettingsIn(env);
 const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
+const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = readSetting(env, "SHELF_SECRET");
@@ -177,7 +178,7 @@ const app = createShelfApp({
     // `serverTiming` emits Server-Timing response headers (total + db/storage).
     secret,
     // Rotation: keep the old SHELF_SECRET here until stored credentials are re-encrypted.
-    previousSecret: readSetting(env, "SHELF_SECRET_PREVIOUS") || undefined,
+    previousSecret: previousSecret === "" ? undefined : previousSecret,
     migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
     adminToken,
     publicBaseUrl,

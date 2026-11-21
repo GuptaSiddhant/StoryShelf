@@ -19,7 +19,7 @@ VARIANT="$(mktemp -d)"
 FEATURE_CSS='button[style*="29, 78, 216"]{background:#7c3aed!important;border-radius:999px!important}'
 # The workspace CLI (built in the job), so it always matches the server on this commit.
 CLI=(node "$PWD/packages/cli/dist/index.js")
-AUTH=(-H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" -H "content-type: application/json")
+AUTH=(-H "Authorization: Bearer $SHELF_ADMIN_TOKEN" -H "content-type: application/json")
 AUTHOR=(--author-name "Alex Doe" --author-email alex@example.com)
 
 # DEMO_BROWSER (e.g. chromium@sprite) renders the demo on that target; unset keeps the VM's Chromium.
@@ -28,7 +28,7 @@ AUTHOR=(--author-name "Alex Doe" --author-email alex@example.com)
 # the demo is already up to date, otherwise a newly set DEMO_BROWSER would be ignored.
 set_demo_browser() {
   [ -n "${DEMO_BROWSER:-}" ] || return 0
-  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+  curl -fsS "${AUTH[@]}" -X PATCH "$SHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
     -d "$(jq -nc --arg b "$DEMO_BROWSER" '{browsers: [$b]}')"
 }
 
@@ -38,9 +38,9 @@ set_demo_browser() {
 # warns and carries on without insights. Any other failure still stops the seed.
 set_demo_ai_profile() {
   local current code
-  current="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG" | jq -r '.aiProfile // empty')"
+  current="$(curl -fsS "${AUTH[@]}" "$SHELF_URL/api/v1/projects/$SLUG" | jq -r '.aiProfile // empty')"
   [ "$current" = "default" ] && return 0
-  code="$(curl -sS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+  code="$(curl -sS "${AUTH[@]}" -X PATCH "$SHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
     -w '%{http_code}' -d '{"aiProfile":"default"}')"
   case "$code" in
     2*) ;;
@@ -54,9 +54,9 @@ set_demo_ai_profile() {
 # endpoint has no such field, so it is a PATCH, set only when it differs; a re-run is a no-op.
 set_demo_public() {
   local current
-  current="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG" | jq -r '.publicBranchRegex // empty')"
+  current="$(curl -fsS "${AUTH[@]}" "$SHELF_URL/api/v1/projects/$SLUG" | jq -r '.publicBranchRegex // empty')"
   [ "$current" = ".*" ] && return 0
-  curl -fsS "${AUTH[@]}" -X PATCH "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
+  curl -fsS "${AUTH[@]}" -X PATCH "$SHELF_URL/api/v1/projects/$SLUG" -o /dev/null \
     -d '{"publicBranchRegex":".*"}'
 }
 
@@ -67,7 +67,7 @@ set_demo_public() {
 approve_main() {
   local i build status
   for i in $(seq 1 120); do
-    build="$(curl -fsS "${AUTH[@]}" "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" |
+    build="$(curl -fsS "${AUTH[@]}" "$SHELF_URL/api/v1/projects/$SLUG/builds" |
       jq -c --arg sha "$MAIN_SHA" '[.[] | select(.gitSha == $sha)] | first // empty')"
     status="$(jq -r '.status // empty' <<<"$build")"
     case "$status" in
@@ -76,7 +76,7 @@ approve_main() {
       "" | pending | capturing | comparing) sleep 5 ;;
       *)
         curl -fsS "${AUTH[@]}" -X POST -o /dev/null \
-          "$STORYSHELF_URL/api/v1/projects/$SLUG/builds/$(jq -r '.id' <<<"$build")/approve-all"
+          "$SHELF_URL/api/v1/projects/$SLUG/builds/$(jq -r '.id' <<<"$build")/approve-all"
         sleep 2
         ;;
     esac
@@ -93,7 +93,7 @@ FEATURE_SHA="$(sha_for feature/new-button)"
 # yet"; any other failure (auth, 5xx, unreachable) stops here instead of guessing.
 BUILDS_FILE="$(mktemp)"
 CODE="$(curl -sS -o "$BUILDS_FILE" -w '%{http_code}' "${AUTH[@]}" \
-  "$STORYSHELF_URL/api/v1/projects/$SLUG/builds" || true)"
+  "$SHELF_URL/api/v1/projects/$SLUG/builds" || true)"
 case "$CODE" in
   200)
     if jq -e --arg a "$MAIN_SHA" --arg b "$FEATURE_SHA" \
@@ -107,18 +107,18 @@ case "$CODE" in
       exit 0
     fi
     echo "Demo project is stale; recreating it."
-    curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$SLUG" -o /dev/null
+    curl -fsS "${AUTH[@]}" -X DELETE "$SHELF_URL/api/v1/projects/$SLUG" -o /dev/null
     ;;
   404) ;;
   *)
-    echo "::error::GET $STORYSHELF_URL/api/v1/projects/$SLUG/builds answered '$CODE': $(head -c 300 "$BUILDS_FILE")"
+    echo "::error::GET $SHELF_URL/api/v1/projects/$SLUG/builds answered '$CODE': $(head -c 300 "$BUILDS_FILE")"
     exit 1
     ;;
 esac
 
 # Create the project with fixed metadata. Uploads use the admin token itself: a project token
 # minted through it has no owner, which makes it a viewer that cannot upload.
-curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
+curl -fsS "${AUTH[@]}" -X POST "$SHELF_URL/api/v1/projects" -o /dev/null \
   -d '{"name":"Demo Design System","gitRepository":"acme/design-system","gitDefaultBranch":"main","requireVerifiedDefault":false}'
 # Before the first upload, so the first build already renders on the chosen target.
 set_demo_browser
@@ -129,7 +129,7 @@ set_demo_ai_profile
 # differs between the two builds (the feature build only injects CSS into the built output), so
 # affected capture would inherit every story and the demo would show no diffs.
 upload() { # <dir> <branch> <sha> <message>
-  (cd "$FIXTURE" && "${CLI[@]}" upload --url "$STORYSHELF_URL" --slug "$SLUG" --token "$STORYSHELF_ADMIN_TOKEN" \
+  (cd "$FIXTURE" && "${CLI[@]}" upload --url "$SHELF_URL" --slug "$SLUG" --token "$SHELF_ADMIN_TOKEN" \
     --build-dir "$1" --branch "$2" --sha "$3" --message "$4" "${AUTHOR[@]}" --full)
 }
 

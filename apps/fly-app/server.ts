@@ -51,6 +51,7 @@ refuseLegacyVariables(env);
 // names of one setting set to different values stop boot here; each old name is logged below.
 renamedSettingsIn(env);
 const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
+const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
 const secret = readSetting(env, "SHELF_SECRET");
@@ -207,7 +208,7 @@ const app = createShelfApp({
   config: {
     secret,
     // Rotation: keep the old SHELF_SECRET here until stored credentials are re-encrypted.
-    previousSecret: readSetting(env, "SHELF_SECRET_PREVIOUS") || undefined,
+    previousSecret: previousSecret === "" ? undefined : previousSecret,
     migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
     adminToken,
     publicBaseUrl,

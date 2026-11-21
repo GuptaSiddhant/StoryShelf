@@ -111,7 +111,7 @@ const OBSERVABILITY_SETUP_LINES = [
 
 const CONFIG_AND_SETUP_LINES = [
   `  config: {`,
-  `    // Lets \`storyshelf create --token $STORYSHELF_ADMIN_TOKEN\` bootstrap projects; unset disables it.`,
+  `    // Lets \`storyshelf create --token $SHELF_ADMIN_TOKEN\` bootstrap projects; unset disables it.`,
   `    adminToken: process.env.SHELF_ADMIN_TOKEN || undefined,`,
   `    publicBaseUrl: process.env.SHELF_PUBLIC_BASE_URL || undefined,`,
   `    secret: process.env.SHELF_SECRET,`,
