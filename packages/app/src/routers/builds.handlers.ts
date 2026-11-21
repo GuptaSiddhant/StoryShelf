@@ -312,10 +312,18 @@ export const APPROVER_ROLES: readonly ProjectRole[] = ["approver", "admin"];
 /** Labels on a build, validated the same way on normal and skipped creation. */
 export const buildLabelsSchema = z.array(z.object({ key: z.string().min(1), value: z.string() }));
 
+/**
+ * A commit id: 7 to 64 hex characters, or the `local-<hex>` identity the CLI synthesizes without
+ * git. It is written into comments and check runs, so nothing else is accepted (#1268).
+ */
+export const gitShaSchema = z
+  .string()
+  .regex(/^(?:[0-9a-fA-F]{7,64}|local-[0-9a-fA-F]{1,64})$/u, "gitSha must be a hex commit id");
+
 /** JSON input schema for creating a build before streaming its bundle. */
 export const buildCreateJsonSchema = z
   .object({
-    gitSha: z.string().min(1),
+    gitSha: gitShaSchema,
     gitBranch: z.string().min(1),
     authorEmail: z.string().optional(),
     authorName: z.string().optional(),

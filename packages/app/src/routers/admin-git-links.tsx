@@ -112,7 +112,9 @@ const APPROVE_FLASH = {
 /** Approve after checking coverage again; open builds are asked for their state through the link. */
 async function handleApprove(c: Context): Promise<Response> {
   const { row, view } = await openLink(c);
-  const outcome = await approve(row);
+  const seen = (await c.req.parseBody())["updatedAt"];
+  // Approve what the dialog showed: a link edited since is still pending, with the same id.
+  const outcome = seen === row.updatedAt ? await approve(row) : "moved";
   if (outcome !== "refused") {
     const done = { message: `${view.repository} approved`, tone: "success" } as const;
     const { message, tone } = outcome === "moved" ? APPROVE_FLASH.moved : done;
