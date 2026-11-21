@@ -64,6 +64,8 @@ export interface ProjectSettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  /** The viewer is a site admin and may delete the project (omitted ⇒ no danger zone). */
+  canDeleteProject?: boolean | undefined;
   /** Notifiers are wired but no public origin resolves (ADR 0014, decision 11). */
   notificationsPaused?: boolean | undefined;
   /** AI availability and the profile choices (omitted ⇒ AI off). */
@@ -186,7 +188,8 @@ const REVIEW_SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
 
 const SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
   ...REVIEW_SECTIONS,
-  general: (data, formState) => renderSettingsGeneral(data.project, formState, data.isAdmin),
+  general: (data, formState) =>
+    renderSettingsGeneral(data.project, formState, data.isAdmin, data.canDeleteProject),
   links: (data, formState) =>
     renderSettingsLinks(data.project, data.links, data.linkCandidates, data.isAdmin, formState),
   thresholds: (data, formState) => renderSettingsThresholds(data.project, formState, data.isAdmin),

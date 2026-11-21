@@ -20,7 +20,7 @@ export const DB_IMPORT: Record<DatabaseChoice, string> = {
 };
 
 export const STORAGE_IMPORT: Record<StorageChoice, string> = {
-  local: `import { createLocalStorage } from "@storyshelf/storage-local";`,
+  local: `import { createLocalStorage } from "@storyshelf/core/storage/local";`,
   s3: `import { createS3Storage } from "@storyshelf/storage-s3";`,
   azure: `import { createAzureStorage } from "@storyshelf/storage-azure";`,
   gcs: `import { createGcsStorage } from "@storyshelf/storage-gcs";`,

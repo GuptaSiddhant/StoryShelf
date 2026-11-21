@@ -98,6 +98,6 @@ Helper that joins a storage prefix with a relative path into a blob name.
 
 ## How it fits in
 
-`storage-azure` is the `storage` option for `createShelfApp` in Azure deployments. It implements the same `StorageAdapter` interface as `@storyshelf/storage-local`, `@storyshelf/storage-s3`, and `@storyshelf/storage-gcs`, so switching between local disk, S3, GCS, and Azure requires no changes elsewhere.
+`storage-azure` is the `storage` option for `createShelfApp` in Azure deployments. It implements the same `StorageAdapter` interface as `@storyshelf/core/storage/local`, `@storyshelf/storage-s3`, and `@storyshelf/storage-gcs`, so switching between local disk, S3, GCS, and Azure requires no changes elsewhere.
 
 See `docs/architecture.md` and ADR 0006.

@@ -172,6 +172,8 @@ jobs:
       packages: write
       id-token: write # provenance attestation
       attestations: write
+    outputs:
+      dockerhub: ${{ steps.dockerhub.outputs.dockerhub }} # "true" when Docker Hub got the tags; never the secret
     env:
       VERSION: ${{ needs.validate.outputs.version }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'guptasiddhant' }}
@@ -283,6 +285,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.detect.outputs.tag }}
       RELEASE_SHA: ${{ needs.detect.outputs.sha }}
+      DOCKERHUB_PUSHED: ${{ needs.publish-image.outputs.dockerhub }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -311,7 +314,10 @@ jobs:
         # the git log when the tag has no section.
         run: |
           set -e
-          if node scripts/release-notes.mjs "$RELEASE_TAG" > release-body.md; then
+          flags=""
+          if [ "$DOCKERHUB_PUSHED" = "true" ]; then flags="--dockerhub"; fi
+          # shellcheck disable=SC2086
+          if node scripts/release-notes.mjs "$RELEASE_TAG" $flags > release-body.md; then
             echo "notes from CHANGELOG.md"
           else
             PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || echo "")
@@ -325,6 +331,8 @@ jobs:
               echo "## $RELEASE_TAG"
               echo ""
               echo "$LOG"
+              echo ""
+              node scripts/release-notes.mjs "$RELEASE_TAG" --install-only $flags
             } > release-body.md
           fi
           cat release-body.md
