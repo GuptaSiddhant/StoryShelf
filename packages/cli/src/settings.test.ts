@@ -36,7 +36,7 @@ describe("refuseRenamedCliSettings", () => {
       "STORYSHELF_TOKEN -> SHELF_TOKEN",
     ]);
     expect(() => refuseRenamedCliSettings(env)).toThrow(
-      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then run again:\n  STORYSHELF_HOST -> SHELF_URL\n  STORYSHELF_TOKEN -> SHELF_TOKEN",
+      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then run again:\n  STORYSHELF_HOST -> SHELF_URL\n  STORYSHELF_TOKEN -> SHELF_TOKEN\nIf another tool sets one of these names for itself, set SHELF_ALLOW_OLD_NAMES=1: the CLI then runs and still ignores them.",
     );
     let message = "";
     try {
@@ -45,6 +45,18 @@ describe("refuseRenamedCliSettings", () => {
       message = (error as Error).message;
     }
     expect(message).not.toContain(TOKEN_VALUE);
+  });
+
+  it("with SHELF_ALLOW_OLD_NAMES=1, runs and returns the old names to warn about", () => {
+    const env = { STORYSHELF_TOKEN: TOKEN_VALUE, SHELF_ALLOW_OLD_NAMES: "1" };
+    expect(refuseRenamedCliSettings(env)).toEqual(["STORYSHELF_TOKEN -> SHELF_TOKEN"]);
+    expect(readSetting(env, "SHELF_TOKEN")).toBeUndefined();
+  });
+
+  it("refuses when the hatch holds anything but 1", () => {
+    expect(() =>
+      refuseRenamedCliSettings({ STORYSHELF_TOKEN: TOKEN_VALUE, SHELF_ALLOW_OLD_NAMES: "yes" }),
+    ).toThrow(/STORYSHELF_TOKEN -> SHELF_TOKEN/u);
   });
 
   it("ignores an empty old name", () => {

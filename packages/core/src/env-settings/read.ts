@@ -1,7 +1,8 @@
 /**
  * StoryShelf's own environment variables (#1308): `readSetting` reads a `SHELF_*` name, and
  * `refuseRenamedSettings` is the boot guard that refuses to start while an old name from
- * {@link RENAMED_SETTINGS} is set. Old names are never read. Errors name variables only, never a value.
+ * {@link RENAMED_SETTINGS} is set, unless `SHELF_ALLOW_OLD_NAMES=1` says another service owns it.
+ * Old names are never read. Errors and warnings name variables only, never a value.
  */
 import { RENAMED_SETTINGS, type RenamedSetting, type SettingName } from "./renames.ts";
 
@@ -37,6 +38,16 @@ export function renamedSettingsIn(
   );
 }
 
+/**
+ * The escape hatch: another service in the same environment sets one of the generic old names
+ * (a log level, a data directory, a bucket, SMTP settings) for itself. With it, boot warns and
+ * starts; the old names are still never read.
+ */
+export const ALLOW_OLD_NAMES_ENV = "SHELF_ALLOW_OLD_NAMES";
+
+/** The warning logged when the escape hatch lets boot continue past old names. */
+export const OLD_NAMES_ALLOWED_MESSAGE = `Old StoryShelf variable names are set and ignored (${ALLOW_OLD_NAMES_ENV}=1)`;
+
 /** Refused boot: old variable names are set. Lists each with its new name, never a value. */
 export class RenamedSettingError extends Error {
   override readonly name = "RenamedSettingError";
@@ -45,16 +56,29 @@ export class RenamedSettingError extends Error {
   constructor(renames: readonly SettingRename[]) {
     const lines = renames.map((rename) => `  ${rename.old} -> ${rename.new}`);
     super(
-      `StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n${lines.join("\n")}`,
+      `StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n${lines.join("\n")}\nIf another service sets one of these names for itself, set ${ALLOW_OLD_NAMES_ENV}=1: StoryShelf then starts and still ignores them.`,
     );
     this.renames = renames;
   }
 }
 
-/** The boot guard: throws {@link RenamedSettingError} when any old name (of `names`) is set. */
-export function refuseRenamedSettings(env: SettingsEnv, names?: readonly RenamedSetting[]): void {
+/**
+ * The boot guard. Throws {@link RenamedSettingError} when any old name (of `names`) is set. With
+ * `SHELF_ALLOW_OLD_NAMES=1` it returns those old names instead, for the caller to log once as a
+ * warning (names only); otherwise it returns an empty list.
+ */
+export function refuseRenamedSettings(
+  env: SettingsEnv,
+  names?: readonly RenamedSetting[],
+): SettingRename[] {
   const renames = renamedSettingsIn(env, names);
-  if (renames.length > 0) {
-    throw new RenamedSettingError(renames);
+  if (renames.length === 0 || env[ALLOW_OLD_NAMES_ENV] === "1") {
+    return renames;
   }
+  throw new RenamedSettingError(renames);
+}
+
+/** The fields of the hatch's warning: each ignored old name with its new one, never a value. */
+export function oldNamesAllowedFields(renames: readonly SettingRename[]): { oldNames: string[] } {
+  return { oldNames: renames.map((rename) => `${rename.old} -> ${rename.new}`) };
 }

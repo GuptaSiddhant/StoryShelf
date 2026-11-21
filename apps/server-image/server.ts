@@ -4,7 +4,13 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
-import { parseTrustProxy, readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
+import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  parseTrustProxy,
+  readSetting,
+  refuseRenamedSettings,
+} from "@storyshelf/core/config";
 import {
   createEmailNotifier,
   gitFromEnv,
@@ -58,7 +64,8 @@ process.on("uncaughtException", (error) => {
 });
 // The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
 // old name is set, listing each with its new name and never a value, so no setting is silently dropped.
-refuseRenamedSettings(env);
+// With SHELF_ALLOW_OLD_NAMES=1 the old names found come back, to be logged once below.
+const ignoredOldNames = refuseRenamedSettings(env);
 
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
@@ -157,6 +164,9 @@ const app = createShelfApp({
 // A failed boot check (auth secret, AI, images, adapters) stops the server: it never listens.
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
+if (ignoredOldNames.length > 0) {
+  logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+}
 
 if (imageAuth.mode === "password") {
   await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });

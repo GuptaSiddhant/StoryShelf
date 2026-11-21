@@ -3,7 +3,7 @@
  * `@storyshelf/core` (it is a dev dependency), so it keeps the rows of core's `RENAMED_SETTINGS` it
  * reads; `settings.test.ts` fails when a row here differs from core's. Old names are never read
  * (owner policy #1309): the CLI refuses to run while one is set, naming each with its new name and
- * never a value.
+ * never a value, unless `SHELF_ALLOW_OLD_NAMES=1`. Removed with core's table in the first release of 2027.
  */
 
 /** The CLI's settings with the old names they replaced: the same rows as core's `RENAMED_SETTINGS`. */
@@ -36,12 +36,19 @@ export function renamedCliSettingsIn(env: Env): string[] {
   );
 }
 
-/** Throws, naming each old variable with its new name (never a value), when any is set. */
-export function refuseRenamedCliSettings(env: Env): void {
+/** Lets the CLI run past old names another service owns; they are still never read. */
+export const ALLOW_OLD_NAMES_ENV = "SHELF_ALLOW_OLD_NAMES";
+
+/**
+ * Throws, naming each old variable with its new name (never a value), when any is set. With
+ * `SHELF_ALLOW_OLD_NAMES=1` it returns those `OLD -> NEW` lines instead, for one warning.
+ */
+export function refuseRenamedCliSettings(env: Env): string[] {
   const renames = renamedCliSettingsIn(env);
-  if (renames.length > 0) {
-    throw new Error(
-      `StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then run again:\n${renames.map((line) => `  ${line}`).join("\n")}`,
-    );
+  if (renames.length === 0 || env[ALLOW_OLD_NAMES_ENV] === "1") {
+    return renames;
   }
+  throw new Error(
+    `StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then run again:\n${renames.map((line) => `  ${line}`).join("\n")}\nIf another tool sets one of these names for itself, set ${ALLOW_OLD_NAMES_ENV}=1: the CLI then runs and still ignores them.`,
+  );
 }

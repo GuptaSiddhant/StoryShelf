@@ -1,7 +1,13 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy, readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
+import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  parseTrustProxy,
+  readSetting,
+  refuseRenamedSettings,
+} from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
@@ -36,7 +42,8 @@ if (legacy.length > 0) {
 }
 // The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
 // old name is set, listing each with its new name and never a value, so no setting is silently dropped.
-refuseRenamedSettings(env);
+// With SHELF_ALLOW_OLD_NAMES=1 the old names found come back, to be logged once below.
+const ignoredOldNames = refuseRenamedSettings(env);
 const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
 const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? ".dev-data";
@@ -185,6 +192,9 @@ const app = createShelfApp({
 
 await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
+if (ignoredOldNames.length > 0) {
+  logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+}
 
 if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });

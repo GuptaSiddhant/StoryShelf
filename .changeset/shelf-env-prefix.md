@@ -18,7 +18,10 @@ are unchanged. The full table is in the upgrading guide.
 
 The old names are not read. So that an upgrade cannot silently drop a setting, the server, the CLI
 and the MCP server refuse to start while any old name is set, listing each with its new name and
-never a value. Rename the variables before upgrading. `storyshelf server init` and the Terraform
+never a value. Rename the variables before upgrading. When another service in the same
+environment sets one of the generic old names (`LOG_LEVEL`, `DATA_DIR`, `BUCKET_NAME`, …) for
+itself, `SHELF_ALLOW_OLD_NAMES=1` lets StoryShelf start with one warning that names them; they are
+still not read. The guard is removed in the first release of 2027. `storyshelf server init` and the Terraform
 modules write only the new names.
 
 Schema: none.

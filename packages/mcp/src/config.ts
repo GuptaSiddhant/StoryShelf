@@ -1,4 +1,9 @@
-import { readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
+import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  readSetting,
+  refuseRenamedSettings,
+} from "@storyshelf/core/config";
 
 /** Resolved connection settings for the MCP server. */
 export interface McpConfig {
@@ -20,7 +25,7 @@ export function resolveConfig(
   env: NodeJS.ProcessEnv = process.env,
   overrides: Partial<McpConfig> = {},
 ): McpConfig {
-  refuseRenamedSettings(env, ["SHELF_URL", "SHELF_TOKEN", "SHELF_SLUG"]);
+  warnIgnoredOldNames(refuseRenamedSettings(env, ["SHELF_URL", "SHELF_TOKEN", "SHELF_SLUG"]));
   const url = overrides.url ?? readSetting(env, "SHELF_URL");
   if (!url) {
     throw new Error("SHELF_URL is required (or pass --url)");
@@ -32,4 +37,12 @@ export function resolveConfig(
     ...(token ? { token } : {}),
     ...(slug ? { slug } : {}),
   };
+}
+
+/** With SHELF_ALLOW_OLD_NAMES=1, one stderr line naming the ignored old variables (never values). */
+function warnIgnoredOldNames(renames: ReturnType<typeof refuseRenamedSettings>): void {
+  if (renames.length > 0) {
+    const names = oldNamesAllowedFields(renames).oldNames.join(", ");
+    process.stderr.write(`storyshelf-mcp: ${OLD_NAMES_ALLOWED_MESSAGE}: ${names}\n`);
+  }
 }

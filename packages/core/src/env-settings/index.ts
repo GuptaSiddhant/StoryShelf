@@ -6,6 +6,9 @@ export {
   type SettingName,
 } from "./renames.ts";
 export {
+  ALLOW_OLD_NAMES_ENV,
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
   readSetting,
   refuseRenamedSettings,
   renamedSettingsIn,

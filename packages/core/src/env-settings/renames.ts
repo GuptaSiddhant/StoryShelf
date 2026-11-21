@@ -2,7 +2,11 @@
  * StoryShelf's renamed environment variables (#1308): each `SHELF_*` name with the old names it
  * replaces. The old names are **not** read (owner policy #1309: no compatibility before 2027-01-01).
  * Boot refuses to start while one is set (`refuseRenamedSettings`), so an upgrade never silently
- * drops a setting. This file is the only source that names an old variable.
+ * drops a setting; `SHELF_ALLOW_OLD_NAMES=1` lets it start with a warning when another service owns
+ * a generic name. This file is the only source that names an old variable.
+ *
+ * End date: the guard and this table are removed in the first release of 2027. After that the
+ * ratchet (`ratchet.test.ts`) alone keeps the old names from coming back.
  */
 export const RENAMED_SETTINGS = {
   // Secrets and access

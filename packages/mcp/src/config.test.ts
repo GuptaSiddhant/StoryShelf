@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resolveConfig } from "./config.ts";
 
 describe("resolveConfig", () => {
@@ -25,6 +25,25 @@ describe("resolveConfig", () => {
     }
     expect(message).toContain("  STORYSHELF_TOKEN -> SHELF_TOKEN");
     expect(message).not.toContain(secret);
+  });
+
+  it("with SHELF_ALLOW_OLD_NAMES=1, warns on stderr with names only and starts", () => {
+    const secret = "secret-token-value";
+    const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      expect(
+        resolveConfig({
+          SHELF_URL: "http://a",
+          STORYSHELF_TOKEN: secret,
+          SHELF_ALLOW_OLD_NAMES: "1",
+        }),
+      ).toEqual({ url: "http://a" });
+      const printed = write.mock.calls.map((call) => String(call[0])).join("");
+      expect(printed).toContain("STORYSHELF_TOKEN -> SHELF_TOKEN");
+      expect(printed).not.toContain(secret);
+    } finally {
+      write.mockRestore();
+    }
   });
 
   it("ignores old names of settings it does not read", () => {

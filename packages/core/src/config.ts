@@ -715,6 +715,9 @@ export {
 } from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";
 export {
+  ALLOW_OLD_NAMES_ENV,
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
   readSetting,
   refuseRenamedSettings,
   renamedSettingsIn,

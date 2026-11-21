@@ -43,6 +43,8 @@ StoryShelf's own settings are now `SHELF_*`. A name stays unprefixed only when a
 
 - The old names are not read any more; there are no aliases.
 - So that an upgrade cannot silently drop a setting, the server (the image, the Fly app and the dev server), the CLI and the MCP server refuse to start while any old name in the table below is set. The refusal lists each old name with its new one and never prints a value. This holds even when the new name is set too: unset the old one.
+- If another service in the same environment sets one of these generic names for itself (`LOG_LEVEL`, `DATA_DIR`, `BUCKET_NAME`, `SECRET`, `SMTP_*` in a shared compose `.env`, …), set `SHELF_ALLOW_OLD_NAMES=1`. StoryShelf then starts, logs one warning naming the old variables it found (never their values), and still does not read them.
+- The guard is temporary: it is removed in the first release of 2027. From then on the old names are simply ignored.
 - `storyshelf server init` and the Terraform modules write only the new names. A server you generated earlier keeps its own `process.env` reads; change them when you rename the variables.
 
 To move, set every new name with the old value, unset the old names, then deploy the new release. In CI, rename the variable your workflow passes (`SHELF_TOKEN`, `SHELF_URL`); the repository secret behind it can keep its name.

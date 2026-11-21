@@ -543,8 +543,19 @@ describe("old variable names (#1308)", () => {
       caught = error;
     }
     expect(describeBootFailure(caught)).toBe(
-      "storyshelf: StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\n  AUTH_PASSWORD -> SHELF_ADMIN_PASSWORD\n",
+      "storyshelf: StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\n  AUTH_PASSWORD -> SHELF_ADMIN_PASSWORD\nIf another service sets one of these names for itself, set SHELF_ALLOW_OLD_NAMES=1: StoryShelf then starts and still ignores them.\n",
     );
     expect(describeBootFailure(caught)).not.toContain(secret);
+  });
+
+  it("boot past them with SHELF_ALLOW_OLD_NAMES=1, which returns the names to warn about and reads none", () => {
+    const env = { SECRET: secret, LOG_LEVEL: "debug", SHELF_ALLOW_OLD_NAMES: "1" };
+    expect(refuseRenamedSettings(env)).toEqual([
+      { old: "SECRET", new: "SHELF_SECRET" },
+      { old: "LOG_LEVEL", new: "SHELF_LOG_LEVEL" },
+    ]);
+    expect(() => authFromEnv({ ...env, AUTH_PASSWORD: "a-long-password" })).toThrow(
+      /^SHELF_ADMIN_PASSWORD is unset/u,
+    );
   });
 });

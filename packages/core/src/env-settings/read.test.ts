@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
   readSetting,
   refuseRenamedSettings,
   RenamedSettingError,
@@ -38,7 +40,7 @@ describe("refuseRenamedSettings (the boot guard)", () => {
     const error = refusal({ SECRET: SECRET_VALUE });
     expect(error).toBeInstanceOf(RenamedSettingError);
     expect(error?.message).toBe(
-      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET",
+      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\nIf another service sets one of these names for itself, set SHELF_ALLOW_OLD_NAMES=1: StoryShelf then starts and still ignores them.",
     );
     expect(error?.message).not.toContain(SECRET_VALUE);
   });
@@ -59,11 +61,42 @@ describe("refuseRenamedSettings (the boot guard)", () => {
       { old: "AWS_BUCKET", new: "SHELF_S3_BUCKET" },
       { old: "BUCKET_NAME", new: "SHELF_S3_BUCKET" },
     ]);
-    expect(error?.message.split("\n").slice(1)).toEqual([
+    expect(error?.message.split("\n").slice(1, -1)).toEqual([
       "  DATA_DIR -> SHELF_DATA_DIR",
       "  AWS_BUCKET -> SHELF_S3_BUCKET",
       "  BUCKET_NAME -> SHELF_S3_BUCKET",
     ]);
+  });
+
+  it("names the escape hatch in the refusal", () => {
+    expect(refusal({ LOG_LEVEL: "debug" })?.message).toContain("set SHELF_ALLOW_OLD_NAMES=1");
+  });
+
+  it("with SHELF_ALLOW_OLD_NAMES=1, boots and returns the old names to warn about (names only)", () => {
+    const env = { SECRET: SECRET_VALUE, BUCKET_NAME: "other-service", SHELF_ALLOW_OLD_NAMES: "1" };
+    const ignored = refuseRenamedSettings(env);
+    expect(ignored).toEqual([
+      { old: "SECRET", new: "SHELF_SECRET" },
+      { old: "BUCKET_NAME", new: "SHELF_S3_BUCKET" },
+    ]);
+    expect(oldNamesAllowedFields(ignored)).toEqual({
+      oldNames: ["SECRET -> SHELF_SECRET", "BUCKET_NAME -> SHELF_S3_BUCKET"],
+    });
+    expect(JSON.stringify(oldNamesAllowedFields(ignored))).not.toContain(SECRET_VALUE);
+    expect(OLD_NAMES_ALLOWED_MESSAGE).toContain("SHELF_ALLOW_OLD_NAMES=1");
+    // Still never read.
+    expect(readSetting(env, "SHELF_SECRET")).toBeUndefined();
+  });
+
+  it("refuses when the hatch holds anything but 1", () => {
+    expect(refusal({ SECRET: SECRET_VALUE, SHELF_ALLOW_OLD_NAMES: "true" })).toBeInstanceOf(
+      RenamedSettingError,
+    );
+  });
+
+  it("returns nothing when no old name is set, hatch or not", () => {
+    expect(refuseRenamedSettings({ SHELF_SECRET: SECRET_VALUE })).toEqual([]);
+    expect(refuseRenamedSettings({ SHELF_ALLOW_OLD_NAMES: "1" })).toEqual([]);
   });
 
   it("ignores an empty old name", () => {

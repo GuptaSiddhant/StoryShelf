@@ -275,7 +275,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   them through `readSetting` (`@storyshelf/core/config`; the CLI keeps its rows in
   `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
   (`packages/core/src/env-settings/renames.ts`), which every entry point checks at boot
-  (`refuseRenamedSettings`, names only), and `packages/core/src/env-settings/ratchet.test.ts`
+  (`refuseRenamedSettings`, names only; `SHELF_ALLOW_OLD_NAMES=1` warns instead; removed in the first
+  release of 2027), and `packages/core/src/env-settings/ratchet.test.ts`
   fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.

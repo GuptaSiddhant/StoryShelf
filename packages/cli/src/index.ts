@@ -314,7 +314,12 @@ async function main(): Promise<void> {
 if (isMainModule(import.meta.url, process.argv[1])) {
   // The variables were renamed with no aliases (#1308): refuse while an old name is set, naming it.
   try {
-    refuseRenamedCliSettings(process.env);
+    const ignored = refuseRenamedCliSettings(process.env);
+    if (ignored.length > 0) {
+      printError(
+        `storyshelf: old StoryShelf variable names are set and ignored (SHELF_ALLOW_OLD_NAMES=1): ${ignored.join(", ")}`,
+      );
+    }
   } catch (error) {
     printError(`storyshelf: ${(error as Error).message}`);
     process.exitCode = 1;
