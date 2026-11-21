@@ -8,7 +8,7 @@
 "storyshelf": minor
 ---
 
-Changed: StoryShelf's own environment variables use the SHELF_ prefix; old names still work
+Breaking: StoryShelf's own environment variables use the SHELF_ prefix (no aliases)
 
 Every setting StoryShelf defines is now `SHELF_*`: `SECRET` is `SHELF_SECRET`, `ADMIN_TOKEN` and
 `STORYSHELF_ADMIN_TOKEN` are `SHELF_ADMIN_TOKEN`, `AUTH_PASSWORD` is `SHELF_ADMIN_PASSWORD`,
@@ -16,10 +16,9 @@ Every setting StoryShelf defines is now `SHELF_*`: `SECRET` is `SHELF_SECRET`, `
 so on (#1308). Names a platform or SDK defines (`PORT`, `DATABASE_URL`, `AWS_REGION`, `OTEL_*`, …)
 are unchanged. The full table is in the upgrading guide.
 
-Old names keep working through one alias table in `@storyshelf/core/config` (`readSetting`). Boot
-logs one warning per old name in use, `{ old, new }`, never the value. An old and a new name set to
-different values refuse to boot, naming both variables. `storyshelf server init` and the Terraform
-modules write only the new names. Old names stay accepted until at least the third minor release
-after 1.0.
+The old names are not read. So that an upgrade cannot silently drop a setting, the server, the CLI
+and the MCP server refuse to start while any old name is set, listing each with its new name and
+never a value. Rename the variables before upgrading. `storyshelf server init` and the Terraform
+modules write only the new names.
 
 Schema: none.

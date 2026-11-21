@@ -1,10 +1,10 @@
 /**
- * The one table of StoryShelf's renamed environment variables (#1308): each `SHELF_*` name with the
- * old names that still set it. Every reader goes through `readSetting`, so no source names an old
- * variable outside this file. Old names stay accepted until at least the third minor release after
- * 1.0; removing them is its own `Breaking:` changeset.
+ * StoryShelf's renamed environment variables (#1308): each `SHELF_*` name with the old names it
+ * replaces. The old names are **not** read (owner policy #1309: no compatibility before 2027-01-01).
+ * Boot refuses to start while one is set (`refuseRenamedSettings`), so an upgrade never silently
+ * drops a setting. This file is the only source that names an old variable.
  */
-export const SETTING_ALIASES = {
+export const RENAMED_SETTINGS = {
   // Secrets and access
   SHELF_SECRET: ["SECRET"],
   SHELF_SECRET_PREVIOUS: ["SECRET_PREVIOUS"],
@@ -70,8 +70,8 @@ export const SETTING_ALIASES = {
   SHELF_SKIP_UNCHANGED: ["STORYSHELF_SKIP_UNCHANGED"],
 } as const satisfies Readonly<Record<`SHELF_${string}`, readonly string[]>>;
 
-/** A `SHELF_*` name that has old names. */
-export type AliasedSetting = keyof typeof SETTING_ALIASES;
+/** A `SHELF_*` name that replaced old names. */
+export type RenamedSetting = keyof typeof RENAMED_SETTINGS;
 
 /** Any of StoryShelf's own variable names. */
 export type SettingName = `SHELF_${string}`;

@@ -1,17 +1,15 @@
-/** StoryShelf's own environment variables: the alias table and its one reader (#1308). */
+/** StoryShelf's own environment variables: the renamed table, the reader and the boot guard (#1308). */
 export {
-  SETTING_ALIASES,
+  RENAMED_SETTINGS,
   UNPREFIXED_ALLOWED,
-  type AliasedSetting,
+  type RenamedSetting,
   type SettingName,
-} from "./aliases.ts";
+} from "./renames.ts";
 export {
-  aliasesOf,
   readSetting,
+  refuseRenamedSettings,
   renamedSettingsIn,
-  SettingConflictError,
-  warnRenamedSettings,
+  RenamedSettingError,
   type SettingRename,
   type SettingsEnv,
-  type SettingsWarnLogger,
 } from "./read.ts";

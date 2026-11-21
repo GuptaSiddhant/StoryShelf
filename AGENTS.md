@@ -273,8 +273,10 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
 - **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` ("Shelf" in prose and
   diagrams). `SHELF_*` for StoryShelf's own settings; unprefixed only for platform or SDK names. Read
   them through `readSetting` (`@storyshelf/core/config`; the CLI keeps its rows in
-  `packages/cli/src/settings.ts`); an old name lives only in the alias table, and
-  `packages/core/src/env-settings/ratchet.test.ts` fails on any other unprefixed read.
+  `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
+  (`packages/core/src/env-settings/renames.ts`), which every entry point checks at boot
+  (`refuseRenamedSettings`, names only), and `packages/core/src/env-settings/ratchet.test.ts`
+  fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.

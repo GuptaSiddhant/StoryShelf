@@ -1,12 +1,12 @@
 /**
  * The naming ratchet (#1308): product source reads only `SHELF_*` names, the platform and SDK names
  * in `UNPREFIXED_ALLOWED`, and the names below that are not settings at all. An old name lives only in the
- * alias table. A new `env["FOO"]` fails here until it is `SHELF_FOO` or added to a list on purpose.
+ * renamed table. A new `env["FOO"]` fails here until it is `SHELF_FOO` or added to a list on purpose.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { SETTING_ALIASES, UNPREFIXED_ALLOWED } from "./aliases.ts";
+import { RENAMED_SETTINGS, UNPREFIXED_ALLOWED } from "./renames.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
 
@@ -62,8 +62,8 @@ function filesUnder(): { file: string; text: string }[] {
 }
 
 const FILES = filesUnder();
-const OLD_NAMES = new Set<string>(Object.values(SETTING_ALIASES).flat());
-const ALIAS_TABLE = "packages/core/src/env-settings/aliases.ts";
+const OLD_NAMES = new Set<string>(Object.values(RENAMED_SETTINGS).flat());
+const ALIAS_TABLE = "packages/core/src/env-settings/renames.ts";
 const CLI_ALIAS_TABLE = "packages/cli/src/settings.ts";
 
 describe("environment variable naming ratchet", () => {
@@ -82,7 +82,7 @@ describe("environment variable naming ratchet", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("names an old variable as a string only in the alias tables", () => {
+  it("names an old variable as a string only in the renamed tables", () => {
     const QUOTED = /["'`](?<name>[A-Z][A-Z0-9_]*)["'`]/gu;
     const offenders = FILES.filter(
       ({ file }) => file !== ALIAS_TABLE && file !== CLI_ALIAS_TABLE,

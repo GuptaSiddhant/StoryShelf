@@ -37,25 +37,15 @@ describe("storageFromEnv", () => {
     expect(chosen.log).toEqual({ storage: "s3", endpointOrigin: null });
   });
 
-  it("still takes the old AWS_BUCKET and BUCKET_NAME (what `fly storage create` sets)", () => {
+  it("never reads the old AWS_BUCKET or BUCKET_NAME (boot refuses them instead)", () => {
     const { s3, set } = factories();
-    storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set);
-    storageFromEnv({ AWS_BUCKET: "explicit" }, "/data", set);
-    storageFromEnv({ SHELF_S3_BUCKET: "same", BUCKET_NAME: "same" }, "/data", set);
-    expect(s3.mock.calls.map(([options]) => (options as { bucket: string }).bucket)).toEqual([
-      "from-fly",
-      "explicit",
-      "same",
-    ]);
-  });
-
-  it("refuses two bucket names that disagree, naming both and neither value", () => {
-    const { set } = factories();
-    expect(() =>
-      storageFromEnv({ SHELF_S3_BUCKET: "explicit", BUCKET_NAME: "from-fly" }, "/data", set),
-    ).toThrow(
-      "SHELF_S3_BUCKET and BUCKET_NAME are both set, to different values: set only SHELF_S3_BUCKET and unset BUCKET_NAME",
-    );
+    expect(storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set).log).toEqual({
+      storage: "local",
+    });
+    expect(storageFromEnv({ AWS_BUCKET: "explicit" }, "/data", set).log).toEqual({
+      storage: "local",
+    });
+    expect(s3).not.toHaveBeenCalled();
   });
 
   it.each([{}, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: undefined }])(

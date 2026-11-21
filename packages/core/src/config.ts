@@ -715,16 +715,14 @@ export {
 } from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";
 export {
-  aliasesOf,
   readSetting,
+  refuseRenamedSettings,
   renamedSettingsIn,
-  SETTING_ALIASES,
-  SettingConflictError,
+  RENAMED_SETTINGS,
+  RenamedSettingError,
   UNPREFIXED_ALLOWED,
-  warnRenamedSettings,
-  type AliasedSetting,
+  type RenamedSetting,
   type SettingName,
   type SettingRename,
   type SettingsEnv,
-  type SettingsWarnLogger,
 } from "./env-settings/index.ts";

@@ -1,7 +1,7 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { readSetting, SettingConflictError, type SettingName } from "@storyshelf/core/config";
+import { readSetting, RenamedSettingError, type SettingName } from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
@@ -419,7 +419,7 @@ export function describeBootFailure(error: unknown): string {
   if (!(error instanceof Error)) {
     return `storyshelf: ${String(error)}\n`;
   }
-  if (error instanceof BootRefusal || error instanceof SettingConflictError) {
+  if (error instanceof BootRefusal || error instanceof RenamedSettingError) {
     return `storyshelf: ${error.message}\n`;
   }
   const frames = (error.stack ?? "")

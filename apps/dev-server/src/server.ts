@@ -1,12 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import {
-  parseTrustProxy,
-  readSetting,
-  renamedSettingsIn,
-  warnRenamedSettings,
-} from "@storyshelf/core/config";
+import { parseTrustProxy, readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
@@ -39,9 +34,9 @@ if (legacy.length > 0) {
       .join("\n")}`,
   );
 }
-// Old variable names still work (#1308): two names of one setting set to different values stop
-// boot here; each old name in use is logged once the logger exists.
-renamedSettingsIn(env);
+// The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
+// old name is set, listing each with its new name and never a value, so no setting is silently dropped.
+refuseRenamedSettings(env);
 const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
 const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? ".dev-data";
@@ -128,7 +123,6 @@ const ui = buildUi();
 // the pino mixin correlates every log line with the active trace.
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
-warnRenamedSettings(env, shelfLogger);
 
 // Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
 // SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport

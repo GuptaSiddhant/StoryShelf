@@ -1,4 +1,5 @@
-import { readSetting } from "@storyshelf/core/config";
+import { readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
+
 /** Resolved connection settings for the MCP server. */
 export interface McpConfig {
   /** StoryShelf server base URL (no trailing slash). */
@@ -13,12 +14,13 @@ export interface McpConfig {
  * Read the connection from the environment (same variables as the CLI:
  * `SHELF_URL`, `SHELF_TOKEN`, `SHELF_SLUG`).
  *
- * @throws When no server URL is configured.
+ * @throws When no server URL is configured, or an old name of these variables is set (#1308).
  */
 export function resolveConfig(
   env: NodeJS.ProcessEnv = process.env,
   overrides: Partial<McpConfig> = {},
 ): McpConfig {
+  refuseRenamedSettings(env, ["SHELF_URL", "SHELF_TOKEN", "SHELF_SLUG"]);
   const url = overrides.url ?? readSetting(env, "SHELF_URL");
   if (!url) {
     throw new Error("SHELF_URL is required (or pass --url)");

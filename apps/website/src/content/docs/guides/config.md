@@ -146,7 +146,7 @@ So a first deploy needs no redeploy to learn its URL: open **System** once and c
 
 ## Environment variables
 
-StoryShelf's own settings are `SHELF_*` variables (`SHELF_SECRET`, `SHELF_PUBLIC_BASE_URL`, `SHELF_TOKEN`, …). A name is unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning, such as `PORT`, `DATABASE_URL`, `AWS_REGION` or `OTEL_EXPORTER_OTLP_ENDPOINT`. The names from before 0.15 (`SECRET`, `ADMIN_TOKEN`, `STORYSHELF_URL`, …) still work: the server logs one warning per old name at boot, and an old and a new name of one setting set to different values stop it, naming both variables and never a value. The [upgrading guide](/guides/upgrading/#storyshelfs-environment-variables-use-the-shelf_-prefix) has the full table.
+StoryShelf's own settings are `SHELF_*` variables (`SHELF_SECRET`, `SHELF_PUBLIC_BASE_URL`, `SHELF_TOKEN`, …). A name is unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning, such as `PORT`, `DATABASE_URL`, `AWS_REGION` or `OTEL_EXPORTER_OTLP_ENDPOINT`. The names from before 0.15 (`SECRET`, `ADMIN_TOKEN`, `STORYSHELF_URL`, …) are not read: the server, the CLI and the MCP server refuse to start while one is set, naming each with its new name and never a value. The [upgrading guide](/guides/upgrading/#storyshelfs-environment-variables-use-the-shelf_-prefix) has the full table.
 
 ### Your own adapters
 

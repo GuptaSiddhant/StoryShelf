@@ -39,10 +39,4 @@ describe("assertServerless", () => {
       assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", SHELF_ALLOW_SERVERLESS: "0" }),
     ).toThrow();
   });
-
-  it("still takes the old STORYSHELF_ALLOW_SERVERLESS (#1308)", () => {
-    expect(
-      assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", STORYSHELF_ALLOW_SERVERLESS: "1" }),
-    ).toBeUndefined();
-  });
 });

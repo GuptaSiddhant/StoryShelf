@@ -17,6 +17,8 @@ import type { UploadOptions } from "./commands/upload.ts";
 import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
 import { isMainModule } from "./is-main.ts";
+import { printError } from "./output.ts";
+import { refuseRenamedCliSettings } from "./settings.ts";
 
 /**
  * Build the StoryShelf CLI program with all subcommands registered.
@@ -298,13 +300,26 @@ function buildProtectCommand(): Command {
     .action(run<ProtectOptions>(async () => (await import("./commands/protect.ts")).runProtect));
 }
 
-if (isMainModule(import.meta.url, process.argv[1])) {
+/** Run the CLI: `storyshelf` with no args uploads if config exists, else helps to init. */
+async function main(): Promise<void> {
   const program = createProgram();
-  // Default: `storyshelf` with no args -> upload if config exists, else help to init
   if (process.argv.length <= 2) {
     const { runDefaultCommand } = await import("./commands/default.ts");
     await runDefaultCommand(program);
   } else {
     program.parse(process.argv);
+  }
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
+  // The variables were renamed with no aliases (#1308): refuse while an old name is set, naming it.
+  try {
+    refuseRenamedCliSettings(process.env);
+  } catch (error) {
+    printError(`storyshelf: ${(error as Error).message}`);
+    process.exitCode = 1;
+  }
+  if (process.exitCode !== 1) {
+    await main();
   }
 }

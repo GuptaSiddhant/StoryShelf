@@ -4,35 +4,31 @@ import { resolveConfig } from "./config.ts";
 describe("resolveConfig", () => {
   it("reads env and trims trailing slashes", () => {
     expect(
-      resolveConfig({
-        STORYSHELF_URL: "https://s.example/",
-        STORYSHELF_TOKEN: "t",
-        STORYSHELF_SLUG: "web",
-      }),
+      resolveConfig({ SHELF_URL: "https://s.example/", SHELF_TOKEN: "t", SHELF_SLUG: "web" }),
     ).toEqual({ url: "https://s.example", token: "t", slug: "web" });
   });
 
-  it("accepts SHELF_TOKEN and lets overrides win", () => {
-    expect(resolveConfig({ STORYSHELF_URL: "http://a", SHELF_TOKEN: "x" }, { token: "y" })).toEqual(
-      {
-        url: "http://a",
-        token: "y",
-      },
-    );
-  });
-
-  it("reads the new names", () => {
-    expect(resolveConfig({ SHELF_URL: "http://a", SHELF_TOKEN: "t", SHELF_SLUG: "s" })).toEqual({
+  it("lets overrides win", () => {
+    expect(resolveConfig({ SHELF_URL: "http://a", SHELF_TOKEN: "x" }, { token: "y" })).toEqual({
       url: "http://a",
-      token: "t",
-      slug: "s",
+      token: "y",
     });
   });
 
-  it("refuses an old and a new name that disagree", () => {
-    expect(() => resolveConfig({ SHELF_URL: "http://a", STORYSHELF_URL: "http://b" })).toThrow(
-      "SHELF_URL and STORYSHELF_URL are both set",
-    );
+  it("refuses an old name, naming it with its new name and never the value", () => {
+    const secret = "secret-token-value";
+    let message = "";
+    try {
+      resolveConfig({ SHELF_URL: "http://a", STORYSHELF_TOKEN: secret });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain("  STORYSHELF_TOKEN -> SHELF_TOKEN");
+    expect(message).not.toContain(secret);
+  });
+
+  it("ignores old names of settings it does not read", () => {
+    expect(resolveConfig({ SHELF_URL: "http://a", SECRET: "s" })).toEqual({ url: "http://a" });
   });
 
   it("throws without a url", () => {

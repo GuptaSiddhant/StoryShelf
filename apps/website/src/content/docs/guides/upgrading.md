@@ -37,16 +37,15 @@ Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0
 
 ### StoryShelf's environment variables use the `SHELF_` prefix
 
-**Who is affected:** everyone who sets StoryShelf's variables (a server, the image, the CLI in CI, an MCP client). Nothing breaks: every old name still works.
+**Who is affected:** everyone who sets StoryShelf's variables (a server, the image, the CLI in CI, an MCP client). **Rename them before you upgrade.**
 
 StoryShelf's own settings are now `SHELF_*`. A name stays unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning: `PORT`, `HOST`, `NODE_ENV`, `DATABASE_URL`, `AWS_*`, `AZURE_CLIENT_ID`, `GOOGLE_CLOUD_PROJECT`, `OTEL_*`, `PLAYWRIGHT_SERVICE_*`, `ANTHROPIC_API_KEY`, `TURSO_*`, and platform facts such as `CI_*`, `GITHUB_*`, `VERCEL_*` and `FLY_APP_NAME`.
 
-- An old name is still read. The server logs one warning per old name at boot, `{ old, new }`, never the value; the CLI prints one line per old name.
-- An old and a new name of one setting with **different** values stop the server (and the CLI command), naming both variables and never a value. The same value under both names is accepted, with the warning.
-- Old names keep working until at least the third minor release after 1.0. Removing them will be its own breaking release note.
+- The old names are not read any more; there are no aliases.
+- So that an upgrade cannot silently drop a setting, the server (the image, the Fly app and the dev server), the CLI and the MCP server refuse to start while any old name in the table below is set. The refusal lists each old name with its new one and never prints a value. This holds even when the new name is set too: unset the old one.
 - `storyshelf server init` and the Terraform modules write only the new names. A server you generated earlier keeps its own `process.env` reads; change them when you rename the variables.
 
-To move, set the new name with the same value, deploy, then unset the old name (secrets first: `SHELF_SECRET`, `SHELF_ADMIN_TOKEN`, `SHELF_ADMIN_PASSWORD`). In CI, rename the variable your workflow passes (`SHELF_TOKEN`); the repository secret behind it can keep its name.
+To move, set every new name with the old value, unset the old names, then deploy the new release. In CI, rename the variable your workflow passes (`SHELF_TOKEN`, `SHELF_URL`); the repository secret behind it can keep its name.
 
 | Old name                                                                                         | New name                                                                           |
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |

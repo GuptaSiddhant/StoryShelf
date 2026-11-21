@@ -22,8 +22,8 @@ function nonEmpty(value: string | undefined): string | undefined {
 const DEFAULT_FACTORIES: StorageFactories = { s3: createS3Storage, local: createLocalStorage };
 
 /**
- * S3-compatible storage (Tigris on Fly) when `SHELF_S3_BUCKET` is set (its old names, including
- * the BUCKET_NAME that `fly storage create` sets, still work through the alias table), else the volume under `dataDir`. The endpoint is
+ * S3-compatible storage (Tigris on Fly) when `SHELF_S3_BUCKET` is set (`fly storage create` sets
+ * BUCKET_NAME, an old name that boot refuses: rename it), else the volume under `dataDir`. The endpoint is
  * `AWS_ENDPOINT_URL_S3` and the region `AWS_REGION` (Tigris answers to `auto`). Credentials are never read here: the SDK's default chain takes `AWS_ACCESS_KEY_ID` and
  * `AWS_SECRET_ACCESS_KEY` from the environment.
  */

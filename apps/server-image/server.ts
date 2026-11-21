@@ -4,12 +4,7 @@ import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
-import {
-  parseTrustProxy,
-  readSetting,
-  renamedSettingsIn,
-  warnRenamedSettings,
-} from "@storyshelf/core/config";
+import { parseTrustProxy, readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
 import {
   createEmailNotifier,
   gitFromEnv,
@@ -61,9 +56,9 @@ process.on("uncaughtException", (error) => {
   process.stderr.write(describeBootFailure(error));
   process.exit(1);
 });
-// Old variable names still work (#1308): two names of one setting set to different values stop
-// boot here, naming both variables; each old name in use is logged once the logger exists.
-renamedSettingsIn(env);
+// The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
+// old name is set, listing each with its new name and never a value, so no setting is silently dropped.
+refuseRenamedSettings(env);
 
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
@@ -82,7 +77,6 @@ const { database, log: databaseLog } = databaseFromEnv(env, dataDir);
 const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
-warnRenamedSettings(env, shelfLogger);
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
 if (unverifiedDatabaseTls(env)) {
   shelfLogger.warn(

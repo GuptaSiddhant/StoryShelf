@@ -1,102 +1,86 @@
-import { describe, expect, it, vi } from "vitest";
-import { SETTING_ALIASES } from "./aliases.ts";
+import { describe, expect, it } from "vitest";
 import {
-  aliasesOf,
   readSetting,
+  refuseRenamedSettings,
+  RenamedSettingError,
   renamedSettingsIn,
-  SettingConflictError,
-  warnRenamedSettings,
 } from "./read.ts";
+import { RENAMED_SETTINGS } from "./renames.ts";
 
 const SECRET_VALUE = "s".repeat(40);
-const OTHER_VALUE = "o".repeat(40);
 
-function logger() {
-  return { warn: vi.fn<(details: object, message: string) => void>() };
+function refusal(env: Record<string, string>): RenamedSettingError | undefined {
+  try {
+    refuseRenamedSettings(env);
+  } catch (error) {
+    return error as RenamedSettingError;
+  }
+  return undefined;
 }
 
 describe("readSetting", () => {
-  it("reads the new name alone, with no warning", () => {
-    const env = { SHELF_SECRET: SECRET_VALUE };
-    const log = logger();
-    expect(readSetting(env, "SHELF_SECRET")).toBe(SECRET_VALUE);
-    expect(warnRenamedSettings(env, log)).toEqual([]);
-    expect(log.warn).not.toHaveBeenCalled();
+  it("reads the new name", () => {
+    expect(readSetting({ SHELF_SECRET: SECRET_VALUE }, "SHELF_SECRET")).toBe(SECRET_VALUE);
   });
 
-  it("reads the old name alone, and boot warns once with { old, new } and no value", () => {
-    const env = { SECRET: SECRET_VALUE };
-    const log = logger();
-    expect(readSetting(env, "SHELF_SECRET")).toBe(SECRET_VALUE);
-    expect(warnRenamedSettings(env, log)).toEqual([{ old: "SECRET", new: "SHELF_SECRET" }]);
-    expect(log.warn).toHaveBeenCalledTimes(1);
-    expect(log.warn.mock.calls[0]?.[0]).toEqual({ old: "SECRET", new: "SHELF_SECRET" });
-    expect(JSON.stringify(log.warn.mock.calls)).not.toContain(SECRET_VALUE);
-  });
-
-  it("accepts both names with the same value, and still warns about the old one", () => {
-    const env = { SHELF_SECRET: SECRET_VALUE, SECRET: SECRET_VALUE };
-    const log = logger();
-    expect(readSetting(env, "SHELF_SECRET")).toBe(SECRET_VALUE);
-    expect(warnRenamedSettings(env, log)).toEqual([{ old: "SECRET", new: "SHELF_SECRET" }]);
-  });
-
-  it("refuses both names with different values, naming the variables and never the values", () => {
-    const env = { SHELF_SECRET: SECRET_VALUE, SECRET: OTHER_VALUE };
-    expect(() => readSetting(env, "SHELF_SECRET")).toThrow(SettingConflictError);
-    let message = "";
-    try {
-      warnRenamedSettings(env, logger());
-    } catch (error) {
-      message = (error as Error).message;
-    }
-    expect(message).toBe(
-      "SHELF_SECRET and SECRET are both set, to different values: set only SHELF_SECRET and unset SECRET",
-    );
-    expect(message).not.toContain(SECRET_VALUE);
-    expect(message).not.toContain(OTHER_VALUE);
-  });
-
-  it("refuses two old names of one setting that disagree", () => {
-    const env = { ADMIN_TOKEN: "a", STORYSHELF_ADMIN_TOKEN: "b" };
-    expect(() => readSetting(env, "SHELF_ADMIN_TOKEN")).toThrow(
-      "ADMIN_TOKEN and STORYSHELF_ADMIN_TOKEN are both set, to different values: set only SHELF_ADMIN_TOKEN and unset ADMIN_TOKEN, STORYSHELF_ADMIN_TOKEN",
-    );
-  });
-
-  it("names three variables in a three-way conflict", () => {
-    const env = { SHELF_S3_BUCKET: "a", AWS_BUCKET: "a", BUCKET_NAME: "b" };
-    expect(() => readSetting(env, "SHELF_S3_BUCKET")).toThrow(
-      "SHELF_S3_BUCKET, AWS_BUCKET and BUCKET_NAME are all set",
-    );
-  });
-
-  it("treats an empty value as unset, so an empty new name falls back to the old one", () => {
-    expect(readSetting({ SHELF_DATA_DIR: "", DATA_DIR: "/data" }, "SHELF_DATA_DIR")).toBe("/data");
-    expect(readSetting({ SHELF_DATA_DIR: "" }, "SHELF_DATA_DIR")).toBe("");
-    expect(readSetting({}, "SHELF_DATA_DIR")).toBeUndefined();
-  });
-
-  it("reads a SHELF_ name that has no old names", () => {
-    expect(aliasesOf("SHELF_AUTH")).toEqual([]);
-    expect(readSetting({ SHELF_AUTH: "none" }, "SHELF_AUTH")).toBe("none");
+  it("never reads an old name", () => {
+    expect(readSetting({ SECRET: SECRET_VALUE }, "SHELF_SECRET")).toBeUndefined();
+    expect(readSetting({ STORYSHELF_URL: "u" }, "SHELF_URL")).toBeUndefined();
   });
 });
 
-describe("renamedSettingsIn", () => {
-  it("lists every old name in use, once each", () => {
-    const env = { DATA_DIR: "/d", AWS_BUCKET: "b", S3_BUCKET: "b", SHELF_TOKEN: "t" };
-    expect(renamedSettingsIn(env)).toEqual([
+describe("refuseRenamedSettings (the boot guard)", () => {
+  it("lets the new names boot", () => {
+    expect(refusal({ SHELF_SECRET: SECRET_VALUE, SHELF_ADMIN_TOKEN: "t" })).toBeUndefined();
+  });
+
+  it("refuses an old name alone, naming it with its new name and never the value", () => {
+    const error = refusal({ SECRET: SECRET_VALUE });
+    expect(error).toBeInstanceOf(RenamedSettingError);
+    expect(error?.message).toBe(
+      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET",
+    );
+    expect(error?.message).not.toContain(SECRET_VALUE);
+  });
+
+  it("refuses an old name even when the new one is also set, with the same or another value", () => {
+    expect(refusal({ SHELF_SECRET: SECRET_VALUE, SECRET: SECRET_VALUE })).toBeInstanceOf(
+      RenamedSettingError,
+    );
+    expect(refusal({ SHELF_SECRET: SECRET_VALUE, SECRET: "other" })).toBeInstanceOf(
+      RenamedSettingError,
+    );
+  });
+
+  it("lists every old name that is set, one line each", () => {
+    const error = refusal({ DATA_DIR: "/d", AWS_BUCKET: "b", BUCKET_NAME: "b", SHELF_TOKEN: "t" });
+    expect(error?.renames).toEqual([
       { old: "DATA_DIR", new: "SHELF_DATA_DIR" },
       { old: "AWS_BUCKET", new: "SHELF_S3_BUCKET" },
-      { old: "S3_BUCKET", new: "SHELF_S3_BUCKET" },
+      { old: "BUCKET_NAME", new: "SHELF_S3_BUCKET" },
+    ]);
+    expect(error?.message.split("\n").slice(1)).toEqual([
+      "  DATA_DIR -> SHELF_DATA_DIR",
+      "  AWS_BUCKET -> SHELF_S3_BUCKET",
+      "  BUCKET_NAME -> SHELF_S3_BUCKET",
+    ]);
+  });
+
+  it("ignores an empty old name", () => {
+    expect(refusal({ SECRET: "" })).toBeUndefined();
+  });
+
+  it("checks only the given settings when narrowed", () => {
+    const env = { SECRET: SECRET_VALUE, STORYSHELF_URL: "u" };
+    expect(renamedSettingsIn(env, ["SHELF_URL", "SHELF_TOKEN", "SHELF_SLUG"])).toEqual([
+      { old: "STORYSHELF_URL", new: "SHELF_URL" },
     ]);
   });
 });
 
-describe("SETTING_ALIASES", () => {
-  it("gives each old name exactly one new name, and never aliases a SHELF_ name", () => {
-    const olds = Object.values(SETTING_ALIASES).flat();
+describe("RENAMED_SETTINGS", () => {
+  it("gives each old name exactly one new name, and never lists a SHELF_ name as old", () => {
+    const olds = Object.values(RENAMED_SETTINGS).flat();
     expect(new Set(olds).size).toBe(olds.length);
     expect(olds.filter((name) => name.startsWith("SHELF_"))).toEqual([]);
   });

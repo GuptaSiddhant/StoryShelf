@@ -1,3 +1,4 @@
+import { refuseRenamedSettings } from "@storyshelf/core/config";
 import { describe, expect, it, vi } from "vitest";
 import {
   authFromEnv,
@@ -520,55 +521,30 @@ describe("unverifiedDatabaseTls", () => {
 describe("old variable names (#1308)", () => {
   const secret = "s".repeat(32);
 
-  it("still read an old name alone: AUTH_PASSWORD, SECRET and AUTH_EMAIL sign in", () => {
-    expect(
-      authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: secret, AUTH_EMAIL: "a@b.co" }),
-    ).toEqual({ mode: "password", password: "a-long-password", email: "a@b.co", secret });
+  it("are never read: AUTH_PASSWORD and SECRET do not sign anyone in", () => {
+    expect(() => authFromEnv({ AUTH_PASSWORD: "a-long-password", SECRET: secret })).toThrow(
+      /^SHELF_ADMIN_PASSWORD is unset/u,
+    );
   });
 
-  it("read each old S3 bucket name as SHELF_S3_BUCKET", () => {
+  it("are never read: an old bucket name leaves storage on the volume", () => {
     for (const name of ["AWS_BUCKET", "S3_BUCKET", "BUCKET_NAME"]) {
       const { set, as } = factories();
-      storageFromEnv({ [name]: "b" }, "/d", as);
-      expect(set.s3).toHaveBeenCalledWith({ bucket: "b", endpoint: undefined, region: "auto" });
+      expect(storageFromEnv({ [name]: "b" }, "/d", as).log).toEqual({ storage: "local" });
+      expect(set.s3).not.toHaveBeenCalled();
     }
   });
 
-  it("select Azure and RDS IAM by their old names too", () => {
-    const { set, as } = factories();
-    storageFromEnv({ AZURE_STORAGE_ACCOUNT: "acct", AZURE_STORAGE_CONTAINER: "c" }, "/d", as);
-    expect(set.azure).toHaveBeenCalledWith({ container: "c", accountName: "acct" });
-    const iam = { DATABASE_IAM_HOST: "h", DATABASE_IAM_USER: "u", DATABASE_IAM_NAME: "n" };
-    databaseFromEnv({ ...iam, AWS_REGION: "eu-west-1" }, "/d", as);
-    expect(set.rdsIam).toHaveBeenCalledWith({
-      host: "h",
-      user: "u",
-      database: "n",
-      region: "eu-west-1",
-    });
-  });
-
-  it("accept the old and new name with the same value", () => {
-    const { set, as } = factories();
-    storageFromEnv({ SHELF_S3_BUCKET: "b", BUCKET_NAME: "b" }, "/d", as);
-    expect(set.s3).toHaveBeenCalledTimes(1);
-  });
-
-  it("refuse the old and new name with different values, as one line naming both and no value", () => {
+  it("stop boot: the refusal prints each old name with its new one, no stack and no value", () => {
     let caught: unknown;
     try {
-      authFromEnv({
-        SHELF_ADMIN_PASSWORD: "a-long-password",
-        SHELF_SECRET: secret,
-        SECRET: "x".repeat(40),
-      });
+      refuseRenamedSettings({ SECRET: secret, AUTH_PASSWORD: "a-long-password", SHELF_AUTH: "x" });
     } catch (error) {
       caught = error;
     }
-    const printed = describeBootFailure(caught);
-    expect(printed).toBe(
-      "storyshelf: SHELF_SECRET and SECRET are both set, to different values: set only SHELF_SECRET and unset SECRET\n",
+    expect(describeBootFailure(caught)).toBe(
+      "storyshelf: StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\n  AUTH_PASSWORD -> SHELF_ADMIN_PASSWORD\n",
     );
-    expect(printed).not.toContain(secret);
+    expect(describeBootFailure(caught)).not.toContain(secret);
   });
 });

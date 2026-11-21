@@ -6,12 +6,7 @@ import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
-import {
-  parseTrustProxy,
-  readSetting,
-  renamedSettingsIn,
-  warnRenamedSettings,
-} from "@storyshelf/core/config";
+import { parseTrustProxy, readSetting, refuseRenamedSettings } from "@storyshelf/core/config";
 import {
   createEmailNotifier,
   gitFromEnv,
@@ -49,9 +44,9 @@ import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
 refuseLegacyVariables(env);
-// Old variable names still work (#1308), so the demo's existing Fly secrets keep booting it: two
-// names of one setting set to different values stop boot here; each old name is logged below.
-renamedSettingsIn(env);
+// The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
+// old name is set, listing each with its new name and never a value, so no setting is silently dropped.
+refuseRenamedSettings(env);
 const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
 const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
 const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
@@ -144,7 +139,6 @@ const ai = aiFromEnv(env);
 // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
-warnRenamedSettings(env, shelfLogger);
 // Which storage serves the objects: the origin of the endpoint only, never the bucket or a key.
 shelfLogger.info(storageLog, "object storage");
 // Only whether the Sprite is configured: its token, secret and URL never reach a log.

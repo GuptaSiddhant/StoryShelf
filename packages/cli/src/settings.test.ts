@@ -1,72 +1,53 @@
-import { SETTING_ALIASES } from "@storyshelf/core/config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RENAMED_SETTINGS } from "@storyshelf/core/config";
+import { describe, expect, it } from "vitest";
 import {
-  CLI_SETTING_ALIASES,
-  overrideSetting,
+  CLI_RENAMED_SETTINGS,
   readSetting,
-  resetSettingWarnings,
+  refuseRenamedCliSettings,
+  renamedCliSettingsIn,
 } from "./settings.ts";
 
-let stderr: ReturnType<typeof vi.spyOn>;
+const TOKEN_VALUE = "t".repeat(40);
 
-beforeEach(() => {
-  resetSettingWarnings();
-  stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-});
-
-afterEach(() => {
-  stderr.mockRestore();
-});
-
-function printed(): string {
-  return stderr.mock.calls.map((call: unknown[]) => String(call[0])).join("");
-}
-
-describe("CLI readSetting", () => {
-  it("keeps the same rows as core's alias table", () => {
-    for (const [name, olds] of Object.entries(CLI_SETTING_ALIASES)) {
-      expect(SETTING_ALIASES[name as keyof typeof SETTING_ALIASES]).toEqual(olds);
+describe("CLI settings", () => {
+  it("keeps the same rows as core's renamed table", () => {
+    for (const [name, olds] of Object.entries(CLI_RENAMED_SETTINGS)) {
+      expect(RENAMED_SETTINGS[name as keyof typeof RENAMED_SETTINGS]).toEqual(olds);
     }
   });
 
-  it("reads the new name alone, silently", () => {
-    expect(readSetting({ SHELF_TOKEN: "t" }, "SHELF_TOKEN")).toBe("t");
-    expect(printed()).toBe("");
-  });
-
-  it("reads an old name alone and warns once per name, never printing the value", () => {
-    const env = { STORYSHELF_TOKEN: "secret-token-value" };
-    expect(readSetting(env, "SHELF_TOKEN")).toBe("secret-token-value");
-    expect(readSetting(env, "SHELF_TOKEN")).toBe("secret-token-value");
-    expect(printed()).toBe(
-      "storyshelf: STORYSHELF_TOKEN is renamed SHELF_TOKEN; the old name still works, set the new one\n",
-    );
-    expect(printed()).not.toContain("secret-token-value");
-  });
-
-  it("accepts the old and new names with one value", () => {
-    expect(readSetting({ SHELF_URL: "u", STORYSHELF_URL: "u" }, "SHELF_URL")).toBe("u");
-  });
-
-  it("refuses the old and new names with different values, naming both", () => {
-    expect(() =>
-      readSetting({ SHELF_ADMIN_TOKEN: "a", ADMIN_TOKEN: "b" }, "SHELF_ADMIN_TOKEN"),
-    ).toThrow(
-      "SHELF_ADMIN_TOKEN and ADMIN_TOKEN are both set, to different values: set only SHELF_ADMIN_TOKEN and unset ADMIN_TOKEN",
-    );
-  });
-
-  it("treats an empty value as unset", () => {
-    expect(readSetting({ SHELF_SLUG: "", STORYSHELF_SLUG: "s" }, "SHELF_SLUG")).toBe("s");
-    expect(readSetting({}, "SHELF_SLUG")).toBeUndefined();
+  it("reads the new name and never an old one", () => {
+    expect(readSetting({ SHELF_TOKEN: TOKEN_VALUE }, "SHELF_TOKEN")).toBe(TOKEN_VALUE);
+    expect(readSetting({ STORYSHELF_TOKEN: TOKEN_VALUE }, "SHELF_TOKEN")).toBeUndefined();
   });
 });
 
-describe("overrideSetting", () => {
-  it("sets the new name and drops the old ones, so a child never sees two values", () => {
-    const env: Record<string, string | undefined> = { STORYSHELF_URL: "old", HOME: "/h" };
-    overrideSetting(env, "SHELF_URL", "new");
-    expect(env).toEqual({ SHELF_URL: "new", HOME: "/h" });
-    expect(readSetting(env, "SHELF_URL")).toBe("new");
+describe("refuseRenamedCliSettings", () => {
+  it("passes the new names", () => {
+    expect(() =>
+      refuseRenamedCliSettings({ SHELF_URL: "u", SHELF_TOKEN: TOKEN_VALUE }),
+    ).not.toThrow();
+  });
+
+  it("lists every old name with its new name, never a value", () => {
+    const env = { STORYSHELF_TOKEN: TOKEN_VALUE, STORYSHELF_HOST: "h", SHELF_TOKEN: TOKEN_VALUE };
+    expect(renamedCliSettingsIn(env)).toEqual([
+      "STORYSHELF_HOST -> SHELF_URL",
+      "STORYSHELF_TOKEN -> SHELF_TOKEN",
+    ]);
+    expect(() => refuseRenamedCliSettings(env)).toThrow(
+      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then run again:\n  STORYSHELF_HOST -> SHELF_URL\n  STORYSHELF_TOKEN -> SHELF_TOKEN",
+    );
+    let message = "";
+    try {
+      refuseRenamedCliSettings(env);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).not.toContain(TOKEN_VALUE);
+  });
+
+  it("ignores an empty old name", () => {
+    expect(renamedCliSettingsIn({ STORYSHELF_TOKEN: "" })).toEqual([]);
   });
 });
