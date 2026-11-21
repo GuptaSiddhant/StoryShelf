@@ -6,7 +6,7 @@ import {
   removedSection,
 } from "./build-comment-changes.ts";
 import { actionLinks, approvalsText, headlineOf, openChanges } from "./build-comment-headline.ts";
-import { escapeText, percentOf, plural, utcTime } from "./build-comment-text.ts";
+import { commitCode, escapeText, percentOf, plural, utcTime } from "./build-comment-text.ts";
 import type { BuildCommentInput } from "./build-comment-types.ts";
 
 const base: BuildCommentInput = {
@@ -39,6 +39,25 @@ describe("build-comment-text", () => {
     const escaped = escapeText("@acme/button and @team");
     expect(escaped).not.toMatch(/@(?!\u200D)/u);
     expect(escaped.replaceAll("\u200D", "")).toBe("@acme/button and @team");
+  });
+
+  it("breaks bare links so GitHub and GitLab do not autolink them", () => {
+    const escaped = escapeText("see https://evil.example/login and www.evil.example now");
+    expect(escaped).not.toMatch(/:\/\/(?!\u200D)/u);
+    expect(escaped).not.toMatch(/www\.(?!\u200D)/iu);
+    expect(escaped.replaceAll("\u200D", "")).toBe(
+      "see https://evil.example/login and www.evil.example now",
+    );
+  });
+
+  it("escapes & so an entity cannot be written", () => {
+    expect(escapeText("a &lt;b&gt; & c")).toBe("a &amp;lt;b&amp;gt; &amp; c");
+  });
+
+  it("keeps only commit-id characters inside a code span", () => {
+    expect(commitCode("abc1234")).toBe("`abc1234`");
+    expect(commitCode("local-0a1b2c")).toBe("`local-0a1b2c`");
+    expect(commitCode("`]@bob")).toBe("`bob`");
   });
 });
 

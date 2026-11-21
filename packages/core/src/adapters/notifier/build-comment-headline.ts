@@ -1,4 +1,4 @@
-import { escapeText, plural } from "./build-comment-text.ts";
+import { commitCode, escapeText, plural } from "./build-comment-text.ts";
 /** The headline (one state, one emoji) and the action links of the pull-request comment. */
 import type { BuildCommentInput } from "./build-comment-types.ts";
 
@@ -37,7 +37,7 @@ export function headlineOf(input: BuildCommentInput): { emoji: string; text: str
         text:
           newer === undefined
             ? "Cancelled"
-            : `Cancelled: superseded by [\`${newer.sha}\`](${newer.url})`,
+            : `Cancelled: superseded by [${commitCode(newer.sha)}](${newer.url})`,
       };
     }
     default: {

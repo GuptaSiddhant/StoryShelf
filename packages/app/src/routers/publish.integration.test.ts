@@ -80,7 +80,7 @@ async function createBuild(app: App, slug: string, branch: string): Promise<{ id
   const created = await app.request(`/api/v1/projects/${slug}/builds`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ gitSha: `sha-${branch}`, gitBranch: branch }),
+    body: JSON.stringify({ gitSha: `abc${branch.length}00ff`, gitBranch: branch }),
   });
   expect(created.status).toBe(202);
   return ((await created.json()) as { build: { id: string } }).build;
