@@ -121,7 +121,23 @@ storyshelf upload --wait --timeout 20m
 case $? in 0) ;; 2) echo "visual changes need review" ;; *) exit 1 ;; esac
 ```
 
-**Output.** Phases and progress go to stderr; the summary and build link go to stdout.
+**Output.** Phases and progress go to stderr; the summary and build link go to stdout. A run whose changes need review ends like this (exit code 2):
+
+```text
+Summary
+  Files:    32
+  Size:     4.8 MiB
+  Stories:  full capture (24 stories)
+  Build:    01M7YHNVJD84B65FX880D4FW57
+  Time:     0.1s
+View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNVJD84B65FX880D4FW57/diff
+==> Capturing
+--> Captured (5.0s)
+26 visual changes need review
+Review: http://localhost:3000/projects/my-design-system/builds/01M7YHNVJD84B65FX880D4FW57/diff
+```
+
+A build with nothing to review prints `Build approved` and `View: <url>` instead, and exits `0`.
 
 **Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
 
@@ -135,12 +151,13 @@ case $? in 0) ;; 2) echo "visual changes need review" ;; *) exit 1 ;; esac
 
 ```bash
 storyshelf doctor
-# ✓ Storybook setup found
+# ✓ Storybook setup found (/work/app/.storybook/main.ts)
 # ✓ Config loaded (slug "my-design-system")
 # ✓ Connection: http://localhost:3000 / my-design-system (token present)
-# ✓ Server reachable
-# ! Build output missing — upload would run: npm run build-storybook -- --output-dir storybook-static
-# ✓ Affected capture ready (history and stats available)
+# ✓ Server reachable, project "My Design System" readable
+# ✓ Token may upload builds
+# ✓ Build output ready: storybook-static (16 top-level entries)
+# ✓ Affected capture ready (history and stats available; Storybook project /work/app, repository root /work/app)
 
 storyshelf whoami
 # Server: http://localhost:3000
