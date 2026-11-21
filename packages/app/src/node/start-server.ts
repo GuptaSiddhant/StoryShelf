@@ -77,15 +77,22 @@ function createHost(options: StartServerOptions): Host {
   return hostOf(options, state, close, done.promise);
 }
 
-/** Stop watching for signals, then shut down what the host owns (the listener read now, not earlier). */
+/**
+ * Shut down what the host owns (the listener read now, not earlier), then stop watching for signals.
+ * The handlers stay until the shutdown settles, so a repeated signal joins it instead of hitting
+ * the default action and killing the process mid-drain.
+ */
 async function shutdownOnce(
   state: HostState,
   unwatch: () => void,
   partsOf: (listener: Listener | null) => ShutdownParts,
   trigger: ShutdownTrigger,
 ): Promise<ShutdownResult> {
-  unwatch();
-  return await shutdown(partsOf(state.listener), trigger);
+  try {
+    return await shutdown(partsOf(state.listener), trigger);
+  } finally {
+    unwatch();
+  }
 }
 
 interface HostState {
