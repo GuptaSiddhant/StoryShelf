@@ -7,6 +7,7 @@
  * in the default scaffold (#1137). This script has no workspace links at all:
  *
  *  1. pack every public package (manifests rewritten as the release does, then restored),
+ *     and check each archive holds every export and bin target (#1265),
  *  2. install the CLI from its tarball in an empty directory outside this checkout,
  *  3. run the default `storyshelf server init` (answers: all defaults, so local accounts),
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
@@ -90,6 +91,8 @@ function packAll(dest) {
   try {
     // The release publishes after this same rewrite: npm cannot record `workspace:` or `catalog:`.
     run("node", [join(root, "scripts/rewrite-workspace-protocol.mjs")]);
+    // ...and with the dist-only exports written into the manifest (no `source` condition ships, #1265).
+    run("node", [join(root, "scripts/materialize-exports.mjs")]);
     for (const dir of dirs) {
       const cwd = join(packagesDir, dir);
       const name = JSON.parse(readFileSync(join(cwd, "package.json"), "utf8")).name;
@@ -104,6 +107,18 @@ function packAll(dest) {
     }
   }
   return tarballs;
+}
+
+/** Fail unless every packed archive holds its export and bin targets, with no `source` condition or map (#1265). */
+function assertArchives(tarballs) {
+  const output = run(
+    "node",
+    [join(root, "scripts/check-packed-archives.mjs"), ...Object.values(tarballs)],
+    {
+      merge: true,
+    },
+  );
+  console.log(output.trim().split("\n").slice(-20).join("\n"));
 }
 
 /** A free TCP port. */
@@ -379,6 +394,7 @@ async function main() {
     log("packing every public package");
     const tarballs = packAll(tarDir);
     log(`packed ${Object.keys(tarballs).length} packages`);
+    assertArchives(tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

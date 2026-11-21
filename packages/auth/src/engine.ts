@@ -22,6 +22,7 @@ import {
   describeLoginMethods,
 } from "./engine/login-methods.ts";
 import { sendAuthMail } from "./engine/mail.ts";
+import { engineRateLimit } from "./engine/rate-limit.ts";
 import { readOnlyEngineGuard } from "./engine/read-only.ts";
 import { assertAuthSecret, assertNoLibrarySecretOverride } from "./engine/secret.ts";
 import { SSO_MANAGEMENT_PATHS } from "./engine/sso.ts";
@@ -108,6 +109,7 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
     // Shelf SSO providers are code-driven recipes; runtime provider
     // management stays off (see SSO_MANAGEMENT_PATHS).
     ...(options.sso ? { disabledPaths: SSO_MANAGEMENT_PATHS } : {}),
+    rateLimit: engineRateLimit(options.rateLimit?.enabled ?? null, options.logger ?? null),
     session: { expiresIn, updateAge: 60 * 60 * 24, cookieCache: { enabled: false } },
     advanced: advancedOptions(options),
     databaseHooks: {
@@ -148,7 +150,14 @@ interface AdvancedOptions {
   defaultCookieAttributes?: { secure: true };
   /** Set to false for the `__Host-` cookie: the library would add `__Secure-` in front of the name. */
   useSecureCookies?: false;
+  /**
+   * The only header the engine reads a client address from (rate-limit key, session `ipAddress`).
+   * The app overwrites it on every request it hands over, from its own resolver.
+   */
+  ipAddress: { ipAddressHeaders: ["x-forwarded-for"] };
 }
+
+const ENGINE_IP_OPTIONS: AdvancedOptions["ipAddress"] = { ipAddressHeaders: ["x-forwarded-for"] };
 
 /** Better Auth's `advanced` block: ULID ids and our session cookie (name and attributes). */
 function advancedOptions(options: ShelfAuthOptions): AdvancedOptions {
@@ -163,11 +172,13 @@ function advancedOptions(options: ShelfAuthOptions): AdvancedOptions {
       },
       useSecureCookies: false,
       defaultCookieAttributes: { secure: true },
+      ipAddress: ENGINE_IP_OPTIONS,
     };
   }
   return {
     database: { generateId: (): string => ulid() },
     cookies: { session_token: { name: SESSION_COOKIE, attributes } },
+    ipAddress: ENGINE_IP_OPTIONS,
   };
 }
 

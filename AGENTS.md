@@ -284,7 +284,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   module at ~150 lines or 3+ concerns. Adapters follow per-kind layouts (storage:
   `types`/`keys`/`client`/`lifecycle`/`operations`/`streams`/`errors`; runners:
   `types`/`browser`/`runtime-params`/`pipeline`/`screenshot`/`play`/`a11y`). `index.ts` is a
-  composition root, not a logic dump. Keep the package `exports` map frozen; a new module needs a
+  composition root, not a logic dump. Keep the package `exports` map frozen (the keys; the published manifest keeps them and only drops the `source` conditions, `scripts/materialize-exports.mjs`); a new module needs a
   colocated `<module>.test.ts` (indirect coverage only for pure mappers). Load the `adapter-layout`
   skill for templates.
 - **One production owner per third-party dep.** A runtime dependency belongs in exactly one package's

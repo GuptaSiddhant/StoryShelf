@@ -164,7 +164,7 @@ jobs:
       - name: Lint and format-check every tracked file (what the commit hook checks)
         # `verify` lints each package's own globs; this also covers `scripts/` and any file outside them.
         run: |
-          node --test scripts/check-files.test.mjs scripts/audit-check.test.mjs scripts/previous-release/expectation.test.ts
+          node --test scripts/check-files.test.mjs scripts/audit-check.test.mjs scripts/check-packed-archives.test.mjs scripts/previous-release/expectation.test.ts
           nub run lint:files
 
       - name: Verify (build + Storybook + lint + test)
