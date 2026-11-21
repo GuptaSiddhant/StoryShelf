@@ -5,11 +5,14 @@ import { BuildReviewModel } from "../../models/build-review.ts";
 import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { UserModel } from "../../models/user.ts";
 import type { Build } from "../../schema/build.ts";
+import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import type { User } from "../../schema/user.ts";
+import type { UrlBuilder } from "../../urls.ts";
 import { isA11yNote } from "../a11y/index.ts";
 import { parseList } from "../inherited-a11y.ts";
 import { parseTestResults } from "../tests.ts";
+import { earlierBuildsOf, removedStoriesOf } from "./comment-history.ts";
 import type { BuildStateDeps } from "./types.ts";
 
 /** Phrases by error class: the comment is public, so no message, path or endpoint ever reaches it. */
@@ -82,9 +85,15 @@ async function failureOf(deps: BuildStateDeps, build: Build): Promise<string | u
 /** What the comment shows besides the build row; each is left out while it does not apply. */
 export async function extrasOf(
   deps: BuildStateDeps,
-  where: { build: Build; testing: boolean; snapshots: readonly Snapshot[] | undefined },
+  where: {
+    build: Build;
+    project: Project;
+    urls: UrlBuilder;
+    testing: boolean;
+    snapshots: readonly Snapshot[] | undefined;
+  },
 ): Promise<BuildStateExtras> {
-  const { build, testing, snapshots } = where;
+  const { build, project, urls, testing, snapshots } = where;
   const closed = build.status === "approved" || build.status === "rejected";
   const a11y = testing && snapshots ? a11yCountOf(snapshots) : 0;
   return {
@@ -92,5 +101,7 @@ export async function extrasOf(
     failure: build.status === "failed" ? await failureOf(deps, build) : undefined,
     failedTests: testing ? failedTestsOf(build) : undefined,
     a11yCount: a11y > 0 ? a11y : undefined,
+    removed: testing ? await removedStoriesOf(deps, { build, project }) : undefined,
+    earlier: await earlierBuildsOf(deps, { build, project, urls }),
   };
 }
