@@ -5,7 +5,7 @@ import type { ShelfOptions } from "@storyshelf/core/config";
 import { BuildModel, MemberModel } from "@storyshelf/core/models";
 import { makeStorage } from "@storyshelf/core/test-helpers";
 import { ulid } from "@storyshelf/core/utils";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";

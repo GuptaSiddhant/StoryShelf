@@ -4,7 +4,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

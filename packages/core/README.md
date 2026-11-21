@@ -138,7 +138,7 @@ Import from `core/capture`, `core/diff`, and the model entries — never from th
 
 ## How it fits in
 
-`core` is the framework everything else plugs into: `createShelfApp` takes database, storage, capture, and auth adapters (from the `db-*`, `storage-*`, and `auth-*` packages) and produces a complete Hono server. The web UI is server-rendered `hono/jsx` + HTMX, and custom UIs can consume the JSON API under `/api/v1`.
+`core` is the framework everything else plugs into: `createShelfApp` takes database, storage, capture, and auth adapters (from the `@storyshelf/db`, `@storyshelf/storage` and `@storyshelf/auth` packages) and produces a complete Hono server. The web UI is server-rendered `hono/jsx` + HTMX, and custom UIs can consume the JSON API under `/api/v1`.
 
 See `docs/architecture.md` and the ADRs in `docs/adr/`.
 
@@ -148,8 +148,8 @@ The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`
 
 | Platform                                                             | Database                              | Storage                                        | `testing` (capture) | Server entry                      |
 | -------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------- | ------------------- | --------------------------------- |
-| **Vercel, AWS Lambda, Azure Functions**                              | `@storyshelf/db-sqlite/turso`         | `@storyshelf/storage/s3`                       | No (hosting only)   | Hono + platform handler           |
-| **Cloudflare Workers**                                               | `@storyshelf/db-sqlite/d1` or turso   | `@storyshelf/storage/s3` (R2)                  | No (hosting only)   | Hono + Workers entry              |
+| **Vercel, AWS Lambda, Azure Functions**                              | `@storyshelf/db/sqlite/turso`         | `@storyshelf/storage/s3`                       | No (hosting only)   | Hono + platform handler           |
+| **Cloudflare Workers**                                               | `@storyshelf/db/sqlite/d1` or turso   | `@storyshelf/storage/s3` (R2)                  | No (hosting only)   | Hono + Workers entry              |
 | **Bun / Node (VPS, Fly, Railway, Render)**                           | `db-sqlite` (+ `./bun-sqlite` on Bun) | `core/storage/local` / `@storyshelf/storage/s3`            | Yes, database queue | `storyshelf-server serve`         |
 | **Container platforms (ECS, Cloud Run, Container Apps, Kubernetes)** | `db-postgres` / `db-mysql`            | `@storyshelf/storage/s3` / `@storyshelf/storage/gcs` / `@storyshelf/storage/azure` | Yes, database queue | `storyshelf server init` scaffold |
 

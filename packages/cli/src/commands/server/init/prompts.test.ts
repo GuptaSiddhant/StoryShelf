@@ -101,7 +101,7 @@ describe("collectAnswers", () => {
   it("starts the database menu on the adapter found in the project's package.json", async () => {
     writeFileSync(
       join(tmpRoot, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "1.0.0", "@libsql/client": "1" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/db": "1.0.0", "@libsql/client": "1" } }),
     );
     vi.mocked(prompts)
       .mockResolvedValueOnce({ ...PROJECT, deployTarget: "local" })

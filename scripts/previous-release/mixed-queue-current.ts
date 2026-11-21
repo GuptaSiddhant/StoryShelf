@@ -67,11 +67,11 @@ const CONSUME_TIMEOUT_MS = 120_000;
 
 async function open(): Promise<DatabaseAdapter> {
   if (dialect === "sqlite") {
-    const { createSqliteDatabase } = await import("../../packages/db-sqlite/src/index.ts");
+    const { createSqliteDatabase } = await import("../../packages/db/src/sqlite/index.ts");
     return createSqliteDatabase(`${dataDir}/shelf.db`);
   }
   if (dialect === "postgres") {
-    const { createPostgresDatabase } = await import("../../packages/db-postgres/src/index.ts");
+    const { createPostgresDatabase } = await import("../../packages/db/src/postgres/index.ts");
     return createPostgresDatabase({ url: process.env["DATABASE_URL"] });
   }
   throw new Error(`unknown DIALECT: ${dialect}`);

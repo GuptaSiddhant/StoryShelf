@@ -142,7 +142,7 @@ describe("checkChangeset", () => {
       check([
         "packages/core/src/a.test.ts",
         "packages/core/src/a.integration.test.ts",
-        "packages/db-sqlite/src/test-helpers/x.ts",
+        "packages/db/src/sqlite/test-helpers/x.ts",
       ]).ok,
       true,
     );
@@ -156,7 +156,7 @@ describe("checkChangeset", () => {
 
   it("treats core's published test-helpers as shipped, and other packages' as not", () => {
     assert.equal(check(["packages/core/src/test-helpers/queue-contract.ts"]).ok, false);
-    assert.equal(check(["packages/db-sqlite/src/test-helpers/x.ts"]).ok, true);
+    assert.equal(check(["packages/db/src/sqlite/test-helpers/x.ts"]).ok, true);
     assert.equal(check(["packages/core/src/test-helpers/queue-contract.test.ts"]).ok, true);
   });
 

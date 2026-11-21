@@ -67,8 +67,7 @@ rather than pushing and waiting.
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
-- Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner`,
+- Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).

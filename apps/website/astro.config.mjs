@@ -260,7 +260,7 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "packages" },
             packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
-            packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
+            packageGroup("Databases", ["db"]),
             packageGroup("Storage", ["storage"]),
             packageGroup("Capture runners", ["runner"]),
           ],

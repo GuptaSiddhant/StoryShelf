@@ -200,7 +200,7 @@ Two changes in the module are deliberate and show in the plan:
 
 ### Switch the database to `rds-iam`
 
-The old stack read the RDS-managed master password from Secrets Manager at startup and built `DATABASE_URL`, so a rotated password broke the connection until a restart. The module connects with short-lived IAM tokens instead (`db-postgres/rds-iam`), so no database password reaches the app.
+The old stack read the RDS-managed master password from Secrets Manager at startup and built `DATABASE_URL`, so a rotated password broke the connection until a restart. The module connects with short-lived IAM tokens instead (`@storyshelf/db/postgres/rds-iam`), so no database password reaches the app.
 
 The module creates the instance with IAM authentication on (`iam_database_authentication_enabled`), and the migration applies that in place, with no restart of the app's data.
 

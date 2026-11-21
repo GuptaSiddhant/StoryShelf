@@ -20,7 +20,7 @@ import {
   smtpPresetFromEnv,
 } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createCaptureRunner } from "@storyshelf/runner";
@@ -32,7 +32,7 @@ import { createCaptureRunner } from "@storyshelf/runner";
  * file from source instead.
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
- *  - @storyshelf/db-sqlite → {SHELF_DATA_DIR}/shelf.db
+ *  - @storyshelf/db/sqlite → {SHELF_DATA_DIR}/shelf.db
  *  - @storyshelf/core/storage/local → SHELF_DATA_DIR, or @storyshelf/storage/s3 (Tigris) when SHELF_S3_BUCKET is set
  *  - @storyshelf/runner → chrome-headless-shell installed in the image
  *

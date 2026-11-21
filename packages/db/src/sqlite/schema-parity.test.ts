@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { DDL } from "./ddl.ts";
 import * as schema from "./schema/index.ts";
 
-const CORE_SCHEMA_DIR = fileURLToPath(new URL("../../core/src/schema", import.meta.url));
+const CORE_SCHEMA_DIR = fileURLToPath(new URL("../../../core/src/schema", import.meta.url));
 const MIGRATE_SOURCE = readFileSync(fileURLToPath(new URL("./ddl.ts", import.meta.url)), "utf8");
 const config = getTableConfig as unknown as GetTableConfig;
 

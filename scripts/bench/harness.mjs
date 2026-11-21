@@ -30,7 +30,7 @@ export async function startApp(dir) {
   const [{ serve }, { createShelfApp }, sqlite, local, playwright, models] = await Promise.all([
     load("node_modules/@hono/node-server/dist/index.mjs"),
     load("packages/app/dist/index.mjs"),
-    load("packages/db-sqlite/dist/index.mjs"),
+    load("packages/db/dist/sqlite/index.mjs"),
     load("packages/core/dist/storage/local.mjs"),
     load("packages/runner/dist/index.mjs"),
     load("packages/core/dist/models.mjs"),

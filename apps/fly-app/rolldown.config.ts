@@ -49,7 +49,7 @@ export default defineConfig({
     alias: {
       "@storyshelf/core": resolve(root, "packages/core/src/index.tsx"),
       "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
-      "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
+      "@storyshelf/db/sqlite": resolve(root, "packages/db/src/sqlite/index.ts"),
       "@storyshelf/runner": resolve(root, "packages/runner/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
     },

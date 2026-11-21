@@ -9,10 +9,10 @@ import {
 } from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
-import { createMysqlDatabase } from "@storyshelf/db-mysql";
-import { createPostgresDatabase } from "@storyshelf/db-postgres";
-import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db-postgres/rds-iam";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createMysqlDatabase } from "@storyshelf/db/mysql";
+import { createPostgresDatabase } from "@storyshelf/db/postgres";
+import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db/postgres/rds-iam";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { azurePlaywright } from "@storyshelf/runner/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage/azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage/gcs";

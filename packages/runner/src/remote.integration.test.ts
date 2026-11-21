@@ -10,7 +10,7 @@ import { TargetLaunchError, type StoryEntry } from "@storyshelf/core/adapter/cap
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Snapshot } from "@storyshelf/core/schema";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createRequire } from "node:module";

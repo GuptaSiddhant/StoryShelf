@@ -1,6 +1,6 @@
 import { createShelfAuth, samlPreset } from "@storyshelf/auth";
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";

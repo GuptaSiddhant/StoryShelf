@@ -1,6 +1,6 @@
 # StoryShelf Fly App (apps/fly-app)
 
-Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `@storyshelf/storage/s3` (or on the volume with core's local storage when no bucket is configured), `runner` for capture, and **workspace packages** (no publish).
+Production demo: SQLite on the volume (`@storyshelf/db/sqlite`), objects on **Tigris** through `@storyshelf/storage/s3` (or on the volume with core's local storage when no bucket is configured), `runner` for capture, and **workspace packages** (no publish).
 
 - `server.ts` mirrors `apps/dev-server/src/server.ts:1` but with `SHELF_DATA_DIR=/data`, `PORT=3000`, `SHELF_SECRET`/`SHELF_ADMIN_PASSWORD` via Fly secrets.
 - `Dockerfile` is multi-stage, cache-efficient, and uses `ghcr.io/nubjs/nub:0.8.1` for `nub install --frozen-lockfile` with BuildKit cache mount, then `mcr.microsoft.com/playwright:v1.62.1-noble` for runtime. Build context must be **repo root**.

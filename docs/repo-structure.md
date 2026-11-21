@@ -62,8 +62,8 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 ## Schema layout (0.2.0 target, R2)
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
-- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
-- `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
+- The DDL is hand-written per dialect in `packages/db/src/{sqlite,postgres,mysql}/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
+- `packages/db` (`@storyshelf/db`) holds the three dialects as subpaths `/sqlite`, `/postgres` and `/mysql` (`src/<dialect>/`, each with its own contract and migration tests) and their presets under each (`/sqlite/turso`, `/sqlite/better-sqlite3`, `/sqlite/bun-sqlite`, `/sqlite/d1`, `/postgres/pg`, `/postgres/neon`, …). Each driver is an optional peer that only its own subpath loads (`src/peer-isolation.test.ts`). Each dialect's `ddl`, `schema` and `drizzle-factory` modules are internal and unpublished (ADR 0041 replaces them); nothing outside the package imports them except through relative paths in tests. The package sits above core until #1242 inverts the layering (ADR 0049 amendment 2026-11-21).
 
 ## App convention (lives in `packages/app/src/`)
 
