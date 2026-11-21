@@ -10,7 +10,7 @@ import { notFound } from "./helpers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect, retargetBody } from "./htmx.ts";
 import { webhookModel } from "./scoped-models.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** Webhook settings (create with one-time secret display, delete). */
 export function registerWebhookSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/webhooks/new", async (c) => {
@@ -36,7 +36,7 @@ function parseWebhookEvents(form: FormData): string[] | undefined {
 }
 
 async function handleCreateWebhook(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   const url = asString(form.get("url"));
   const urlError = await WebhookModel.urlRefusal(url);
@@ -72,7 +72,7 @@ async function createWebhookRecord(
 }
 
 async function handleDeleteWebhook(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const webhook = await webhookModel().get(project.id, c.req.param("webhookId") ?? "");
   if (!webhook) {
     notFound("Webhook not found");

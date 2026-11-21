@@ -377,6 +377,7 @@ export async function renderSettingsPage(
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
+      canDeleteProject: data.isAdmin && isSiteAdmin(c),
       git: data.git ?? undefined,
       notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
@@ -408,15 +409,6 @@ function aiSettingsData(c: Context): SettingsAiData {
     defaultProfile: ai?.defaultProfile() ?? "",
     isSiteAdmin: isSiteAdmin(c),
   };
-}
-
-/** Find a project by slug or throw 404. */
-export async function findProject(slug: string): Promise<Project> {
-  const project = await new ProjectModel(getStore().db).getBySlug(slug);
-  if (!project) {
-    notFound("Project not found");
-  }
-  return project;
 }
 
 /** Trim a form value to a string, dropping files and blanks. */
