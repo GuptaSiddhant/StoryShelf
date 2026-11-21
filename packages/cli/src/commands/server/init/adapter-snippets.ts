@@ -58,7 +58,7 @@ export function dbPrelude(database: DatabaseChoice): string[] {
 
 export const STORAGE_INIT: Record<StorageChoice, string> = {
   local: `createLocalStorage(dataDir)`,
-  s3: `createS3Storage({ bucket: process.env.S3_BUCKET!, region: process.env.AWS_REGION })`,
-  azure: `createAzureStorage({ container: "storybook", connectionString: process.env.AZURE_STORAGE_CONNECTION! })`,
-  gcs: `createGcsStorage({ bucket: process.env.GCS_BUCKET! })`,
+  s3: `createS3Storage({ bucket: process.env.SHELF_S3_BUCKET!, region: process.env.AWS_REGION })`,
+  azure: `createAzureStorage({ container: "storybook", connectionString: process.env.SHELF_AZURE_CONNECTION_STRING! })`,
+  gcs: `createGcsStorage({ bucket: process.env.SHELF_GCS_BUCKET! })`,
 };

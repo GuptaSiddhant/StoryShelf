@@ -34,11 +34,11 @@ output "key_vault_name" {
 }
 
 output "admin_token_secret_id" {
-  description = "Versionless Key Vault id of the break-glass ADMIN_TOKEN (read it with the Azure CLI; it is not an output value)."
+  description = "Versionless Key Vault id of the break-glass SHELF_ADMIN_TOKEN (read it with the Azure CLI; it is not an output value)."
   value       = azurerm_key_vault_secret.admin_token.versionless_id
 }
 
-output "auth_password_secret_id" {
+output "admin_password_secret_id" {
   description = "Versionless Key Vault id of the generated admin password (read it with the Azure CLI; it is not an output value)."
   value       = azurerm_key_vault_secret.auth_password.versionless_id
 }

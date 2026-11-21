@@ -41,7 +41,7 @@ resource "random_password" "auth_password" {
 }
 
 resource "azurerm_key_vault_secret" "shelf_secret" {
-  name         = "SECRET"
+  name         = "SHELF-SECRET"
   value        = random_password.shelf_secret.result
   key_vault_id = azurerm_key_vault.main.id
 
@@ -49,7 +49,7 @@ resource "azurerm_key_vault_secret" "shelf_secret" {
 }
 
 resource "azurerm_key_vault_secret" "admin_token" {
-  name         = "ADMIN-TOKEN"
+  name         = "SHELF-ADMIN-TOKEN"
   value        = random_password.admin_token.result
   key_vault_id = azurerm_key_vault.main.id
 
@@ -58,7 +58,7 @@ resource "azurerm_key_vault_secret" "admin_token" {
 
 # The local admin's password: sign-in is on from the first boot, and the image refuses to boot without it.
 resource "azurerm_key_vault_secret" "auth_password" {
-  name         = "AUTH-PASSWORD"
+  name         = "SHELF-ADMIN-PASSWORD"
   value        = random_password.auth_password.result
   key_vault_id = azurerm_key_vault.main.id
 
@@ -67,7 +67,7 @@ resource "azurerm_key_vault_secret" "auth_password" {
 
 # An operator step: Terraform writes "change-me" once and never overwrites the real value.
 resource "azurerm_key_vault_secret" "oidc_client_secret" {
-  name         = "OIDC-CLIENT-SECRET"
+  name         = "SHELF-OIDC-CLIENT-SECRET"
   value        = "change-me"
   key_vault_id = azurerm_key_vault.main.id
 
@@ -93,11 +93,11 @@ locals {
   # Container App secret name -> versionless Key Vault secret id.
   app_secrets = merge(
     {
-      "shelf-secret"       = azurerm_key_vault_secret.shelf_secret.versionless_id
-      "admin-token"        = azurerm_key_vault_secret.admin_token.versionless_id
-      "auth-password"      = azurerm_key_vault_secret.auth_password.versionless_id
-      "oidc-client-secret" = azurerm_key_vault_secret.oidc_client_secret.versionless_id
-      "database-url"       = local.create_database ? azurerm_key_vault_secret.database_url[0].versionless_id : var.existing_database_url_secret_id
+      "shelf-secret"             = azurerm_key_vault_secret.shelf_secret.versionless_id
+      "shelf-admin-token"        = azurerm_key_vault_secret.admin_token.versionless_id
+      "shelf-admin-password"     = azurerm_key_vault_secret.auth_password.versionless_id
+      "shelf-oidc-client-secret" = azurerm_key_vault_secret.oidc_client_secret.versionless_id
+      "database-url"             = local.create_database ? azurerm_key_vault_secret.database_url[0].versionless_id : var.existing_database_url_secret_id
     },
     local.playwright ? {
       "playwright-endpoint" = var.playwright_workspace_endpoint_secret_id
@@ -110,11 +110,11 @@ locals {
   # Environment variable -> Container App secret name.
   secret_env = merge(
     {
-      "SECRET"             = "shelf-secret"
-      "ADMIN_TOKEN"        = "admin-token"
-      "AUTH_PASSWORD"      = "auth-password"
-      "OIDC_CLIENT_SECRET" = "oidc-client-secret"
-      "DATABASE_URL"       = "database-url"
+      "SHELF_SECRET"             = "shelf-secret"
+      "SHELF_ADMIN_TOKEN"        = "shelf-admin-token"
+      "SHELF_ADMIN_PASSWORD"     = "shelf-admin-password"
+      "SHELF_OIDC_CLIENT_SECRET" = "shelf-oidc-client-secret"
+      "DATABASE_URL"             = "database-url"
     },
     local.playwright ? {
       "PLAYWRIGHT_SERVICE_URL"          = "playwright-endpoint"

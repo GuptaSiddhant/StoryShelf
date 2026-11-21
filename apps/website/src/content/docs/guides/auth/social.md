@@ -10,8 +10,8 @@ import { createShelfAuth, githubPreset, googlePreset } from "@storyshelf/auth";
 
 const shelf = createShelfAuth({
   db: database,
-  secret: process.env.SECRET!,
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: process.env.SHELF_SECRET!,
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
   social: [
     githubPreset({ clientId: "...", clientSecret: "{env:GITHUB_CLIENT_SECRET}" }),
     googlePreset({ clientId: "...", clientSecret: "{env:GOOGLE_CLIENT_SECRET}" }),

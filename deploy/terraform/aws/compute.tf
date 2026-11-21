@@ -10,10 +10,10 @@ locals {
   stop_timeout = var.shutdown_grace_seconds + 10
 
   database_environment = local.create_database ? [
-    { name = "DATABASE_IAM_HOST", value = aws_db_instance.main[0].address },
-    { name = "DATABASE_IAM_USER", value = local.database_user },
-    { name = "DATABASE_IAM_NAME", value = local.database_name },
-    { name = "DATABASE_IAM_REGION", value = var.region },
+    { name = "SHELF_DATABASE_IAM_HOST", value = aws_db_instance.main[0].address },
+    { name = "SHELF_DATABASE_IAM_USER", value = local.database_user },
+    { name = "SHELF_DATABASE_IAM_NAME", value = local.database_name },
+    { name = "SHELF_DATABASE_IAM_REGION", value = var.region },
   ] : []
 
   database_secrets = local.create_database ? [] : [
@@ -22,7 +22,7 @@ locals {
 
   # The master secret is JSON ({"username","password"}); ECS picks one key per reference.
   oidc_secrets = var.enable_cognito ? [
-    { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret[0].arn },
+    { name = "SHELF_OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret[0].arn },
   ] : []
 
   db_init_secrets = local.create_database ? [
@@ -188,18 +188,18 @@ resource "aws_ecs_task_definition" "app" {
     stopTimeout  = local.stop_timeout
     portMappings = [{ containerPort = 3000, protocol = "tcp" }]
     environment = concat([
-      { name = "AWS_BUCKET", value = aws_s3_bucket.storybook.id },
+      { name = "SHELF_S3_BUCKET", value = aws_s3_bucket.storybook.id },
       { name = "AWS_REGION", value = var.region },
-      { name = "PUBLIC_BASE_URL", value = local.public_base_url },
-      { name = "TRUST_PROXY", value = "1" },
-      { name = "SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
-      { name = "DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
-      { name = "AUTH_EMAIL", value = var.auth_email },
+      { name = "SHELF_PUBLIC_BASE_URL", value = local.public_base_url },
+      { name = "SHELF_TRUST_PROXY", value = "1" },
+      { name = "SHELF_SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
+      { name = "SHELF_DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
+      { name = "SHELF_ADMIN_EMAIL", value = var.admin_email },
     ], local.database_environment, local.git_environment)
     secrets = concat([
-      { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
-      { name = "AUTH_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
-      { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
+      { name = "SHELF_SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
+      { name = "SHELF_ADMIN_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
+      { name = "SHELF_ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
     ], local.oidc_secrets, local.database_secrets, local.git_secrets)
     logConfiguration = {
       logDriver = "awslogs"

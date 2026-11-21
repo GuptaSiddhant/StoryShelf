@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import { printError } from "../output.ts";
+import { readSetting } from "../settings.ts";
 import { runUpload } from "./upload.ts";
 
 /** Print an error and mark the process as failed. */
@@ -22,9 +23,9 @@ interface DefaultUploadOptions {
 }
 
 function defaultUploadOptions(cfg: StorybookConfig | null): DefaultUploadOptions | null {
-  const url = cfg?.url ?? process.env["STORYSHELF_URL"];
+  const url = cfg?.url ?? readSetting(process.env, "SHELF_URL");
   const slug = cfg?.slug;
-  const token = process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
+  const token = readSetting(process.env, "SHELF_TOKEN");
   const sha =
     process.env["GITHUB_SHA"] ??
     process.env["VERCEL_GIT_COMMIT_SHA"] ??
@@ -60,7 +61,7 @@ export async function runDefaultCommand(program: Command): Promise<void> {
     program.outputHelp();
     if (cfg) {
       printError(
-        "Missing required upload options — ensure STORYSHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`",
+        "Missing required upload options — ensure SHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`",
       );
     } else {
       printError(

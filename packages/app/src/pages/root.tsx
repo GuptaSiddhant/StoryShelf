@@ -50,8 +50,7 @@ const Hero: FC = () => (
       <Meta>
         Tip: use{" "}
         <code>
-          npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token
-          $STORYSHELF_ADMIN_TOKEN
+          npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token $SHELF_ADMIN_TOKEN
         </code>{" "}
         to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
         <code>.storybook/storyshelf.json</code>.

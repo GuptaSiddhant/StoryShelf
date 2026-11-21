@@ -68,7 +68,7 @@ function buildAdapterLines(answers: Answers): string[] {
 }
 
 const EMAIL_SENDER_LINES = [
-  `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
+  `// SMTP sender from SHELF_SMTP_* env (undefined keeps invites out-of-band).`,
   `const emailSender = await smtpPresetFromEnv(process.env);`,
 ];
 
@@ -80,7 +80,7 @@ const EMAIL_NOTIFIERS_LINES = [
   `      emailSender`,
   `        ? builtIn.map((provider) =>`,
   `            provider.metadata.kind === "email"`,
-  `              ? createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })`,
+  `              ? createEmailNotifier(emailSender, { from: process.env.SHELF_SMTP_FROM })`,
   `              : provider,`,
   `          )`,
   `        : builtIn,`,
@@ -111,12 +111,12 @@ const OBSERVABILITY_SETUP_LINES = [
 
 const CONFIG_AND_SETUP_LINES = [
   `  config: {`,
-  `    // Lets \`storyshelf create --token $STORYSHELF_ADMIN_TOKEN\` bootstrap projects; unset disables it.`,
-  `    adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined,`,
-  `    publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined,`,
-  `    secret: process.env.SECRET,`,
-  `    previousSecret: process.env.SECRET_PREVIOUS || undefined,`,
-  `    migrateCredentialsOnBoot: process.env.SECRET_MIGRATE === "true",`,
+  `    // Lets \`storyshelf create --token $SHELF_ADMIN_TOKEN\` bootstrap projects; unset disables it.`,
+  `    adminToken: process.env.SHELF_ADMIN_TOKEN || undefined,`,
+  `    publicBaseUrl: process.env.SHELF_PUBLIC_BASE_URL || undefined,`,
+  `    secret: process.env.SHELF_SECRET,`,
+  `    previousSecret: process.env.SHELF_SECRET_PREVIOUS || undefined,`,
+  `    migrateCredentialsOnBoot: process.env.SHELF_SECRET_MIGRATE === "true",`,
   `    scratchDir: dataDir,`,
   `  },`,
   `});`,
@@ -126,18 +126,18 @@ const CONFIG_AND_SETUP_LINES = [
 
 const PASSWORD_ADMIN_LINES = [
   ``,
-  `// Provision the env-driven local admin (AUTH_PASSWORD, at least 12 chars).`,
+  `// Provision the env-driven local admin (SHELF_ADMIN_PASSWORD, at least 12 chars).`,
   `await ensurePasswordAdmin(database, {`,
-  `  email: process.env.AUTH_EMAIL ?? "admin@example.com",`,
-  `  password: process.env.AUTH_PASSWORD!,`,
+  `  email: process.env.SHELF_ADMIN_EMAIL ?? "admin@example.com",`,
+  `  password: process.env.SHELF_ADMIN_PASSWORD!,`,
   `});`,
 ];
 
 const KEYCLOAK_OAUTH_LINES = [
   `    oauth: [`,
-  `      keycloakPreset(process.env.OIDC_ISSUER!, {`,
-  `        clientId: process.env.OIDC_CLIENT_ID!,`,
-  `        clientSecret: process.env.OIDC_CLIENT_SECRET,`,
+  `      keycloakPreset(process.env.SHELF_OIDC_ISSUER!, {`,
+  `        clientId: process.env.SHELF_OIDC_CLIENT_ID!,`,
+  `        clientSecret: process.env.SHELF_OIDC_CLIENT_SECRET,`,
   `      }),`,
   `    ],`,
 ];
@@ -151,8 +151,8 @@ function authLines(answers: Answers): string[] {
   return [
     `  auth: createShelfAuth({`,
     `    db: database,`,
-    `    secret: process.env.SECRET!,`,
-    `    baseURL: process.env.PUBLIC_BASE_URL!,`,
+    `    secret: process.env.SHELF_SECRET!,`,
+    `    baseURL: process.env.SHELF_PUBLIC_BASE_URL!,`,
     ...(wantsNotifications(answers) ? AUTH_NOTIFICATION_LINES : []),
     ...provider,
     `  }).adapter,`,
@@ -161,15 +161,15 @@ function authLines(answers: Answers): string[] {
 
 const AUTH_NOTIFICATION_LINES = [
   `    emailSender,`,
-  `    fromEmail: process.env.SMTP_FROM,`,
+  `    fromEmail: process.env.SHELF_SMTP_FROM,`,
   `    onAuthSystemEvent: createAuthSystemHook(),`,
 ];
 
 /** The variables the server cannot start without, for the chosen auth and database. */
 export function requiredEnv(answers: Answers): string[] {
-  const names = answers.auth === "none" ? [] : ["SECRET", "PUBLIC_BASE_URL"];
+  const names = answers.auth === "none" ? [] : ["SHELF_SECRET", "SHELF_PUBLIC_BASE_URL"];
   if (answers.auth === "password") {
-    names.push("AUTH_PASSWORD");
+    names.push("SHELF_ADMIN_PASSWORD");
   }
   if (DB_INIT[answers.database].includes("process.env.DATABASE_URL")) {
     names.push("DATABASE_URL");
@@ -208,7 +208,7 @@ export function generateServer(answers: Answers): string {
   return [
     ...buildImports(answers),
     ``,
-    `const dataDir = process.env.DATA_DIR || "./data";`,
+    `const dataDir = process.env.SHELF_DATA_DIR || "./data";`,
     `const port = Number(process.env.PORT) || 3000;`,
     ``,
     ...LOAD_ENV_LINES,

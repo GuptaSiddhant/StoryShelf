@@ -9,7 +9,7 @@
 #   fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh --dry-run"   # counts only, writes nothing
 #   fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh"
 #
-# It reads AWS_BUCKET, AWS_ENDPOINT_URL_S3, AWS_REGION and the AWS_* credentials from the
+# It reads SHELF_S3_BUCKET, AWS_ENDPOINT_URL_S3, AWS_REGION and the AWS_* credentials from the
 # machine's environment (the Fly secrets) and prints only counts, never a key or a credential.
 set -euo pipefail
 exec node "$(dirname "$0")/dist/migrate-to-s3.mjs" "$@"

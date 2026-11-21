@@ -17,6 +17,8 @@ import type { UploadOptions } from "./commands/upload.ts";
 import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
 import { isMainModule } from "./is-main.ts";
+import { printError } from "./output.ts";
+import { refuseRenamedCliSettings } from "./settings.ts";
 
 /**
  * Build the StoryShelf CLI program with all subcommands registered.
@@ -78,10 +80,7 @@ function buildInitCommand(): Command {
     .option("--build-script-name <name>", "npm script to build Storybook (default build-storybook)")
     .option("--skip <glob>", "skip upload for matching branch (glob)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
-    .option(
-      "--token <token>",
-      "auth token for sync (or STORYSHELF_TOKEN/STORYSHELF_ADMIN_TOKEN env)",
-    )
+    .option("--token <token>", "auth token for sync (or SHELF_TOKEN/SHELF_ADMIN_TOKEN env)")
     .action(run<InitOptions>(async () => (await import("./commands/init.ts")).runInit));
 }
 
@@ -90,7 +89,7 @@ function buildCreateCommand(): Command {
     .description("Create a project on StoryShelf server (requires admin token)")
     .option("--url <url>", "server base URL")
     .option("--name <name>", "project name")
-    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
+    .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
     .action(run<CreateOptions>(async () => (await import("./commands/create.ts")).runCreate));
 }
 
@@ -117,7 +116,7 @@ function buildServerCommand(): Command {
     .command("check-storage")
     .description("Read-only: report blobs the database references but storage lacks")
     .requiredOption("--url <url>", "server base URL")
-    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
+    .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
     .option("--sample <n>", "check only the newest n builds", (value) => Math.trunc(Number(value)))
     .action(
       run<ServerCheckStorageOptions>(
@@ -138,9 +137,9 @@ function buildMcpCommand(): Command {
   const serve = new Command("serve")
     .description("Run a scaffolded StoryShelf MCP server project")
     .option("--dir <dir>", "MCP project directory (default cwd)")
-    .option("--url <url>", "StoryShelf server URL (sets STORYSHELF_URL)")
-    .option("--slug <slug>", "default project slug (sets STORYSHELF_SLUG)")
-    .option("--token <token>", "API token for stdio (sets STORYSHELF_TOKEN)")
+    .option("--url <url>", "StoryShelf server URL (sets SHELF_URL)")
+    .option("--slug <slug>", "default project slug (sets SHELF_SLUG)")
+    .option("--token <token>", "API token for stdio (sets SHELF_TOKEN)")
     .option("--port <port>", "HTTP port (sets PORT)")
     .action(
       run<McpServeOptions>(async () => (await import("./commands/mcp/serve.ts")).runMcpServe),
@@ -153,7 +152,7 @@ function buildPurgeCommand(): Command {
   return new Command("purge")
     .description("Purge expired builds on a StoryShelf server")
     .requiredOption("--url <url>", "server base URL")
-    .option("--token <token>", "admin token (or STORYSHELF_ADMIN_TOKEN env)")
+    .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
     .action(run<PurgeOptions>(async () => (await import("./commands/purge.ts")).runPurge));
 }
 
@@ -163,7 +162,7 @@ function buildUploadCommand(): Command {
       .description("Create a build record for a StoryShelf project")
       .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
       .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-      .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+      .option("--token <token>", "CI token (or SHELF_TOKEN env)")
       .option("--sha <sha>", "revision SHA (flag, CI env, local git HEAD, or synthesized local-*)")
       .option("--branch <branch>", "baseline namespace (flag, CI env, local git branch, or local)")
       .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
@@ -244,7 +243,7 @@ function buildDoctorCommand(): Command {
     .description("Diagnose whether an upload would succeed (no side effects)")
     .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
     .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--token <token>", "CI token (or SHELF_TOKEN env)")
     .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .option("--build-command <cmd>", "build command to run if buildDir missing/empty")
@@ -257,7 +256,7 @@ function buildWhoamiCommand(): Command {
     .description("Verify the token against the server and print the project")
     .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
     .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--token <token>", "CI token (or SHELF_TOKEN env)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .action(run<ConnectionOptions>(async () => (await import("./commands/whoami.ts")).runWhoami));
 }
@@ -268,7 +267,7 @@ function buildRetryCommand(): Command {
     .requiredOption("--url <url>", "server base URL")
     .requiredOption("--slug <slug>", "project slug")
     .requiredOption("--build-id <id>", "build id")
-    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--token <token>", "CI token (or SHELF_TOKEN env)")
     .action(run<RetryOptions>(async () => (await import("./commands/retry.ts")).runRetry));
 }
 
@@ -277,7 +276,7 @@ function buildCancelCommand(): Command {
     .description("Cancel older unfinished builds, keeping the newest of each branch")
     .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
     .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("--token <token>", "CI token (or SHELF_TOKEN env)")
     .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
     .option("--branch <name>", "only cancel builds of this branch")
     .option("--keep-newest <n>", "unfinished builds to keep per branch (default 1)")
@@ -301,13 +300,31 @@ function buildProtectCommand(): Command {
     .action(run<ProtectOptions>(async () => (await import("./commands/protect.ts")).runProtect));
 }
 
-if (isMainModule(import.meta.url, process.argv[1])) {
+/** Run the CLI: `storyshelf` with no args uploads if config exists, else helps to init. */
+async function main(): Promise<void> {
   const program = createProgram();
-  // Default: `storyshelf` with no args -> upload if config exists, else help to init
   if (process.argv.length <= 2) {
     const { runDefaultCommand } = await import("./commands/default.ts");
     await runDefaultCommand(program);
   } else {
     program.parse(process.argv);
+  }
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
+  // The variables were renamed with no aliases (#1308): refuse while an old name is set, naming it.
+  try {
+    const ignored = refuseRenamedCliSettings(process.env);
+    if (ignored.length > 0) {
+      printError(
+        `storyshelf: old StoryShelf variable names are set and ignored (SHELF_ALLOW_OLD_NAMES=1): ${ignored.join(", ")}`,
+      );
+    }
+  } catch (error) {
+    printError(`storyshelf: ${(error as Error).message}`);
+    process.exitCode = 1;
+  }
+  if (process.exitCode !== 1) {
+    await main();
   }
 }

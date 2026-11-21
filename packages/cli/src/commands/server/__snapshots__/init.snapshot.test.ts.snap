@@ -3,11 +3,11 @@
 exports[`server init output > is unchanged for auth oauth 1`] = `
 {
   "files": [
-    ".env.example 498 d505c90cda58b2df8b41275f35a1eecf674824451f61925ec4853f4d2a9553a2",
+    ".env.example 511 1123dbbe1b01cceeb8e78900f3e5e6e9682533e9ac80f1a75b477f7f6b96659c",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 722 26d50ae37f83959d33c9c790a93fe5fce5e299fce89f8bddf21268b7a0cfcc5b",
+    "README.md 735 07916ac878e950ee313f1e69264971796408fb90ab9f383fb26363265ec95937",
     "package.json 624 a6116a5f80aade1b13dad34914481314f887d647696a4f1de605a63983f33236",
-    "src/index.ts 2169 32a78027dac71c24e46d00d5cc62be86869597b5301f839cb10a3e0145c56831",
+    "src/index.ts 2231 3bf44c75ce78f5d765aab983153f0ff4615fa33505cc3f4de5b9b999195584e0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -19,9 +19,9 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  # Required: SECRET, PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
-  export PUBLIC_BASE_URL=http://localhost:3000
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
   npm install
   npm start
 ",
@@ -31,11 +31,11 @@ Next steps:
 exports[`server init output > is unchanged for auth password 1`] = `
 {
   "files": [
-    ".env.example 565 56f4c453513c1c15eb3423acfe986a22e88f47f0cfc1777e1cc728aab1cbfe58",
+    ".env.example 585 9a4b3e69a87f4819cd091fdbe6d6e0f87eabd518766009dfe750182a673b7e6e",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 862 3099a51867098212fab88c3367c7cdbd436cb083e43f869696bf54545114a594",
+    "README.md 895 859846050ec24aa3d5f7323a756371c107aeb3265cdabd1ac902213ae65ec6f8",
     "package.json 624 a6116a5f80aade1b13dad34914481314f887d647696a4f1de605a63983f33236",
-    "src/index.ts 2226 4b7274532348e229a731e836860ed19e11ac323eaedd8c08a1193e02258f2bda",
+    "src/index.ts 2298 d5ba9184a65c6dc837a8d6083b21b802a36ed745c226e5bdd86250f3f9b54eef",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -47,10 +47,10 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD. Set them in the shell, or in .env (copy .env.example):
-  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
-  export PUBLIC_BASE_URL=http://localhost:3000
-  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
   npm install
   npm start
   # then sign in as admin@example.com
@@ -61,11 +61,11 @@ Next steps:
 exports[`server init output > is unchanged for database better-sqlite3 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 624 289a37ee4b7bc5ce8f04116d4dbd606299867e5d7b01fa3b467838d862267c50",
-    "src/index.ts 1598 cf5927061b05cfeaa1443b5e90855b4ae2173f478d8f3d22779ddc134897e173",
+    "src/index.ts 1618 ad3f2ab05cd34f38744964878b76e7a3f561b835946b9028d9c16ff0d5d22721",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -86,11 +86,11 @@ Next steps:
 exports[`server init output > is unchanged for database bun-sqlite 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 591 8b632b567e7e29323bef7d101a45f2c9e5039da1fbd87ed698bdddf71989cc38",
-    "src/index.ts 1586 27fbade301d74f7852779850f40200caece53b035b6cd8e354cb986467657d79",
+    "src/index.ts 1606 4aa2e20de5c1e675ee385739193816ae886557b25ddab28f5b4bcaad0e30388b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -111,11 +111,11 @@ Next steps:
 exports[`server init output > is unchanged for database d1 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 591 8b632b567e7e29323bef7d101a45f2c9e5039da1fbd87ed698bdddf71989cc38",
-    "src/index.ts 1722 d5509668f355d0ae8c7e964fa69dcd6ffd9047513bc830910f8ee4e074cbe34b",
+    "src/index.ts 1742 f43399077d5aeb02469d43291214e09c14321d71b776583fda40c0d193251ca8",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -136,11 +136,11 @@ Next steps:
 exports[`server init output > is unchanged for database mysql 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 614 c0dee10bb09b8ebf156f70ce22cf578ecf740d5ab445ad41317990cfe4d7a7a2",
-    "src/index.ts 1784 d401834e168a7c11058f1fc692c3e8de049a296a3161c95b6a8c77a0681ef0b8",
+    "src/index.ts 1804 c6e56b28beb31ad5527ca88cb0dd794594ec9db9d8c148240f7a92390fcbc6b1",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -163,11 +163,11 @@ Next steps:
 exports[`server init output > is unchanged for database neon 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 635 0e17469bb2b53913838549c28fd1fcd6e8095a4c16d0954d33834f5b30c636f4",
-    "src/index.ts 1790 d24fe267641fe29ddf2769cbc8e5b888e4e2ad09f5b7d0af8f9c2e76cc79418f",
+    "src/index.ts 1810 76ec60db49b80586fd274b7135cc1a191ad5f89b0638c554893b5b5aba3376b3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -190,11 +190,11 @@ Next steps:
 exports[`server init output > is unchanged for database neon-http 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 635 0e17469bb2b53913838549c28fd1fcd6e8095a4c16d0954d33834f5b30c636f4",
-    "src/index.ts 1803 4a262f1fb5aeecbcba3be1e09dd9e6cf9af32f3734eff5b48cc1945cc621a147",
+    "src/index.ts 1823 b808efbb8ff4ddfc41adef4213de71f103a997b2ca4e5e79d9653d3754ff7888",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -217,11 +217,11 @@ Next steps:
 exports[`server init output > is unchanged for database pg 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 613 92511855f5ef1363cdbf7b4895bd77d2356f462077136ef26081fcdc4ef7d938",
-    "src/index.ts 1784 3d65f51d0f34ce31c25921546bd4983a7b495b5387c57b3f12f17404b8914cbb",
+    "src/index.ts 1804 eee4bf82abc5ae76a4f22a12dd21f3367984c94a138bb700c2d226939eddb192",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -244,11 +244,11 @@ Next steps:
 exports[`server init output > is unchanged for database pglite 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 631 52da0e0b7daf0c652cf4bd66673291d8852b550c44eb05e20c416957b3e36f41",
-    "src/index.ts 1547 b1cc44aec55ff3e7aea0727e2ef5394b5773cd1f0b68c0c413139e2b80f359b2",
+    "src/index.ts 1567 0ce938a385a620bc41f6e8a2479c06bc2be050090389d7228f9cdf8dc233aa6a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -269,11 +269,11 @@ Next steps:
 exports[`server init output > is unchanged for database planetscale 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 630 f5354a6677b07989bc1b9738ed7b1813c267d764a72017b97372892692a61a47",
-    "src/index.ts 1808 445bed1494f9ce8c0eb9fbc1d31c771fceeb774858ec9b621707950a800fc54b",
+    "src/index.ts 1828 df67c5e631bf9301d84a60de5ffa9800d7d061ab9cb4b55dfa8db4ce5a59420f",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -296,11 +296,11 @@ Next steps:
 exports[`server init output > is unchanged for database postgres 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 593 7373a6ff0e84f32c281ed17b6d75fbc0f57ac8a1a602d04ac33adfe194c9ecea",
-    "src/index.ts 1793 39ad97517a3e4ffc81c10f458a37e2ca52c13c40defc5221f423289110cdff6a",
+    "src/index.ts 1813 82d023195655d27cf8ec99e4c17809c13df3e274a975f65258f60afb4b9f7f6a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -323,11 +323,11 @@ Next steps:
 exports[`server init output > is unchanged for database sqlite 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 591 8b632b567e7e29323bef7d101a45f2c9e5039da1fbd87ed698bdddf71989cc38",
-    "src/index.ts 1559 cd3d4d0a0d594d289a27761aae0d2296fde786c27f298a9c2a5f9eb48a8b0d00",
+    "src/index.ts 1579 9af05f439b07cfb9ba13231f2c1766fce0b016e10d61b28c1c066190f7a50cb0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -348,11 +348,11 @@ Next steps:
 exports[`server init output > is unchanged for database tidb 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 629 3c136564446839d71b00857e71bb1c338caf3e5aedf2258e03a84362bf21a752",
-    "src/index.ts 1787 7ed309dae074c50ffafaac0817f5b95bb2076811029c25597246278d79fb5907",
+    "src/index.ts 1807 a02d8eb7e45064719b11bd8509a621cf8432078a94a43ad16ad4a1c24ca3afd1",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -375,11 +375,11 @@ Next steps:
 exports[`server init output > is unchanged for database turso 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 624 ff1c0841f2d006aa50d72ef867db785c4e0eb31e15317b063cfe35ceeacc0eff",
-    "src/index.ts 1623 e070c2536e8099916c6830f982ed3319f1c3acb2d5e597fc36594c3fec9c7df0",
+    "src/index.ts 1643 e81b455b004ca05ef2478b81cd1be484fddf1e704e0cdad993bff02b0a3eef6b",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -400,11 +400,11 @@ Next steps:
 exports[`server init output > is unchanged for database vercel 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 628 1aa672bbd98cdbae59c92f8d4b60265476a9cc19c506d56fbf0ee02ff8c91e2d",
-    "src/index.ts 1547 d3cab827dd325d1b2a50939ca762dd9538591e80acb381f4965054d5c52b6dbe",
+    "src/index.ts 1567 31d1dfb509ecc1ae2af234ec8d9dc6e8741358cd3a15ccb13700e9210a0308d3",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -425,11 +425,11 @@ Next steps:
 exports[`server init output > is unchanged for design 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 591 8b632b567e7e29323bef7d101a45f2c9e5039da1fbd87ed698bdddf71989cc38",
-    "src/index.ts 1559 cd3d4d0a0d594d289a27761aae0d2296fde786c27f298a9c2a5f9eb48a8b0d00",
+    "src/index.ts 1579 9af05f439b07cfb9ba13231f2c1766fce0b016e10d61b28c1c066190f7a50cb0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -451,12 +451,12 @@ exports[`server init output > is unchanged for docker advanced adapters 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
-    "package.json 759 5f3f289e4281996dd5024ad50eeeb8e13f6373444930aa3564477c276f310b36",
-    "src/index.ts 1784 d401834e168a7c11058f1fc692c3e8de049a296a3161c95b6a8c77a0681ef0b8",
+    "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
+    "package.json 765 8aaa5b928b8cdb30524dfe0b181805bb44eebe23dbc596865a80c2bee4235cad",
+    "src/index.ts 1804 c6e56b28beb31ad5527ca88cb0dd794594ec9db9d8c148240f7a92390fcbc6b1",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -469,7 +469,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  export SECRET=...      # at least 32 random characters; keep and reuse it
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -480,12 +480,12 @@ exports[`server init output > is unchanged for docker single container 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
-    "package.json 736 8763a2c03500cdf261298a38a840b891fa91edc3f15c35e884fe1c55df018933",
-    "src/index.ts 1559 cd3d4d0a0d594d289a27761aae0d2296fde786c27f298a9c2a5f9eb48a8b0d00",
+    "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
+    "package.json 742 d13b7a0cddb56bfab522d2a32085a51872b39ed5623abc83a371ff5f68ea9d78",
+    "src/index.ts 1579 9af05f439b07cfb9ba13231f2c1766fce0b016e10d61b28c1c066190f7a50cb0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -498,7 +498,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  export SECRET=...      # at least 32 random characters; keep and reuse it
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -509,13 +509,13 @@ exports[`server init output > is unchanged for docker with postgres compose 1`] 
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
-    "compose.yaml 876 8ff61200c71430864eb2b97b997da392cf0aef941db00bd28c24c9469eb712e9",
+    "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
+    "compose.yaml 900 4675c1ee9d583dba51e01568ec61a137851db3c9f0dfb2decc8bab2c0955a36c",
     "package.json 770 fe65726f79143ad451c2e1cd2d5a06d08860e813a28e5ccd34deb7277bc69aed",
-    "src/index.ts 1793 39ad97517a3e4ffc81c10f458a37e2ca52c13c40defc5221f423289110cdff6a",
+    "src/index.ts 1813 82d023195655d27cf8ec99e4c17809c13df3e274a975f65258f60afb4b9f7f6a",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -528,7 +528,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  export SECRET=...      # at least 32 random characters; keep and reuse it
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:up      # builds + starts the app
   npm run docker:logs    # follow logs
   npm run docker:down    # tear down
@@ -539,11 +539,11 @@ Next steps:
 exports[`server init output > is unchanged for everything on 1`] = `
 {
   "files": [
-    ".env.example 612 efbea3d78b8d4cb416a8be45799210e34acbf13dea2457ae3c9c309713670ef6",
+    ".env.example 632 721865831c46b68e31badf88551e668adfadcf35e12a199f59c22b780c49ddba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 911 f422c871803bde26db5e1cac8c15d11fc8a24a45dde8c8d1911f084df007a626",
+    "README.md 944 cde6b4d86a53e3167ae734764ae6841eca83361943545b777d8c26c2f0e154ec",
     "package.json 737 26d8ae835368b19b01c2df51e10391813d44f12db8c3d16c3e4efd926dd42fac",
-    "src/index.ts 3441 3ee7c295a325c7d0b76740e855ecc7fd0654db66bd7b3407e6e5f2e84d549424",
+    "src/index.ts 3537 d264fd2f4f5a08ca4a3c3a116722a7ffcdf9e273b9de7af385aa5b8c5f05d804",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -555,10 +555,10 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD, DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
-  export PUBLIC_BASE_URL=http://localhost:3000
-  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD, DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
   export DATABASE_URL=...
   npm install
   npm start
@@ -570,11 +570,11 @@ Next steps:
 exports[`server init output > is unchanged for git on 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 591 8b632b567e7e29323bef7d101a45f2c9e5039da1fbd87ed698bdddf71989cc38",
-    "src/index.ts 1559 cd3d4d0a0d594d289a27761aae0d2296fde786c27f298a9c2a5f9eb48a8b0d00",
+    "src/index.ts 1579 9af05f439b07cfb9ba13231f2c1766fce0b016e10d61b28c1c066190f7a50cb0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -596,12 +596,12 @@ exports[`server init output > is unchanged for legacy docker flag 1`] = `
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "Dockerfile 200 2c2f663678ef91d199899428e167c5d9dbcb9f92ab4f06f981f5aa342f283f74",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
-    "package.json 736 8763a2c03500cdf261298a38a840b891fa91edc3f15c35e884fe1c55df018933",
-    "src/index.ts 1559 cd3d4d0a0d594d289a27761aae0d2296fde786c27f298a9c2a5f9eb48a8b0d00",
+    "Dockerfile 206 cc9241e698ccf978de5643ffb92699d91061dd4086bc4d8943e5743b01f27347",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
+    "package.json 742 d13b7a0cddb56bfab522d2a32085a51872b39ed5623abc83a371ff5f68ea9d78",
+    "src/index.ts 1579 9af05f439b07cfb9ba13231f2c1766fce0b016e10d61b28c1c066190f7a50cb0",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -614,7 +614,7 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  export SECRET=...      # at least 32 random characters; keep and reuse it
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
   npm run docker:build   # builds the image
   npm run docker:run     # runs it on :3000 (data in a named volume)
 ",
@@ -624,11 +624,11 @@ Next steps:
 exports[`server init output > is unchanged for local with advanced adapters 1`] = `
 {
   "files": [
-    ".env.example 352 ff82a71ec5226dfa9788a2020ce36e61a913c33b993dad8400aadb097e29f31c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 595 2aa8e129ed31d4a14972d1f337525d9a466d157c47e64103be5fcef0a2bb39cf",
+    "README.md 596 09a4d78384bd605c540ef45225af17dd5f88b0fce7e7b0408eca5544a44318f4",
     "package.json 629 3c136564446839d71b00857e71bb1c338caf3e5aedf2258e03a84362bf21a752",
-    "src/index.ts 1787 7ed309dae074c50ffafaac0817f5b95bb2076811029c25597246278d79fb5907",
+    "src/index.ts 1807 a02d8eb7e45064719b11bd8509a621cf8432078a94a43ad16ad4a1c24ca3afd1",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -651,11 +651,11 @@ Next steps:
 exports[`server init output > is unchanged for notifications 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 621 ee8ec32df5acea937d3636ab4b7bdf7b28f2ed8b925cf8910af79758e06fdffb",
-    "src/index.ts 2164 1a6c1ac90edbb29022be2e0f69ed0f3931080c5d3ad46544c788a0904c6670af",
+    "src/index.ts 2196 038355da34b81d8446755c64b7e305cbcef1df8165f1aabe6d2b40d29e66d94d",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -676,11 +676,11 @@ Next steps:
 exports[`server init output > is unchanged for notifications with oauth 1`] = `
 {
   "files": [
-    ".env.example 498 d505c90cda58b2df8b41275f35a1eecf674824451f61925ec4853f4d2a9553a2",
+    ".env.example 511 1123dbbe1b01cceeb8e78900f3e5e6e9682533e9ac80f1a75b477f7f6b96659c",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 722 26d50ae37f83959d33c9c790a93fe5fce5e299fce89f8bddf21268b7a0cfcc5b",
+    "README.md 735 07916ac878e950ee313f1e69264971796408fb90ab9f383fb26363265ec95937",
     "package.json 654 84d54b4c11189c764229f655de905a3fe5a724f99325e72a9cbcd0ab66f6b30e",
-    "src/index.ts 2898 66c5a4a3794d2de758a89ecc1377a8ff6fe6348953eb3b678add4120f1077132",
+    "src/index.ts 2978 5f3547f2659bc29fb52acf03467b09270a119b07cb5a858014156ed6ff45fa09",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -692,9 +692,9 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  # Required: SECRET, PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
-  export PUBLIC_BASE_URL=http://localhost:3000
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
   npm install
   npm start
 ",
@@ -704,11 +704,11 @@ Next steps:
 exports[`server init output > is unchanged for notifications with password auth 1`] = `
 {
   "files": [
-    ".env.example 565 56f4c453513c1c15eb3423acfe986a22e88f47f0cfc1777e1cc728aab1cbfe58",
+    ".env.example 585 9a4b3e69a87f4819cd091fdbe6d6e0f87eabd518766009dfe750182a673b7e6e",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 862 3099a51867098212fab88c3367c7cdbd436cb083e43f869696bf54545114a594",
+    "README.md 895 859846050ec24aa3d5f7323a756371c107aeb3265cdabd1ac902213ae65ec6f8",
     "package.json 654 84d54b4c11189c764229f655de905a3fe5a724f99325e72a9cbcd0ab66f6b30e",
-    "src/index.ts 2955 c7151455e37d49f3191dea419268da4c34c5f07a736ce57ba829a96f1e26856d",
+    "src/index.ts 3045 ae79ae0faf89e582770700b2ab0022adac2cf5f934999bc1f7a75c49efe8b188",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -720,10 +720,10 @@ Scaffolded my-server in <tmp>/my-server
 
 Next steps:
   cd ./my-server
-  # Required: SECRET, PUBLIC_BASE_URL, AUTH_PASSWORD. Set them in the shell, or in .env (copy .env.example):
-  export SECRET="$(openssl rand -hex 32)"   # keep and reuse it
-  export PUBLIC_BASE_URL=http://localhost:3000
-  export AUTH_PASSWORD=...   # the admin's password, 12+ characters
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
   npm install
   npm start
   # then sign in as admin@example.com
@@ -734,11 +734,11 @@ Next steps:
 exports[`server init output > is unchanged for observability 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 633 a840656b92768ca6c58b53b3d0dae6133a36c0d33345a922e8ff7c05e908651a",
-    "src/index.ts 1965 fa1744b897b2668c229dbb4d760f6c79a10d83eb192720f90088ef42712a6da1",
+    "src/index.ts 1985 9c2042eeddd553ecc5006817d36a6d3b58a6ab6c038270b2c05013f7157308c6",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -759,11 +759,11 @@ Next steps:
 exports[`server init output > is unchanged for storage azure 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 600 62b345677215b07939a2c00106072e0f42eeebee70465d0acf6e5ec702022e8e",
-    "src/index.ts 1630 b36b1c1d7217eaa04a012e14c574b79deecc8d501a014344a4117a2d11b354ec",
+    "src/index.ts 1655 7a23e82fef28c3e524032cb79e1d15ccb6bb3a6ac15468cb7c0b3ba3c2fe6c8c",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -784,11 +784,11 @@ Next steps:
 exports[`server init output > is unchanged for storage gcs 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 598 077613a273c8c9637bd53dc5fdda0691a26fc39e148b175a4ce9012d902027f0",
-    "src/index.ts 1576 1cfcdfd2afb882330e571427604f6a9c03286d15a666b5d291512e1d38553ae2",
+    "src/index.ts 1602 95fcff70c40e327237b3a2487f291d2a3d8e9cd1c3b420a78cda0388ac74a1cf",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project
@@ -809,11 +809,11 @@ Next steps:
 exports[`server init output > is unchanged for storage s3 1`] = `
 {
   "files": [
-    ".env.example 293 77b2c43f9aca11e0b5653504cc3977e39b3341866d7c09ec8d0471df91e9e62d",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
-    "README.md 482 89707892e9562fbc4aa4be180d042d90cf1fd07502b83ca22e8f564cba859492",
+    "README.md 483 c8549eec36d035b79c0eeb241a8b1ba54a7f888c508b98bb11d2714b5cf1c451",
     "package.json 597 aa981aefaf9b1d5c3e1f34d61fe95e0171a65cc1fa9a4a3679354e15bd73b478",
-    "src/index.ts 1604 cec13da05b56c3d474c1706fd3c04e3816f1bc1ea50ef44aea519eeede396838",
+    "src/index.ts 1630 02a532429a0203fd5600f21777e26271f985b9e550982daddb51e86569e2b359",
     "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
   ],
   "output": "[stderr] ==> Writing server project

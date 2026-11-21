@@ -54,10 +54,10 @@ describe("sesPreset", () => {
 
 describe("sesPresetFromEnv", () => {
   const full = {
-    SES_REGION: "us-east-1",
-    SES_SMTP_USER: "u",
-    SES_SMTP_PASS: "p",
-    SES_FROM: "a@b.c",
+    SHELF_SES_REGION: "us-east-1",
+    SHELF_SES_SMTP_USER: "u",
+    SHELF_SES_SMTP_PASS: "p",
+    SHELF_SES_FROM: "a@b.c",
   };
 
   it("returns undefined unless region, credentials and from are all set", async () => {
@@ -73,7 +73,7 @@ describe("sesPresetFromEnv", () => {
   });
 
   it("falls back to AWS_REGION", async () => {
-    const { SES_REGION: _unused, ...rest } = full;
+    const { SHELF_SES_REGION: _unused, ...rest } = full;
     expect(await sesPresetFromEnv({ ...rest, AWS_REGION: "eu-west-1" })).toBeDefined();
   });
 });

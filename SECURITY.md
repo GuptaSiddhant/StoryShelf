@@ -24,8 +24,8 @@ In scope: the `@storyshelf/*` packages, the `storyshelf` CLI, the server scaffol
 
 Areas of particular interest:
 
-- **`SECRET` handling.** The server `SECRET` signs sessions and is the key material for AES-256-GCM encryption of webhook secrets and git-provider tokens at rest. Any leak, weak derivation, or way to bypass it is in scope. Operators must set it to at least 32 random characters and rotate it deliberately, because rotating it makes existing encrypted rows unreadable.
-- Authentication and authorization: roles, API tokens, `STORYSHELF_ADMIN_TOKEN`, OIDC/SAML/passkey flows.
+- **`SHELF_SECRET` handling.** The server `SHELF_SECRET` signs sessions and is the key material for AES-256-GCM encryption of webhook secrets and git-provider tokens at rest. Any leak, weak derivation, or way to bypass it is in scope. Operators must set it to at least 32 random characters and rotate it deliberately, because rotating it makes existing encrypted rows unreadable.
+- Authentication and authorization: roles, API tokens, `SHELF_ADMIN_TOKEN`, OIDC/SAML/passkey flows.
 - Upload and static serving of Storybook builds, including path traversal and stored XSS in published Storybooks.
 - Server-side request forgery through webhooks or git-provider integrations.
 

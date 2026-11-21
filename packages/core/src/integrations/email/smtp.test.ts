@@ -6,13 +6,13 @@ import { smtpPreset, smtpPresetFromEnv } from "./smtp.ts";
 describe("smtpPresetFromEnv", () => {
   it("returns undefined unless host and from are set", async () => {
     expect(await smtpPresetFromEnv({})).toBeUndefined();
-    expect(await smtpPresetFromEnv({ SMTP_HOST: "mail.example.com" })).toBeUndefined();
+    expect(await smtpPresetFromEnv({ SHELF_SMTP_HOST: "mail.example.com" })).toBeUndefined();
   });
 
   it("builds an SMTP sender from the environment", async () => {
     const sender = await smtpPresetFromEnv({
-      SMTP_HOST: "mail.example.com",
-      SMTP_FROM: "shelf@example.com",
+      SHELF_SMTP_HOST: "mail.example.com",
+      SHELF_SMTP_FROM: "shelf@example.com",
     });
     expect(sender?.metadata.kind).toBe("email-smtp");
   });

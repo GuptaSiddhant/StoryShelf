@@ -130,7 +130,7 @@ async function probe(
           }),
         );
   } catch (error) {
-    // A secret that no configured SECRET decrypts lands here; the System page names those.
+    // A secret that no configured SHELF_SECRET decrypts lands here; the System page names those.
     getStore().logger.warn(
       { connectionId: connection.id, reason: errorName(error) },
       "git connection probe failed",

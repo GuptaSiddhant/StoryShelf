@@ -7,37 +7,37 @@
 #      viewer of (the server, `demo-viewer.ts`, creates the account from the SHELF_DEMO_VIEWER_PASSWORD
 #      Fly secret and adds the membership; this script never sees that password).
 #
-#   STORYSHELF_URL=https://storyshelf.fly.dev STORYSHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
+#   SHELF_URL=https://storyshelf.fly.dev SHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
 #
 # Idempotent: a re-run changes nothing.
 set -euo pipefail
 
-: "${STORYSHELF_URL:?}" "${STORYSHELF_ADMIN_TOKEN:?}"
+: "${SHELF_URL:?}" "${SHELF_ADMIN_TOKEN:?}"
 OLD_SLUG=demo-design-system
 UI_SLUG=storyshelf-ui
-AUTH=(-H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" -H "content-type: application/json")
+AUTH=(-H "Authorization: Bearer $SHELF_ADMIN_TOKEN" -H "content-type: application/json")
 
 # Prints the HTTP status of a request; only the status decides what happens next.
 status_of() { curl -sS -o /dev/null -w '%{http_code}' "${AUTH[@]}" "$@"; }
 
 # 1. The old seeded project. Only 200 (delete it) and 404 (already gone) are expected.
-code="$(status_of "$STORYSHELF_URL/api/v1/projects/$OLD_SLUG")"
+code="$(status_of "$SHELF_URL/api/v1/projects/$OLD_SLUG")"
 case "$code" in
   200)
     echo "Deleting the old seeded project '$OLD_SLUG'."
-    curl -fsS "${AUTH[@]}" -X DELETE "$STORYSHELF_URL/api/v1/projects/$OLD_SLUG" -o /dev/null
+    curl -fsS "${AUTH[@]}" -X DELETE "$SHELF_URL/api/v1/projects/$OLD_SLUG" -o /dev/null
     ;;
   404) ;;
   *) echo "::error::GET /projects/$OLD_SLUG answered '$code'"; exit 1 ;;
 esac
 
 # 2. The demo project.
-code="$(status_of "$STORYSHELF_URL/api/v1/projects/$UI_SLUG")"
+code="$(status_of "$SHELF_URL/api/v1/projects/$UI_SLUG")"
 case "$code" in
   200) ;;
   404)
     echo "Creating the '$UI_SLUG' project."
-    curl -fsS "${AUTH[@]}" -X POST "$STORYSHELF_URL/api/v1/projects" -o /dev/null \
+    curl -fsS "${AUTH[@]}" -X POST "$SHELF_URL/api/v1/projects" -o /dev/null \
       -d '{"name":"StoryShelf UI","gitRepository":"GuptaSiddhant/StoryShelf","gitDefaultBranch":"main","requireVerifiedDefault":false}'
     ;;
   *) echo "::error::GET /projects/$UI_SLUG answered '$code'"; exit 1 ;;

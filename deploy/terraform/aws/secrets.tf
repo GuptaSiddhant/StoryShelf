@@ -1,33 +1,33 @@
 # Secrets Manager holds every app secret. The task receives them as ECS `secrets` references; no
 # module output carries a value.
 resource "aws_secretsmanager_secret" "shelf_secret" {
-  name_prefix = "${var.name}/SECRET-"
+  name_prefix = "${var.name}/SHELF_SECRET-"
 
   tags = var.tags
 }
 
 resource "aws_secretsmanager_secret" "oidc_client_secret" {
   count       = var.enable_cognito ? 1 : 0
-  name_prefix = "${var.name}/OIDC_CLIENT_SECRET-"
+  name_prefix = "${var.name}/SHELF_OIDC_CLIENT_SECRET-"
 
   tags = var.tags
 }
 
-# The local admin login: the image enables sign-in when AUTH_PASSWORD and SECRET are both set, so
-# the stack never boots open. Sign in as AUTH_EMAIL (default admin@example.com).
+# The local admin login: the image enables sign-in when SHELF_ADMIN_PASSWORD and SHELF_SECRET are both set, so
+# the stack never boots open. Sign in as SHELF_ADMIN_EMAIL (default admin@example.com).
 resource "aws_secretsmanager_secret" "auth_password" {
-  name_prefix = "${var.name}/AUTH_PASSWORD-"
+  name_prefix = "${var.name}/SHELF_ADMIN_PASSWORD-"
 
   tags = var.tags
 }
 
 resource "aws_secretsmanager_secret" "admin_token" {
-  name_prefix = "${var.name}/ADMIN_TOKEN-"
+  name_prefix = "${var.name}/SHELF_ADMIN_TOKEN-"
 
   tags = var.tags
 }
 
-# SECRET, AUTH_PASSWORD and ADMIN_TOKEN are generated, so their values also sit in the Terraform state: keep the
+# SHELF_SECRET, SHELF_ADMIN_PASSWORD and SHELF_ADMIN_TOKEN are generated, so their values also sit in the Terraform state: keep the
 # state in an encrypted backend with restricted access.
 resource "random_password" "shelf_secret" {
   length  = 48

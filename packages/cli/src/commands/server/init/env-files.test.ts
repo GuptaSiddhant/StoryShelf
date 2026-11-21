@@ -15,11 +15,11 @@ function answers(overrides: Partial<Answers> = {}): Answers {
 }
 
 describe("generateEnvExample", () => {
-  it("lists the three variables of local accounts, with PUBLIC_BASE_URL filled in", () => {
+  it("lists the three variables of local accounts, with SHELF_PUBLIC_BASE_URL filled in", () => {
     const text = generateEnvExample(answers());
-    expect(text).toContain("\nSECRET=\n");
-    expect(text).toContain("\nPUBLIC_BASE_URL=http://localhost:3000\n");
-    expect(text).toContain("\nAUTH_PASSWORD=\n");
+    expect(text).toContain("\nSHELF_SECRET=\n");
+    expect(text).toContain("\nSHELF_PUBLIC_BASE_URL=http://localhost:3000\n");
+    expect(text).toContain("\nSHELF_ADMIN_PASSWORD=\n");
     expect(text).not.toContain("DATABASE_URL");
   });
 
@@ -35,7 +35,7 @@ describe("generateReadme", () => {
   it("names the project, the variables, sign-in and the first-build card", () => {
     const text = generateReadme(answers());
     expect(text).toContain("# my-server");
-    expect(text).toContain("`AUTH_PASSWORD`");
+    expect(text).toContain("`SHELF_ADMIN_PASSWORD`");
     expect(text).toContain("admin@example.com");
     expect(text).toContain("Get your first build");
   });

@@ -9,18 +9,18 @@ locals {
 
   secret_env = merge(
     {
-      SECRET        = google_secret_manager_secret.shelf_secret.secret_id
-      ADMIN_TOKEN   = google_secret_manager_secret.admin_token.secret_id
-      AUTH_PASSWORD = google_secret_manager_secret.auth_password.secret_id
-      DATABASE_URL  = local.create_database ? google_secret_manager_secret.database_url[0].secret_id : var.existing_database_url_secret_id
+      SHELF_SECRET         = google_secret_manager_secret.shelf_secret.secret_id
+      SHELF_ADMIN_TOKEN    = google_secret_manager_secret.admin_token.secret_id
+      SHELF_ADMIN_PASSWORD = google_secret_manager_secret.auth_password.secret_id
+      DATABASE_URL         = local.create_database ? google_secret_manager_secret.database_url[0].secret_id : var.existing_database_url_secret_id
     },
     var.github_app_private_key_secret_id == "" ? {} : { SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret_id },
     var.gitlab_token_secret_id == "" ? {} : { SHELF_GITLAB_TOKEN = var.gitlab_token_secret_id },
   )
 
   # The created database's CA (a public certificate, not a secret): the app verifies the server
-  # certificate against it (DATABASE_CA), so the password is never sent to an unverified peer.
-  database_env = local.create_database ? { DATABASE_CA = google_sql_database_instance.main[0].server_ca_cert[0].cert } : {}
+  # certificate against it (SHELF_DATABASE_CA), so the password is never sent to an unverified peer.
+  database_env = local.create_database ? { SHELF_DATABASE_CA = google_sql_database_instance.main[0].server_ca_cert[0].cert } : {}
 
   # Git connections (ADR 0054): plain values only; the key and the token are in secret_env.
   git_env = { for name, value in {
@@ -112,7 +112,7 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name  = "GCS_BUCKET"
+        name  = "SHELF_GCS_BUCKET"
         value = google_storage_bucket.storybook.name
       }
 
@@ -122,28 +122,28 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name  = "TRUST_PROXY"
+        name  = "SHELF_TRUST_PROXY"
         value = "1"
       }
 
       env {
-        name  = "SHUTDOWN_GRACE_SECONDS"
+        name  = "SHELF_SHUTDOWN_GRACE_SECONDS"
         value = tostring(var.shutdown_grace_seconds)
       }
 
       env {
-        name  = "DATABASE_POOL_MAX"
+        name  = "SHELF_DATABASE_POOL_MAX"
         value = tostring(var.database_pool_size)
       }
 
       env {
-        name  = "PUBLIC_BASE_URL"
+        name  = "SHELF_PUBLIC_BASE_URL"
         value = local.public_base_url
       }
 
       env {
-        name  = "AUTH_EMAIL"
-        value = var.auth_email
+        name  = "SHELF_ADMIN_EMAIL"
+        value = var.admin_email
       }
 
       dynamic "env" {
@@ -194,8 +194,8 @@ resource "google_cloud_run_v2_service" "app" {
   ]
 }
 
-# Anyone can reach the service; the app's sign-in gates it (the generated AUTH_PASSWORD, plus the
-# break-glass ADMIN_TOKEN), and the image refuses to boot without it.
+# Anyone can reach the service; the app's sign-in gates it (the generated SHELF_ADMIN_PASSWORD, plus the
+# break-glass SHELF_ADMIN_TOKEN), and the image refuses to boot without it.
 resource "google_cloud_run_v2_service_iam_member" "public" {
   project  = var.project_id
   location = var.region

@@ -60,7 +60,7 @@ function toQueryString(query: Record<string, string | number | undefined> | unde
 }
 
 const STATUS_HINTS: Record<number, string> = {
-  401: "authentication failed: check STORYSHELF_TOKEN",
+  401: "authentication failed: check SHELF_TOKEN",
   403: "forbidden: this token's role does not allow that (comments need developer or above)",
   404: "not found: check the project slug and build id",
   409: "conflict: AI insights are disabled for this project",

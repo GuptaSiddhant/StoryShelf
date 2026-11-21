@@ -206,7 +206,8 @@ const emailUnavailable: SettingsUnoffered = {
     {
       kind: "email",
       name: "Email",
-      reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+      reason:
+        "Email has no transport: set SHELF_SMTP_HOST and SHELF_SMTP_FROM or configure a sender",
     },
     { kind: "teams-workflow", name: "Microsoft Teams", reason: "Turned off by the operator" },
   ],

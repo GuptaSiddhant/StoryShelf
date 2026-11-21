@@ -80,7 +80,7 @@ export function uploadCommand(input: {
   token: string | undefined;
 }): string {
   return [
-    `STORYSHELF_TOKEN=${input.token ?? "<token>"} npx storyshelf upload`,
+    `SHELF_TOKEN=${input.token ?? "<token>"} npx storyshelf upload`,
     `  --url ${input.origin ?? ORIGIN_PLACEHOLDER}`,
     `  --slug ${input.slug}`,
   ].join(" \\\n");

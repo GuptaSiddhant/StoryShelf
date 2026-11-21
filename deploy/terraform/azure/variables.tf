@@ -75,13 +75,13 @@ variable "max_instances" {
 }
 
 variable "database_pool_size" {
-  description = "Most database connections each copy opens (DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
+  description = "Most database connections each copy opens (SHELF_DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
   type        = number
   default     = 10
 }
 
 variable "shutdown_grace_seconds" {
-  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHUTDOWN_GRACE_SECONDS). The container's termination grace is this plus 10 seconds."
+  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHELF_SHUTDOWN_GRACE_SECONDS). The container's termination grace is this plus 10 seconds."
   type        = number
   default     = 30
 
@@ -194,8 +194,8 @@ variable "gitlab_host" {
   default     = ""
 }
 
-variable "auth_email" {
-  description = "Email of the local admin login created from the generated AUTH_PASSWORD (AUTH_EMAIL)."
+variable "admin_email" {
+  description = "Email of the local admin login created from the generated SHELF_ADMIN_PASSWORD (SHELF_ADMIN_EMAIL)."
   type        = string
   default     = "admin@example.com"
 }

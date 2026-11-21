@@ -40,16 +40,16 @@ function envSteps(answers: Answers): string[] {
 }
 
 const EXPORT_HINT: Record<string, string> = {
-  SECRET: `"$(openssl rand -hex 32)"   # keep and reuse it`,
-  PUBLIC_BASE_URL: `http://localhost:3000`,
-  AUTH_PASSWORD: `...   # the admin's password, 12+ characters`,
+  SHELF_SECRET: `"$(openssl rand -hex 32)"   # keep and reuse it`,
+  SHELF_PUBLIC_BASE_URL: `http://localhost:3000`,
+  SHELF_ADMIN_PASSWORD: `...   # the admin's password, 12+ characters`,
 };
 
 function dockerSteps(compose: boolean, password: boolean): string[] {
   const env = [
-    `  export SECRET=...      # at least 32 random characters; keep and reuse it`,
+    `  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it`,
     ...(password
-      ? [`  export AUTH_PASSWORD=...  # the local admin's password (12+ characters)`]
+      ? [`  export SHELF_ADMIN_PASSWORD=...  # the local admin's password (12+ characters)`]
       : []),
   ];
   return compose

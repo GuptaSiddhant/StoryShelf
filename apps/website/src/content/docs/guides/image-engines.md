@@ -21,7 +21,7 @@ createShelfApp({
 });
 ```
 
-or set `STORYSHELF_IMAGE_ENGINE=sharp` (the option wins over the variable). Install `sharp` next to StoryShelf; it is an optional peer dependency.
+or set `SHELF_IMAGE_ENGINE=sharp` (the option wins over the variable). Install `sharp` next to StoryShelf; it is an optional peer dependency.
 
 If the name is unknown, or `sharp` is not installed or has no binary for the platform, StoryShelf refuses to start (readiness fails under `images`) instead of quietly falling back, so a typo never changes your diffs without anyone noticing. The engine in use is logged on each capture attempt's `render pass finished` line.
 
@@ -29,7 +29,7 @@ Where the engine applies:
 
 - **The server** (`createShelfApp`) uses `testing.images.engine` for diffs, overlays, and AI thumbnails.
 - **A forked capture child** inherits it from the server (and `testing.compare.threads` too), so you set it once.
-- **Every other instance** reads its own `testing.images` option, or `STORYSHELF_IMAGE_ENGINE` from its environment, so give all instances behind one database the same value.
+- **Every other instance** reads its own `testing.images` option, or `SHELF_IMAGE_ENGINE` from its environment, so give all instances behind one database the same value.
 
 With `sharp`, each diff-pool worker thread limits libvips to one thread, so a busy server is not oversubscribed.
 

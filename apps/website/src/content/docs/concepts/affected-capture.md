@@ -40,12 +40,12 @@ Git reports changed files relative to the repository root, while the bundler's m
 | Method                                                  | Effect                                                         |
 | ------------------------------------------------------- | -------------------------------------------------------------- |
 | `storyshelf upload --full`                              | Render every story for this upload                             |
-| `STORYSHELF_FULL=1`                                     | Same, via env (useful for release pipelines)                   |
+| `SHELF_FULL=1`                                          | Same, via env (useful for release pipelines)                   |
 | `"affectedOnly": false` in `.storybook/storyshelf.json` | Disable for the project (see [Configuration](/guides/config/)) |
 
 ## Skipping unchanged commits
 
-Opt in with `storyshelf upload --skip-unchanged` (`"skipUnchanged": true`, or `STORYSHELF_SKIP_UNCHANGED=1`). When a commit reaches **no** story, the CLI records a `skipped` build instead of uploading the Storybook: no upload, no capture, no snapshots. The commit still gets a status, because a pull request that requires the check would otherwise wait forever.
+Opt in with `storyshelf upload --skip-unchanged` (`"skipUnchanged": true`, or `SHELF_SKIP_UNCHANGED=1`). When a commit reaches **no** story, the CLI records a `skipped` build instead of uploading the Storybook: no upload, no capture, no snapshots. The commit still gets a status, because a pull request that requires the check would otherwise wait forever.
 
 **What is compared.** The CLI asks the server for the newest earlier build on the same branch, then traces `git diff <that build's commit>..HEAD` as above. Only an empty affected set skips, and the skipped build repeats the outcome of that build.
 

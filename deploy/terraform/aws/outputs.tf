@@ -49,11 +49,11 @@ output "service_name" {
 }
 
 output "admin_token_secret_arn" {
-  description = "Secrets Manager ARN of the break-glass ADMIN_TOKEN (read it with the AWS CLI; it is not an output value)."
+  description = "Secrets Manager ARN of the break-glass SHELF_ADMIN_TOKEN (read it with the AWS CLI; it is not an output value)."
   value       = aws_secretsmanager_secret.admin_token.arn
 }
 
-output "auth_password_secret_arn" {
+output "admin_password_secret_arn" {
   description = "Secrets Manager ARN of the generated admin password (read it with the AWS CLI; it is not an output value)."
   value       = aws_secretsmanager_secret.auth_password.arn
 }

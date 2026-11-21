@@ -28,15 +28,15 @@ changing both versions together and reading the release notes. A runnable exampl
 
 ## What it creates
 
-| Part     | Resources                                                                                        |
-| -------- | ------------------------------------------------------------------------------------------------ |
-| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                |
-| Compute  | Container Apps environment (Consumption profile), one app of identical copies                    |
-| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)             |
-| Storage  | Storage account and a private `storybook` Blob container                                         |
-| Identity | One user-assigned managed identity for the app                                                   |
-| Secrets  | Key Vault (RBAC): `SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL` |
-| Logs     | Log Analytics workspace                                                                          |
+| Part     | Resources                                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------------ |
+| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                            |
+| Compute  | Container Apps environment (Consumption profile), one app of identical copies                                |
+| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)                         |
+| Storage  | Storage account and a private `storybook` Blob container                                                     |
+| Identity | One user-assigned managed identity for the app                                                               |
+| Secrets  | Key Vault (RBAC): `SHELF_SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`, `OIDC-CLIENT-SHELF_SECRET`, `DATABASE-URL` |
+| Logs     | Log Analytics workspace                                                                                      |
 
 The app is served on the Container Apps default domain over HTTPS; `allowed_cidr_blocks` becomes its
 ingress IP restrictions. A custom domain and sign-in federation (Entra) are not part of the module.
@@ -63,14 +63,14 @@ The database has no public endpoint: only the VNet reaches it.
 | `github_api_url`                                               | `""`                               | GitHub Enterprise Server API base; empty means github.com               |
 | `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                               | Server-wide GitLab connection (both or none)                            |
 | `gitlab_host`                                                  | `""`                               | GitLab base URL; empty means gitlab.com                                 |
-| `auth_email`                                                   | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                  |
+| `admin_email`                                                  | `admin@example.com`                | Local admin login email (`SHELF_ADMIN_EMAIL`)                           |
 | `log_retention_days`                                           | `30`                               | Log Analytics retention                                                 |
 | `tags`                                                         | `{}`                               | Added to every taggable resource                                        |
 
 ## Outputs
 
 `url`, `resource_group_name`, `container_app_name`, `storage_account_name`, `storage_container_name`,
-`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `auth_password_secret_id`, `oidc_client_secret_id`,
+`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `admin_password_secret_id`, `oidc_client_secret_id`,
 `identity_principal_id`, `identity_client_id` and `role_assignments`. Secret outputs are Key Vault
 ids (references), never values.
 
@@ -79,19 +79,19 @@ ids (references), never values.
 The app gets every secret as a Container Apps secret that is a **Key Vault reference** resolved by its
 managed identity. No output carries a value.
 
-- **`SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`** are generated. Their values, the database password,
+- **`SHELF_SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`** are generated. Their values, the database password,
   the storage account's access keys and connection strings, and the Log Analytics workspace's shared
   keys are also in the Terraform state (the provider records the keys as computed attributes, whether
   or not anything uses them): keep the state in an encrypted backend with restricted access.
-- **Sign-in.** The image turns sign-in on from `AUTH_PASSWORD` and `SECRET`, and the module always
+- **Sign-in.** The image turns sign-in on from `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET`, and the module always
   sets both, so the app never boots open. Read the password with
   `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`
-  and sign in as `admin@example.com` (or `auth_email`).
-- **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
+  and sign in as `admin@example.com` (or `admin_email`).
+- **`OIDC-CLIENT-SHELF_SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
 
   ```sh
-  az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name OIDC-CLIENT-SECRET --value "<client secret>"
+  az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name OIDC-CLIENT-SHELF_SECRET --value "<client secret>"
   az containerapp revision restart --name "$(terraform output -raw container_app_name)" --resource-group "$(terraform output -raw resource_group_name)" --revision <revision>
   ```
 
@@ -112,8 +112,8 @@ User` for `identity_principal_id` on that vault; the module does not grant it.
 
 ## Blob access
 
-Blob access uses the app's managed identity, not the account key. The image gets `AZURE_STORAGE_ACCOUNT`,
-`AZURE_STORAGE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
+Blob access uses the app's managed identity, not the account key. The image gets `SHELF_AZURE_ACCOUNT`,
+`SHELF_AZURE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
 `DefaultAzureCredential` (the user-assigned identity, by client id), which holds `Storage Blob Data
 Contributor` on the container. No connection string or account key is stored in Key Vault or passed to
 the app.
@@ -133,7 +133,7 @@ created, before a role assignment could take effect. That identity already needs
 Administrator` to create the module's role assignments. Operators who browse the container with `az
 storage` or the portal need the same role (`--auth-mode login`), not a key.
 
-Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection string) instead; that
+Outside Azure, the image also takes `SHELF_AZURE_CONNECTION_STRING` (a connection string) instead; that
 needs an account that allows shared keys, so it does not work against this module's account.
 
 ## Capture, scaling and shutdown
@@ -147,7 +147,7 @@ needs an account that allows shared keys, so it does not work against this modul
   concurrent requests. `min_instances` is at least 1: the capture and notify consumers poll in the
   background, and Container Apps stops a scaled-to-zero app until a request arrives.
 - **Shutdown.** On a new revision the app gets SIGTERM and drains running captures for
-  `shutdown_grace_seconds` (`SHUTDOWN_GRACE_SECONDS`), then hands the rest back to the queue. The
+  `shutdown_grace_seconds` (`SHELF_SHUTDOWN_GRACE_SECONDS`), then hands the rest back to the queue. The
   container's termination grace is the grace plus 10 seconds, so it is never killed mid-drain.
 
 ## Git connections
@@ -168,17 +168,17 @@ az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --
 
 | Variable                                                                                         | Source                          | Status |
 | ------------------------------------------------------------------------------------------------ | ------------------------------- | ------ |
-| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`                                       | module                          | read   |
-| `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                   | Key Vault                       | read   |
-| `AUTH_EMAIL`                                                                                     | `auth_email`                    | read   |
-| `DATABASE_URL`, `DATABASE_POOL_MAX`                                                              | Key Vault, `database_pool_size` | read   |
+| `SHELF_PUBLIC_BASE_URL`, `SHELF_TRUST_PROXY`, `SHELF_SHUTDOWN_GRACE_SECONDS`                     | module                          | read   |
+| `SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, `SHELF_OIDC_CLIENT_SECRET`          | Key Vault                       | read   |
+| `SHELF_ADMIN_EMAIL`                                                                              | `admin_email`                   | read   |
+| `DATABASE_URL`, `SHELF_DATABASE_POOL_MAX`                                                        | Key Vault, `database_pool_size` | read   |
 | `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`                                      | Key Vault references (optional) | read   |
-| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID`                            | the module                      | read   |
+| `SHELF_AZURE_ACCOUNT`, `SHELF_AZURE_CONTAINER`, `AZURE_CLIENT_ID`                                | the module                      | read   |
 | `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)           | read   |
 | `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Key Vault references (optional) | read   |
 
-The image stores uploads in the Blob container when `AZURE_STORAGE_ACCOUNT` is set (managed identity),
-or `AZURE_STORAGE_CONNECTION` for a host without one. Setting more than one storage backend refuses to
+The image stores uploads in the Blob container when `SHELF_AZURE_ACCOUNT` is set (managed identity),
+or `SHELF_AZURE_CONNECTION_STRING` for a host without one. Setting more than one storage backend refuses to
 boot. The module's live apply stays behind the repository variable `LIVE_AZURE_MODULE_APPLY`: it is
 billed, so the owner turns it on. No live Azure run has confirmed this path yet; the adapter is tested
 against a faked SDK.

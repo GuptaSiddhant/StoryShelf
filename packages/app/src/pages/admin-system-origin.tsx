@@ -24,7 +24,7 @@ export interface PublicOriginView {
 }
 
 const SOURCE_LABELS = {
-  config: "configured (PUBLIC_BASE_URL)",
+  config: "configured (SHELF_PUBLIC_BASE_URL)",
   platform: "detected from the hosting platform",
   admin: "confirmed by an admin",
 } as const;
@@ -43,9 +43,9 @@ export function PublicOriginCard(props: {
       <SectionTitle>Public origin</SectionTitle>
       <Meta>
         The address links in emails, commit statuses and signed Storybook URLs use. It comes from{" "}
-        <code>PUBLIC_BASE_URL</code>, then the hosting platform, then an address an admin confirmed
-        here. An address detected from a browser is used for none of these until it is confirmed;
-        sign-in (OAuth redirects) may use the address of the request itself.
+        <code>SHELF_PUBLIC_BASE_URL</code>, then the hosting platform, then an address an admin
+        confirmed here. An address detected from a browser is used for none of these until it is
+        confirmed; sign-in (OAuth redirects) may use the address of the request itself.
       </Meta>
       {resolved === null ? (
         <NothingResolved learns={learns} stored={stored} />
@@ -118,7 +118,7 @@ function NothingResolved(props: {
       Notifications are paused, and browsers that reach the Storybook by URL stay unavailable.{" "}
       {props.learns
         ? "Reload this page: it reports the address you opened it with, for you to confirm."
-        : "Set PUBLIC_BASE_URL, or turn authentication on so an admin's browser can report it."}
+        : "Set SHELF_PUBLIC_BASE_URL, or turn authentication on so an admin's browser can report it."}
     </Alert>
   );
 }
