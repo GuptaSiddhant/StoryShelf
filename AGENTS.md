@@ -255,7 +255,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   thing. Rename = add, dual-write, drop over three releases. A new status value or job kind is read
   first and written one release later; backfills are batched, idempotent jobs, never boot work.
   Until the claim filter and payload version land, ship no new job kind or status value. A schema
-  change's changeset carries a `Schema:` line.
+  change's changeset carries a `Schema:` line. Until 2027-01-01 contract steps ship in the release
+  that needs them and the upgrade is stop-the-world (label `schema-break`; ADR 0053 amendment 2026-11-21).
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
@@ -269,7 +270,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
   the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
-  tells the CI check so. Task PRs on an epic branch add theirs there.
+  tells the CI check so. Task PRs on an epic branch add theirs there. Until 2027-01-01 a breaking
+  change ships without a shim or alias, as `Breaking:` (ADR 0049 and ADR 0053 amendments, 2026-11-21).
 - **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` (`SHELF_*` variables, "Shelf" in prose and diagrams).
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
@@ -327,7 +329,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
 - **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
   or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
   owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
-  `minor`, and a `major` changeset fails the changeset check.
+  `minor`, and a `major` changeset fails the changeset check. Until 2027-01-01 a renamed or folded
+  package is not published again; the owner deprecates it on npm (ADR 0049 amendment 2026-11-21).
 
 ## Agent operating model
 

@@ -5,6 +5,7 @@ import {
   bumpVersion,
   changesetName,
   checkChangeset,
+  checkSchemaBreak,
   highestBump,
   malformedChangesets,
   manifestPublished,
@@ -488,5 +489,39 @@ describe("malformedChangesets, unknown packages", () => {
       [],
     );
     assert.deepEqual(malformedChangesets([file], read("@storyshelf/nope")), []);
+  });
+});
+
+describe("checkSchemaBreak", () => {
+  const added = [".changeset/drop-column.md"];
+  const file = (kind, schema) =>
+    `---\n"@storyshelf/core": minor\n---\n\n${kind}: drops a column\n\nDetails.\n${schema}\n`;
+  const run = (text, extra = {}) =>
+    checkSchemaBreak({ labels: ["schema-break"], added, read: () => text, ...extra });
+
+  it("passes any pull request without the label", () => {
+    assert.equal(checkSchemaBreak({ labels: [], added: [], read: () => "" }).ok, true);
+  });
+
+  it("passes a Breaking changeset whose Schema line names the step", () => {
+    assert.equal(run(file("Breaking", "Schema: drops builds.legacy_flag (contract step)")).ok, true);
+  });
+
+  it("fails without a changeset, or with a non-Breaking kind", () => {
+    assert.equal(run("", { added: [] }).ok, false);
+    assert.equal(run(file("Changed", "Schema: drops builds.legacy_flag")).ok, false);
+    assert.match(run(file("Changed", "Schema: x")).reason, /Breaking:/u);
+  });
+
+  it("fails without a Schema line, or with Schema: none", () => {
+    assert.equal(run(file("Breaking", "")).ok, false);
+    assert.equal(run(file("Breaking", "Schema: none")).ok, false);
+    assert.equal(run(file("Breaking", "Schema: none.")).ok, false);
+    assert.equal(run(file("Breaking", "Schema:")).ok, false);
+  });
+
+  it("ignores the changesets README and an unreadable changeset", () => {
+    assert.equal(run("x", { added: [".changeset/README.md"] }).ok, false);
+    assert.equal(run("no front matter").ok, false);
   });
 });

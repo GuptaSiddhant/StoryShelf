@@ -19,6 +19,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   checkChangeset,
+  checkSchemaBreak,
   malformedChangesets,
   manifestPublished,
   releaseBranchVersion,
@@ -135,6 +136,17 @@ if (releaseVersion !== null) {
     `changeset check passed: release ${releaseVersion} (versions, changelog, consumed changesets)`,
   );
   process.exit(0);
+}
+const schemaBreak = checkSchemaBreak({
+  labels,
+  added,
+  read: (path) => readFileSync(join(root, path), "utf8"),
+});
+if (!schemaBreak.ok) {
+  console.error(
+    `::error title=Schema break undeclared::This pull request ${schemaBreak.reason}. Add or edit a changeset: \`Breaking: <summary>\`, a blank line, then a \`Schema: <the contract step>\` line (ADR 0053 amendment, 2026-11-21).`,
+  );
+  process.exit(1);
 }
 const isPublished = (manifest) => manifestPublished(readHead(manifest), readBase(base, manifest));
 const verdict = checkChangeset({ changed, added, labels, isPublished });

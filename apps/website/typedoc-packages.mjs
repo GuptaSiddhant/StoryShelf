@@ -20,7 +20,6 @@ const SLUGS = [
   "db-sqlite",
   "db-postgres",
   "db-mysql",
-  "storage-local",
   "storage-s3",
   "storage-azure",
   "storage-gcs",

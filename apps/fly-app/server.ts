@@ -27,7 +27,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {DATA_DIR}/shelf.db
- *  - @storyshelf/storage-local → DATA_DIR, or @storyshelf/storage-s3 (Tigris) when AWS_BUCKET is set
+ *  - @storyshelf/core/storage/local → DATA_DIR, or @storyshelf/storage-s3 (Tigris) when AWS_BUCKET is set
  *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where

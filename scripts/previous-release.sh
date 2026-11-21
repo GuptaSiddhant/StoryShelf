@@ -48,9 +48,12 @@ if [ "$DIALECT" = postgres ]; then
 fi
 
 # The published release, exactly as an operator installs it.
-(cd "$WORK/consumer" && npm init -y >/dev/null && npm install --no-audit --no-fund --silent \
-  "@storyshelf/app@$PREV" "@storyshelf/core@$PREV" "@storyshelf/storage-local@$PREV" \
-  "@storyshelf/db-$DIALECT@$PREV")
+# Before 0.15.0 local storage was its own package; from 0.15.0 it is `@storyshelf/core/storage/local`.
+PKGS=("@storyshelf/app@$PREV" "@storyshelf/core@$PREV" "@storyshelf/db-$DIALECT@$PREV")
+if [ "$(echo "$PREV" | awk -F. '{ print ($1 == 0 && $2 < 15) }')" = 1 ]; then
+  PKGS+=("@storyshelf/storage-local@$PREV")
+fi
+(cd "$WORK/consumer" && npm init -y >/dev/null && npm install --no-audit --no-fund --silent "${PKGS[@]}")
 cp scripts/previous-release/smoke-previous.mjs scripts/previous-release/mixed-queue-previous.mjs \
   "$WORK/consumer/"
 
