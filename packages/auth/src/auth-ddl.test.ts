@@ -1,7 +1,13 @@
 import { getTableColumns, type Table } from "@storyshelf/core/orm";
 import { describe, expect, it } from "vitest";
-import { DDL, tableColumns } from "../../db/src/sqlite/ddl.ts";
 import { baseAuthTables } from "./auth-tables.ts";
+
+/** `@storyshelf/db` does not publish its `ddl` module, so load it by file: a static import would pull another package's source into this package's type-check and declaration build. */
+const ddlModule = new URL("../../db/src/sqlite/ddl.ts", import.meta.url).href;
+const { DDL, tableColumns } = (await import(ddlModule)) as {
+  DDL: string;
+  tableColumns: (ddl: string) => Map<string, string[]>;
+};
 
 /**
  * Pin the auth drizzle definitions to the driver DDL: every table and
