@@ -11,8 +11,11 @@ const COLUMN = /^(?<name>"[^"]+"|`[^`]+`|\w+) (?<rest>.+)$/u;
 const TYPE_END = / (?:NOT NULL|NULL|DEFAULT|PRIMARY KEY|UNIQUE|REFERENCES|CHECK)\b/iu;
 const DEFAULT_VALUE = /\bDEFAULT (?<value>'[^']*'|\((?:[^()]|\([^()]*\))*\)|[^\s,]+)/iu;
 const CHECK_BODY = /\bCHECK\s*(?<sql>\((?:[^()]|\([^()]*\))*\))/iu;
-const NAMED = /^CONSTRAINT (?<name>"[^"]+"|`[^`]+`|\w+) (?<rest>.+)$/iu;
-const KEY_COLUMNS = /^(?:PRIMARY KEY|UNIQUE)\s*\((?<columns>[^)]*)\)$/iu;
+/** `CONSTRAINT [name] …`: MySQL may leave the name out (`CONSTRAINT PRIMARY KEY(…)`). */
+const NAMED =
+  /^CONSTRAINT (?:(?<name>"[^"]+"|`[^`]+`|(?!(?:PRIMARY|UNIQUE|CHECK|FOREIGN)\b)\w+) )?(?<rest>.+)$/iu;
+/** `PRIMARY KEY (…)`, `UNIQUE (…)`, or MySQL's `UNIQUE INDEX (…)` / `UNIQUE KEY (…)`. */
+const KEY_COLUMNS = /^(?:PRIMARY KEY|UNIQUE(?: INDEX| KEY)?)\s*\((?<columns>[^)]*)\)$/iu;
 const FOREIGN_KEY = /^FOREIGN KEY\s*\((?<columns>[^)]*)\) (?<rest>REFERENCES .+)$/iu;
 const REFERENCES =
   /REFERENCES (?:(?:"\w+"|`\w+`|\w+)\.)?(?<table>"[^"]+"|`[^`]+`|\w+)\s*\((?<column>[^)]*)\)(?<actions>.*)$/iu;

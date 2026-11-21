@@ -35,7 +35,7 @@ export interface VercelDatabaseOptions {
  */
 export function createVercelDatabase(options: VercelDatabaseOptions = {}): DatabaseAdapter {
   const client = options.client ?? sql;
-  const db = drizzle(client, { schema });
+  const db = drizzle({ client });
 
   return createDrizzlePgAdapter(db, {
     metadata: {

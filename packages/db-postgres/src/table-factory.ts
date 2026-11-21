@@ -3,7 +3,6 @@
  * neutral table. Not used by the adapter yet; `schema/` and `ddl.ts` stay authoritative.
  */
 import { neutralSchema as ns } from "@storyshelf/core/test-helpers";
-import type { BuildColumns } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -16,21 +15,22 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  type PgBuildColumns,
   type PgTableWithColumns,
-  type PgTextBuilderInitial,
+  type PgTextBuilder,
 } from "drizzle-orm/pg-core";
 
-type Base = PgTextBuilderInitial<"", [string, ...string[]]>;
+type Base = PgTextBuilder;
 
 /** The Drizzle table a neutral table builds; its `$inferSelect` is `InferRow` of the neutral one. */
 export type PgTableOf<T extends ns.NeutralTable> = PgTableWithColumns<{
   name: T["name"];
   schema: undefined;
   dialect: "pg";
-  columns: BuildColumns<
+  isAlias: false;
+  columns: PgBuildColumns<
     T["name"],
-    { [K in keyof T["columns"]]: ns.FlaggedBuilder<Base, T["columns"][K]> },
-    "pg"
+    { [K in keyof T["columns"]]: ns.FlaggedBuilder<Base, T["columns"][K]> }
   >;
 }>;
 
@@ -76,5 +76,5 @@ export function pgTableOf<T extends ns.NeutralTable>(
     table.name,
     columns as never,
     (built) => ns.tableExtras({ table, columns: built, resolve, builders, names }) as never,
-  ) as unknown as PgTableOf<T>;
+  );
 }

@@ -65,7 +65,7 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
 
   const owned = !options.client;
   const pool = options.client ?? newPool(options, connectionString);
-  const db = drizzle(pool, { schema });
+  const db = drizzle({ client: pool });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
   // so row locks would prove nothing and the capability stays off.

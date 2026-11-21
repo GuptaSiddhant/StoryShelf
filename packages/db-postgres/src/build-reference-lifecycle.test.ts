@@ -20,7 +20,6 @@ import { afterAll, describe, it, vi } from "vitest";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPostgresDatabase } from "./index.ts";
 import { createPgliteDatabase } from "./pglite.ts";
-import { schema } from "./schema/index.ts";
 import {
   seed,
   marker,
@@ -54,11 +53,11 @@ afterAll(async () => {
 
 buildReferenceContractSuite("Postgres (PGlite, one connection)", async (run) => {
   const { client, adapter } = await sharedPglite();
-  const lifecycle = createBuildReferenceLifecycle(drizzlePglite(client, { schema }));
+  const lifecycle = createBuildReferenceLifecycle(drizzlePglite({ client }));
   const seeded = await seed(adapter);
   await run({
     first: lifecycle,
-    second: createBuildReferenceLifecycle(drizzlePglite(client, { schema })),
+    second: createBuildReferenceLifecycle(drizzlePglite({ client })),
     owner: seeded.owner,
     buildIds: seeded.buildIds,
     marker: marker(seeded.run, async (name) => {
@@ -73,18 +72,12 @@ buildReferenceContractSuite("Postgres (PGlite, one connection)", async (run) => 
 
 it("claims tens of thousands of idle hashes in one pass (PGlite)", async () => {
   const { client, adapter } = await sharedPglite();
-  await claimsManyIdleHashes(
-    adapter,
-    createBuildReferenceLifecycle(drizzlePglite(client, { schema })),
-  );
+  await claimsManyIdleHashes(adapter, createBuildReferenceLifecycle(drizzlePglite({ client })));
 });
 
 it("records tens of thousands of hashes in one call (PGlite)", async () => {
   const { client, adapter } = await sharedPglite();
-  await recordsManyHashes(
-    adapter,
-    createBuildReferenceLifecycle(drizzlePglite(client, { schema })),
-  );
+  await recordsManyHashes(adapter, createBuildReferenceLifecycle(drizzlePglite({ client })));
 });
 
 describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
@@ -100,8 +93,8 @@ describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     const seeded = await seed(adapter);
     await run({
-      first: createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
-      second: createBuildReferenceLifecycle(drizzlePostgres(two, { schema })),
+      first: createBuildReferenceLifecycle(drizzlePostgres({ client: one })),
+      second: createBuildReferenceLifecycle(drizzlePostgres({ client: two })),
       owner: seeded.owner,
       buildIds: seeded.buildIds,
       marker: marker(seeded.run, async (name) => {
@@ -117,7 +110,7 @@ describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     await recordsManyHashes(
       adapter,
-      createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
+      createBuildReferenceLifecycle(drizzlePostgres({ client: one })),
     );
   });
 
@@ -127,7 +120,7 @@ describe.skipIf(!LIVE)("real Postgres, one connection per lifecycle", () => {
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     await claimsManyIdleHashes(
       adapter,
-      createBuildReferenceLifecycle(drizzlePostgres(one, { schema })),
+      createBuildReferenceLifecycle(drizzlePostgres({ client: one })),
     );
   });
 });
