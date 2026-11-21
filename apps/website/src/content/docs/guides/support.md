@@ -28,24 +28,6 @@ A preview works and is documented, but may change between releases and gets fixe
 
 To roll back one release, start the previous image or version against the same database. Do not roll back further than one release.
 
-## Switching from Puppeteer to Playwright
-
-`@storyshelf/runner-puppeteer` was deprecated in 0.14.0 and is removed in 0.15.0. Playwright is the one capture runner.
-
-1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
-2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
-3. Map the options:
-
-| Puppeteer                                                                               | Playwright                                                                                                                              |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `executablePath` for a system Chrome, or `local("chrome", { executablePath })`          | `local("chrome", { channel: "chrome" })` (bare `"chrome"` uses the same channel; `chrome-beta` and `msedge` also work)                  |
-| `executablePath` for any other Chromium                                                 | No path option: `playwright install chromium` and the bare `"chromium"` target                                                          |
-| `args` (launch flags)                                                                   | No equivalent option                                                                                                                    |
-| `cdp({ name, endpoint, headers, sessions })` from `@storyshelf/runner-puppeteer/remote` | `remote({ name, protocol: "cdp", reach: "url", sessions, connect: { endpoint, headers } })` from `@storyshelf/runner-playwright/remote` |
-| `concurrency`, `navigationTimeoutMs`, `recycleBrowserEvery`, `reusePages`               | The same options on `createPlaywrightCaptureRunner`                                                                                     |
-
-4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.
-
 ## Getting help
 
 - **Question or idea:** open a thread in [GitHub Discussions](https://github.com/GuptaSiddhant/StoryShelf/discussions) (Q&A for questions, Ideas for requests). Try [Troubleshooting & FAQ](/guides/troubleshooting/) first.
