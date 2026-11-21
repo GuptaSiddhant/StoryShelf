@@ -210,3 +210,7 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
 - **Until removal.** Puppeteer gets fixes only; new capture features go into Playwright only, so the
   rule that the two runners' `settle.ts` copies stay identical is lifted. The runner logs one
   deprecation warning when the host binds its logger. Users re-baseline once after switching.
+- **Removed in 0.15.0 (#1244).** The package, its CI leg and its docs are deleted; Playwright is the
+  only runner and the two-runner parity rule no longer applies. The switching steps moved to the
+  upgrading guide (`guides/support`). No further versions are published; `npm deprecate` on the old
+  ones is the owner's step.
