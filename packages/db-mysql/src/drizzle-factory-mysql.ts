@@ -6,6 +6,7 @@ import type {
 } from "@storyshelf/core/adapter/database";
 import { listSelection } from "@storyshelf/core/adapter/database";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { SQLWrapper } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
@@ -58,9 +59,9 @@ async function updateWhereOne<T extends Table>(
   drizzle: DrizzleMySqlLike,
   table: T,
   id: string,
-  values: Partial<T["$inferInsert"]>,
+  values: Partial<InferInsertModel<T>>,
   where: SQL,
-): Promise<T["$inferSelect"] | null> {
+): Promise<InferSelectModel<T> | null> {
   // MySQL has no UPDATE RETURNING. The condition is evaluated by the UPDATE;
   // reading afterwards may observe a newer state, but cannot undo cancellation.
   // oxlint-disable-next-line typescript/await-thenable -- MySQL updates are thenable via drizzle
@@ -72,25 +73,29 @@ async function updateWhereOne<T extends Table>(
     .select()
     .from(table)
     .where(eq(idColumn(table), id))
-    .limit(1)) as T["$inferSelect"][];
+    .limit(1)) as InferSelectModel<T>[];
   return current[0] ?? null;
 }
 
 async function insertOne<T extends Table>(
   drizzle: DrizzleMySqlLike,
   table: T,
-  values: T["$inferInsert"],
-): Promise<T["$inferSelect"]> {
+  values: InferInsertModel<T>,
+): Promise<InferSelectModel<T>> {
   try {
     const rows = await drizzle.insert(table).values(values).returning();
-    return firstRow(rows, "Insert") as T["$inferSelect"];
+    return firstRow(rows, "Insert") as InferSelectModel<T>;
   } catch {
     // oxlint-disable-next-line typescript/await-thenable -- MySQL insert is thenable via drizzle
     await drizzle.insert(table).values(values);
     const id = (values as Record<string, unknown>)["id"] as string;
     const where = eq(idColumn(table), id);
-    const rows = (await drizzle.select().from(table).where(where).limit(1)) as T["$inferSelect"][];
-    return firstRow(rows, "Insert") as T["$inferSelect"];
+    const rows = (await drizzle
+      .select()
+      .from(table)
+      .where(where)
+      .limit(1)) as InferSelectModel<T>[];
+    return firstRow(rows, "Insert") as InferSelectModel<T>;
   }
 }
 
@@ -98,17 +103,21 @@ async function updateOne<T extends Table>(
   drizzle: DrizzleMySqlLike,
   table: T,
   id: string,
-  values: Partial<T["$inferInsert"]>,
-): Promise<T["$inferSelect"]> {
+  values: Partial<InferInsertModel<T>>,
+): Promise<InferSelectModel<T>> {
   const where = eq(idColumn(table), id);
   try {
     const rows = await drizzle.update(table).set(values).where(where).returning();
-    return firstRow(rows, "Update") as T["$inferSelect"];
+    return firstRow(rows, "Update") as InferSelectModel<T>;
   } catch {
     // oxlint-disable-next-line typescript/await-thenable -- MySQL update is thenable via drizzle
     await drizzle.update(table).set(values).where(where);
-    const rows = (await drizzle.select().from(table).where(where).limit(1)) as T["$inferSelect"][];
-    return firstRow(rows, "Update") as T["$inferSelect"];
+    const rows = (await drizzle
+      .select()
+      .from(table)
+      .where(where)
+      .limit(1)) as InferSelectModel<T>[];
+    return firstRow(rows, "Update") as InferSelectModel<T>;
   }
 }
 
@@ -138,20 +147,21 @@ export function createDrizzleMySqlAdapter(
     lifecycle,
     insert: async <T extends Table>(
       table: T,
-      values: T["$inferInsert"],
-    ): Promise<T["$inferSelect"]> => await insertOne(drizzle, table, values),
+      values: InferInsertModel<T>,
+    ): Promise<InferSelectModel<T>> => await insertOne(drizzle, table, values),
     update: async <T extends Table>(
       table: T,
       id: string,
-      values: Partial<T["$inferInsert"]>,
-    ): Promise<T["$inferSelect"]> => await updateOne(drizzle, table, id, values),
+      values: Partial<InferInsertModel<T>>,
+    ): Promise<InferSelectModel<T>> => await updateOne(drizzle, table, id, values),
     updateWhere: async <T extends Table>(
       table: T,
       id: string,
-      values: Partial<T["$inferInsert"]>,
+      values: Partial<InferInsertModel<T>>,
       where: SQL,
-    ): Promise<T["$inferSelect"] | null> => await updateWhereOne(drizzle, table, id, values, where),
-    get: async <T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> =>
+    ): Promise<InferSelectModel<T> | null> =>
+      await updateWhereOne(drizzle, table, id, values, where),
+    get: async <T extends Table>(table: T, id: string): Promise<InferSelectModel<T> | null> =>
       await getOne(drizzle, table, id),
     remove: async (table: Table, id: string): Promise<void> => {
       const where = eq(idColumn(table), id);
@@ -160,13 +170,13 @@ export function createDrizzleMySqlAdapter(
     list: async <T extends Table>(
       table: T,
       opts: ListOptions = {},
-    ): Promise<T["$inferSelect"][]> => {
+    ): Promise<InferSelectModel<T>[]> => {
       const rows: unknown = await applyListOptions(
         drizzle.select(listSelection(table, opts.columns)).from(table),
         opts,
         idColumn(table),
       );
-      return rows as T["$inferSelect"][];
+      return rows as InferSelectModel<T>[];
     },
     count: async (table: Table, where?: SQL): Promise<number> => await drizzle.$count(table, where),
     all: async <T>(query: SQL): Promise<T[]> => await allRows<T>(drizzle, query),
@@ -206,8 +216,8 @@ async function getOne<T extends Table>(
   drizzle: DrizzleMySqlLike,
   table: T,
   id: string,
-): Promise<T["$inferSelect"] | null> {
+): Promise<InferSelectModel<T> | null> {
   const where = eq(idColumn(table), id);
-  const rows = (await drizzle.select().from(table).where(where).limit(1)) as T["$inferSelect"][];
+  const rows = (await drizzle.select().from(table).where(where).limit(1)) as InferSelectModel<T>[];
   return rows[0] ?? null;
 }

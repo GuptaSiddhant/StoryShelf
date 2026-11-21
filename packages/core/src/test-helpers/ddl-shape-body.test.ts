@@ -11,6 +11,23 @@ const empty = (): ShapeTable => ({
 });
 
 describe("CREATE TABLE body", () => {
+  it("reads MySQL's unnamed primary key and UNIQUE INDEX constraints (drizzle-kit 1.0)", () => {
+    const table = applyTableBody(
+      empty(),
+      "t",
+      [
+        "`a` varchar(64) NOT NULL",
+        "`b` varchar(64) NOT NULL",
+        "CONSTRAINT PRIMARY KEY(`a`,`b`)",
+        "CONSTRAINT `t_b_idx` UNIQUE INDEX(`b`)",
+      ],
+      "mysql",
+    );
+    expect([...table.columns.keys()]).toEqual(["a", "b"]);
+    expect(table.primaryKey).toEqual({ name: "PRIMARY", columns: ["a", "b"], detail: "" });
+    expect(table.uniques).toEqual([{ name: "t_b_idx", columns: ["b"], detail: "" }]);
+  });
+
   it("reads inline constraints", () => {
     const table = applyTableBody(
       empty(),

@@ -6,7 +6,7 @@
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
-import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/postgres";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -21,14 +21,38 @@ const resolverOf = (tables: Record<string, unknown>) =>
   ns.resolverOf({ ...external, ...tables } as never);
 const TABLES = ns.SPIKE_TABLES.map((table) => table.name);
 
+/**
+ * Columns of a composite primary key. ddl.ts writes NOT NULL on each; drizzle-kit 1.0 leaves it to
+ * the PRIMARY KEY constraint, which makes them NOT NULL in Postgres all the same.
+ */
+const PRIMARY_KEY_COLUMNS = [
+  "build_references.project_id",
+  "build_references.owner_type",
+  "build_references.owner_id",
+  "build_references.build_id",
+  "build_reference_generations.project_id",
+  "build_reference_generations.owner_type",
+  "build_reference_generations.owner_id",
+  "build_content_releases.build_id",
+  "build_content_releases.content_hash",
+];
+
 /** Every remaining difference, `today → generated`, with its classification. */
 const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] = [
+  ...PRIMARY_KEY_COLUMNS.slice(0, 7).map((column) => ({
+    difference: `${column}: notNull true → false`,
+    kind: "equivalent" as const,
+  })),
   {
     // ddl.ts disagrees across dialects (MySQL BIGINT, Postgres INTEGER). The neutral `bigint`
     // makes them agree; on Postgres that is a widening, an ADR 0053 expand step.
     difference: 'build_reference_generations.generation: type "integer" → "bigint"',
     kind: "schema",
   },
+  ...PRIMARY_KEY_COLUMNS.slice(7).map((column) => ({
+    difference: `${column}: notNull true → false`,
+    kind: "equivalent" as const,
+  })),
 ];
 
 async function generatedDdl(): Promise<string> {
@@ -95,8 +119,9 @@ describe("Postgres table factory (spike #800)", () => {
     );
   });
 
-  it("qualifies foreign-key targets with the public schema", async () => {
-    // Equivalent today: the adapter never sets a search_path, so every table is in `public`.
-    expect(await generatedDdl()).toContain('REFERENCES "public"."projects"("id")');
+  it("leaves foreign-key targets unqualified, as ddl.ts does", async () => {
+    // drizzle-kit 0.31 wrote `"public"."projects"`; 1.0 writes the bare name, as ddl.ts does. The
+    // adapter never sets a search_path, so every table is in `public` either way.
+    expect(await generatedDdl()).toContain('REFERENCES "projects"("id")');
   });
 });

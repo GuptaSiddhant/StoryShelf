@@ -17,17 +17,18 @@ import {
   uniqueIndex,
   varchar,
   type MySqlTableWithColumns,
-  type MySqlTextBuilderInitial,
+  type MySqlTextBuilder,
 } from "drizzle-orm/mysql-core";
 import { datetime } from "./schema/datetime.ts";
 
-type Base = MySqlTextBuilderInitial<"", [string, ...string[]]>;
+type Base = MySqlTextBuilder<[string, ...string[]]>;
 
 /** The Drizzle table a neutral table builds; its `$inferSelect` is `InferRow` of the neutral one. */
 export type MySqlTableOf<T extends ns.NeutralTable> = MySqlTableWithColumns<{
   name: T["name"];
   schema: undefined;
   dialect: "mysql";
+  isAlias: false;
   columns: BuildColumns<
     T["name"],
     { [K in keyof T["columns"]]: ns.FlaggedBuilder<Base, T["columns"][K]> },
@@ -89,5 +90,5 @@ export function mysqlTableOf<T extends ns.NeutralTable>(
     table.name,
     columns as never,
     (built) => ns.tableExtras({ table, columns: built, resolve, builders, names }) as never,
-  ) as unknown as MySqlTableOf<T>;
+  );
 }

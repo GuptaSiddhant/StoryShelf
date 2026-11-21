@@ -1,3 +1,4 @@
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import { getTableName, type SQL, type Table } from "drizzle-orm";
 /**
  * Database adapter wrapper: one span + duration metric per operation.
@@ -60,24 +61,27 @@ class InstrumentedDatabase implements DatabaseAdapter {
     this.inner.setLogger?.(logger);
   }
 
-  async insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]> {
+  async insert<T extends Table>(
+    table: T,
+    values: InferInsertModel<T>,
+  ): Promise<InferSelectModel<T>> {
     return await track("db.insert", table, async () => await this.inner.insert(table, values));
   }
 
   async update<T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
-  ): Promise<T["$inferSelect"]> {
+    values: Partial<InferInsertModel<T>>,
+  ): Promise<InferSelectModel<T>> {
     return await track("db.update", table, async () => await this.inner.update(table, id, values));
   }
 
   async updateWhere<T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
+    values: Partial<InferInsertModel<T>>,
     where: SQL,
-  ): Promise<T["$inferSelect"] | null> {
+  ): Promise<InferSelectModel<T> | null> {
     return await track(
       "db.updateWhere",
       table,
@@ -85,7 +89,7 @@ class InstrumentedDatabase implements DatabaseAdapter {
     );
   }
 
-  async get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null> {
+  async get<T extends Table>(table: T, id: string): Promise<InferSelectModel<T> | null> {
     return await track("db.get", table, async () => await this.inner.get(table, id));
   }
 
@@ -95,7 +99,7 @@ class InstrumentedDatabase implements DatabaseAdapter {
     });
   }
 
-  async list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]> {
+  async list<T extends Table>(table: T, opts?: ListOptions): Promise<InferSelectModel<T>[]> {
     return await track("db.list", table, async () => await this.inner.list(table, opts));
   }
 

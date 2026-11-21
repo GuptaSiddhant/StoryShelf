@@ -8,6 +8,7 @@ import { sql, type SQL } from "drizzle-orm";
 import {
   inTransaction,
   instant,
+  jsonText,
   textArray,
   textRows,
   type LifecycleDatabase,
@@ -72,7 +73,7 @@ export async function recordContentUses(
     // for each of tens of thousands of hashes, which ran for minutes in `postgres-lifecycle` (#1067).
     await tx.query(sql`WITH incoming AS MATERIALIZED (
         SELECT use->>'hash' AS hash, (use->>'size')::bigint AS size
-        FROM jsonb_array_elements(${uses}::jsonb) AS use),
+        FROM jsonb_array_elements(${jsonText(uses)}) AS use),
       known AS (
         SELECT content_hash, MAX(size_bytes) AS size FROM content_uses
         WHERE size_bytes IS NOT NULL AND content_hash = ANY(ARRAY(SELECT hash FROM incoming))

@@ -52,7 +52,16 @@ export function valueList(values: readonly string[]): SQL {
  * protocol's limit of 65535 parameters per statement.
  */
 export function textRows(values: readonly string[]): SQL {
-  return sql`jsonb_array_elements_text(${JSON.stringify(values)}::jsonb)`;
+  return sql`jsonb_array_elements_text(${jsonText(JSON.stringify(values))})`;
+}
+
+/**
+ * Already-encoded JSON as a `jsonb` value. The parameter is bound as `text` and cast by the server:
+ * bound straight as `jsonb`, postgres.js encodes the string again (Drizzle 1.0 no longer overrides
+ * its JSON serializer), and the server receives a JSON string, not the array.
+ */
+export function jsonText(json: string): SQL {
+  return sql`${json}::text::jsonb`;
 }
 
 /**

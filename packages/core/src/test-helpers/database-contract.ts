@@ -10,6 +10,7 @@
  * databaseContractSuite("sqlite", () => createSqliteDatabase(":memory:"));
  * ```
  */
+import type { SQL } from "drizzle-orm";
 import { asc, desc, getTableColumns, like, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -36,6 +37,23 @@ export type DatabaseFactory = () => DatabaseAdapter | Promise<DatabaseAdapter>;
 
 function idsOf(rows: Record<string, unknown>[]): unknown[] {
   return rows.map((row) => row["id"]);
+}
+
+/**
+ * Paging stays what it was before Drizzle 1.0 (`listPage`): a negative limit and a zero offset are
+ * not applied, a zero limit is. `sorted` holds the ids `where` matches, in id order.
+ */
+async function expectUnchangedPaging(
+  adapter: DatabaseAdapter,
+  table: DatabaseAdapter["tables"]["projects"],
+  where: SQL,
+  sorted: unknown[],
+): Promise<void> {
+  expect(idsOf(await adapter.list(table, { where, limit: -1 }))).toEqual(sorted);
+  expect(idsOf(await adapter.list(table, { where, limit: 0 }))).toEqual([]);
+  expect(idsOf(await adapter.list(table, { where, limit: 2, offset: 0 }))).toEqual(
+    sorted.slice(0, 2),
+  );
 }
 
 /** Run the database contract against a factory. */
@@ -129,6 +147,7 @@ export function databaseContractSuite(label: string, make: DatabaseFactory): voi
         expect(idsOf(byNameDesc)).toEqual(sorted);
         const page = await adapter.list(table, { where, limit: 1, offset: 1 });
         expect(idsOf(page)).toEqual([sorted[1]]);
+        await expectUnchangedPaging(adapter, table, where, sorted);
       } finally {
         try {
           await Promise.all(ids.map(async (id) => await adapter.remove(table, id)));

@@ -16,16 +16,17 @@ import {
   type AnySQLiteColumn,
   type ForeignKeyBuilder,
   type SQLiteTableWithColumns,
-  type SQLiteTextBuilderInitial,
+  type SQLiteTextBuilder,
 } from "drizzle-orm/sqlite-core";
 
-type Base = SQLiteTextBuilderInitial<"", [string, ...string[]], undefined>;
+type Base = SQLiteTextBuilder<[string, ...string[]]>;
 
 /** The Drizzle table a neutral table builds; its `$inferSelect` is `InferRow` of the neutral one. */
 export type SqliteTableOf<T extends ns.NeutralTable> = SQLiteTableWithColumns<{
   name: T["name"];
   schema: undefined;
   dialect: "sqlite";
+  isAlias: false;
   columns: BuildColumns<
     T["name"],
     { [K in keyof T["columns"]]: ns.FlaggedBuilder<Base, T["columns"][K]> },
@@ -82,5 +83,5 @@ export function sqliteTableOf<T extends ns.NeutralTable>(
     table.name,
     columns as never,
     (built) => ns.tableExtras({ table, columns: built, resolve, builders, names }) as never,
-  ) as unknown as SqliteTableOf<T>;
+  );
 }

@@ -72,7 +72,7 @@ afterAll(async () => {
 retentionActivationContractSuite("Postgres (PGlite, one connection)", async (run) => {
   const { client, adapter } = await sharedPglite();
   await freshProject(adapter);
-  const database = drizzlePglite(client, { schema });
+  const database = drizzlePglite({ client });
   await run({
     lifecycle: createBuildReferenceLifecycle(database),
     prepare: async () => {
@@ -97,7 +97,7 @@ describe.skipIf(!LIVE)("real Postgres, one connection per party", () => {
     const adapter = createPostgresDatabase({ client: one });
     await adapter.lifecycle?.setup({ config: {}, logger: silent });
     await freshProject(adapter);
-    const database = (n: 0 | 1 | 2) => drizzlePostgres([one, two, three][n] ?? one, { schema });
+    const database = (n: 0 | 1 | 2) => drizzlePostgres({ client: [one, two, three][n] ?? one });
     return { adapter, database };
   }
 

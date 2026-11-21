@@ -108,7 +108,7 @@ export function createMysqlAdapter(
   unverifiedRetention?: string,
 ): DatabaseAdapter {
   const { pool, owned } = resolvePool(options);
-  const db = drizzle(pool as never, { schema, mode: "default" });
+  const db = drizzle({ client: pool as never });
   const retention: RetentionActivation = {};
 
   const adapter = createDrizzleMySqlAdapter(db, {

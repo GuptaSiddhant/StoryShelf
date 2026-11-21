@@ -1,4 +1,5 @@
 import type { DrizzleAdapterOptions, ListOptions } from "@storyshelf/core/adapter/database";
+import { listPage } from "@storyshelf/core/adapter/database";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
@@ -24,11 +25,12 @@ export function applyListOptions<C extends ChainFilter<C>>(
     current = current.where(opts.where);
   }
   current = current.orderBy(opts.orderBy ? sql`${opts.orderBy}, ${id}` : sql`${id}`);
-  if (opts.limit !== undefined) {
-    current = current.limit(opts.limit);
+  const page = listPage(opts);
+  if (page.limit !== undefined) {
+    current = current.limit(page.limit);
   }
-  if (opts.offset !== undefined) {
-    current = current.offset(opts.offset);
+  if (page.offset !== undefined) {
+    current = current.offset(page.offset);
   }
   return current;
 }

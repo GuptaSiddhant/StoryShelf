@@ -6,7 +6,7 @@
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
-import { generateMySQLDrizzleJson, generateMySQLMigration } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/mysql";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -28,9 +28,9 @@ const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory"
 
 async function generatedDdl(): Promise<string> {
   const built = ns.buildAll(ns.SPIKE_TABLES, mysqlTableOf, external);
-  const before = await generateMySQLDrizzleJson({});
-  const after = await generateMySQLDrizzleJson(built);
-  return (await generateMySQLMigration(before, after)).join(";\n");
+  const before = await generateDrizzleJson({});
+  const after = await generateDrizzleJson(built);
+  return (await generateMigration(before, after)).join(";\n");
 }
 
 describe("MySQL table factory (spike #800)", () => {
