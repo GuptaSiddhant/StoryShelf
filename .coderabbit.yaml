@@ -163,7 +163,7 @@ reviews:
         - No full-image copy per pixel; flag quadratic scans over large images.
         Require fixture coverage for identical, differing, size-changed and malformed images.
 
-    - path: "packages/image/**"
+    - path: "packages/core/src/diff/**"
       instructions: |
         Image processing runs on a worker pool. Verify:
         - Worker tasks always settle (resolve or reject) and the pool is drained/terminated on teardown.
@@ -315,7 +315,7 @@ reviews:
         - Passkey/SSO challenges are single-use, expire, and bind to the session/user; replay and cross-user use are rejected.
         Require tests for anonymous/member/admin, expired/revoked sessions, wrong-user tokens and replay.
 
-    - path: "packages/notify-*/**"
+    - path: "packages/core/src/integrations/{git,chat,email}/**"
       instructions: |
         Notifications are durable side effects. Verify:
         - Nothing is sent without a confirmed public origin; no relative-link fallback and no channel marked errored because the origin is unknown.
@@ -359,7 +359,7 @@ reviews:
         - Changed files map to owning packages deterministically; a test-only change does not select unrelated packages.
         Require tests for cycles, empty graphs, scoped packages, renamed files and Windows/POSIX separators.
 
-    - path: "packages/design-figma/**"
+    - path: "packages/core/src/integrations/design/**"
       instructions: |
         External design-provider integration. Verify:
         - Credentials and tokens never enter logs, errors, URLs or rendered HTML; link validation does not leak private file access.

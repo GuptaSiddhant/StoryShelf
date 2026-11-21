@@ -76,6 +76,8 @@ export interface Tables {
   projectMembers: Table;
   projectGroupMappings: Table;
   contentUses: Table;
+  gitConnections: Table;
+  gitRepositoryLinks: Table;
 }
 
 /** Table keys every DatabaseAdapter must expose (contract + validation share this). */

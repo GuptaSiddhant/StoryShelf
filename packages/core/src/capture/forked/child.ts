@@ -117,6 +117,7 @@ function buildHandler(
     runner: options.runner,
     scratchDir: options.scratchDir,
     notifiers: options.notifiers,
+    gitConnections: options.gitConnections,
     config: options.config,
     // The parent's consumer runs `notify` jobs, so the child hands state deliveries to the queue.
     buildState: options.buildState ?? notifyJobsPublisher(options, queue, logger),
@@ -147,6 +148,7 @@ function notifyJobsPublisher(
       db: options.db,
       storage: options.storage,
       notifiers: options.notifiers ?? [],
+      gitConnections: options.gitConnections,
       secret: options.secret,
       config: options.config ?? {},
       publicOrigin: originOf(options),

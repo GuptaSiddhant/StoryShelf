@@ -69,8 +69,8 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}` (puppeteer deprecated),
-  `notify-{git,chat,email}`, `design-figma`, `observability`, `ai`, `mcp`.
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-{playwright,puppeteer}` (puppeteer deprecated),
+  `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
@@ -112,8 +112,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `BuildStatePublisher.request(buildId)` (app: `requestBuildState`) queues one `notify` job per git
   channel. A new status is a new case in `statusesForBuild`; a refused write throws so the consumer
   retries. GitHub check runs share that mapper
-  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the channel secret and must
-  never appear in config, logs, errors or API output.
+  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the connection secret (a
+  per-project channel secret until it moves) and must never appear in config, logs, errors or API output.
 - **`cancelled` is terminal.** Cancel through `announceBuildStatus` (`build:cancelled`; no
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
@@ -245,7 +245,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   is accepted: the one service worker caches only opted-in default-branch Storybooks and the
   offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
   move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
-  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  stops requiring observability; the compatibility packages were retired in 0.14.0 (§8). ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image. ADR 0052 (story switching during
   capture) is accepted behind `projects.switch_stories` (default off) and ships only after its

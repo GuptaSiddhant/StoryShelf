@@ -74,6 +74,50 @@ provider "google" {
 `;
 }
 
+/** Git connections (ADR 0054, decision 9): the App ID, and references to secrets, never values. */
+function gitVariables(): string {
+  return `
+# Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+# GitLab token are Secret Manager secret ids you create outside Terraform (same project), so their
+# values never enter configuration or state. Empty keeps the connection off.
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret" {
+  description = "Secret Manager secret id holding the GitHub App private key (PEM). Required with github_app_id."
+  type        = string
+  default     = ""
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3). Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret" {
+  description = "Secret Manager secret id holding a GitLab group or project access token (api scope). Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD); the System page warns 30 days before. Required with gitlab_token_secret."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
+}
+`;
+}
+
 export function generateGcpVariables(): string {
   return `${header()}variable "project" {
   description = "Project slug, used as a name prefix for all resources."
@@ -102,7 +146,8 @@ variable "identity_tenant" {
   type        = string
   default     = ""
 }
-`;
+
+${gitVariables()}`;
 }
 
 export function generateGcpMain(): string {
@@ -110,6 +155,19 @@ export function generateGcpMain(): string {
 # default (true) so CI teardown also releases the API bindings.
 locals {
   slug = lower(var.project)
+
+  # Git connections: plain values, and secrets read from Secret Manager at start (never copied here).
+  git_env = { for k, v in {
+    SHELF_GITHUB_APP_ID        = var.github_app_id
+    SHELF_GITHUB_API_URL       = var.github_api_url
+    SHELF_GITLAB_TOKEN_EXPIRES = var.gitlab_token_expires
+    SHELF_GITLAB_HOST          = var.gitlab_host
+  } : k => v if v != "" }
+  git_secrets = { for k, v in {
+    SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret
+    SHELF_GITLAB_TOKEN           = var.gitlab_token_secret
+  } : k => v if v != "" }
+
   apis = toset([
     "run.googleapis.com",
     "sqladmin.googleapis.com",
@@ -152,6 +210,27 @@ resource "google_cloud_run_v2_service" "app" {
           memory = "4Gi"
         }
       }
+
+      dynamic "env" {
+        for_each = local.git_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.git_secrets
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
     }
 
     scaling {
@@ -161,6 +240,22 @@ resource "google_cloud_run_v2_service" "app" {
   }
 
   ingress = "INGRESS_TRAFFIC_ALL"
+}
+`;
+}
+
+/** The service runs as the project's default compute account; it may read exactly the git secrets. */
+export function generateGcpGitAccess(): string {
+  return `${header()}data "google_compute_default_service_account" "default" {
+  project = var.gcp_project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "git" {
+  for_each  = local.git_secrets
+  project   = var.gcp_project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:\${data.google_compute_default_service_account.default.email}"
 }
 `;
 }
@@ -382,6 +477,8 @@ function generateGcpEnvTable(): string {
 | \`database_url\` | \`DATABASE_URL\` | \`db-postgres\` |
 | \`identity_tenant_id\` | \`OIDC_ISSUER\` (tenant issuer URL) / \`OIDC_CLIENT_ID\` | \`auth\` (keycloak recipe) |
 | Secret Manager | \`SECRET\` / \`OIDC_CLIENT_SECRET\` / \`ADMIN_TOKEN\` | sessions / OIDC / bootstrap |
+| \`github_app_id\` + \`github_app_private_key_secret\` (optional) | \`SHELF_GITHUB_APP_ID\` / \`SHELF_GITHUB_APP_PRIVATE_KEY\` | server git connection (ADR 0054) |
+| \`gitlab_token_secret\` + \`gitlab_token_expires\` (optional) | \`SHELF_GITLAB_TOKEN\` / \`SHELF_GITLAB_TOKEN_EXPIRES\` | server git connection (ADR 0054) |
 `;
 }
 
@@ -454,6 +551,7 @@ const GCP_FILES: ReadonlyArray<readonly [string, (options: GcpTerraformOptions) 
   ["terraform/storage.tf", () => generateGcpStorage()],
   ["terraform/identity.tf", () => generateGcpIdentity()],
   ["terraform/secrets.tf", () => generateGcpSecrets()],
+  ["terraform/git-access.tf", () => generateGcpGitAccess()],
   ["terraform/dns.tf", () => generateGcpDns()],
   ["terraform/outputs.tf", () => generateGcpOutputs()],
   ["terraform/terraform.tfvars.example", () => generateGcpTfvarsExample()],

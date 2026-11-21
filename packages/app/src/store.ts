@@ -12,8 +12,9 @@ import {
 } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { IntegrationStatus } from "@storyshelf/core/integrations";
+import type { GitLinkConfig } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
-import type { PublicOriginResolver } from "@storyshelf/core/models";
+import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PublishService } from "./publish-setup.ts";
@@ -58,10 +59,14 @@ export interface Store {
    * read as "everything wired is available".
    */
   integrations?: readonly IntegrationStatus[];
+  /** Links declared in configuration: shown as managed, never edited here (ADR 0054, decision 9). */
+  gitConfiguredLinks?: readonly GitLinkConfig[] | undefined;
   /** Brand/sender settings for outgoing notifications (`notifications.config`). */
   notificationsConfig?: NotificationsConfig;
   /** AI insights surface; absent ⇒ AI off site-wide. */
   ai?: Ai;
+  /** The server's git connections, configured and stored (ADR 0054); absent in hand-built stores. */
+  gitConnections?: GitConnectionModel;
 }
 
 const storage = new AsyncLocalStorage<Store>();

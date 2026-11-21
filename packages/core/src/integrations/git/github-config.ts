@@ -17,6 +17,11 @@ export const githubConfigSchema = z
     mode: z.enum(["statuses", "checks"]).optional(),
     appId: z.string().regex(/^\d+$/u, "Use the numeric App ID").optional(),
     installationId: z.string().regex(/^\d+$/u, "Use the numeric installation ID").optional(),
+    /**
+     * The repository's numeric id. Set by a repository link (ADR 0054): the installation token is
+     * then requested for this repository only. Never set on a per-project channel.
+     */
+    repositoryId: z.string().regex(/^\d+$/u, "Use the numeric repository ID").optional(),
   })
   .superRefine((cfg, ctx) => {
     if (cfg.mode !== "checks") {

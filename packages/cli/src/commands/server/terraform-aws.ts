@@ -82,6 +82,51 @@ variable "saml_metadata_url" {
   type        = string
   default     = ""
 }
+${gitVariables()}`;
+}
+
+/**
+ * Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+ * GitLab token are references to Secrets Manager secrets the operator creates outside Terraform, so
+ * their values are never in configuration or state. Empty keeps the connection off.
+ */
+function gitVariables(): string {
+  return `
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the GitHub App private key (PEM). Create it outside Terraform; its value never enters state. Required with github_app_id."
+  type        = string
+  default     = ""
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3). Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding a GitLab group or project access token (api scope). Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD); the System page warns 30 days before. Required with gitlab_token_secret_arn."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
+}
 `;
 }
 
@@ -520,12 +565,12 @@ resource "aws_iam_role_policy" "execution_secrets" {
     Statement = [{
       Effect = "Allow"
       Action = ["secretsmanager:GetSecretValue"]
-      Resource = [
+      Resource = concat([
         aws_secretsmanager_secret.shelf_secret.arn,
         aws_secretsmanager_secret.oidc_client_secret.arn,
         aws_secretsmanager_secret.admin_token.arn,
         local.db_secret_arn,
-      ]
+      ], local.git_secret_arns)
     }]
   })
 }
@@ -563,11 +608,11 @@ resource "aws_iam_role_policy" "task_secrets" {
     Statement = [{
       Effect = "Allow"
       Action = ["secretsmanager:GetSecretValue"]
-      Resource = [
+      Resource = concat([
         aws_secretsmanager_secret.shelf_secret.arn,
         aws_secretsmanager_secret.oidc_client_secret.arn,
         aws_secretsmanager_secret.admin_token.arn,
-      ]
+      ], local.git_secret_arns)
     }]
   })
 }
@@ -586,6 +631,20 @@ function generateAwsAppLocals(): string {
 locals {
   public_base_url = var.domain_name == "" ? "http://\${aws_lb.main.dns_name}" : "https://\${var.domain_name}"
   db_secret_arn   = aws_db_instance.main.master_user_secret[0].secret_arn
+
+  # Git connections (ADR 0054): each is on only when its reference is set. The key and the token
+  # reach the task as secrets (the execution role reads them), never as plain environment values.
+  git_secret_arns = compact([var.github_app_private_key_secret_arn, var.gitlab_token_secret_arn])
+  git_environment = concat(
+    var.github_app_id == "" ? [] : [{ name = "SHELF_GITHUB_APP_ID", value = var.github_app_id }],
+    var.github_api_url == "" ? [] : [{ name = "SHELF_GITHUB_API_URL", value = var.github_api_url }],
+    var.gitlab_token_expires == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN_EXPIRES", value = var.gitlab_token_expires }],
+    var.gitlab_host == "" ? [] : [{ name = "SHELF_GITLAB_HOST", value = var.gitlab_host }],
+  )
+  git_secrets = concat(
+    var.github_app_private_key_secret_arn == "" ? [] : [{ name = "SHELF_GITHUB_APP_PRIVATE_KEY", valueFrom = var.github_app_private_key_secret_arn }],
+    var.gitlab_token_secret_arn == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN", valueFrom = var.gitlab_token_secret_arn }],
+  )
 
   app_command = [
     "sh",
@@ -617,19 +676,19 @@ resource "aws_ecs_task_definition" "app" {
     essential    = true
     portMappings = [{ containerPort = 3000, protocol = "tcp" }]
     command      = local.app_command
-    environment = [
+    environment = concat([
       { name = "S3_BUCKET", value = aws_s3_bucket.storybook.id },
       { name = "AWS_REGION", value = var.region },
       { name = "PUBLIC_BASE_URL", value = local.public_base_url },
       { name = "DB_HOST", value = aws_db_instance.main.address },
-    ]
-    secrets = [
+    ], local.git_environment)
+    secrets = concat([
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
       { name = "DB_USERNAME", valueFrom = "\${local.db_secret_arn}:username::" },
       { name = "DB_PASSWORD", valueFrom = "\${local.db_secret_arn}:password::" },
-    ]
+    ], local.git_secrets)
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -890,6 +949,18 @@ function generateAwsReadmeSecrets(): string {
 \`\`\`sh
 aws secretsmanager put-secret-value --secret-id "<project>/OIDC_CLIENT_SECRET" --secret-string "<client secret>"
 aws ecs update-service --cluster <project>-cluster --service <project>-app --force-new-deployment
+\`\`\`
+
+- **Git connections (optional).** To post merge gates and pull-request comments without anyone
+  pasting a key (ADR 0054), create the GitHub App's private key as a Secrets Manager secret
+  yourself, then set \`github_app_id\` and \`github_app_private_key_secret_arn\`. For GitLab, store a
+  group or project access token (\`api\` scope) the same way and set \`gitlab_token_secret_arn\` and
+  \`gitlab_token_expires\`. Terraform only holds the ARN, so the key and the token are never in
+  configuration or state; the task reads them as \`SHELF_GITHUB_APP_PRIVATE_KEY\` and
+  \`SHELF_GITLAB_TOKEN\`. Rotating one is a new secret value and a new deployment.
+
+\`\`\`sh
+aws secretsmanager create-secret --name "<project>/GITHUB_APP_PRIVATE_KEY" --secret-string file://app.private-key.pem
 \`\`\`
 `;
 }

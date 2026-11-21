@@ -254,16 +254,7 @@ export default defineConfig({
           label: "Packages",
           items: [
             { label: "Overview", slug: "packages" },
-            packageGroup("Core", [
-              "core",
-              "app",
-              "affected",
-              "image",
-              "observability",
-              "auth",
-              "ai",
-              "mcp",
-            ]),
+            packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [
               "storage-local",
@@ -272,8 +263,6 @@ export default defineConfig({
               "storage-gcs",
             ]),
             packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
-            packageGroup("Design", ["design-figma"]),
-            packageGroup("Notifications", ["notify-chat", "notify-email", "notify-git"]),
           ],
         },
       ],
