@@ -83,5 +83,5 @@ export function sqliteTableOf<T extends ns.NeutralTable>(
     table.name,
     columns as never,
     (built) => ns.tableExtras({ table, columns: built, resolve, builders, names }) as never,
-  ) as unknown as SqliteTableOf<T>;
+  );
 }

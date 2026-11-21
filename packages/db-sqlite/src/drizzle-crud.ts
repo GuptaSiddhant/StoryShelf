@@ -115,7 +115,7 @@ export function buildTxStore(drizzle: DrizzleLike): TxStore {
       await removeOne(drizzle, table, id);
     },
     list: async (table, opts) => await listMany(drizzle, table, opts),
-    count: async (table, where) => await drizzle.$count(table as AnySQLiteTable, where),
+    count: async (table, where) => await drizzle.$count(table, where),
   };
 }
 
