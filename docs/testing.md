@@ -37,7 +37,7 @@ The touched timing-sensitive files have a `test:flake` script in their package: 
 
 ### 2. Adapter contract tests
 
-Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), storage-local via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
+Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), local storage (core's `storage/local`) via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
 
 > Known environment limitation: `@libsql/client` (native binding ≤ 0.5.29)
 > segfaults at process teardown on current Node majors — even on a bare
@@ -170,7 +170,7 @@ Rules:
 `scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
 
 ```sh
-nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/storage-local' --filter='@storyshelf/runner-playwright'
+nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/runner-playwright'
 (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
 nub run bench                      # warm-up run (dropped), then the median of 3
 nub run bench -- --runs 5 --out .tmp/bench.json

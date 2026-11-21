@@ -1,7 +1,9 @@
+import type { ReachabilityChange } from "@storyshelf/core/capture";
 /** Admin alerts for captures that leave their build failed; the app, not the capture child, sends them. */
 import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { alertDataOf } from "./capture-reachability.ts";
 import { notifyProjectWith, notifySystemWith } from "./notify.ts";
 
 /**
@@ -103,4 +105,19 @@ async function sendCaptureAlert(
       `/builds/${buildId}`,
     );
   }
+}
+
+/** Alert admins once when a capture target becomes unreachable, and once when it recovers. */
+export async function notifyTargetChange(
+  options: ResolvedShelfOptions,
+  config: ShelfConfig,
+  logger: Logger,
+  change: ReachabilityChange,
+  publicOrigin?: () => Promise<string | undefined>,
+): Promise<void> {
+  await notifySystemWith(
+    alertDeps(options, config, logger, publicOrigin),
+    change.kind === "unreachable" ? "sys:target-unreachable" : "sys:target-recovered",
+    alertDataOf(change),
+  );
 }

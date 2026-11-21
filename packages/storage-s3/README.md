@@ -53,6 +53,6 @@ Helper that joins a storage prefix with a relative path into an object key.
 
 ## How it fits in
 
-`storage-s3` is the `storage` option for `createShelfApp` in cloud or multi-node deployments. It implements the same `StorageAdapter` interface as `@storyshelf/storage-local`, so switching between local disk and object storage requires no changes elsewhere.
+`storage-s3` is the `storage` option for `createShelfApp` in cloud or multi-node deployments. It implements the same `StorageAdapter` interface as `@storyshelf/core/storage/local`, so switching between local disk and object storage requires no changes elsewhere.
 
 See `docs/architecture.md` and ADR 0006.

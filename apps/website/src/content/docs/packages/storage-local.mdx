@@ -1,25 +1,24 @@
 ---
 title: "@storyshelf/storage-local"
-description: Store StoryShelf screenshots, diffs, and Storybook archives on a local filesystem.
+description: Deprecated. Local filesystem storage is built into @storyshelf/core/storage/local.
 ---
 
-import { PackageManagers } from "starlight-package-managers";
+`@storyshelf/storage-local` is **deprecated**. Local filesystem storage is built into core, and the factory and its options are unchanged. This package re-exports it for one minor release (ADR 0049), then is no longer published.
 
-`@storyshelf/storage-local` is the default blob storage adapter for a single-node deployment. It stores screenshots, diff overlays, and uploaded Storybook archives below one data directory.
+## Migrate
 
-## Install
+```ts
+// before
+import { createLocalStorage } from "@storyshelf/storage-local";
+// after
+import { createLocalStorage } from "@storyshelf/core/storage/local";
+```
 
-<PackageManagers pkg="@storyshelf/storage-local" />
+Remove `@storyshelf/storage-local` from your `package.json` and keep `@storyshelf/core`.
 
-- [npm package](https://www.npmjs.com/package/@storyshelf/storage-local) — install tarballs and version history.
-- [Public API reference](/reference/storage-local/) — generated docs for every export; start here to learn the API.
-- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage-local) — package directory on `main`.
+## `createLocalStorage(dataDir: string): StorageAdapter`
 
-## Configure
-
-<Readme heading="Quick start" />
-
-<Readme heading="API" />
+Stores all blobs under the resolved `dataDir`, creating directories as needed. A path that escapes the data directory throws.
 
 ## When to use it
 

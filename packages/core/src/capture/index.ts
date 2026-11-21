@@ -218,3 +218,12 @@ export {
   parseComparisonReference,
   type ComparisonReference,
 } from "./comparison-reference.ts";
+export {
+  launchFailureOf,
+  reachabilityOf,
+  reasonClassOf,
+  TargetReachability,
+  type ReachabilityChange,
+  type UnreachableReason,
+  type UnreachableTarget,
+} from "./target-reachability.ts";
