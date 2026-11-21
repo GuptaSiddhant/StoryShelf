@@ -3,24 +3,24 @@ import { requiredEnv } from "./codegen.ts";
 
 /** What each variable is for, as a comment line in `.env.example` and a row in the scaffold README. */
 const ENV_HELP: Record<string, { example: string; note: string }> = {
-  SECRET: {
+  SHELF_SECRET: {
     example: "",
     note: "at least 32 random characters; generate with `openssl rand -hex 32`, keep it and reuse it",
   },
-  PUBLIC_BASE_URL: {
+  SHELF_PUBLIC_BASE_URL: {
     example: "http://localhost:3000",
     note: "the URL people open in a browser (no trailing slash)",
   },
-  AUTH_PASSWORD: { example: "", note: "the first admin's password, 12 or more characters" },
+  SHELF_ADMIN_PASSWORD: { example: "", note: "the first admin's password, 12 or more characters" },
   DATABASE_URL: { example: "", note: "the database connection string" },
 };
 
 /** Optional variables every scaffold reads, commented out in `.env.example`. */
 const OPTIONAL_ENV: readonly (readonly [string, string, string])[] = [
   ["PORT", "3000", "the port to listen on"],
-  ["DATA_DIR", "./data", "where the SQLite file and local uploads live"],
+  ["SHELF_DATA_DIR", "./data", "where the SQLite file and local uploads live"],
   [
-    "STORYSHELF_ADMIN_TOKEN",
+    "SHELF_ADMIN_TOKEN",
     "",
     "lets `storyshelf create --token` bootstrap a project from the command line",
   ],
@@ -48,7 +48,7 @@ export function generateReadme(answers: Answers): string {
   const names = requiredEnv(answers);
   const signIn =
     answers.auth === "password"
-      ? "Open the URL you set as `PUBLIC_BASE_URL` and sign in as `admin@example.com` with `AUTH_PASSWORD`."
+      ? "Open the URL you set as `SHELF_PUBLIC_BASE_URL` and sign in as `admin@example.com` with `SHELF_ADMIN_PASSWORD`."
       : "Open http://localhost:3000.";
   const variables = names.map((name) => `- \`${name}\`: ${ENV_HELP[name]?.note ?? name}`);
   return [
@@ -74,8 +74,8 @@ export function generateReadme(answers: Answers): string {
     "and the command. From your Storybook project:",
     "",
     "```sh",
-    "npx storyshelf init --url <PUBLIC_BASE_URL> --slug <slug>",
-    "STORYSHELF_TOKEN=<token> npx storyshelf upload",
+    "npx storyshelf init --url <SHELF_PUBLIC_BASE_URL> --slug <slug>",
+    "SHELF_TOKEN=<token> npx storyshelf upload",
     "```",
     "",
     "Docs: https://storyshelf.js.org/guides/getting-started/",

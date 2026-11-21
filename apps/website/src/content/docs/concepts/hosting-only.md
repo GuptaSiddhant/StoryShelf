@@ -37,4 +37,4 @@ A published build on the project's default branch becomes `approved` when publis
 
 ## Serverless platforms
 
-`testing` needs a long-running process, so Vercel, AWS Lambda, Netlify and Cloudflare Workers host Storybooks only: boot refuses `testing.runner` on AWS Lambda, warns on Vercel and Netlify, and refuses it on the Cloudflare D1 database preset. `STORYSHELF_ALLOW_SERVERLESS=1` overrides the host check. See [Cloud assembly](/guides/deployment/cloud/).
+`testing` needs a long-running process, so Vercel, AWS Lambda, Netlify and Cloudflare Workers host Storybooks only: boot refuses `testing.runner` on AWS Lambda, warns on Vercel and Netlify, and refuses it on the Cloudflare D1 database preset. `SHELF_ALLOW_SERVERLESS=1` overrides the host check. See [Cloud assembly](/guides/deployment/cloud/).

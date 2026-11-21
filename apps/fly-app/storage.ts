@@ -1,5 +1,6 @@
 /** Which object storage the Fly demo uses, chosen from its environment. */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { readS3Bucket } from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
@@ -21,8 +22,8 @@ function nonEmpty(value: string | undefined): string | undefined {
 const DEFAULT_FACTORIES: StorageFactories = { s3: createS3Storage, local: createLocalStorage };
 
 /**
- * S3-compatible storage (Tigris on Fly) when `AWS_BUCKET` (or `BUCKET_NAME`, the name
- * `fly storage create` uses) is set, else the volume under `dataDir`. The endpoint is
+ * S3-compatible storage (Tigris on Fly) when `SHELF_S3_BUCKET` is set, or else the `BUCKET_NAME`
+ * that `fly storage create` injects (`readS3Bucket`), else the volume under `dataDir`. The endpoint is
  * `AWS_ENDPOINT_URL_S3` and the region `AWS_REGION` (Tigris answers to `auto`). Credentials are never read here: the SDK's default chain takes `AWS_ACCESS_KEY_ID` and
  * `AWS_SECRET_ACCESS_KEY` from the environment.
  */
@@ -31,7 +32,7 @@ export function storageFromEnv(
   dataDir: string,
   factories: StorageFactories = DEFAULT_FACTORIES,
 ): { storage: StorageAdapter; log: StorageLog } {
-  const bucket = nonEmpty(env["AWS_BUCKET"]) ?? nonEmpty(env["BUCKET_NAME"]);
+  const bucket = readS3Bucket(env);
   if (bucket === undefined) {
     return { storage: factories.local(dataDir), log: { storage: "local" } };
   }

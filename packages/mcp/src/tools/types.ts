@@ -22,7 +22,7 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
 export function projectSlug(client: ApiClient, project: unknown): string {
   const slug = typeof project === "string" && project ? project : client.defaultSlug;
   if (!slug) {
-    throw new ToolError("No project given: pass `project` or set STORYSHELF_SLUG");
+    throw new ToolError("No project given: pass `project` or set SHELF_SLUG");
   }
   return encodeURIComponent(slug);
 }

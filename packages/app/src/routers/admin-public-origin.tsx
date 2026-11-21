@@ -25,7 +25,7 @@ export function registerPublicOriginRoutes(app: ShelfRouter): void {
 
 /** What an admin is told when the origin is not theirs to set. */
 const FIXED_ORIGIN_MESSAGE =
-  "The public origin comes from PUBLIC_BASE_URL or the hosting platform, so there is nothing to confirm";
+  "The public origin comes from SHELF_PUBLIC_BASE_URL or the hosting platform, so there is nothing to confirm";
 
 /** Whether the configuration or the platform answers: an origin an admin cannot confirm or replace. */
 async function isFixed(): Promise<boolean> {

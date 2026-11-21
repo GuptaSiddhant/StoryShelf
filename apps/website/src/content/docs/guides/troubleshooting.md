@@ -13,9 +13,9 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 ## Uploads from CI
 
-**A script that greps for `Build created:` finds nothing, or the server refuses to start after an upgrade.** Both changed in 0.14.0: read the id from the `Build:` row of the upload summary, and set `AUTH_PASSWORD` and `SECRET` (or `SHELF_AUTH=none`). See the [Upgrading guide](/guides/upgrading/).
+**A script that greps for `Build created:` finds nothing, or the server refuses to start after an upgrade.** Both changed in 0.14.0: read the id from the `Build:` row of the upload summary, and set `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` (or `SHELF_AUTH=none`). See the [Upgrading guide](/guides/upgrading/).
 
-**`--url is required`, `--slug is required` or `--token is required`.** The upload has no server address, project slug or token. Set them with flags, in `.storybook/storyshelf.json` (`url`, `slug`), or in the `STORYSHELF_URL`, `STORYSHELF_SLUG` and `STORYSHELF_TOKEN` environment variables. The token belongs in a CI secret, not in the file. See [Configuration](/guides/config/).
+**`--url is required`, `--slug is required` or `--token is required`.** The upload has no server address, project slug or token. Set them with flags, in `.storybook/storyshelf.json` (`url`, `slug`), or in the `SHELF_URL`, `SHELF_SLUG` and `SHELF_TOKEN` environment variables. The token belongs in a CI secret, not in the file. See [Configuration](/guides/config/).
 
 **`401 Unauthorized` or `403 Forbidden`.** `401` means the token is missing or not recognised: check you copied the whole token and that it belongs to this server. `403` means it is valid but its owner cannot upload to this project. A token has the role of the user who created it, so that user needs at least the `developer` role on the project. Run `storyshelf whoami` to confirm which server and project the CLI is using. See [Roles & tokens](/concepts/roles/).
 
@@ -57,17 +57,17 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 ## Git statuses and notifications
 
-**No commit status or pull-request comment appears.** The most common cause is that no public URL is confirmed, so notifications are paused (the System page says "Notifications are paused until a public URL is set"). Set `PUBLIC_BASE_URL`, or open **System** once and confirm the detected address. See [Public origin](/guides/config/#public-origin). For missing, late or wrong-commit statuses and GitHub App check runs, see [Merge gate troubleshooting](/guides/merge-gate/#troubleshooting).
+**No commit status or pull-request comment appears.** The most common cause is that no public URL is confirmed, so notifications are paused (the System page says "Notifications are paused until a public URL is set"). Set `SHELF_PUBLIC_BASE_URL`, or open **System** once and confirm the detected address. See [Public origin](/guides/config/#public-origin). For missing, late or wrong-commit statuses and GitHub App check runs, see [Merge gate troubleshooting](/guides/merge-gate/#troubleshooting).
 
-**Links in notifications point at the wrong host.** The public origin is set to a platform address while a custom domain fronts the app. Set `PUBLIC_BASE_URL` to the address people use.
+**Links in notifications point at the wrong host.** The public origin is set to a platform address while a custom domain fronts the app. Set `SHELF_PUBLIC_BASE_URL` to the address people use.
 
 ## Sign-in and access
 
-**Nobody is an admin yet.** With authentication on and an empty database, set `STORYSHELF_ADMIN_TOKEN` on the server: its bearer token grants site-admin API access without a session. See [Roles & tokens](/concepts/roles/#first-admin-bootstrap).
+**Nobody is an admin yet.** With authentication on and an empty database, set `SHELF_ADMIN_TOKEN` on the server: its bearer token grants site-admin API access without a session. See [Roles & tokens](/concepts/roles/#first-admin-bootstrap).
 
 **"Invalid or expired invite".** Invite links are single-use and expire after seven days. Ask an admin to re-invite: that is also how a password is recovered. See [Local accounts](/guides/auth/local/).
 
-**Everyone was signed out, or stored webhooks and tokens stopped working, after a deploy.** `SECRET` changed. It signs sessions and encrypts stored credentials, so a new value signs people out and makes old credentials unreadable. Put the old value in `SECRET_PREVIOUS` and re-encrypt: see [Rotating the server secret](/guides/deployment/secret-rotation/).
+**Everyone was signed out, or stored webhooks and tokens stopped working, after a deploy.** `SHELF_SECRET` changed. It signs sessions and encrypts stored credentials, so a new value signs people out and makes old credentials unreadable. Put the old value in `SHELF_SECRET_PREVIOUS` and re-encrypt: see [Rotating the server secret](/guides/deployment/secret-rotation/).
 
 **A published Storybook asks for sign-in, or the link 404s.** Only public builds are open to everyone: a build whose branch matches the project's `public_branch_regex`, or that is marked public. Everything else needs at least `viewer` membership. See [Published Storybook](/concepts/publishing/#public-vs-auth-gate).
 

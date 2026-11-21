@@ -25,8 +25,8 @@ import { createShelfAuth, resolveAuthOptions } from "@storyshelf/auth";
 const shelf = createShelfAuth(
   await resolveAuthOptions({
     db: database,
-    secret: "{env:SECRET}",
-    baseURL: process.env.PUBLIC_BASE_URL!,
+    secret: "{env:SHELF_SECRET}",
+    baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
     passkeys: {},
   }),
 );

@@ -190,7 +190,7 @@ describe("public origin on the System page", () => {
     const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
     const html = await (await app.request("/admin")).text();
     expect(html).toContain("configured.example.com");
-    expect(html).toContain("configured (PUBLIC_BASE_URL)");
+    expect(html).toContain("configured (SHELF_PUBLIC_BASE_URL)");
     expect(html).not.toContain("data-report-origin");
     // Nothing to confirm: no stored-origin form and no entry form either (#315).
     expect(html).not.toContain('action="/admin/public-origin"');
@@ -218,7 +218,7 @@ describe("public origin on the System page", () => {
         const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
         expect(response.status).toBeLessThan(400);
         expect(flashOf(response)).toEqual({
-          message: expect.stringContaining("PUBLIC_BASE_URL") as string,
+          message: expect.stringContaining("SHELF_PUBLIC_BASE_URL") as string,
           tone: "warning",
         });
         expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();

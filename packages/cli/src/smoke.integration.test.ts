@@ -160,8 +160,8 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
       env: {
         ...process.env,
         PORT: String(port),
-        DATA_DIR: join(dir, "data"),
-        SECRET: "smoke-test-secret-smoke-test-secret",
+        SHELF_DATA_DIR: join(dir, "data"),
+        SHELF_SECRET: "smoke-test-secret-smoke-test-secret",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

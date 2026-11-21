@@ -157,7 +157,7 @@ describe("runCreate with sign-in on", () => {
     expect(process.exitCode).toBeUndefined();
     expect(seen.some((url) => url.endsWith("/tokens"))).toBe(false);
     expect(out).toContain("https://shelf.example.com/projects/demo/builds");
-    expect(out).toContain("STORYSHELF_TOKEN");
+    expect(out).toContain("SHELF_TOKEN");
     expect(out).not.toContain("CI token:");
     await expect(loadStorybookConfig(dir)).resolves.toMatchObject({ slug: "demo" });
   });

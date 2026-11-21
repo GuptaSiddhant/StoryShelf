@@ -16,7 +16,7 @@ function imageLines(baseImage: string, entry: string): string[] {
     "COPY src/ ./src/",
     "EXPOSE 3000",
     "ENV PORT=3000",
-    "ENV DATA_DIR=/data",
+    "ENV SHELF_DATA_DIR=/data",
     `CMD ["node", "${entry}"]`,
   ];
 }
@@ -35,9 +35,9 @@ const COMPOSE_BASE_LINES = [
   "      - storyshelf-data:/data",
   "    environment:",
   "      # At least 32 random characters (openssl rand -hex 32): generate once, keep it, reuse it.",
-  "      - SECRET=${SECRET:?set SECRET to at least 32 random characters}",
+  "      - SHELF_SECRET=${SHELF_SECRET:?set SHELF_SECRET to at least 32 random characters}",
   "      - PORT=3000",
-  "      - DATA_DIR=/data",
+  "      - SHELF_DATA_DIR=/data",
 ];
 
 const COMPOSE_TURSO_LINES = [
@@ -80,7 +80,9 @@ export function generateDockerignore(): string {
 /** The password admin's variable: required for a password scaffold (it signs in with it). */
 function authLines(auth: string): string[] {
   return auth === "password"
-    ? ["      - AUTH_PASSWORD=${AUTH_PASSWORD:?set AUTH_PASSWORD (at least 12 characters)}"]
+    ? [
+        "      - SHELF_ADMIN_PASSWORD=${SHELF_ADMIN_PASSWORD:?set SHELF_ADMIN_PASSWORD (at least 12 characters)}",
+      ]
     : [];
 }
 

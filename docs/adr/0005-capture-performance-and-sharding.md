@@ -166,7 +166,7 @@ local engines on one machine: capture runs in a child process of the app.
   handler on the one consumer. The child inserts shard jobs directly, with `testing.retries`.
 - **Child bootstrap:** adapters are live objects, so the child re-runs the user's module graph:
   `testing.workerEntry` when set, otherwise `process.argv[1]` with
-  `STORYSHELF_ROLE=capture-worker` and a role guard above import-time side effects. The child
+  `SHELF_ROLE=capture-worker` and a role guard above import-time side effects. The child
   passes `tables` explicitly. The parent passes `testing.compare.threads` and
   `testing.shardSize` as environment variables (the entry module's own `shardSize` wins).
   Concurrency slots live in the parent; the child runs what it is pushed.

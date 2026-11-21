@@ -10,11 +10,11 @@ function factories() {
 }
 
 describe("storageFromEnv", () => {
-  it("uses S3 with the given endpoint and region when AWS_BUCKET is set", () => {
+  it("uses S3 with the given endpoint and region when SHELF_S3_BUCKET is set", () => {
     const { s3, local, set } = factories();
     const chosen = storageFromEnv(
       {
-        AWS_BUCKET: "demo-bucket",
+        SHELF_S3_BUCKET: "demo-bucket",
         AWS_ENDPOINT_URL_S3: "https://t3.storage.dev/some/path?token=x",
         AWS_REGION: "eu-west-1",
       },
@@ -32,22 +32,38 @@ describe("storageFromEnv", () => {
 
   it("defaults the region to auto, and an unset endpoint to the SDK's own", () => {
     const { s3, set } = factories();
-    const chosen = storageFromEnv({ AWS_BUCKET: "demo-bucket" }, "/data", set);
+    const chosen = storageFromEnv({ SHELF_S3_BUCKET: "demo-bucket" }, "/data", set);
     expect(s3).toHaveBeenCalledWith({ bucket: "demo-bucket", endpoint: undefined, region: "auto" });
     expect(chosen.log).toEqual({ storage: "s3", endpointOrigin: null });
   });
 
-  it("also takes BUCKET_NAME, the name `fly storage create` sets, and prefers AWS_BUCKET", () => {
+  it("never reads the old AWS_BUCKET (boot refuses it instead)", () => {
     const { s3, set } = factories();
-    storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set);
-    storageFromEnv({ AWS_BUCKET: "explicit", BUCKET_NAME: "from-fly" }, "/data", set);
-    expect(s3.mock.calls.map(([options]) => (options as { bucket: string }).bucket)).toEqual([
-      "from-fly",
-      "explicit",
-    ]);
+    expect(storageFromEnv({ AWS_BUCKET: "explicit" }, "/data", set).log).toEqual({
+      storage: "local",
+    });
+    expect(s3).not.toHaveBeenCalled();
   });
 
-  it.each([{}, { AWS_BUCKET: "" }, { BUCKET_NAME: "" }, { AWS_BUCKET: undefined }])(
+  it("uses the BUCKET_NAME that fly storage create injects, unless SHELF_S3_BUCKET names one", () => {
+    const { s3, set } = factories();
+    expect(storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set).log.storage).toBe("s3");
+    expect(s3).toHaveBeenLastCalledWith({
+      bucket: "from-fly",
+      endpoint: undefined,
+      region: "auto",
+    });
+    storageFromEnv({ BUCKET_NAME: "from-fly", SHELF_S3_BUCKET: "own" }, "/data", set);
+    expect(s3).toHaveBeenLastCalledWith({ bucket: "own", endpoint: undefined, region: "auto" });
+    storageFromEnv({ BUCKET_NAME: "from-fly", SHELF_S3_BUCKET: "" }, "/data", set);
+    expect(s3).toHaveBeenLastCalledWith({
+      bucket: "from-fly",
+      endpoint: undefined,
+      region: "auto",
+    });
+  });
+
+  it.each([{}, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: undefined }])(
     "falls back to the volume when no bucket is set (%o)",
     (env) => {
       const { s3, local, set } = factories();
@@ -62,7 +78,7 @@ describe("storageFromEnv", () => {
     const { s3, set } = factories();
     const chosen = storageFromEnv(
       {
-        AWS_BUCKET: "secret-bucket-name",
+        SHELF_S3_BUCKET: "secret-bucket-name",
         AWS_ENDPOINT_URL_S3: "https://t3.storage.dev",
         AWS_ACCESS_KEY_ID: "tid_AKIAEXAMPLE",
         AWS_SECRET_ACCESS_KEY: "tsec_SUPERSECRET",
@@ -77,8 +93,10 @@ describe("storageFromEnv", () => {
   it("builds the real adapters by default", () => {
     expect(storageFromEnv({}, "/tmp/never-created").storage.metadata.kind).toBe("local");
     expect(
-      storageFromEnv({ AWS_BUCKET: "b", AWS_ENDPOINT_URL_S3: "https://t3.storage.dev" }, "/data")
-        .storage.metadata.kind,
+      storageFromEnv(
+        { SHELF_S3_BUCKET: "b", AWS_ENDPOINT_URL_S3: "https://t3.storage.dev" },
+        "/data",
+      ).storage.metadata.kind,
     ).toBe("s3");
   });
 });

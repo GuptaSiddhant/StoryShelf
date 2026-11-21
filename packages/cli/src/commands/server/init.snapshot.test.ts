@@ -95,32 +95,6 @@ const PRESETS: Record<string, Record<string, unknown>> = {
     advancedAdapters: true,
     database: "tidb",
   },
-  "aws minimal": { deployTarget: "aws", auth: "oauth" },
-  "aws full": {
-    deployTarget: "aws",
-    auth: "oauth",
-    git: "git",
-    awsRegion: "eu-west-1",
-    domainName: "shelf.example.com",
-    samlMetadataUrl: "https://idp.example.com/metadata.xml",
-  },
-  "azure minimal": { deployTarget: "azure", auth: "oauth" },
-  "azure full": {
-    deployTarget: "azure",
-    auth: "oauth",
-    azureLocation: "westeurope",
-    domainName: "shelf.example.com",
-    entraTenantId: "11111111-2222-3333-4444-555555555555",
-  },
-  "gcp minimal": { deployTarget: "gcp", auth: "oauth", gcpProjectId: "my-gcp-project" },
-  "gcp full": {
-    deployTarget: "gcp",
-    auth: "oauth",
-    gcpProjectId: "my-gcp-project",
-    gcpLocation: "europe-west1",
-    domainName: "shelf.example.com",
-    identityTenant: "tenant-1",
-  },
 };
 
 let tmpRoot = "";

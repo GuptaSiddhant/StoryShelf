@@ -139,7 +139,7 @@ Rules:
 
 - **Settled signalling and `.test()` runs (`settle.integration.test.ts` in the Playwright runner):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do.
 
-- **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `STORYSHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook, the read-only demo account) tested in Chromium against the production image the Fly dry run already boots. It adds no server of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SECRET`, a confirmed `PUBLIC_BASE_URL`, `SHELF_READ_ONLY_ACCOUNTS` and a throwaway `SHELF_DEMO_VIEWER_PASSWORD`; the seed (`seed.sh`) seeds no demo project (#1275), so the spec creates its own with the admin token, uploads a baseline `main` build of the built `storybook-9` fixture and approves it, adds a `git-log` channel and uploads a feature-branch copy with one story repainted by a CSS patch (workspace CLI); waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/server.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in user; signs in as `demo@storyshelf.js.org`, sees `storyshelf-ui` but not the spec's project, and gets 403 on a profile and a comment write; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
+- **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `SHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook, the read-only demo account) tested in Chromium against the production image the Fly dry run already boots. It adds no server of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SHELF_SECRET`, a confirmed `SHELF_PUBLIC_BASE_URL`, `SHELF_READ_ONLY_ACCOUNTS` and a throwaway `SHELF_DEMO_VIEWER_PASSWORD`; the seed (`seed.sh`) seeds no demo project (#1275), so the spec creates its own with the admin token, uploads a baseline `main` build of the built `storybook-9` fixture and approves it, adds a `git-log` channel and uploads a feature-branch copy with one story repainted by a CSS patch (workspace CLI); waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/server.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in user; signs in as `demo@storyshelf.js.org`, sees `storyshelf-ui` but not the spec's project, and gets 403 on a profile and a comment write; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
 
   | Trigger                         | Fly dry run               | Browser step (`e2e`)                                        |
   | ------------------------------- | ------------------------- | ----------------------------------------------------------- |
@@ -155,10 +155,10 @@ Rules:
   nubx turbo build --filter=storyshelf
   (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
   docker build -f apps/fly-app/Dockerfile -t storyshelf-fly .
-  docker run -d --name storyshelf -p 3000:3000 -e STORYSHELF_ADMIN_TOKEN=ci-admin-token \
-    -e SECRET=e2e-secret-that-is-long-enough-1234567890 -e AUTH_EMAIL=reviewer@example.com \
-    -e AUTH_PASSWORD=e2e-password-123 -e PUBLIC_BASE_URL=http://127.0.0.1:3000 storyshelf-fly
-  export STORYSHELF_URL=http://127.0.0.1:3000 STORYSHELF_ADMIN_TOKEN=ci-admin-token
+  docker run -d --name storyshelf -p 3000:3000 -e SHELF_ADMIN_TOKEN=ci-admin-token \
+    -e SHELF_SECRET=e2e-secret-that-is-long-enough-1234567890 -e SHELF_ADMIN_EMAIL=reviewer@example.com \
+    -e SHELF_ADMIN_PASSWORD=e2e-password-123 -e SHELF_PUBLIC_BASE_URL=http://127.0.0.1:3000 storyshelf-fly
+  export SHELF_URL=http://127.0.0.1:3000 SHELF_ADMIN_TOKEN=ci-admin-token
   apps/fly-app/seed.sh                                  # then wait until the demo builds settle
   npx -y playwright@1.63.0 install chromium             # one-time
   (cd apps/fly-app && E2E_EMAIL=reviewer@example.com E2E_PASSWORD=e2e-password-123 nub run test:e2e)
@@ -202,7 +202,7 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
-- **Terraform scaffolds:** `packages/cli/src/commands/server/terraform-*.integration.test.ts` run `terraform fmt`, `init` and `validate`; `init` downloads providers, so they are gated behind `RUN_TERRAFORM=1` (not `RUN_INTEGRATION`, which would switch on the browser suites). With the gate set and no `terraform` binary the suites fail; without it they skip even when Terraform is installed. CI's `verify` job sets it next to `setup-terraform`, and `turbo.json` lists it as a `test` env so the cache key includes it.
+- **Terraform modules:** the CLI no longer generates Terraform (`server init --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
@@ -237,31 +237,31 @@ Strictly real providers — no injected fake clients, no emulators. Hermetic
 and construct adapters inside `beforeAll`, so skipped runs don't even read
 cloud env vars. Live results must never come from the turbo cache — always
 run with `--force`. Manual dispatch only, per provider (the nightly schedules
-are deferred until secrets exist and the AWS scaffold is fixed; see #410):
+are deferred until secrets exist; see #410):
 
 - `.github/workflows/live-cloud-aws.yml` — S3
 - `.github/workflows/live-cloud-azure.yml` — Blob
 - `.github/workflows/live-cloud-gcp.yml` — GCS
 - `.github/workflows/live-cloud-ancillary.yml` — Turso + Postgres + MySQL + OAuth + GitHub + GitLab (matrix `db`/`auth`/`git`; long-lived resources, no scaffold)
 
-Each workflow also validates its terraform scaffold generator (`fmt` +
-`init -backend=false` + `validate`, mirroring the CLI's
-`terraform-*.integration.test.ts`). Scaffold output keys are a frozen
-contract pinned by `terraform-*.test.ts` — renames break CI.
+The Terraform modules under `deploy/terraform/` are checked by the deploy checks in `ci.yml`
+(`fmt`, `validate`, `tflint`). Each workflow's `module-apply` job applies the module's
+`examples/minimal` (see the module README, "Checks"); it stays off until its repository variable
+is `1`.
 
 ### Output → env map
 
-| Target | Terraform output                 | Env / secret                        |
-| ------ | -------------------------------- | ----------------------------------- |
-| AWS    | `s3_bucket`                      | `S3_BUCKET` (+ `AWS_REGION`)        |
-| AWS    | `db_endpoint`                    | `DATABASE_URL` (`?sslmode=require`) |
-| AWS    | `user_pool_id` / `app_client_id` | `COGNITO_*` / `OIDC_*` (phase 4)    |
-| Azure  | `storage_connection_string`      | `AZURE_STORAGE_CONNECTION`          |
-| Azure  | (container, pre-provisioned)     | `LIVE_AZURE_CONTAINER`              |
-| Azure  | `database_url`                   | `DATABASE_URL` (phase 4)            |
-| GCP    | `gcs_bucket`                     | `LIVE_GCS_BUCKET`                   |
-| GCP    | (project)                        | `GCP_PROJECT_ID`                    |
-| GCP    | (service-account key JSON)       | `GCP_SERVICE_ACCOUNT_JSON`          |
+| Target | Terraform output                 | Env / secret                           |
+| ------ | -------------------------------- | -------------------------------------- |
+| AWS    | `s3_bucket`                      | `SHELF_S3_BUCKET` (+ `AWS_REGION`)     |
+| AWS    | `db_endpoint`                    | `DATABASE_URL` (`?sslmode=require`)    |
+| AWS    | `user_pool_id` / `app_client_id` | `COGNITO_*` / `SHELF_OIDC_*` (phase 4) |
+| Azure  | `storage_connection_string`      | `SHELF_AZURE_CONNECTION_STRING`        |
+| Azure  | (container, pre-provisioned)     | `LIVE_AZURE_CONTAINER`                 |
+| Azure  | `database_url`                   | `DATABASE_URL` (phase 4)               |
+| GCP    | `gcs_bucket`                     | `LIVE_GCS_BUCKET`                      |
+| GCP    | (project)                        | `GCP_PROJECT_ID`                       |
+| GCP    | (service-account key JSON)       | `GCP_SERVICE_ACCOUNT_JSON`             |
 
 AWS creds come from the standard SDK chain (`AWS_ACCESS_KEY_ID` /
 `AWS_SECRET_ACCESS_KEY` or an IAM role). GCP creds come from ADC
@@ -270,13 +270,17 @@ in CI).
 
 ### Manual runbook (follow these steps later)
 
-1. **Provision** (per target, one-time): `storyshelf server init --target
-<aws|azure|gcp>`, then under the generated `terraform/`:
+1. **Provision** (per target, one-time): `storyshelf server init --cloud
+<aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`). The stub and `examples/minimal`
+   output only `url` (and `service_name`). For the storage name in the table below, first add a
+   root output that forwards the module's, such as
+   `output "gcs_bucket" { value = module.storyshelf.gcs_bucket }` (GCP) or `s3_bucket` (AWS), so it
+   is in the state the apply writes. Then, in that directory:
    ```sh
    terraform init
-   terraform plan -var "project=shelf-manual-<name>" -out=tfplan  # review!
+   terraform plan -var "name=shelf-manual-<name>" -out=tfplan  # review!
    terraform apply tfplan
-   terraform output -json   # or: npm run infra:outputs
+   terraform output -json
    ```
    Use a personal `shelf-manual-<name>` prefix so parallel runs never share
    resources. Prefer serverless/cheap engines (AWS DSQL, Cloud SQL `f1-micro`).
@@ -285,30 +289,30 @@ in CI).
 3. **Run** (from the repo root, or per package):
    ```sh
    export PATH="$HOME/.nub/bin:$PATH"
-   LIVE_CLOUD=1 S3_BUCKET=... \
+   LIVE_CLOUD=1 SHELF_S3_BUCKET=... \
      nubx turbo test --filter='@storyshelf/storage-s3' --force
    ```
-   Per-package equivalent: `cd packages/storage-s3 && LIVE_CLOUD=1 S3_BUCKET=... ./node_modules/.bin/vitest run`.
+   Per-package equivalent: `cd packages/storage-s3 && LIVE_CLOUD=1 SHELF_S3_BUCKET=... ./node_modules/.bin/vitest run`.
 4. **Teardown:** suites delete their own keys/messages (unique
    `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
    infrastructure is yours — `terraform destroy -var
-"project=shelf-manual-<name>" -auto-approve` when done.
+"name=shelf-manual-<name>" -auto-approve` when done.
 5. **Costs:** live suites are a handful of API calls; the spend is idle
    infrastructure (RDS, Cloud SQL, Postgres Flexible Server). Destroy promptly.
 
 ### Phase 4 (ancillary: `.github/workflows/live-cloud-ancillary.yml`)
 
-No terraform scaffold covers these — resources are long-lived and shared,
+No terraform module covers these — resources are long-lived and shared,
 isolation is per-run. Matrix legs: `db`, `auth`, `git` (nightly +
 manual dispatch, `--force` so results never come from cache).
 
-| Suite    | Resource to provision (one-time, manual)                                                                                      | Env                                                                                      |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Turso    | Turso database (`turso db create shelf-live-test`)                                                                            | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN`                                  |
-| Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler)                           | `DATABASE_URL` (`?sslmode=require` for managed)                                          |
-| OAuth    | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL`               |
-| GitHub   | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable)                                          | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA`                          |
-| GitLab   | Test project + token with `api` scope; reserve a throwaway SHA                                                                | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST` |
+| Suite    | Resource to provision (one-time, manual)                                                                                      | Env                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Turso    | Turso database (`turso db create shelf-live-test`)                                                                            | `TURSO_DATABASE_URL` (`libsql://…`), `TURSO_AUTH_TOKEN`                                      |
+| Postgres | Any wire-compatible DB (Neon/Supabase free tier is enough; use a direct connection, not the pooler)                           | `DATABASE_URL` (`?sslmode=require` for managed)                                              |
+| OAuth    | OIDC app with a redirect URL (Auth0 free tenant; Keycloak/Entra/Okta/Cognito work too) — discovery-only, no interactive login | `SHELF_OIDC_ISSUER`, `SHELF_OIDC_CLIENT_ID`, `SHELF_OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` |
+| GitHub   | Test repo + PAT with `repo:status`; reserve a throwaway SHA (statuses are immutable)                                          | `LIVE_GH_TOKEN`, `LIVE_GH_OWNER`, `LIVE_GH_REPO`, `LIVE_GH_SHA`                              |
+| GitLab   | Test project + token with `api` scope; reserve a throwaway SHA                                                                | `LIVE_GL_TOKEN`, `LIVE_GL_OWNER`, `LIVE_GL_REPO`, `LIVE_GL_SHA`, optional `LIVE_GL_HOST`     |
 
 Isolation: unique row ids/slugs (DBs, removed afterwards), unique status contexts (`storyshelf/live-<run-id>`).
 Suites gate on their own env (`skipIf`), so a leg exercises exactly the

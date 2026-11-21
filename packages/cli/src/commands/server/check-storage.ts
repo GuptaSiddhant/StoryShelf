@@ -1,5 +1,6 @@
 import { createClient } from "../../client.ts";
 import { printLine } from "../../output.ts";
+import { readSetting } from "../../settings.ts";
 
 interface CheckStorageResponse {
   buildsChecked: number;
@@ -24,8 +25,7 @@ export interface ServerCheckStorageOptions {
  * exit code when a blob or baseline image is missing or a manifest is unreadable.
  */
 export async function runServerCheckStorage(options: ServerCheckStorageOptions): Promise<void> {
-  const token =
-    options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
+  const token = options.token ?? readSetting(process.env, "SHELF_ADMIN_TOKEN");
   const client = createClient(options.url, token);
   const sample = options.sample;
   const report = (await client.projects.admin.checkStorage(

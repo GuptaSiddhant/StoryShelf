@@ -31,8 +31,8 @@ describe("telemetryRow", () => {
     expect(JSON.stringify(row)).not.toMatch(/topsecret|pw|abc|v1\/traces/u);
   });
 
-  it("honours STORYSHELF_OTEL_ENABLED without an endpoint", () => {
-    const row = telemetryRow({ STORYSHELF_OTEL_ENABLED: "true" });
+  it("honours SHELF_OTEL_ENABLED without an endpoint", () => {
+    const row = telemetryRow({ SHELF_OTEL_ENABLED: "true" });
     expect(row.value).toBe("on");
     expect(row.detail).toBe("exporter host not set");
   });

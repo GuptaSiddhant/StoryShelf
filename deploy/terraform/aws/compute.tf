@@ -1,0 +1,281 @@
+# ECS Fargate: one service of identical copies behind the load balancer. Every copy serves the app
+# and consumes the capture queue in the database, and renders in the container (the image ships
+# Chromium). The module deploys the published image and never builds one.
+locals {
+  public_base_url = var.domain_name == "" ? "http://${aws_lb.main.dns_name}" : "https://${var.domain_name}"
+  image           = "${var.image_repository}:${var.image_version}"
+
+  # The task is stopped after the grace plus a margin for the process to exit; the load balancer
+  # keeps the target draining for the grace, so no request lands on a copy that is shutting down.
+  stop_timeout = var.shutdown_grace_seconds + 10
+
+  database_environment = local.create_database ? [
+    { name = "SHELF_DATABASE_IAM_HOST", value = aws_db_instance.main[0].address },
+    { name = "SHELF_DATABASE_IAM_USER", value = local.database_user },
+    { name = "SHELF_DATABASE_IAM_NAME", value = local.database_name },
+    { name = "SHELF_DATABASE_IAM_REGION", value = var.region },
+  ] : []
+
+  database_secrets = local.create_database ? [] : [
+    { name = "DATABASE_URL", valueFrom = var.existing_database_url_secret_arn },
+  ]
+
+  # The master secret is JSON ({"username","password"}); ECS picks one key per reference.
+  oidc_secrets = var.enable_cognito ? [
+    { name = "SHELF_OIDC_CLIENT_SECRET", valueFrom = aws_secretsmanager_secret.oidc_client_secret[0].arn },
+  ] : []
+
+  db_init_secrets = local.create_database ? [
+    { name = "PGUSER", valueFrom = "${aws_db_instance.main[0].master_user_secret[0].secret_arn}:username::" },
+    { name = "PGPASSWORD", valueFrom = "${aws_db_instance.main[0].master_user_secret[0].secret_arn}:password::" },
+  ] : []
+
+  # Idempotent: runs on every task start, as the master user, over TLS. RDS cannot grant rds_iam
+  # itself, so without this every task would fail at database setup and ECS would restart it forever.
+  db_init_script = <<-EOT
+    set -e
+    psql -v ON_ERROR_STOP=1 -v app_user=${local.database_user} -v app_db=${local.database_name} <<'SQL'
+    SELECT format('CREATE ROLE %I LOGIN', :'app_user') WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'app_user') \gexec
+    SELECT format('GRANT rds_iam TO %I', :'app_user') \gexec
+    SELECT format('GRANT ALL ON DATABASE %I TO %I', :'app_db', :'app_user') \gexec
+    SELECT format('GRANT ALL ON SCHEMA public TO %I', :'app_user') \gexec
+    SQL
+  EOT
+
+  db_init_container = local.create_database ? [{
+    name      = "db-init"
+    image     = var.database_init_image
+    essential = false
+    command   = ["sh", "-c", local.db_init_script]
+    environment = [
+      { name = "PGHOST", value = aws_db_instance.main[0].address },
+      { name = "PGDATABASE", value = local.database_name },
+      { name = "PGSSLMODE", value = "require" },
+    ]
+    secrets = local.db_init_secrets
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "db-init"
+      }
+    }
+  }] : []
+
+  # Git connections (ADR 0054): each is on only when its reference is set. The key and the token
+  # reach the task as secret references (the execution role reads them), never as plain values.
+  git_environment = concat(
+    var.github_app_id == "" ? [] : [{ name = "SHELF_GITHUB_APP_ID", value = var.github_app_id }],
+    var.github_api_url == "" ? [] : [{ name = "SHELF_GITHUB_API_URL", value = var.github_api_url }],
+    var.gitlab_token_expires == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN_EXPIRES", value = var.gitlab_token_expires }],
+    var.gitlab_host == "" ? [] : [{ name = "SHELF_GITLAB_HOST", value = var.gitlab_host }],
+  )
+
+  git_secrets = concat(
+    var.github_app_private_key_secret_arn == "" ? [] : [{ name = "SHELF_GITHUB_APP_PRIVATE_KEY", valueFrom = var.github_app_private_key_secret_arn }],
+    var.gitlab_token_secret_arn == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN", valueFrom = var.gitlab_token_secret_arn }],
+  )
+}
+
+resource "aws_lb" "main" {
+  name                       = "${var.name}-alb"
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.alb.id]
+  subnets                    = local.public_subnet_ids
+  drop_invalid_header_fields = true
+
+  tags = var.tags
+
+  lifecycle {
+    precondition {
+      condition     = var.domain_name != "" || var.allow_http
+      error_message = "Set domain_name to serve HTTPS, or set allow_http = true to accept plain HTTP for a throwaway stack."
+    }
+  }
+}
+
+resource "aws_lb_target_group" "app" {
+  name                 = "${var.name}-app"
+  port                 = 3000
+  protocol             = "HTTP"
+  target_type          = "ip"
+  vpc_id               = local.vpc_id
+  deregistration_delay = var.shutdown_grace_seconds
+
+  health_check {
+    path    = "/api/v1/health"
+    matcher = "200"
+  }
+
+  tags = var.tags
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  dynamic "default_action" {
+    for_each = var.domain_name == "" ? [1] : []
+
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.app.arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.domain_name == "" ? [] : [1]
+
+    content {
+      type = "redirect"
+
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "aws_lb_listener" "https" {
+  count             = var.domain_name == "" ? 0 : 1
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+
+  tags = var.tags
+}
+
+resource "aws_ecs_cluster" "main" {
+  name = "${var.name}-cluster"
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "app" {
+  name              = "/ecs/${var.name}-app"
+  retention_in_days = var.log_retention_days
+
+  tags = var.tags
+}
+
+resource "aws_ecs_task_definition" "app" {
+  family                   = "${var.name}-app"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode(concat(local.db_init_container, [{
+    name         = "app"
+    image        = local.image
+    essential    = true
+    dependsOn    = local.create_database ? [{ containerName = "db-init", condition = "SUCCESS" }] : []
+    stopTimeout  = local.stop_timeout
+    portMappings = [{ containerPort = 3000, protocol = "tcp" }]
+    environment = concat([
+      { name = "SHELF_S3_BUCKET", value = aws_s3_bucket.storybook.id },
+      { name = "AWS_REGION", value = var.region },
+      { name = "SHELF_PUBLIC_BASE_URL", value = local.public_base_url },
+      { name = "SHELF_TRUST_PROXY", value = "1" },
+      { name = "SHELF_SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
+      { name = "SHELF_DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
+      { name = "SHELF_ADMIN_EMAIL", value = var.admin_email },
+    ], local.database_environment, local.git_environment)
+    secrets = concat([
+      { name = "SHELF_SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
+      { name = "SHELF_ADMIN_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
+      { name = "SHELF_ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
+    ], local.oidc_secrets, local.database_secrets, local.git_secrets)
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.app.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "app"
+      }
+    }
+  }]))
+
+  tags = var.tags
+}
+
+resource "aws_ecs_service" "app" {
+  name            = "${var.name}-app"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = var.min_instances
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = local.public_subnet_ids
+    security_groups  = [aws_security_group.app.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "app"
+    container_port   = 3000
+  }
+
+  # Autoscaling owns the count once it exists.
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
+  # The target group must be on a listener, and the secrets must have values, before the first
+  # task starts (a task cannot fetch a secret that has no version).
+  depends_on = [
+    aws_lb_listener.http,
+    aws_lb_listener.https,
+    aws_secretsmanager_secret_version.shelf_secret,
+    aws_secretsmanager_secret_version.auth_password,
+    aws_secretsmanager_secret_version.oidc_client_secret,
+    aws_db_instance.main,
+    aws_secretsmanager_secret_version.admin_token,
+    aws_iam_role_policy.task,
+    aws_iam_role_policy.execution_secrets,
+  ]
+
+  tags = var.tags
+}
+
+# Identical copies between min_instances and max_instances, scaled on CPU.
+resource "aws_appautoscaling_target" "app" {
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.min_instances
+  max_capacity       = max(var.min_instances, var.max_instances)
+}
+
+resource "aws_appautoscaling_policy" "cpu" {
+  name               = "${var.name}-cpu"
+  policy_type        = "TargetTrackingScaling"
+  service_namespace  = aws_appautoscaling_target.app.service_namespace
+  resource_id        = aws_appautoscaling_target.app.resource_id
+  scalable_dimension = aws_appautoscaling_target.app.scalable_dimension
+
+  target_tracking_scaling_policy_configuration {
+    target_value = 60
+
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+  }
+}

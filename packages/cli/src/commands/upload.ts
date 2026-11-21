@@ -29,6 +29,7 @@ import {
   type Reporter,
   setHumanOutputToStderr,
 } from "../output.ts";
+import { readSetting } from "../settings.ts";
 import {
   HashRoutesMissingError,
   isOverInlineLimit,
@@ -260,8 +261,8 @@ function collectUploadOptions(
   const identity = resolveIdentity(cwd, options);
   return {
     url: resolveServerUrl(options, cfg),
-    slug: options.slug ?? cfg?.slug ?? envOf("STORYSHELF_SLUG"),
-    token: options.token ?? envOf("STORYSHELF_TOKEN", "SHELF_TOKEN"),
+    slug: options.slug ?? cfg?.slug ?? readSetting(process.env, "SHELF_SLUG"),
+    token: options.token ?? readSetting(process.env, "SHELF_TOKEN"),
     sha: identity.sha,
     branch: identity.branch,
     synthesized: identity.synthesized,
@@ -278,13 +279,13 @@ function collectUploadOptions(
     buildStats: resolveBuildStats(options, cfg),
     untraced: mergeUntraced(cfg?.untraced, options.untraced),
     statsFile: options.statsFile,
-    zip: options.zip === true || envOf("STORYSHELF_ZIP") === "1",
+    zip: options.zip === true || readSetting(process.env, "SHELF_ZIP") === "1",
   };
 }
 
 /** The server URL from flag, config file or env, without a trailing slash. */
 function resolveServerUrl(options: UploadOptions, cfg: StorybookConfig | null): string | undefined {
-  const url = options.url ?? cfg?.url ?? envOf("STORYSHELF_URL");
+  const url = options.url ?? cfg?.url ?? readSetting(process.env, "SHELF_URL");
   return url === undefined ? undefined : normalizeBaseUrl(url);
 }
 
@@ -298,22 +299,22 @@ function mergeUntraced(configured: string[] | undefined, flagged: string[] | und
   return [...new Set([...(configured ?? []), ...(flagged ?? [])])];
 }
 
-/** Affected capture is on by default; `--full` (or `STORYSHELF_FULL=1`) opts out. */
+/** Affected capture is on by default; `--full` (or `SHELF_FULL=1`) opts out. */
 function resolveAffectedOnly(options: UploadOptions, cfg: StorybookConfig | null): boolean {
-  if (options.full === true || envOf("STORYSHELF_FULL") === "1") {
+  if (options.full === true || readSetting(process.env, "SHELF_FULL") === "1") {
     return false;
   }
   return options.affectedOnly ?? cfg?.affectedOnly ?? true;
 }
 
-/** Skipping is opt-in (flag, `STORYSHELF_SKIP_UNCHANGED=1` or config); `--full` always wins. */
+/** Skipping is opt-in (flag, `SHELF_SKIP_UNCHANGED=1` or config); `--full` always wins. */
 function resolveSkipUnchanged(options: UploadOptions, cfg: StorybookConfig | null): boolean {
   if (!resolveAffectedOnly(options, cfg)) {
     return false;
   }
   return (
     options.skipUnchanged ??
-    (envOf("STORYSHELF_SKIP_UNCHANGED") === "1" || cfg?.skipUnchanged) ??
+    (readSetting(process.env, "SHELF_SKIP_UNCHANGED") === "1" || cfg?.skipUnchanged) ??
     false
   );
 }
@@ -323,13 +324,13 @@ function assertUploadOptions(
   collected: CollectedUploadOptions,
 ): asserts collected is ResolvedUploadOptions {
   if (!collected.url) {
-    throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");
+    throw new Error("--url is required (or .storybook/storyshelf.json / SHELF_URL)");
   }
   if (!collected.slug) {
-    throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");
+    throw new Error("--slug is required (or .storybook/storyshelf.json / SHELF_SLUG)");
   }
   if (!collected.token) {
-    throw new Error("--token is required (or STORYSHELF_TOKEN env)");
+    throw new Error("--token is required (or SHELF_TOKEN env)");
   }
 }
 

@@ -1,12 +1,21 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import {
+  readS3Bucket,
+  readSetting,
+  RenamedSettingError,
+  type SettingName,
+} from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
+import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db-postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { azurePlaywright } from "@storyshelf/runner/remote";
+import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
+import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
 import { readFileSync } from "node:fs";
@@ -30,33 +39,39 @@ export function nonEmpty(value: string | undefined): string | undefined {
 /** The adapter constructors, replaceable so a test can see what they were given. */
 export interface Factories {
   sqlite(path: string): DatabaseAdapter;
-  postgres(url: string, ca?: string): DatabaseAdapter;
+  postgres(url: string, ca?: string, max?: number): DatabaseAdapter;
+  rdsIam(options: RdsIamDatabaseOptions): DatabaseAdapter;
   mysql(url: string, ca?: string): DatabaseAdapter;
   s3(options: S3StorageOptions): StorageAdapter;
+  gcs(options: GcsStorageOptions): StorageAdapter;
+  azure(options: AzureStorageOptions): StorageAdapter;
   local(dataDir: string): StorageAdapter;
 }
 
 const DEFAULTS: Factories = {
   sqlite: createSqliteDatabase,
-  postgres: (url, ca) =>
-    createPostgresDatabase({ url, ...(ca === undefined ? {} : { ssl: { ca } }) }),
+  postgres: (url, ca, max) =>
+    createPostgresDatabase({ url, max, ...(ca === undefined ? {} : { ssl: { ca } }) }),
+  rdsIam: createRdsIamDatabase,
   mysql: (url, ca) => createMysqlDatabase({ url, ...(ca === undefined ? {} : { ssl: { ca } }) }),
   s3: createS3Storage,
+  gcs: createGcsStorage,
+  azure: createAzureStorage,
   local: createLocalStorage,
 };
 
 /**
- * The CA that signs the database's certificate: `DATABASE_CA` (PEM text) or `DATABASE_CA_FILE` (a path).
+ * The CA that signs the database's certificate: `SHELF_DATABASE_CA` (PEM text) or `SHELF_DATABASE_CA_FILE` (a path).
  * Both set is refused. Errors name the variable, never the contents or the URL.
  */
 export function databaseCaFromEnv(
   env: Env,
   readFile: (path: string) => string = (path) => readFileSync(path, "utf8"),
 ): string | undefined {
-  const pem = nonEmpty(env["DATABASE_CA"]);
-  const file = nonEmpty(env["DATABASE_CA_FILE"]);
+  const pem = nonEmpty(readSetting(env, "SHELF_DATABASE_CA"));
+  const file = nonEmpty(readSetting(env, "SHELF_DATABASE_CA_FILE"));
   if (pem !== undefined && file !== undefined) {
-    throw new BootRefusal("Set only one of DATABASE_CA and DATABASE_CA_FILE");
+    throw new BootRefusal("Set only one of SHELF_DATABASE_CA and SHELF_DATABASE_CA_FILE");
   }
   return file === undefined ? pem : readCaFile(file, readFile);
 }
@@ -67,10 +82,10 @@ function readCaFile(path: string, readFile: (path: string) => string): string {
   try {
     text = readFile(path);
   } catch {
-    throw new BootRefusal("DATABASE_CA_FILE could not be read");
+    throw new BootRefusal("SHELF_DATABASE_CA_FILE could not be read");
   }
   if (text.trim() === "") {
-    throw new BootRefusal("DATABASE_CA_FILE is empty");
+    throw new BootRefusal("SHELF_DATABASE_CA_FILE is empty");
   }
   return text;
 }
@@ -85,19 +100,96 @@ export function unverifiedDatabaseTls(env: Env): boolean {
   return unverified && databaseCaFromEnv(env, () => "x") === undefined;
 }
 
-/** Which database `DATABASE_URL` names: a Postgres or MySQL URL, else SQLite on the data volume. */
-export function databaseFromEnv(
+/** A positive whole number from the environment, or undefined when unset; a bad value refuses to boot. */
+function positiveIntFromEnv(
   env: Env,
-  dataDir: string,
-  factories: Factories = DEFAULTS,
-): { database: DatabaseAdapter; log: { database: string } } {
-  const url = nonEmpty(env["DATABASE_URL"]);
-  if (url === undefined) {
-    return { database: factories.sqlite(`${dataDir}/shelf.db`), log: { database: "sqlite" } };
+  name: SettingName,
+  max = Number.MAX_SAFE_INTEGER,
+): number | undefined {
+  const raw = nonEmpty(readSetting(env, name));
+  if (raw === undefined) {
+    return undefined;
   }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > max) {
+    throw new Error(
+      `${name} must be a positive whole number${max === Number.MAX_SAFE_INTEGER ? "" : ` up to ${max}`}`,
+    );
+  }
+  return value;
+}
+
+/** `SHELF_DATABASE_POOL_MAX` as a positive whole number, or undefined when unset. */
+export function poolMaxFromEnv(env: Env): number | undefined {
+  return positiveIntFromEnv(env, "SHELF_DATABASE_POOL_MAX");
+}
+
+/** The variables of an RDS IAM login; any one of them non-empty puts the server in IAM mode. */
+const IAM_VARIABLES = [
+  "SHELF_DATABASE_IAM_HOST",
+  "SHELF_DATABASE_IAM_USER",
+  "SHELF_DATABASE_IAM_NAME",
+  "SHELF_DATABASE_IAM_REGION",
+  "SHELF_DATABASE_IAM_PORT",
+] as const;
+
+/** The IAM login the environment describes; `region` may come from `AWS_REGION`. */
+function rdsIamOptions(env: Env): RdsIamDatabaseOptions {
+  const host = nonEmpty(readSetting(env, "SHELF_DATABASE_IAM_HOST"));
+  const user = nonEmpty(readSetting(env, "SHELF_DATABASE_IAM_USER"));
+  const database = nonEmpty(readSetting(env, "SHELF_DATABASE_IAM_NAME"));
+  const region =
+    nonEmpty(readSetting(env, "SHELF_DATABASE_IAM_REGION")) ?? nonEmpty(env["AWS_REGION"]);
+  const missing = [
+    host === undefined ? "SHELF_DATABASE_IAM_HOST" : undefined,
+    user === undefined ? "SHELF_DATABASE_IAM_USER" : undefined,
+    database === undefined ? "SHELF_DATABASE_IAM_NAME" : undefined,
+    region === undefined ? "SHELF_DATABASE_IAM_REGION (or AWS_REGION)" : undefined,
+  ].filter((name) => name !== undefined);
+  if (host === undefined || user === undefined || database === undefined || region === undefined) {
+    throw new Error(`RDS IAM login is configured but ${missing.join(", ")} is missing`);
+  }
+  const port = positiveIntFromEnv(env, "SHELF_DATABASE_IAM_PORT", 65_535);
+  // The server certificate is always verified: the bundled RDS roots, or `SHELF_DATABASE_CA` when set.
+  const ca = databaseCaFromEnv(env);
+  return {
+    host,
+    user,
+    database,
+    region,
+    ...(port === undefined ? {} : { port }),
+    ...(ca === undefined ? {} : { ca }),
+  };
+}
+
+/** The RDS IAM database the `SHELF_DATABASE_IAM_*` variables describe; never combined with `DATABASE_URL`, never a fallback. */
+function rdsIamFromEnv(
+  env: Env,
+  factories: Factories,
+): { database: DatabaseAdapter; log: { database: string } } {
+  if (nonEmpty(env["DATABASE_URL"]) !== undefined) {
+    throw new Error("Set the SHELF_DATABASE_IAM_* variables or DATABASE_URL, not both");
+  }
+  const options = rdsIamOptions(env);
+  const max = poolMaxFromEnv(env);
+  return {
+    database: factories.rdsIam(max === undefined ? options : { ...options, max }),
+    log: { database: "postgres-rds-iam" },
+  };
+}
+
+/** The database a `DATABASE_URL` names, by scheme. Only the scheme is ever reported: a URL carries the password. */
+function urlDatabase(
+  env: Env,
+  url: string,
+  factories: Factories,
+): { database: DatabaseAdapter; log: { database: string } } {
   const ca = databaseCaFromEnv(env);
   if (/^postgres(ql)?:\/\//u.test(url)) {
-    return { database: factories.postgres(url, ca), log: { database: "postgres" } };
+    return {
+      database: factories.postgres(url, ca, poolMaxFromEnv(env)),
+      log: { database: "postgres" },
+    };
   }
   if (url.startsWith("mysql://")) {
     return { database: factories.mysql(url, ca), log: { database: "mysql" } };
@@ -106,13 +198,98 @@ export function databaseFromEnv(
   throw new BootRefusal("DATABASE_URL must start with postgres://, postgresql:// or mysql://");
 }
 
-/** S3-compatible storage when `AWS_BUCKET` is set, else the data volume. Credentials come from the SDK chain. */
-export function storageFromEnv(
+/**
+ * Which database the environment names. any `SHELF_DATABASE_IAM_*` variable selects an RDS or Aurora Postgres
+ * with short-lived IAM tokens (the `rds-iam` preset); it never falls back to anything else, so an
+ * incomplete configuration, or one that also sets `DATABASE_URL`, refuses to boot. Otherwise
+ * `DATABASE_URL` names a Postgres or MySQL database, and with neither it is SQLite on the volume.
+ */
+export function databaseFromEnv(
   env: Env,
   dataDir: string,
   factories: Factories = DEFAULTS,
-): { storage: StorageAdapter; log: { storage: "local" | "s3"; endpointOrigin?: string | null } } {
-  const bucket = nonEmpty(env["AWS_BUCKET"]);
+): { database: DatabaseAdapter; log: { database: string } } {
+  if (IAM_VARIABLES.some((name) => nonEmpty(readSetting(env, name)) !== undefined)) {
+    return rdsIamFromEnv(env, factories);
+  }
+  const url = nonEmpty(env["DATABASE_URL"]);
+  if (url === undefined) {
+    return { database: factories.sqlite(`${dataDir}/shelf.db`), log: { database: "sqlite" } };
+  }
+  return urlDatabase(env, url, factories);
+}
+
+/** Which storage the image chose, and what it may log (never a key, a SAS token or a connection string). */
+export interface StorageChoice {
+  storage: StorageAdapter;
+  log: {
+    storage: "local" | "s3" | "gcs" | "azure";
+    endpointOrigin?: string | null;
+    auth?: "managed-identity" | "connection-string";
+  };
+}
+
+/** The storage variables, one set per backend; setting more than one backend refuses to boot. */
+const STORAGE_SELECTORS = [
+  ["SHELF_GCS_BUCKET", "GCS"],
+  ["SHELF_AZURE_ACCOUNT", "Azure Blob"],
+  ["SHELF_AZURE_CONNECTION_STRING", "Azure Blob"],
+] as const;
+
+/** Refuses a second backend: the first match would silently win and hide a misconfiguration. */
+function assertOneStorage(env: Env): void {
+  const chosen = new Set(
+    STORAGE_SELECTORS.filter(([name]) => nonEmpty(readSetting(env, name)) !== undefined).map(
+      ([, kind]) => kind as string,
+    ),
+  );
+  if (readS3Bucket(env) !== undefined) {
+    chosen.add("S3");
+  }
+  if (chosen.size > 1) {
+    throw new Error(
+      "Set one storage backend: SHELF_S3_BUCKET, SHELF_GCS_BUCKET, or SHELF_AZURE_ACCOUNT/SHELF_AZURE_CONNECTION_STRING",
+    );
+  }
+}
+
+/** Azure Blob: a connection string when given (other hosts), else the host's managed identity. */
+function azureFromEnv(env: Env, factories: Factories): StorageChoice {
+  const container = nonEmpty(readSetting(env, "SHELF_AZURE_CONTAINER"));
+  const connectionString = nonEmpty(readSetting(env, "SHELF_AZURE_CONNECTION_STRING"));
+  const accountName = nonEmpty(readSetting(env, "SHELF_AZURE_ACCOUNT"));
+  if (container === undefined) {
+    throw new Error("SHELF_AZURE_CONTAINER is unset: Azure Blob storage needs a container name");
+  }
+  if (connectionString !== undefined) {
+    return {
+      storage: factories.azure({ container, connectionString }),
+      log: { storage: "azure", auth: "connection-string" },
+    };
+  }
+  const managedIdentityClientId = nonEmpty(env["AZURE_CLIENT_ID"]);
+  return {
+    storage: factories.azure({
+      container,
+      accountName,
+      ...(managedIdentityClientId === undefined ? {} : { managedIdentityClientId }),
+    }),
+    log: { storage: "azure", auth: "managed-identity" },
+  };
+}
+
+/** Google Cloud Storage from `SHELF_GCS_BUCKET`; the project is optional (Application Default Credentials know it). */
+function gcsFromEnv(env: Env, bucket: string, factories: Factories): StorageChoice {
+  const projectId = nonEmpty(env["GOOGLE_CLOUD_PROJECT"]);
+  return {
+    storage: factories.gcs({ bucket, ...(projectId === undefined ? {} : { projectId }) }),
+    log: { storage: "gcs" },
+  };
+}
+
+/** S3-compatible storage from `SHELF_S3_BUCKET` (or Fly's `BUCKET_NAME`), else the data volume. */
+function s3OrLocalFromEnv(env: Env, dataDir: string, factories: Factories): StorageChoice {
+  const bucket = readS3Bucket(env);
   if (bucket === undefined) {
     return { storage: factories.local(dataDir), log: { storage: "local" } };
   }
@@ -121,6 +298,32 @@ export function storageFromEnv(
     storage: factories.s3({ bucket, endpoint, region: nonEmpty(env["AWS_REGION"]) ?? "auto" }),
     log: { storage: "s3", endpointOrigin: endpoint ? redactUrlForLog(endpoint) : null },
   };
+}
+
+/**
+ * The storage the environment names: S3-compatible with `SHELF_S3_BUCKET`, Google Cloud Storage with
+ * `SHELF_GCS_BUCKET`, Azure Blob with `SHELF_AZURE_ACCOUNT` (managed identity, `AZURE_CLIENT_ID` picks a
+ * user-assigned one) or `SHELF_AZURE_CONNECTION_STRING`, else the data volume. Credentials come from each
+ * SDK's own chain; more than one backend refuses to boot.
+ */
+export function storageFromEnv(
+  env: Env,
+  dataDir: string,
+  factories: Factories = DEFAULTS,
+): StorageChoice {
+  assertOneStorage(env);
+  const gcsBucket = nonEmpty(readSetting(env, "SHELF_GCS_BUCKET"));
+  if (gcsBucket !== undefined) {
+    return gcsFromEnv(env, gcsBucket, factories);
+  }
+  if (
+    STORAGE_SELECTORS.some(
+      ([name, kind]) => kind === "Azure Blob" && nonEmpty(readSetting(env, name)) !== undefined,
+    )
+  ) {
+    return azureFromEnv(env, factories);
+  }
+  return s3OrLocalFromEnv(env, dataDir, factories);
 }
 
 /** Capture is on unless `SHELF_CAPTURE=off` (the `-hosting` image sets it: it has no browser). */
@@ -159,22 +362,24 @@ export type ImageAuth =
   | { mode: "password"; password: string; email: string; secret: string }
   | { mode: "none" };
 
-/** The shortest `SECRET` sign-in accepts (the auth engine's own rule). */
+/** The shortest `SHELF_SECRET` sign-in accepts (the auth engine's own rule). */
 const MIN_SECRET_LENGTH = 32;
 
 const AUTH_MODE_HINT =
-  "set AUTH_PASSWORD and SECRET (at least 32 characters) to sign in, or SHELF_AUTH=none to run with every route open";
+  "set SHELF_ADMIN_PASSWORD and SHELF_SECRET (at least 32 characters) to sign in, or SHELF_AUTH=none to run with every route open";
 
 /**
  * Sign-in is on unless `SHELF_AUTH=none` says otherwise: a missing variable never turns it off.
- * `SECRET` must be at least 32 characters; `createShelfAuth` checks it again.
+ * `SHELF_SECRET` must be at least 32 characters; `createShelfAuth` checks it again.
  */
 export function authFromEnv(env: Env): ImageAuth {
   const mode = nonEmpty(env["SHELF_AUTH"]) ?? "password";
-  const password = nonEmpty(env["AUTH_PASSWORD"]);
+  const password = nonEmpty(readSetting(env, "SHELF_ADMIN_PASSWORD"));
   if (mode === "none") {
     if (password !== undefined) {
-      throw new BootRefusal("SHELF_AUTH=none and AUTH_PASSWORD are both set: unset one of them");
+      throw new BootRefusal(
+        "SHELF_AUTH=none and SHELF_ADMIN_PASSWORD are both set: unset one of them",
+      );
     }
     return { mode: "none" };
   }
@@ -184,25 +389,25 @@ export function authFromEnv(env: Env): ImageAuth {
   return passwordAuth(env, password);
 }
 
-/** The password mode's settings: AUTH_PASSWORD and SECRET are both required. */
+/** The password mode's settings: SHELF_ADMIN_PASSWORD and SHELF_SECRET are both required. */
 function passwordAuth(env: Env, password: string | undefined): ImageAuth {
-  const secret = nonEmpty(env["SECRET"]);
+  const secret = nonEmpty(readSetting(env, "SHELF_SECRET"));
   if (password === undefined) {
-    throw new BootRefusal(`AUTH_PASSWORD is unset: ${AUTH_MODE_HINT}`);
+    throw new BootRefusal(`SHELF_ADMIN_PASSWORD is unset: ${AUTH_MODE_HINT}`);
   }
   if (secret === undefined) {
-    throw new BootRefusal(`SECRET is unset: ${AUTH_MODE_HINT}`);
+    throw new BootRefusal(`SHELF_SECRET is unset: ${AUTH_MODE_HINT}`);
   }
   // Checked again by createShelfAuth; refused here too, before any adapter is created.
   if (secret.length < MIN_SECRET_LENGTH) {
     throw new BootRefusal(
-      `SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`,
+      `SHELF_SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`,
     );
   }
   return {
     mode: "password",
     password,
-    email: nonEmpty(env["AUTH_EMAIL"]) ?? "admin@example.com",
+    email: nonEmpty(readSetting(env, "SHELF_ADMIN_EMAIL")) ?? "admin@example.com",
     secret,
   };
 }
@@ -221,7 +426,7 @@ export function describeBootFailure(error: unknown): string {
   if (!(error instanceof Error)) {
     return `storyshelf: ${String(error)}\n`;
   }
-  if (error instanceof BootRefusal) {
+  if (error instanceof BootRefusal || error instanceof RenamedSettingError) {
     return `storyshelf: ${error.message}\n`;
   }
   const frames = (error.stack ?? "")

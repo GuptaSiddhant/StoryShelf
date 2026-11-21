@@ -184,7 +184,7 @@ describe("serverless and database boot checks", () => {
     const { db } = makeDatabase();
     expect(() => boot(db, true)).toThrow(/AWS Lambda/u);
     expect(() => boot(db, false)).not.toThrow();
-    vi.stubEnv("STORYSHELF_ALLOW_SERVERLESS", "1");
+    vi.stubEnv("SHELF_ALLOW_SERVERLESS", "1");
     expect(() => boot(db, true)).not.toThrow();
   });
 

@@ -3,6 +3,7 @@
  * requests, so it is refused on AWS Lambda and warned about on the other platforms that freeze or
  * end the process after each request. Hosting only works everywhere.
  */
+import { readSetting } from "./env-settings/read.ts";
 
 /** Set by AWS Lambda; the one host where `testing` is refused outright. */
 const LAMBDA_ENV = "AWS_LAMBDA_FUNCTION_NAME";
@@ -11,7 +12,7 @@ const LAMBDA_ENV = "AWS_LAMBDA_FUNCTION_NAME";
 const SERVERLESS_ENV = [LAMBDA_ENV, "VERCEL", "NETLIFY"] as const;
 
 /** Escape hatch for hosts that look serverless but keep a process alive. */
-export const ALLOW_SERVERLESS_ENV = "STORYSHELF_ALLOW_SERVERLESS";
+export const ALLOW_SERVERLESS_ENV = "SHELF_ALLOW_SERVERLESS";
 
 /** Whether the host ends or freezes the process after each request (Lambda, Vercel, Netlify). */
 export function isServerlessHost(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -21,13 +22,13 @@ export function isServerlessHost(env: NodeJS.ProcessEnv = process.env): boolean 
 /**
  * Boot check for `testing` on a serverless host. Returns a warning to log, or `undefined` when
  * there is nothing to say; throws on AWS Lambda. Does nothing without `testing`, or when
- * `STORYSHELF_ALLOW_SERVERLESS=1`.
+ * `SHELF_ALLOW_SERVERLESS=1`.
  */
 export function assertServerless(
   testing: boolean,
   env: NodeJS.ProcessEnv = process.env,
 ): string | undefined {
-  if (!testing || env[ALLOW_SERVERLESS_ENV] === "1" || !isServerlessHost(env)) {
+  if (!testing || readSetting(env, ALLOW_SERVERLESS_ENV) === "1" || !isServerlessHost(env)) {
     return undefined;
   }
   if (env[LAMBDA_ENV]) {

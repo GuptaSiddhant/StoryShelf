@@ -1,5 +1,6 @@
 import { normalizeBaseUrl } from "../client.ts";
 import { loadStorybookConfig } from "../config.ts";
+import { readSetting } from "../settings.ts";
 
 /** Server connection options shared by read-only commands. */
 export interface ConnectionOptions {
@@ -30,9 +31,9 @@ export async function resolveConnection(options: ConnectionOptions): Promise<Res
   const cwd = options.cwd ?? process.cwd();
   const cfg = await loadStorybookConfig(cwd, options.config);
   const fields = {
-    url: options.url ?? cfg?.url ?? process.env["STORYSHELF_URL"],
-    slug: options.slug ?? cfg?.slug ?? process.env["STORYSHELF_SLUG"],
-    token: options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"],
+    url: options.url ?? cfg?.url ?? readSetting(process.env, "SHELF_URL"),
+    slug: options.slug ?? cfg?.slug ?? readSetting(process.env, "SHELF_SLUG"),
+    token: options.token ?? readSetting(process.env, "SHELF_TOKEN"),
   };
   assertConnectionFields(fields);
   return { ...fields, url: normalizeBaseUrl(fields.url) };
@@ -45,12 +46,12 @@ function assertConnectionFields(fields: {
   token?: string;
 }): asserts fields is ResolvedConnection {
   if (!fields.url) {
-    throw new Error("--url is required (or .storybook/storyshelf.json / STORYSHELF_URL)");
+    throw new Error("--url is required (or .storybook/storyshelf.json / SHELF_URL)");
   }
   if (!fields.slug) {
-    throw new Error("--slug is required (or .storybook/storyshelf.json / STORYSHELF_SLUG)");
+    throw new Error("--slug is required (or .storybook/storyshelf.json / SHELF_SLUG)");
   }
   if (!fields.token) {
-    throw new Error("--token is required (or STORYSHELF_TOKEN env)");
+    throw new Error("--token is required (or SHELF_TOKEN env)");
   }
 }

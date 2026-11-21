@@ -6,9 +6,9 @@
 # assertion (`GET /api/v1/projects` -> `[]`). Run from the repo root
 # (CI) or anywhere (the script cds to the repo root itself).
 #
-# Without SMOKE_BASE_URL it also checks the product image refuses to start with a short SECRET.
+# Without SMOKE_BASE_URL it also checks the product image refuses to start with a short SHELF_SECRET.
 #
-# Env overrides: PORT (default 4311; the refusal check uses PORT+1), DATA_DIR (default .tmp/smoke-<run>), SMOKE_BASE_URL (assert
+# Env overrides: PORT (default 4311; the refusal check uses PORT+1), SHELF_DATA_DIR (default .tmp/smoke-<run>), SMOKE_BASE_URL (assert
 # an already-running server, e.g. the container image, instead of booting the dev server).
 set -euo pipefail
 
@@ -21,14 +21,16 @@ else
   mkdir -p .tmp
   PORT="${PORT:-4311}"
   RUN_ID="${GITHUB_RUN_ID:-local}"
-  DATA_DIR="${DATA_DIR:-.tmp/smoke-${RUN_ID}}"
+  SHELF_DATA_DIR="${SHELF_DATA_DIR:-.tmp/smoke-${RUN_ID}}"
   LOG=".tmp/smoke-${RUN_ID}.log"
 
-  # Auth must stay off: with AUTH_PASSWORD set `/` redirects to login and the
-  # HTML assertion false-fails (and without a valid SECRET the server refuses to start).
-  unset SECRET AUTH_PASSWORD AUTH_VIEWER_PASSWORD STORYSHELF_ADMIN_TOKEN ADMIN_TOKEN PUBLIC_BASE_URL
+  # Auth must stay off: with SHELF_ADMIN_PASSWORD set `/` redirects to login and the
+  # HTML assertion false-fails (and without a valid SHELF_SECRET the server refuses to start).
+  # Old names too: they still set the same settings (#1308).
+  unset SHELF_SECRET SECRET SHELF_ADMIN_PASSWORD AUTH_PASSWORD AUTH_VIEWER_PASSWORD \
+    SHELF_ADMIN_TOKEN ADMIN_TOKEN STORYSHELF_ADMIN_TOKEN SHELF_PUBLIC_BASE_URL PUBLIC_BASE_URL DATA_DIR
 
-  export PORT DATA_DIR
+  export PORT SHELF_DATA_DIR
   export PATH="$HOME/.nub/bin:$PATH"
 
   nub ./apps/dev-server/src/server.ts >"$LOG" 2>&1 &
@@ -41,7 +43,7 @@ else
       echo "--- server log ($LOG) ---"
       cat "$LOG"
     fi
-    rm -rf "$DATA_DIR" "$LOG"
+    rm -rf "$SHELF_DATA_DIR" "$LOG"
     exit "$code"
   }
   trap cleanup EXIT
@@ -67,16 +69,16 @@ curl -fsS --max-time 10 "$BASE/assets/htmx.js" | grep 'htmx' >/dev/null
 
 echo "Smoke OK: health + projects + root + htmx.js on :$PORT"
 
-# Must refuse (#1139): the product image with sign-in configured and a SECRET shorter than 32
-# characters exits non-zero before it listens, and its first line names SECRET, never the value.
+# Must refuse (#1139): the product image with sign-in configured and a SHELF_SECRET shorter than 32
+# characters exits non-zero before it listens, and its first line names SHELF_SECRET, never the value.
 refuse_short_secret() {
-  local port=$((PORT + 1)) dir="${DATA_DIR}-refuse" log=".tmp/smoke-${RUN_ID}-refuse.log"
+  local port=$((PORT + 1)) dir="${SHELF_DATA_DIR}-refuse" log=".tmp/smoke-${RUN_ID}-refuse.log"
   local short="smoke-short-secret-value" refused code=0 first
-  env -u SHELF_AUTH AUTH_PASSWORD="smoke-admin-password" SECRET="$short" PORT="$port" \
-    DATA_DIR="$dir" nub ./apps/server-image/server.ts >"$log" 2>&1 &
+  env -u SHELF_AUTH SHELF_ADMIN_PASSWORD="smoke-admin-password" SHELF_SECRET="$short" PORT="$port" \
+    SHELF_DATA_DIR="$dir" nub ./apps/server-image/server.ts >"$log" 2>&1 &
   refused=$!
   fail() {
-    echo "Smoke FAILED (short SECRET): $1"
+    echo "Smoke FAILED (short SHELF_SECRET): $1"
     kill "$refused" 2>/dev/null || true
     echo "--- image log ($log) ---"
     cat "$log"
@@ -96,21 +98,21 @@ refuse_short_secret() {
   # nub's own notices come first; the image's first line follows them.
   first="$(awk '!/^nub: /{ print; exit }' "$log")"
   case "$first" in
-    "storyshelf: SECRET "*) ;;
-    *) fail "the first line does not name SECRET: $first" ;;
+    "storyshelf: SHELF_SECRET "*) ;;
+    *) fail "the first line does not name SHELF_SECRET: $first" ;;
   esac
   # A refusal is one line: a stack frame (`    at fn (file:line)`) would be a leaked crash report.
   if grep -qE '^[[:space:]]+at ' "$log"; then
     fail "the refusal printed a stack trace"
   fi
   if grep -qF "$short" "$log"; then
-    fail "the output contains the SECRET value"
+    fail "the output contains the SHELF_SECRET value"
   fi
   if curl -s --max-time 2 "http://127.0.0.1:$port/" >/dev/null; then
     fail "something answers on :$port"
   fi
   rm -rf "$dir" "$log"
-  echo "Smoke OK: the image refuses a short SECRET (exit $code, first line names SECRET, no stack trace)"
+  echo "Smoke OK: the image refuses a short SHELF_SECRET (exit $code, first line names SHELF_SECRET, no stack trace)"
 }
 
 if [ -z "${SMOKE_BASE_URL:-}" ]; then

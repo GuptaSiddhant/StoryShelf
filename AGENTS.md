@@ -25,7 +25,7 @@ baselines, then review and approve. `docs/architecture/` is the current-state sp
 export PATH="$HOME/.nub/bin:$PATH"   # once per shell
 nub ci                    # install workspace deps (once per clone/worktree)
 nub run hook:install      # enable .githooks: fmt/lint staged files + conventional commits
-nub run serve             # dev server from TS source, :3000, DATA_DIR=.dev-data, hot restart
+nub run serve             # dev server from TS source, :3000, SHELF_DATA_DIR=.dev-data, hot restart
 nub run fmt | lint | test # turbo across the workspace
 nub run docs:check        # ADR numbering, references, links, line cap
 nub run lint:files        # oxfmt --check + oxlint on every tracked file the commit hook checks (CI runs it)
@@ -95,7 +95,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   404 when a project has review off. Gate by class, never with an ad-hoc `if` in a handler; check
   `testingEnabled()` before linking to a `testing` page. No `testing` option ⇒ no capture, compare or
   baselines; `testing` requires a `runner` (`testing: {}` throws). `assertServerless` refuses a runner
-  on AWS Lambda and warns on Vercel/Netlify (`STORYSHELF_ALLOW_SERVERLESS=1` overrides).
+  on AWS Lambda and warns on Vercel/Netlify (`SHELF_ALLOW_SERVERLESS=1` overrides).
 - **Capture targets.** `browser`/`browsers`, a snapshot's `browser`, and baseline keys hold a
   `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName`. Split with
   `parseTarget`/`engineOf`, validate with `isCaptureTarget`; the render input is `target`, not
@@ -272,7 +272,14 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
   tells the CI check so. Task PRs on an epic branch add theirs there. Until 2027-01-01 a breaking
   change ships without a shim or alias, as `Breaking:` (ADR 0049 and ADR 0053 amendments, 2026-11-21).
-- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` (`SHELF_*` variables, "Shelf" in prose and diagrams).
+- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` ("Shelf" in prose and
+  diagrams). `SHELF_*` for StoryShelf's own settings; unprefixed only for platform or SDK names. Read
+  them through `readSetting` (`@storyshelf/core/config`; the CLI keeps its rows in
+  `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
+  (`packages/core/src/env-settings/renames.ts`), which every entry point checks at boot
+  (`refuseRenamedSettings`, names only; `SHELF_ALLOW_OLD_NAMES=1` warns instead; removed in the first
+  release of 2027), and `packages/core/src/env-settings/ratchet.test.ts`
+  fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.

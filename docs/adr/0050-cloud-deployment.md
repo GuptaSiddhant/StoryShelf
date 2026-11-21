@@ -64,7 +64,9 @@ when the preset is used, as the existing database presets do.
 - **`db-postgres/rds-iam`:** connects to RDS or Aurora with short-lived IAM authentication tokens,
   renewed for each new connection. It uses `@aws-sdk/rds-signer` as an optional peer, so the standard
   AWS credential chain (ECS task role, instance role, web identity) applies. With IAM auth there is
-  no database password to rotate. The AWS module (decision 3) uses it and drops the RDS-managed secret
+  no database password to rotate. It verifies the server certificate by default against bundled
+  Amazon RDS root certificates (`ca` overrides them); skipping verification is an explicit,
+  warned opt-out, because the token is a credential. The AWS module (decision 3) uses it and drops the RDS-managed secret
   from the app.
 - **An `ses` email preset** in core's email integration (ADR 0049): SMTP settings for SES per region,
   with credentials from the environment. It is configuration only, with no SDK. An SES API preset
@@ -144,7 +146,8 @@ Amended by the owner on 2026-11-10.
   - Remote browsers (`defineRemote` presets, ADR 0006) are optional, configured from environment
     variables, with endpoints and tokens kept in the cloud's secret store.
   - The Azure module can attach an Azure Playwright Workspace through the existing `azurePlaywright`
-    preset. The nightly Azure run verifies it, because the preset is still marked experimental.
+    preset. A live Azure run will verify it, because the preset is still marked experimental; the
+    module ships without that check (architect, 2026-11-21).
   - No module builds a browser farm.
 - **Scaling is more identical copies.** Every copy serves the app and consumes the database queue, as
   ADR 0006 decision 5 settled when the separate worker package was retired. The modules take

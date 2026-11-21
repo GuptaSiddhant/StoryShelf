@@ -55,9 +55,9 @@ describe("runMcpServe", () => {
       { spawnProcess: spawn },
     );
     expect(calls[0]?.args).toEqual([file]);
-    expect(calls[0]?.options.env["STORYSHELF_URL"]).toBe("https://s.test");
-    expect(calls[0]?.options.env["STORYSHELF_SLUG"]).toBe("web");
-    expect(calls[0]?.options.env["STORYSHELF_TOKEN"]).toBe("t");
+    expect(calls[0]?.options.env["SHELF_URL"]).toBe("https://s.test");
+    expect(calls[0]?.options.env["SHELF_SLUG"]).toBe("web");
+    expect(calls[0]?.options.env["SHELF_TOKEN"]).toBe("t");
     expect(calls[0]?.options.env["PORT"]).toBe("4000");
   });
 
