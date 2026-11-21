@@ -125,7 +125,7 @@ Rules:
   list limits (`clampListLimit`, max 1000).
 - Idempotency is asserted, not assumed: run `setup`, `teardown`, `migrate`,
   and `enqueue`-retry twice.
-- Indirect coverage allowed only for pure mappers (e.g. `notify-git`
+- Indirect coverage allowed only for pure mappers (e.g. the git integration
   `github-mapper.ts` precedent); everything else has a direct colocated suite.
 
 ### 3. Integration (vitest, CI-always)
