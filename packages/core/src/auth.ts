@@ -98,6 +98,37 @@ export interface Auth {
    * bounded batches. Better Auth never sweeps them itself, so the retention timer calls this.
    */
   purgeExpired?: (cutoffIso: string) => Promise<{ sessions: number; verifications: number }>;
+  /**
+   * Whether `email` names a shared read-only account (compared case-insensitively). The app refuses
+   * every write such an account attempts, whether it arrives with the session or a bearer token.
+   * Absent: no account is read-only.
+   */
+  isReadOnlyAccount?: (email: string) => boolean;
+}
+
+/** The one refusal a read-only account gets for any write (403), from the app and the engine alike. */
+export const READ_ONLY_ACCOUNT_MESSAGE =
+  "This is a shared read-only account: it can sign in, sign out and read, but it cannot change anything.";
+
+/**
+ * The read-only account emails of a comma-separated list (`SHELF_READ_ONLY_ACCOUNTS`), trimmed and
+ * lowercased; empty entries are dropped. An unset or blank value is no account.
+ */
+export function parseReadOnlyAccounts(value?: string): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry !== "");
+}
+
+/** A case-insensitive membership test over `emails`; a missing or empty email never matches. */
+export function readOnlyAccountMatcher(
+  emails?: readonly string[],
+): (email?: string | null) => boolean {
+  const accounts = new Set((emails ?? []).map((entry) => entry.trim().toLowerCase()));
+  accounts.delete("");
+  return (email) =>
+    typeof email === "string" && email !== "" && accounts.has(email.trim().toLowerCase());
 }
 
 /** Minimum password length for local accounts (matches legacy policy). */

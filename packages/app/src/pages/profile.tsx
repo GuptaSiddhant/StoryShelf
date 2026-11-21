@@ -139,8 +139,8 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
 
 type SessionInfo = SecurityState["sessions"][number];
 
-/** One signed-in device with its revoke action. */
-const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
+/** One signed-in device with its revoke action (none for a read-only shared account). */
+const SessionRow: FC<{ session: SessionInfo; readOnly: boolean }> = ({ session, readOnly }) => {
   return (
     <tr>
       <td>
@@ -153,7 +153,7 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
       <td>
         {session.current ? (
           <Badge>This device</Badge>
-        ) : (
+        ) : readOnly ? null : (
           <form
             method="post"
             action="/profile/sessions/revoke"
@@ -171,7 +171,10 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
 };
 
 /** Active device sessions with per-device revoke and sign-out-others. */
-const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
+const SessionsSection: FC<{ security: SecurityState; readOnly: boolean }> = ({
+  security,
+  readOnly,
+}) => {
   return (
     <Card>
       <PageHeader level={2} title="Devices" description="Where you are signed in" />
@@ -186,12 +189,12 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
           </thead>
           <tbody>
             {security.sessions.map((session) => (
-              <SessionRow key={session.id} session={session} />
+              <SessionRow key={session.id} session={session} readOnly={readOnly} />
             ))}
           </tbody>
         </table>
       </Table>
-      {security.sessions.length > 1 ? (
+      {security.sessions.length > 1 && !readOnly ? (
         <form
           method="post"
           action="/profile/sessions/revoke-others"
@@ -239,6 +242,69 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   );
 };
 
+/** The display-name form. */
+const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
+  <Card>
+    <PageHeader
+      level={2}
+      title="Display name"
+      description="Shown in comments and the header. Survives SSO refresh."
+    />
+    <form method="post" action="/profile" novalidate>
+      <Field label="Display name" name="displayName" type="text" required value={displayName} />
+      <Button variant="primary" type="submit">
+        Save name
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The password form, for local accounts. */
+const PasswordCard: FC = () => (
+  <Card>
+    <PageHeader level={2} title="Change password" description="For local accounts only" />
+    <form method="post" action="/profile/password" novalidate>
+      <Field
+        label="Current password"
+        name="currentPassword"
+        type="password"
+        required
+        autocomplete="current-password"
+      />
+      <Field
+        label="New password"
+        name="newPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Field
+        label="Confirm new password"
+        name="confirmPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Button variant="primary" type="submit">
+        Change password
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The display-name and password forms; a read-only shared account (#1274) gets neither. */
+const AccountForms: FC<{ displayName: string; isLocal: boolean; readOnly: boolean }> = ({
+  displayName,
+  isLocal,
+  readOnly,
+}) =>
+  readOnly ? null : (
+    <>
+      <DisplayNameCard displayName={displayName} />
+      {isLocal ? <PasswordCard /> : null}
+    </>
+  );
+
 /** Personal profile page (editable display name, password for local accounts). */
 // oxlint-disable-next-line eslint/max-lines-per-function -- profile page composes several sections, cohesive
 export function renderProfilePage(state: ProfilePageState): RenderedContent {
@@ -246,6 +312,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
   const avatar = safeImageUrl(user.avatarUrl);
   const displayName = dbUser?.displayNameOverride ?? user.name;
   const provider = dbUser?.authProvider ?? user.providerId ?? "oidc";
+  // A read-only shared account (#1274) sees its profile but none of the controls that change it.
+  const readOnly = user.readOnly === true;
   return (
     <DocumentLayout title="Profile" nav={{ active: "profile" }}>
       <PageHeader title="Profile" description="Your account and project memberships" />
@@ -281,55 +349,11 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
         </VStack>
       </Card>
 
-      <Card>
-        <PageHeader
-          level={2}
-          title="Display name"
-          description="Shown in comments and the header. Survives SSO refresh."
-        />
-        <form method="post" action="/profile" novalidate>
-          <Field label="Display name" name="displayName" type="text" required value={displayName} />
-          <Button variant="primary" type="submit">
-            Save name
-          </Button>
-        </form>
-      </Card>
+      <AccountForms displayName={displayName} isLocal={isLocal === true} readOnly={readOnly} />
 
-      {isLocal ? (
-        <Card>
-          <PageHeader level={2} title="Change password" description="For local accounts only" />
-          <form method="post" action="/profile/password" novalidate>
-            <Field
-              label="Current password"
-              name="currentPassword"
-              type="password"
-              required
-              autocomplete="current-password"
-            />
-            <Field
-              label="New password"
-              name="newPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Field
-              label="Confirm new password"
-              name="confirmPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Button variant="primary" type="submit">
-              Change password
-            </Button>
-          </form>
-        </Card>
-      ) : null}
+      {security ? <SessionsSection security={security} readOnly={readOnly} /> : null}
 
-      {security ? <SessionsSection security={security} /> : null}
-
-      {security?.passkeysEnabled ? <PasskeysSection security={security} /> : null}
+      {security?.passkeysEnabled && !readOnly ? <PasskeysSection security={security} /> : null}
 
       <Card>
         <PageHeader level={2} title="Project memberships" description="Your role on each project" />{" "}
@@ -399,14 +423,16 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                         </td>
                         <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
                         <td>
-                          <form method="post" action="/profile/notifications">
-                            {csrfField()}
-                            <input type="hidden" name="slug" value={m.projectSlug} />
-                            <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
-                            <Button variant="secondary" size="sm" type="submit">
-                              {subscribed ? "Disable" : "Enable"}
-                            </Button>
-                          </form>
+                          {readOnly ? null : (
+                            <form method="post" action="/profile/notifications">
+                              {csrfField()}
+                              <input type="hidden" name="slug" value={m.projectSlug} />
+                              <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
+                              <Button variant="secondary" size="sm" type="submit">
+                                {subscribed ? "Disable" : "Enable"}
+                              </Button>
+                            </form>
+                          )}
                         </td>
                       </tr>
                     );

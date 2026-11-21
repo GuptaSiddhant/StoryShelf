@@ -3,6 +3,7 @@ import type { Meta } from "@storybook/html-vite";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
+import { SHARED_READ_ONLY_ACCOUNT } from "../stories-fixtures/accounts.ts";
 import {
   BUILD_CANCELLED,
   BUILD_CAPTURING,
@@ -145,6 +146,12 @@ export const NewStory = pageStory(() =>
 
 /** A viewer who cannot decide: the same stage without the approve and reject controls. */
 export const ReadOnly = pageStory(() => renderBuildDiffPage(reviewData({ canReview: false })));
+
+/** A read-only shared account (#1274): the banner, and no review, triage or comment control. */
+export const SharedReadOnlyAccount = pageStory(
+  () => renderBuildDiffPage(reviewData({ canReview: false, canTriage: false, canManage: false })),
+  { store: { authEnabled: true, user: SHARED_READ_ONLY_ACCOUNT } },
+);
 
 export const BaselineMoved = pageStory(() =>
   renderBuildDiffPage(

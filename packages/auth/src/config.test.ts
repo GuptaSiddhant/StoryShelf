@@ -29,6 +29,17 @@ describe("parseEnvRef", () => {
 });
 
 describe("resolveAuthOptions", () => {
+  it("accepts read-only accounts and refuses a blank entry", async () => {
+    const resolved = await resolveAuthOptions({
+      ...base(),
+      readOnlyAccounts: ["demo@example.test"],
+    });
+    expect(resolved.readOnlyAccounts).toEqual(["demo@example.test"]);
+    await expect(resolveAuthOptions({ ...base(), readOnlyAccounts: [" "] })).rejects.toThrow(
+      /readOnlyAccounts/u,
+    );
+  });
+
   it("passes literals through without touching the hook", async () => {
     const hook = vi.fn(async (_names: string[]) => ({}));
     const resolved = await resolveAuthOptions({ ...base(), resolveSecrets: hook });

@@ -9,6 +9,7 @@ import { DARK_THEME, LIGHT_THEME } from "../ui/theme.ts";
 import { BareShell } from "./bare.tsx";
 import { bootScript } from "./boot-script.ts";
 import type { NavConfig } from "./nav.ts";
+import { ReadOnlyBanner } from "./read-only-banner.tsx";
 import { Sidebar } from "./sidebar.tsx";
 import { ToastRegion, TopBar } from "./topbar.tsx";
 /** Active section, project, and breadcrumb trail passed to the shell. */
@@ -97,8 +98,9 @@ const AppChrome: FC<{
   name: string;
   logo: string;
   layout: PageLayout;
+  readOnly: boolean;
   children?: unknown;
-}> = ({ nav, name, logo, layout, children }) => (
+}> = ({ nav, name, logo, layout, readOnly, children }) => (
   <>
     <div class={shellRoot}>
       <Sidebar nav={nav} name={name} logo={logo} />
@@ -109,6 +111,7 @@ const AppChrome: FC<{
           class={layout === "wide" ? shellContentWide : shellContent}
           tabindex={-1}
         >
+          <ReadOnlyBanner readOnly={readOnly} />
           {children}
         </main>
       </div>
@@ -126,7 +129,7 @@ export const DocumentLayout: FC<{
   layout?: PageLayout;
   children?: unknown;
 }> = ({ title, nav, layout = "default", children }) => {
-  const { ui, config, sessionId } = getStore();
+  const { ui, config, sessionId, user } = getStore();
   const name = ui.name ?? "StoryShelf";
   const logo = ui.logo ?? assetManifest.mark.href;
   const light = ui.lightTheme ?? LIGHT_THEME;
@@ -153,7 +156,13 @@ export const DocumentLayout: FC<{
               {children}
             </BareShell>
           ) : (
-            <AppChrome nav={nav} name={name} logo={logo} layout={layout}>
+            <AppChrome
+              nav={nav}
+              name={name}
+              logo={logo}
+              layout={layout}
+              readOnly={user?.readOnly === true}
+            >
               {children}
             </AppChrome>
           )}

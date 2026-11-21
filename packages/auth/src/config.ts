@@ -136,6 +136,7 @@ export const authOptionsSchema = z
       .optional(),
     passkeys: passkeysSchema.optional(),
     sessionExpiresInDays: z.number().int().positive().optional(),
+    readOnlyAccounts: z.array(z.string().trim().min(1)).optional(),
   })
   .strict() as z.ZodType<Omit<ShelfAuthOptions, "plugins">>;
 

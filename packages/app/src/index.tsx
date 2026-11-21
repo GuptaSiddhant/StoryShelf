@@ -42,6 +42,7 @@ import {
   requireReview,
   requireTesting,
   rateLimitKey,
+  readOnlyWrites,
   requestLogging,
   resolveRequestUser,
   sameSiteWrites,
@@ -212,7 +213,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   mountPortalBoundary(app, config);
-  mountAccessGates(app);
+  mountAccessGates(app, wiring.options);
 }
 
 /**
@@ -242,10 +243,12 @@ function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
 }
 
 /**
- * What the request is allowed to see, inside the request store: the not-found page (it needs to
- * know who is asking) wraps the sign-in gate and the project gates, whose 404s it dresses.
+ * What the request is allowed to see, inside the request store: a read-only shared account's writes
+ * are refused first (#1274); the not-found page (it needs to know who is asking) wraps the sign-in
+ * gate and the project gates, whose 404s it dresses.
  */
-function mountAccessGates(app: ShelfRouter): void {
+function mountAccessGates(app: ShelfRouter, options: Pick<ResolvedShelfOptions, "auth">): void {
+  app.use("*", readOnlyWrites(options.auth));
   app.use("*", notFoundPage());
   app.use("*", authGate());
   mountProjectGates(app);

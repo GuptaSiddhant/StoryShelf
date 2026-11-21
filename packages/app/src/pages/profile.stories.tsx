@@ -1,6 +1,7 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import { pageStory } from "../../.storybook/page.tsx";
+import { SHARED_READ_ONLY_ACCOUNT } from "../stories-fixtures/accounts.ts";
 import { renderProfilePage, type ProfilePageState } from "./profile.tsx";
 
 const meta: Meta = { title: "Pages/Account/Profile" };
@@ -71,4 +72,55 @@ export const WithError = pageStory(
 export const NotificationsPaused = pageStory(
   () => renderProfilePage(state({ notificationsPaused: true })),
   { store: { authEnabled: true } },
+);
+
+/** A read-only shared account (#1274): the banner, and no control that would change the account. */
+export const ReadOnlyAccount = pageStory(
+  () =>
+    renderProfilePage(
+      state({
+        user: SHARED_READ_ONLY_ACCOUNT,
+        dbUser: {
+          email: SHARED_READ_ONLY_ACCOUNT.email,
+          name: SHARED_READ_ONLY_ACCOUNT.name,
+          displayNameOverride: null,
+          authProvider: "password",
+          lastLoginAt: "2026-01-15T08:00:00.000Z",
+          createdAt: "2025-11-01T09:00:00.000Z",
+        },
+        memberships: [
+          {
+            projectName: "Design system",
+            projectSlug: "design-system",
+            role: "viewer",
+            source: "direct",
+          },
+        ],
+        isLocal: true,
+        security: {
+          sessions: [
+            {
+              id: "s1",
+              ipAddress: "203.0.113.7",
+              userAgent: "Chrome on macOS",
+              createdAt: "2026-01-14T09:00:00.000Z",
+              expiresAt: "2026-02-14T09:00:00.000Z",
+              current: true,
+            },
+            {
+              id: "s2",
+              ipAddress: "198.51.100.4",
+              userAgent: "Firefox on Linux",
+              createdAt: "2026-01-14T10:00:00.000Z",
+              expiresAt: "2026-02-14T10:00:00.000Z",
+              current: false,
+            },
+          ],
+          passkeys: [],
+          passkeysEnabled: true,
+          hasPassword: true,
+        },
+      }),
+    ),
+  { store: { authEnabled: true, user: SHARED_READ_ONLY_ACCOUNT } },
 );

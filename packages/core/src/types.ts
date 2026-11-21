@@ -86,7 +86,11 @@ export interface AuthUser {
    * Login method that minted this identity.
    * Matches an engine login method id; absent for single-method deployments.
    */
-  providerId?: string;
+  providerId?: string /**
+   * A shared read-only account (`createShelfAuth({ readOnlyAccounts })`): it may sign in, sign out
+   * and read, and every write it attempts is refused. Absent or false for every other user.
+   */;
+  readOnly?: boolean;
 }
 
 /** Build-level review verdicts (ADR 0013, decision 3). */
