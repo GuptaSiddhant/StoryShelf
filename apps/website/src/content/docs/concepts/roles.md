@@ -44,13 +44,13 @@ Each project's **Members** tab can map an IdP group name to a project role. Mapp
 ## API tokens vs user auth
 
 - **Web UI** — session cookie via the auth engine / none.
-- **CLI/CI** — per-project **API tokens** (`Authorization: Bearer <token>`, `STORYSHELF_TOKEN`) and site-admin tokens (`STORYSHELF_ADMIN_TOKEN` / `ADMIN_TOKEN` for `storyshelf create` / `purge`). Tokens are per-project, hashed at rest, shown once at creation in Settings → Tokens.
+- **CLI/CI** — per-project **API tokens** (`Authorization: Bearer <token>`, `SHELF_TOKEN`) and site-admin tokens (`SHELF_ADMIN_TOKEN` for `storyshelf create` / `purge`). Tokens are per-project, hashed at rest, shown once at creation in Settings → Tokens.
 
 Tokens are **bound to the minting user** and resolve to that user’s live project role — demoting a user instantly downgrades their tokens. Legacy pre-binding tokens resolve as `viewer`; tokens whose owner was deleted are denied (re-issue).
 
 ## First admin bootstrap
 
-With auth enabled and an empty DB, no one can be `admin` yet. Set `STORYSHELF_ADMIN_TOKEN` on the server — its bearer grants site-admin API access without a session (distinct from `SECRET` which signs sessions). Creating a project as the first logged-in user also records them as that project’s `admin`.
+With auth enabled and an empty DB, no one can be `admin` yet. Set `SHELF_ADMIN_TOKEN` on the server — its bearer grants site-admin API access without a session (distinct from `SHELF_SECRET` which signs sessions). Creating a project as the first logged-in user also records them as that project’s `admin`.
 
 ## Related
 

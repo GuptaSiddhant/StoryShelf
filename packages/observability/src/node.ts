@@ -78,7 +78,7 @@ function startSdk(config: ObservabilityConfig): ObservabilityHandle {
  * Initialize observability from the environment.
  *
  * Starts the Node SDK when `OTEL_EXPORTER_OTLP_ENDPOINT` (or
- * `STORYSHELF_OTEL_ENABLED=true`) is set; otherwise returns a noop handle
+ * `SHELF_OTEL_ENABLED=true`) is set; otherwise returns a noop handle
  * (also when `OTEL_SDK_DISABLED=true`). Call before
  * `createShelfApp` and flush via the handle next to `app.lifecycle.teardown`.
  *

@@ -9,7 +9,7 @@ import prompts from "prompts";
 import { runMcpInit } from "./init.ts";
 
 // oxlint-disable-next-line no-template-curly-in-string -- literal client-side env interpolation
-const TOKEN_REF = "${STORYSHELF_TOKEN}";
+const TOKEN_REF = "${SHELF_TOKEN}";
 let tmpRoot: string;
 
 beforeEach(() => {
@@ -46,8 +46,8 @@ describe("runMcpInit", () => {
       mcpServers: { storyshelf: { command: string; env: Record<string, string> } };
     };
     expect(config.mcpServers.storyshelf.command).toBe("npx");
-    expect(config.mcpServers.storyshelf.env["STORYSHELF_TOKEN"]).toBe(TOKEN_REF);
-    expect(readFileSync(join(dir, ".env.example"), "utf8")).toContain("STORYSHELF_TOKEN=\n");
+    expect(config.mcpServers.storyshelf.env["SHELF_TOKEN"]).toBe(TOKEN_REF);
+    expect(readFileSync(join(dir, ".env.example"), "utf8")).toContain("SHELF_TOKEN=\n");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
       scripts: Record<string, string>;

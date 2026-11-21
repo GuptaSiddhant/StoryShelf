@@ -153,15 +153,15 @@ describe("generatePackageJson", () => {
     expect(scripts["infra:plan"]).toBeUndefined();
   });
 
-  it("forwards SECRET, and AUTH_PASSWORD for password auth, from the shell to docker:run", () => {
+  it("forwards SHELF_SECRET, and SHELF_ADMIN_PASSWORD for password auth, from the shell to docker:run", () => {
     const open = pkg({ deployTarget: "docker", docker: true }).scripts["docker:run"];
     const password = pkg({ deployTarget: "docker", docker: true, auth: "password" }).scripts[
       "docker:run"
     ];
-    expect(open).toMatch(/ -e SECRET /u);
-    expect(open).not.toContain("AUTH_PASSWORD");
-    expect(password).toMatch(/ -e SECRET -e AUTH_PASSWORD /u);
-    expect(`${open} ${password}`).not.toMatch(/SECRET=|change-me/u);
+    expect(open).toMatch(/ -e SHELF_SECRET /u);
+    expect(open).not.toContain("SHELF_ADMIN_PASSWORD");
+    expect(password).toMatch(/ -e SHELF_SECRET -e SHELF_ADMIN_PASSWORD /u);
+    expect(`${open} ${password}`).not.toMatch(/SHELF_SECRET=|change-me/u);
   });
 
   it("has compose scripts when the stack has more than one service", () => {
@@ -170,14 +170,7 @@ describe("generatePackageJson", () => {
     expect(scripts["docker:run"]).toBeUndefined();
   });
 
-  it.each(["aws", "azure", "gcp"] as const)("has the terraform scripts for %s", (deployTarget) => {
-    const { scripts } = pkg({ deployTarget, docker: true, database: "postgres" });
-    expect(scripts["infra:init"]).toBe("terraform -chdir=terraform init");
-    expect(scripts["infra:apply"]).toBe("terraform -chdir=terraform apply tfplan");
-    expect(scripts["docker:up"]).toBeUndefined();
-  });
-
-  it("has neither docker nor infra scripts on a plain local server", () => {
+  it("has no docker scripts on a plain local server", () => {
     const keys = Object.keys(pkg().scripts).toSorted();
     expect(keys).toEqual(["dev", "start", "typecheck"]);
   });

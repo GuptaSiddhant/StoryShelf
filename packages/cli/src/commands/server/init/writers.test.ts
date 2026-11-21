@@ -57,14 +57,14 @@ describe("writeFiles", () => {
   it("writes .env.example and a README naming the required variables", async () => {
     await writeFiles(out, answers({ auth: "password" }));
     const example = readFileSync(join(out, ".env.example"), "utf8");
-    for (const name of ["SECRET", "PUBLIC_BASE_URL", "AUTH_PASSWORD"]) {
+    for (const name of ["SHELF_SECRET", "SHELF_PUBLIC_BASE_URL", "SHELF_ADMIN_PASSWORD"]) {
       expect(example).toContain(`\n${name}=`);
     }
     expect(example).toContain("# PORT=3000");
     expect(readFileSync(join(out, ".gitignore"), "utf8")).toContain(".env\n");
     const readme = readFileSync(join(out, "README.md"), "utf8");
     expect(readme).toContain("Get your first build");
-    expect(readme).toContain("`SECRET`");
+    expect(readme).toContain("`SHELF_SECRET`");
   });
 
   it("writes a Dockerfile and .dockerignore, and no compose file for one container", async () => {
@@ -85,21 +85,6 @@ describe("writeFiles", () => {
     expect(compose).toContain("postgres:");
     expect(compose).not.toContain("worker:");
     expect(printed).toContain("Created Dockerfile, .dockerignore, compose.yaml\n");
-  });
-
-  it.each([
-    ["aws", "aws_db_instance", { awsRegion: "eu-west-1" }],
-    ["azure", "azurerm", { azureLocation: "westeurope" }],
-    ["gcp", "google", { gcpProjectId: "proj", gcpLocation: "europe-west1" }],
-  ] as const)("writes the %s terraform stack", async (deployTarget, marker, extra) => {
-    await writeFiles(
-      out,
-      answers({ deployTarget, docker: true, database: "postgres", auth: "oauth", ...extra }),
-    );
-    const tf = readFileSync(join(out, "terraform", "database.tf"), "utf8");
-    expect(tf).toContain(marker);
-    expect(printed).toMatch(/Created terraform\/ \(\d+ files\)\n/u);
-    expect(existsSync(join(out, "Dockerfile"))).toBe(true);
   });
 
   it("writes no terraform for local and docker targets", async () => {

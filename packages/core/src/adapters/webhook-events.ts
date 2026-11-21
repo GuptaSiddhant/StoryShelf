@@ -57,7 +57,7 @@ async function deliverToWebhook(
   try {
     plaintext = webhookModel.decryptSecret(webhook);
   } catch {
-    // Undecryptable secret (e.g. rotated server SECRET) — skip, don't leak
+    // Undecryptable secret (e.g. rotated server SHELF_SECRET) — skip, don't leak
     logger?.warn({ webhookId: webhook.id }, "skipping webhook with undecryptable secret");
     return;
   }

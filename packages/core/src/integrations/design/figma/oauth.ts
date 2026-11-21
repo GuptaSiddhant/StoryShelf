@@ -1,5 +1,6 @@
 /** Figma OAuth 2 (authorization-code grant): consent URL, code exchange and refresh. */
 import type { OAuthClient, OAuthTokens } from "../../../adapters/oauth.ts";
+import { readSetting } from "../../../env-settings/read.ts";
 import { httpJson } from "../../../utils/index.ts";
 
 /** Operator-registered Figma OAuth app (Figma → Settings → OAuth apps). */
@@ -22,12 +23,12 @@ interface TokenResponse {
   expires_in?: number;
 }
 
-/** OAuth app credentials from `FIGMA_CLIENT_ID` / `FIGMA_CLIENT_SECRET`, or undefined when either is unset. */
+/** OAuth app credentials from `SHELF_FIGMA_CLIENT_ID` / `SHELF_FIGMA_CLIENT_SECRET`, or undefined when either is unset. */
 export function figmaOAuthFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): FigmaOAuthOptions | undefined {
-  const clientId = env["FIGMA_CLIENT_ID"];
-  const clientSecret = env["FIGMA_CLIENT_SECRET"];
+  const clientId = readSetting(env, "SHELF_FIGMA_CLIENT_ID");
+  const clientSecret = readSetting(env, "SHELF_FIGMA_CLIENT_SECRET");
   return clientId && clientSecret ? { clientId, clientSecret } : undefined;
 }
 

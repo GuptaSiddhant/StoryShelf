@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { detectPackageRunner } from "../../config.ts";
 import { createReporter, printError } from "../../output.ts";
 import type { Answers } from "./init/answers.ts";
+import { isCloud, runCloudInit } from "./init/cloud.ts";
 import { printNextSteps } from "./init/next-steps.ts";
 import { collectAnswers } from "./init/prompts.ts";
 import { writeFiles } from "./init/writers.ts";
@@ -13,6 +14,8 @@ import { writeFiles } from "./init/writers.ts";
 export interface ServerInitOptions {
   /** Output directory for the generated server (defaults to `storyshelf-server`). */
   dir?: string;
+  /** `aws`, `gcp` or `azure`: write a Terraform module stub instead of scaffolding a server. */
+  cloud?: string;
 }
 
 const NO_TERMINAL =
@@ -48,10 +51,22 @@ async function collectAnswersOrFail(dir?: string): Promise<Answers | null> {
  * then generates `server.ts`, `package.json`, and optional Docker files in
  * the chosen directory.
  *
- * @param options - `dir` skips the directory question; every other choice is asked interactively
+ * With `--cloud` it writes a Terraform module stub for that cloud instead.
+ *
+ * @param options - `dir` skips the directory question (every other choice is asked interactively);
+ *   `cloud` selects the Terraform stub
  */
 export async function runServerInit(options: ServerInitOptions): Promise<void> {
-  const answers = await collectAnswersOrFail(options.dir);
+  if (options.cloud !== undefined) {
+    await initCloud(options.cloud, options.dir);
+    return;
+  }
+  await scaffoldServer(options.dir);
+}
+
+/** Ask the questions, then write the server files and print the next steps. */
+async function scaffoldServer(dir: string | undefined): Promise<void> {
+  const answers = await collectAnswersOrFail(dir);
   if (answers === null) {
     process.exitCode = 1;
     return;
@@ -63,4 +78,11 @@ export async function runServerInit(options: ServerInitOptions): Promise<void> {
     await writeFiles(outDir, answers);
   });
   printNextSteps(answers, await detectPackageRunner(process.cwd()));
+}
+
+async function initCloud(cloud: string, dir: string | undefined): Promise<void> {
+  if (!isCloud(cloud)) {
+    throw new Error(`Unknown --cloud "${cloud}"; use aws, gcp or azure.`);
+  }
+  await runCloudInit(cloud, dir);
 }

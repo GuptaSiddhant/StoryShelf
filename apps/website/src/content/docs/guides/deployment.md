@@ -14,16 +14,16 @@ services:
     volumes:
       - storyshelf-data:/app/data
     environment:
-      - SECRET=$(openssl rand -hex 32) # ≥ 32 chars
-      - CAPTURE_CONCURRENCY=2
-      - PURGE_TTL_DAYS=30
+      - SHELF_SECRET=$(openssl rand -hex 32) # ≥ 32 chars
+      - SHELF_CAPTURE_CONCURRENCY=2
+      - SHELF_PURGE_TTL_DAYS=30
       - BRANCH_TTL_DAYS=30
       - BRANCH_GC_INTERVAL_MS=86400000
       # Auth (see /guides/auth/): local admin or SSO example
-      # - AUTH_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin, via invite flow)
-      # - OIDC_ISSUER=https://keycloak.example.com/realms/myteam
-      # - OIDC_CLIENT_ID=storyshelf
-      # - OIDC_CLIENT_SECRET=secret
+      # - SHELF_ADMIN_PASSWORD=a-long-admin-password   # ≥ 12 chars (local admin, via invite flow)
+      # - SHELF_OIDC_ISSUER=https://keycloak.example.com/realms/myteam
+      # - SHELF_OIDC_CLIENT_ID=storyshelf
+      # - SHELF_OIDC_CLIENT_SECRET=secret
 volumes:
   storyshelf-data:
 ```
@@ -60,7 +60,7 @@ Playwright's separate `staticCompression: true` option covers only its temporary
 
 ## Auth
 
-- **Local accounts** — invite-only email/password via the auth engine (`AUTH_PASSWORD` bootstraps the admin).
+- **Local accounts** — invite-only email/password via the auth engine (`SHELF_ADMIN_PASSWORD` bootstraps the admin).
 - **Social / enterprise SSO** — GitHub, Google, Entra, Keycloak, Okta, Auth0, SAML (see [Auth](/guides/auth/)).
 - **None** — for VPN-protected deployments.
 
@@ -82,12 +82,12 @@ storyshelf server init
 
 This generates `src/index.ts`, `package.json` and `tsconfig.json` with the correct imports and dependencies.
 
-| Layer         | Package                     | Notes                                        |
-| ------------- | --------------------------- | -------------------------------------------- |
-| Database      | `@storyshelf/db-sqlite`     | node:sqlite + Drizzle, WAL mode, single file |
+| Layer         | Package                          | Notes                                        |
+| ------------- | -------------------------------- | -------------------------------------------- |
+| Database      | `@storyshelf/db-sqlite`          | node:sqlite + Drizzle, WAL mode, single file |
 | Storage       | `@storyshelf/core/storage/local` | Local filesystem, `--data-dir`               |
-| Capture queue | Database queue (built-in)   | `capture_jobs` in your database, leased      |
-| Auth          | `@storyshelf/auth`          | Local accounts, social, SSO/SAML, passkeys   |
+| Capture queue | Database queue (built-in)        | `capture_jobs` in your database, leased      |
+| Auth          | `@storyshelf/auth`               | Local accounts, social, SSO/SAML, passkeys   |
 
 Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
@@ -99,16 +99,26 @@ Captures, publishing and notifications run in the background, after the upload's
 
 Set the host to keep at least one instance running, and, where the platform bills CPU only during requests, to keep CPU allocated between them:
 
-| Host | Setting |
-| --- | --- |
-| Fly.io | `min_machines_running = 1` and `auto_stop_machines = 'off'` under `[http_service]` in `fly.toml` (Fly's default is `'stop'` with `0`, which stops the machine when traffic stops) |
-| Google Cloud Run | `min_instance_count = 1` and CPU always allocated (`cpu_idle = false` in Terraform, `--no-cpu-throttling` with `gcloud`) |
-| Azure Container Apps | `min_replicas = 1` |
-| Render | A paid instance type that does not spin down: free web services spin down after a period without traffic, and their local filesystem is not kept, so SQLite and uploaded files on it are lost. Use a database and storage that live elsewhere (see the [recipes](./cloud/)) |
-| Railway | Turn off **Settings → Deploy → Serverless** and redeploy; Railway applies the setting when it creates a container |
-| Docker Compose, a VM, `npm start` | Nothing to change, provided the process is not stopped |
+| Host                              | Setting                                                                                                                                                                                                                                                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fly.io                            | `min_machines_running = 1` and `auto_stop_machines = 'off'` under `[http_service]` in `fly.toml` (Fly's default is `'stop'` with `0`, which stops the machine when traffic stops)                                                                                           |
+| Google Cloud Run                  | `min_instance_count = 1` and CPU always allocated (`cpu_idle = false` in Terraform, `--no-cpu-throttling` with `gcloud`)                                                                                                                                                    |
+| Azure Container Apps              | `min_replicas = 1`                                                                                                                                                                                                                                                          |
+| Render                            | A paid instance type that does not spin down: free web services spin down after a period without traffic, and their local filesystem is not kept, so SQLite and uploaded files on it are lost. Use a database and storage that live elsewhere (see the [recipes](./cloud/)) |
+| Railway                           | Turn off **Settings → Deploy → Serverless** and redeploy; Railway applies the setting when it creates a container                                                                                                                                                           |
+| Docker Compose, a VM, `npm start` | Nothing to change, provided the process is not stopped                                                                                                                                                                                                                      |
 
-The GCP and Azure reference stacks below already do this. Hosts that cannot do it are not suitable for capture: see [Capture refuses to start on a serverless host](/guides/troubleshooting/#capture).
+The GCP and Azure modules ([GCP](/guides/deployment/gcp/), [Azure](/guides/deployment/azure/)) already do this, and the AWS module keeps its service at one task or more. Hosts that cannot do it are not suitable for capture: see [Capture refuses to start on a serverless host](/guides/troubleshooting/#capture).
+
+### Shutdown
+
+A deploy or a scale-down sends SIGTERM. The app stops taking jobs and drains running captures for `SHELF_SHUTDOWN_GRACE_SECONDS`, then hands the rest back to the queue, so a restart does not cost an attempt. Keep the value below the platform's stop window, because a process killed anyway loses its lease and counts an attempt:
+
+| Platform             | SIGTERM window                                                            | `SHELF_SHUTDOWN_GRACE_SECONDS`                                 |
+| -------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| AWS ECS Fargate      | `stopTimeout`, up to 120 seconds                                          | The module sets 30, and `stopTimeout` to the grace plus 10     |
+| Google Cloud Run     | 10 seconds, not configurable                                              | 1 to 9, default 8 (the process exits 1 second after the drain) |
+| Azure Container Apps | The termination grace, which the module sets to the grace plus 10 seconds | 30                                                             |
 
 **The symptom** is builds that stay `pending` or `capturing`, and jobs on the **Compute jobs** page that look running, until someone opens the app, when they move for a while and then stall again. See [Troubleshooting](/guides/troubleshooting/#capture).
 
@@ -120,7 +130,7 @@ Tigris is an S3-compatible object store that Fly provisions with `fly storage cr
 import { createS3Storage } from "@storyshelf/storage-s3";
 
 const storage = createS3Storage({
-  bucket: process.env.AWS_BUCKET!,
+  bucket: process.env.SHELF_S3_BUCKET!,
   endpoint: process.env.AWS_ENDPOINT_URL_S3, // https://t3.storage.dev
   region: process.env.AWS_REGION ?? "auto",
 });
@@ -132,16 +142,16 @@ Credentials come from the SDK's default chain, so `AWS_ACCESS_KEY_ID` and `AWS_S
 
 Published Storybook files can sit behind a CDN. What a CDN may keep is decided by the `Cache-Control` each answer carries, which the server sets per request. A CDN must obey it: do not add a default TTL, do not override `private`, and do not cache by URL when the response is `private`.
 
-| Route | Who gets it | `Cache-Control` | A shared cache (CDN) may store it |
-| --- | --- | --- | --- |
-| `/_/<buildId>/*` (a ULID short link) | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/projects/:slug/storybook/build/<buildId>/*` | the same | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/_/<slug>/` (the project's latest build) | the same | `public, max-age=60` | yes, for a minute |
-| `/_/<slug>/*` (a slug, not the root) | the same | `public, max-age=3600` | yes, for an hour |
-| `/projects/:slug/storybook/build/<buildId>/` (the landing page, not a file) | the same | `public, no-cache` | revalidate only |
-| a private build, signed-in viewer with a role | `session` | `private, no-cache` | no |
-| `/_s/:token/*` (a signed URL) | the token holder | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no |
-| `/_r/:token/*` (a read grant) | the token holder | `private, no-store` | no |
+| Route                                                                       | Who gets it                                                 | `Cache-Control`                                                                                                  | A shared cache (CDN) may store it |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `/_/<buildId>/*` (a ULID short link)                                        | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/projects/:slug/storybook/build/<buildId>/*`                               | the same                                                    | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/_/<slug>/` (the project's latest build)                                   | the same                                                    | `public, max-age=60`                                                                                             | yes, for a minute                 |
+| `/_/<slug>/*` (a slug, not the root)                                        | the same                                                    | `public, max-age=3600`                                                                                           | yes, for an hour                  |
+| `/projects/:slug/storybook/build/<buildId>/` (the landing page, not a file) | the same                                                    | `public, no-cache`                                                                                               | revalidate only                   |
+| a private build, signed-in viewer with a role                               | `session`                                                   | `private, no-cache`                                                                                              | no                                |
+| `/_s/:token/*` (a signed URL)                                               | the token holder                                            | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no                                |
+| `/_r/:token/*` (a read grant)                                               | the token holder                                            | `private, no-store`                                                                                              | no                                |
 
 Rules for the CDN:
 
@@ -162,24 +172,24 @@ Several instances can share one database and one storage adapter. Some state is 
 - the database, including the capture and publish job queue (`capture_jobs`): any instance may take a job, and a lease recovers work from an instance that stops;
 - published files and manifests in the storage adapter;
 - the AI token budget: usage is counted from the database, so the daily limit holds across instances;
-- sessions and signed URLs, provided every instance has the same `SECRET`. Set it once and share it.
+- sessions and signed URLs, provided every instance has the same `SHELF_SECRET`. Set it once and share it.
 
 **Per process** (each instance has its own copy):
 
 - the manifest cache (a bounded cache per storage adapter) and the catalog cache (`catalog.json` by build id): a cold instance reads storage once; the entries are immutable, so this never causes a stale answer;
 - the rate-limit buckets: a client's count lives in the instance it reaches;
 - the remote-browser connection limiter (`maxConnections`), and the page limit of each capture run (it is set per run and the adaptive controller is per run, so every instance renders its own runs' pages);
-- the capture consumer: each instance runs its own, so `CAPTURE_CONCURRENCY` applies per instance.
+- the capture consumer: each instance runs its own, so `SHELF_CAPTURE_CONCURRENCY` applies per instance.
 
 What this means for configured limits with N instances:
 
-| Limit | Total across N instances |
-| --- | --- |
+| Limit                                           | Total across N instances                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `/api/v1/*`, sign-in and signed-URL rate limits | up to N × the configured count for one client, when a load balancer spreads that client over instances |
-| `CAPTURE_CONCURRENCY` | N × the value captures run at once; each capture drives a browser |
-| remote-browser `maxConnections` | N × the value connections to a remote service; divide a provider's session limit by N |
-| pages rendered at once by capture runs | N × the page count of one run: each instance runs its own jobs |
-| AI token budget | not multiplied: it is counted from the database |
+| `SHELF_CAPTURE_CONCURRENCY`                     | N × the value captures run at once; each capture drives a browser                                      |
+| remote-browser `maxConnections`                 | N × the value connections to a remote service; divide a provider's session limit by N                  |
+| pages rendered at once by capture runs          | N × the page count of one run: each instance runs its own jobs                                         |
+| AI token budget                                 | not multiplied: it is counted from the database                                                        |
 
 Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
 
@@ -191,14 +201,14 @@ Rendering scales on the browser side, not by adding processes: every instance ru
 
 Capture drives Chromium, which dominates memory use. Each open page costs roughly 100–300 MB, so StoryShelf renders a bounded number of pages at once rather than every story together.
 
-| Setting                                                                                       | Default                                                       | What it controls                                                 |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `testing.concurrency`                                                                         | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
-| `createCaptureRunner({ concurrency })` / `STORYSHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
-| `createCaptureRunner({ navigationTimeoutMs })` / `STORYSHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
+| Setting                                                                        | Default                                                       | What it controls                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `testing.concurrency`                                                          | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `createCaptureRunner({ concurrency })` / `SHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
+| `createCaptureRunner({ navigationTimeoutMs })` / `SHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
 
-| `createCaptureRunner({ reusePages })` / `STORYSHELF_REUSE_PAGES` | on | Reuse a pool of reset pages instead of opening one per capture; `false` or `0` opens a fresh page each time |
-| `createCaptureRunner({ recycleBrowserEvery })` / `STORYSHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
+| `createCaptureRunner({ reusePages })` / `SHELF_REUSE_PAGES` | on | Reuse a pool of reset pages instead of opening one per capture; `false` or `0` opens a fresh page each time |
+| `createCaptureRunner({ recycleBrowserEvery })` / `SHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
 
 The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
 
@@ -213,7 +223,7 @@ More pages than CPUs does not make capture faster: the pages compete for the sam
 
 Screenshots are written to storage as each one is captured instead of being held until the whole build has rendered, so memory use no longer grows with the number of stories.
 
-Captures reuse a small pool of pages by default. Each page runs in its own browser context and is reset between captures (cookies, local and session storage and IndexedDB cleared, blank document), a page is resized when the viewport changes, and a page that failed a capture is thrown away rather than reused. Set `reusePages: false` (or `STORYSHELF_REUSE_PAGES=0`) to open a fresh page per capture, for example if a story leaks state outside those resets and affects the next one. Reuse mostly saves page startup time, which matters most on slower hosts.
+Captures reuse a small pool of pages by default. Each page runs in its own browser context and is reset between captures (cookies, local and session storage and IndexedDB cleared, blank document), a page is resized when the viewport changes, and a page that failed a capture is thrown away rather than reused. Set `reusePages: false` (or `SHELF_REUSE_PAGES=0`) to open a fresh page per capture, for example if a story leaks state outside those resets and affects the next one. Reuse mostly saves page startup time, which matters most on slower hosts.
 
 Chromium grows slowly over a long run, so a local browser is closed and relaunched every 150 captures. A connected remote target is instead disconnected and reconnected, never sent `Browser.close`, so sibling clients and the provider machine survive. The restart happens between batches, after in-flight pages finish, so no capture is interrupted. At the start of every render the runner logs a `capture sizing` line with the detected `cpus` and `memoryMb` and the resulting `pages`, `navigationTimeoutMs` and `recycleBrowserEvery`; check it first if a host behaves differently from the table.
 
@@ -225,13 +235,26 @@ Storing the uploaded Storybook for the published preview handles at most 8 files
 
 If builds still run out of memory, lower the runner concurrency first, then add RAM.
 
-## Cloud reference stacks
+## Supported targets
 
-Enterprise Terraform stacks are available per cloud — each scaffolds one app (it also runs the captures from the database queue), database, storage, auth, and optional DNS/TLS. See the dedicated pages for commands, env wiring, and stable output contracts:
+These targets are documented and tested in CI or nightly ([ADR 0050](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0050-cloud-deployment.md), decision 5).
 
-- [AWS — ECS + S3 + Postgres + Cognito](./aws/) — `s3_bucket`, `db_endpoint`, `user_pool_id`
-- [Azure — Container Apps + Blob + Postgres + Entra](./azure/) — `storage_connection_string`, `entra_application_id`
-- [GCP — Cloud Run + GCS + Postgres + Identity Platform](./gcp/) — `run_url`, `gcs_bucket`, `database_url`
-- [Cloud assembly — all clouds equal](./cloud/) — swap each layer independently, with serverless hosting only on Vercel, Cloudflare Workers and Lambda, plus Postgres provider recipes
+| Target                      | What runs                                        | Status                                                                         |
+| --------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Docker or Compose           | The full product, with capture                   | Supported. See [Docker Compose](/guides/deployment/docker-compose/).           |
+| Fly                         | The full product, with capture                   | Supported.                                                                     |
+| AWS ECS Fargate             | The full product, with capture                   | Supported. See [AWS](/guides/deployment/aws/).                                 |
+| GCP Cloud Run               | The full product, with capture                   | Supported. See [GCP](/guides/deployment/gcp/).                                 |
+| Azure Container Apps        | The full product, with capture                   | Supported. See [Azure](/guides/deployment/azure/).                             |
+| Vercel, Netlify, AWS Lambda | The app **without capture** (hosting and review) | Supported. A runner is refused on Lambda and warned on Vercel and Netlify.     |
+| Kubernetes (a Helm chart)   |                                                  | **Not supported yet.** Run the image yourself; a chart follows when users ask. |
+| Cloudflare Workers          |                                                  | **Not supported yet.** It waits on the blockers reported in #396.              |
 
-For single-host Docker Compose or a bare `npm start` on Fly/Railway/Render/VPS, the [Docker Compose](./docker-compose/) page covers the compose file, subdomains, and auth. The cloud assembly page also includes minimal `Turso + S3` and `Postgres + S3` recipes that run on any `fetch`+`crypto` platform.
+The three clouds each have a versioned Terraform module in `deploy/terraform/` that deploys the published image on one container service with a managed Postgres, a storage bucket and a secret store. Each page also lists the exact permissions and the environment to copy if your team won't use the module.
+
+- [AWS: ECS Fargate, S3, RDS Postgres, Cognito](/guides/deployment/aws/)
+- [GCP: Cloud Run, GCS, Cloud SQL Postgres](/guides/deployment/gcp/)
+- [Azure: Container Apps, Blob, PostgreSQL Flexible Server](/guides/deployment/azure/)
+- [Cloud assembly](/guides/deployment/cloud/): swap each layer on its own, with Postgres provider recipes
+
+The modules use Postgres only. Capture runs in the app's container, and remote browsers are optional. For single-host Docker Compose or a bare `npm start` on Fly, Railway, Render or a VPS, the [Docker Compose](/guides/deployment/docker-compose/) page covers the compose file, subdomains and auth.

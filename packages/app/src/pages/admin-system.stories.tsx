@@ -168,7 +168,7 @@ const integrationStatuses: IntegrationsView["statuses"] = [
     kind: "email",
     name: "Email",
     state: "unavailable",
-    reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+    reason: "Email has no transport: set SHELF_SMTP_HOST and SHELF_SMTP_FROM or configure a sender",
   },
   { group: "notifiers", kind: "slack-webhook", name: "Slack", state: "available" },
   {
@@ -210,7 +210,8 @@ export const IntegrationsTurnedOffChannels = pageStory(() =>
             provider: "email",
             providerName: "Email",
             project: { name: "Design System", href: "/projects/design-system/settings/review" },
-            reason: "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender",
+            reason:
+              "Email has no transport: set SHELF_SMTP_HOST and SHELF_SMTP_FROM or configure a sender",
           },
           {
             id: "01JD000000000000000000CHN011",

@@ -260,7 +260,7 @@ function credentialsEntry(probe: CredentialProbe): AdapterReportFull {
   const unreadable = probe.unreadable.length;
   let detail: string | undefined;
   if (unreadable > 0) {
-    detail = `${unreadable} stored credential(s) cannot be decrypted; check SECRET and SECRET_PREVIOUS`;
+    detail = `${unreadable} stored credential(s) cannot be decrypted; check SHELF_SECRET and SHELF_SECRET_PREVIOUS`;
   } else if (probe.previous > 0) {
     detail = `${probe.previous} credential(s) still encrypted with the previous secret; re-encrypt from the System page`;
   }

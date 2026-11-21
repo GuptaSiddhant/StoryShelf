@@ -158,15 +158,6 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Setup Terraform
-        # The cli's terraform-*.integration.test.ts skip without a terraform binary, so install one
-        # here: `fmt -check` and `validate` of the generated AWS/GCP/Azure output run on every PR.
-        # 1.9.x matches TERRAFORM_REQUIRED_VERSION (">= 1.9") in packages/cli.
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.x"
-          terraform_wrapper: false
-
       - name: Check ADR references and size
         run: nub run docs:check
 
@@ -185,8 +176,6 @@ jobs:
         # per-package vitest worker pools from oversubscribing a small runner.
         env:
           TURBO_CONCURRENCY: "1"
-          # Switches on the Terraform scaffold suites in packages/cli (setup-terraform installs the binary).
-          RUN_TERRAFORM: "1"
           TURBO_SCM_BASE: origin/main
           TURBO_SCM_HEAD: HEAD
         run: |
@@ -528,13 +517,112 @@ jobs:
         run: |
           set -e
           for variant in storyshelf:ci storyshelf:ci-hosting; do
-            # No sign-in on purpose: the image refuses to start without AUTH_PASSWORD unless told.
+            # No sign-in on purpose: the image refuses to start without SHELF_ADMIN_PASSWORD unless told.
             docker run -d --name smoke -p 3000:3000 -e SHELF_AUTH=none "$variant"
             if ! SMOKE_BASE_URL=http://127.0.0.1:3000 bash scripts/smoke.sh; then
               docker logs smoke
               exit 1
             fi
             docker rm -f smoke
+          done
+
+      # The smoke above boots with no database variables, so it cannot see a missing runtime module
+      # on the RDS IAM path (the signer and pg are loaded only there). Boot the full image with a
+      # complete IAM configuration aimed at a closed port: it must get as far as the connection
+      # (ECONNREFUSED), never ERR_MODULE_NOT_FOUND, and never fall back to SQLite.
+      - name: RDS IAM path loads its modules
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          # No sign-in on purpose, as in the smoke above: the image refuses to start without
+          # SHELF_ADMIN_PASSWORD unless told, and that check runs before the database connection.
+          docker run -d --name iam -e SHELF_AUTH=none \
+            -e AWS_ACCESS_KEY_ID=x -e AWS_SECRET_ACCESS_KEY=y \
+            -e SHELF_DATABASE_IAM_HOST=127.0.0.1 -e SHELF_DATABASE_IAM_PORT=1 \
+            -e SHELF_DATABASE_IAM_USER=shelf -e SHELF_DATABASE_IAM_NAME=shelf -e SHELF_DATABASE_IAM_REGION=us-east-1 \
+            storyshelf:ci
+          for _ in $(seq 1 30); do
+            docker logs iam > iam.log 2>&1 || true
+            if grep -q 'ECONNREFUSED\|ERR_MODULE_NOT_FOUND' iam.log; then break; fi
+            sleep 1
+          done
+          cat iam.log
+          docker rm -f iam
+          if grep -q 'ERR_MODULE_NOT_FOUND' iam.log || ! grep -q 'ECONNREFUSED' iam.log; then
+            echo "::error::the RDS IAM path did not reach the database connection"
+            exit 1
+          fi
+
+      # The step above stops at ECONNREFUSED, before pg asks for a password, so it never signs a
+      # token and would not notice the signer going missing again. The image carries only the root
+      # node_modules, so the bundle must hold `@aws-sdk/rds-signer` itself: no bare import of any
+      # `@aws-sdk/*` may remain in the built files.
+      - name: Bundle has no bare @aws-sdk import
+        if: steps.filter.outputs.run == 'true'
+        run: |
+          set -e
+          docker run --rm --entrypoint sh storyshelf:ci -c \
+            "grep -rnE '(import\\(|from ) ?[\"'\"'\"']@aws-sdk' dist --include='*.js' --include='*.mjs' || true" > bare.log
+          cat bare.log
+          if [ -s bare.log ]; then
+            echo "::error::dist imports @aws-sdk by bare name; the image has no such module at runtime"
+            exit 1
+          fi
+
+  # Terraform modules under deploy/ (#891, ADR 0050): fmt, validate and tflint for every module.
+  # Runs only for a change that can alter them; the filter lives in this job so `changes` stays untouched.
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Did a module change?
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            git diff --name-only HEAD^1 HEAD > changed.txt || echo "diff failed; checking" >&2
+            if [ -s changed.txt ] && ! grep -qE '^(deploy/|\.tflint\.hcl|\.github/workflows/ci\.yml)' changed.txt; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Terraform
+        if: steps.filter.outputs.run == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Setup tflint
+        if: steps.filter.outputs.run == 'true'
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.53.0
+
+      - name: fmt, validate and tflint every module
+        if: steps.filter.outputs.run == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          tflint --init --config="$PWD/.tflint.hcl"
+          terraform fmt -check -recursive deploy/
+          # Every module and every example: a directory with a versions.tf, or an example's main.tf.
+          for dir in $(find deploy/terraform -name '*.tf' -printf '%h\n' | sort -u); do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            tflint --chdir="$dir" --config="$PWD/.tflint.hcl"
+            echo "::endgroup::"
           done
 
   # What a user gets (#393 launch slice, #1134 B5): every public package packed with `npm pack`,
@@ -581,6 +669,7 @@ jobs:
         run: node scripts/packed-install-smoke.mjs --storybook fixtures/storybook-9
 
   # The one check to require in branch protection (with `changeset` from changeset.yml): `capture`
+
   # and `fly` are skipped for docs-only PRs, and a skipped reusable-workflow job creates no child
   # checks, so requiring those by name would wait forever. This passes when every job passed or
   # was skipped.
@@ -600,6 +689,7 @@ jobs:
         fly,
         image,
         packed-install,
+        deploy,
       ]
     runs-on: ubuntu-latest
     timeout-minutes: 5

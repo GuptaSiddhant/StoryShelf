@@ -42,7 +42,8 @@ jobs:
     name: upload to storyshelf-ui
     runs-on: ubuntu-latest
     env:
-      STORYSHELF_TOKEN: ${{ secrets.STORYSHELF_UI_TOKEN }}
+      # SHELF_TOKEN: every published CLI reads it (STORYSHELF_TOKEN is its old name, #1308).
+      SHELF_TOKEN: ${{ secrets.STORYSHELF_UI_TOKEN }}
     steps:
       # Fork PRs get no secrets and a missing token is a setup gap, not a failure: skip with a notice.
       - name: Check this run can upload
@@ -53,7 +54,7 @@ jobs:
           if [ "$IS_FORK" = "true" ]; then
             echo "::notice title=Skipped::Fork pull requests have no secrets, so the Storybook is not uploaded to the demo."
             echo "run=false" >> "$GITHUB_OUTPUT"
-          elif [ -z "$STORYSHELF_TOKEN" ]; then
+          elif [ -z "$SHELF_TOKEN" ]; then
             echo "::notice title=Skipped::STORYSHELF_UI_TOKEN is not set, so the Storybook is not uploaded to the demo."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
@@ -114,15 +115,15 @@ jobs:
           UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
           DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-          # ADR 0044: a commit that changes no story gets a skipped build instead of an upload. Set
-          # through the environment (the same switch as --skip-unchanged) so an older published CLI
-          # ignores it instead of failing on an unknown option. `--full` above always wins.
-          STORYSHELF_SKIP_UNCHANGED: "1"
         run: |
           # The Storybook imports the workspace packages through their built dist, so the module
           # graph cannot match a changed packages/*/src file to a story. When one of them changed,
           # render everything, also when the diff cannot be computed; a change confined to packages/app is traced.
-          mode=""
+          # ADR 0044: a commit that changes no story gets a skipped build instead of an upload. A flag,
+          # not an environment variable: every published CLI since 0.14 takes it, while the variable's
+          # name changed in 0.15 (#1308) and a 0.15 CLI refuses to run with the old one set.
+          # `--full` always wins over it.
+          mode="--skip-unchanged"
           if [ -z "$DIFF_BASE" ] || ! changed=$(git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/affected') || [ -n "$changed" ]; then
             mode="--full"
           fi

@@ -26,7 +26,7 @@ storyshelf init --url https://shelf.example.com --slug my-app
 Create a project on the server (requires site-admin token and `.storybook/main.*`):
 
 ```sh
-storyshelf create --url https://shelf.example.com --name my-app --token $STORYSHELF_ADMIN_TOKEN
+storyshelf create --url https://shelf.example.com --name my-app --token $SHELF_ADMIN_TOKEN
 # prints slug + CI token and writes .storybook/storyshelf.json
 ```
 
@@ -50,7 +50,7 @@ storyshelf init --url <url> --slug <slug> [--build-dir <dir> --build-command <cm
 
 ```sh
 storyshelf create --url <url> --name <name> --token <admin-token>
-# or env STORYSHELF_ADMIN_TOKEN / ADMIN_TOKEN
+# or env SHELF_ADMIN_TOKEN
 ```
 
 `storyshelf server init` — scaffold a new StoryShelf server project.
@@ -59,7 +59,7 @@ storyshelf create --url <url> --name <name> --token <admin-token>
 storyshelf server init --dir <dir>
 ```
 
-`storyshelf upload` — upload a built Storybook as a build. `--url/--slug` optional when `.storybook/storyshelf.json` exists (flags > env > file). `--token/--sha/--branch` fallback to `STORYSHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME`. Running `storyshelf` with no args defaults to `upload` if config exists, else shows help to run `init`.
+`storyshelf upload` — upload a built Storybook as a build. `--url/--slug` optional when `.storybook/storyshelf.json` exists (flags > env > file). `--token/--sha/--branch` fallback to `SHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME`. Running `storyshelf` with no args defaults to `upload` if config exists, else shows help to run `init`.
 
 ```sh
 storyshelf upload --url <url> --slug <slug> --token <token> \
@@ -108,7 +108,7 @@ jobs:
       - run: nubx storybook build -o storybook-static
       - run:
           nubx storyshelf upload \
-          --token "${{ secrets.STORYSHELF_TOKEN }}" \
+          --token "${{ secrets.SHELF_TOKEN }}" \
           --sha "${{ github.sha }}" \
           --branch "${{ github.ref_name }}"
           # --url/--slug from .storybook/storyshelf.json

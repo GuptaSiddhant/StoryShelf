@@ -68,7 +68,7 @@ describe("get started card", () => {
     expect(html).not.toContain("evil.example.com");
     expect(html).toContain("--url &lt;your-storyshelf-url&gt;");
     expect(html).toContain("--slug docs");
-    expect(html).toMatch(/STORYSHELF_TOKEN=shelf_/u);
+    expect(html).toMatch(/SHELF_TOKEN=shelf_/u);
   });
 
   it("uses the confirmed public origin when there is one", async () => {

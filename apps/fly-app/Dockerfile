@@ -55,7 +55,7 @@ COPY --from=builder /app/node_modules ./node_modules
 RUN node node_modules/playwright-core/cli.js install --with-deps --only-shell chromium
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DATA_DIR=/data
+ENV SHELF_DATA_DIR=/data
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

@@ -42,7 +42,7 @@ USER node
 RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
 COPY --chown=node:node --from=pruner /app/out/full ./
-# Bundle the workspace into one file; pino, Playwright and sharp stay external (rolldown.config.ts).
+# Bundle the workspace into one file; pino, pg, Playwright and sharp stay external (rolldown.config.ts).
 RUN nubx rolldown -c apps/server-image/rolldown.config.ts
 
 # Shared by both variants: the bundle, tini and a non-root user that owns /data.
@@ -58,7 +58,7 @@ COPY --from=builder /app/node_modules ./node_modules
 RUN mkdir -p /data && chown node:node /data
 ENV NODE_ENV=production \
     PORT=3000 \
-    DATA_DIR=/data
+    SHELF_DATA_DIR=/data
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

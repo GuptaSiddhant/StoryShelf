@@ -232,21 +232,21 @@ describe("worker count", () => {
     expect(resolveDiffWorkers({}, 1)).toBe(1);
   });
 
-  it("honours STORYSHELF_DIFF_WORKERS, including 0, and ignores junk", () => {
+  it("honours SHELF_DIFF_WORKERS, including 0, and ignores junk", () => {
     expect(resolveDiffWorkers({ [DIFF_WORKERS_ENV]: "3" }, 8)).toBe(3);
     expect(resolveDiffWorkers({ [DIFF_WORKERS_ENV]: "0" }, 8)).toBe(0);
     expect(resolveDiffWorkers({ [DIFF_WORKERS_ENV]: "-1" }, 8)).toBe(7);
     expect(resolveDiffWorkers({ [DIFF_WORKERS_ENV]: "abc" }, 8)).toBe(7);
   });
 
-  it("STORYSHELF_DIFF_WORKERS=0 runs diffImagesAsync in-thread", async () => {
+  it("SHELF_DIFF_WORKERS=0 runs diffImagesAsync in-thread", async () => {
     process.env[DIFF_WORKERS_ENV] = "0";
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(
       await diffImages(base(), changed(), failOnResize),
     );
   });
 
-  it("compare.threads beats STORYSHELF_DIFF_WORKERS and can be changed at runtime", async () => {
+  it("compare.threads beats SHELF_DIFF_WORKERS and can be changed at runtime", async () => {
     process.env[DIFF_WORKERS_ENV] = "3";
     configureImages({ threads: 0 });
     expect(await diffImagesAsync(base(), changed(), failOnResize)).toEqual(

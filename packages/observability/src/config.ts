@@ -1,3 +1,4 @@
+import { readSetting } from "@storyshelf/core/config";
 /**
  * Environment-driven observability configuration.
  *
@@ -72,7 +73,7 @@ export function resolveObservabilityConfig(
 ): ObservabilityConfig {
   const endpoint = env["OTEL_EXPORTER_OTLP_ENDPOINT"];
   const sdkDisabled = env["OTEL_SDK_DISABLED"] === "true";
-  const explicit = env["STORYSHELF_OTEL_ENABLED"];
+  const explicit = readSetting(env, "SHELF_OTEL_ENABLED");
   const enabled = !sdkDisabled && (explicit ? explicit === "true" : Boolean(endpoint));
   return {
     enabled,
@@ -81,7 +82,7 @@ export function resolveObservabilityConfig(
     serviceName: env["OTEL_SERVICE_NAME"] ?? DEFAULT_SERVICE_NAME,
     serviceVersion: serviceVersion ?? packageVersion(),
     metricsIntervalMs: parseInterval(
-      env["STORYSHELF_OTEL_METRICS_INTERVAL_MS"],
+      readSetting(env, "SHELF_OTEL_METRICS_INTERVAL_MS"),
       DEFAULT_METRICS_INTERVAL_MS,
     ),
   };

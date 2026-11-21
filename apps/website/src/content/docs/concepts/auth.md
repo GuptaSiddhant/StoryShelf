@@ -37,7 +37,7 @@ Adding a new provider is a preset (pure config) — no UI code. Sole `oauth`/`ss
 
 ## Invite-only local accounts
 
-No self-registration. Admins call `shelf.adapter.issueInvite({ email, name, role })` → one-time link `/auth/invites/<inviteId>?token=<token>` (relay out-of-band; fictional addresses like `front-desk@internal` work because emails are identifiers, not mailboxes). Tokens are `sha256`-hashed at rest, single-use, 7-day TTL, superseded on re-issue — re-invite is also password recovery. `acceptInvite` writes engine `user` + `credential` account rows directly with [Better Auth's hasher](https://www.better-auth.com/docs/concepts/email-and-password). Dev/fly servers bootstrap an env admin via `ensurePasswordAdmin` (`AUTH_PASSWORD` ≥12, `AUTH_EMAIL` optional).
+No self-registration. Admins call `shelf.adapter.issueInvite({ email, name, role })` → one-time link `/auth/invites/<inviteId>?token=<token>` (relay out-of-band; fictional addresses like `front-desk@internal` work because emails are identifiers, not mailboxes). Tokens are `sha256`-hashed at rest, single-use, 7-day TTL, superseded on re-issue — re-invite is also password recovery. `acceptInvite` writes engine `user` + `credential` account rows directly with [Better Auth's hasher](https://www.better-auth.com/docs/concepts/email-and-password). Dev/fly servers bootstrap an env admin via `ensurePasswordAdmin` (`SHELF_ADMIN_PASSWORD` ≥12, `SHELF_ADMIN_EMAIL` optional).
 
 ## Passkeys
 

@@ -4,7 +4,7 @@ import { version } from "./version.ts";
 
 /** What the unconfigured sender says about itself and to a send. */
 export const NOT_CONFIGURED =
-  "Email has no transport: set SMTP_HOST and SMTP_FROM or configure a sender";
+  "Email has no transport: set SHELF_SMTP_HOST and SHELF_SMTP_FROM or configure a sender";
 
 /**
  * The transport of the built-in email notifier until an operator wires one (ADR 0049): sending

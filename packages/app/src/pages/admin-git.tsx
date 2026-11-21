@@ -278,8 +278,8 @@ function OriginNotice(props: {
     <div class="mb-1">
       <Alert tone="warning" title="Connect GitHub needs a public origin">
         GitHub returns to this server's public address, and none is confirmed yet. Confirm it on the{" "}
-        <a href="/admin">System page</a>, or set <code>PUBLIC_BASE_URL</code>. An existing App and a
-        GitLab token can still be added.
+        <a href="/admin">System page</a>, or set <code>SHELF_PUBLIC_BASE_URL</code>. An existing App
+        and a GitLab token can still be added.
       </Alert>
     </div>
   ) : null;

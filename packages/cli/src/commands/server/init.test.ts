@@ -173,143 +173,15 @@ describe("runServerInit", () => {
     expect(existsSync(dir)).toBe(false);
   });
 
-  it("writes the AWS reference stack and forces postgres/s3", async () => {
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        deployTarget: "aws",
-        database: "sqlite",
-        storage: "local",
-        auth: "oauth",
-        git: "git",
-        docker: false,
-      })
-      .mockResolvedValueOnce({
-        awsRegion: "eu-west-1",
-        domainName: "",
-        samlMetadataUrl: "",
-      });
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
-    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(serverCode).toContain("createPostgresDatabase");
-    expect(serverCode).toContain("createS3Storage");
-    expect(serverCode).toContain("cognitoPreset");
-    expect(serverCode).toContain("testing: { runner: captureRunner },");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
-    expect(existsSync(join(dir, "Dockerfile.worker"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "database.tf"))).toBe(true);
-    const databaseTf = readFileSync(join(dir, "terraform", "database.tf"), "utf8");
-    expect(databaseTf).toContain("aws_db_instance");
-    expect(databaseTf).not.toContain("dsql");
-    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-      scripts: Record<string, string>;
-    };
-    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
-    expect(pkg.scripts["infra:plan"]).toBeDefined();
-    expect(pkg.scripts["infra:apply"]).toBeDefined();
-    expect(pkg.scripts["docker:up"]).toBeUndefined();
-  });
-
-  it("writes the Azure reference stack and forces postgres/azure", async () => {
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        deployTarget: "azure",
-        database: "sqlite",
-        storage: "local",
-        auth: "oauth",
-        git: "git",
-        docker: false,
-      })
-      .mockResolvedValueOnce({
-        azureLocation: "westeurope",
-        domainName: "",
-        entraTenantId: "",
-      });
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
-    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(serverCode).toContain("createPostgresDatabase");
-    expect(serverCode).toContain("createAzureStorage");
-    expect(serverCode).not.toContain("cognitoPreset");
-    expect(serverCode).toContain("OIDC_ISSUER");
-    expect(serverCode).toContain("testing: { runner: captureRunner },");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
-    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-      scripts: Record<string, string>;
-    };
-    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/storage-azure"]).toBeDefined();
-    expect(pkg.dependencies["@azure/service-bus"]).toBeUndefined();
-    expect(pkg.scripts["infra:plan"]).toBeDefined();
-    expect(pkg.scripts["infra:apply"]).toBeDefined();
-    expect(pkg.scripts["docker:up"]).toBeUndefined();
-  });
-
-  it("writes the GCP reference stack and forces postgres/gcs", async () => {
-    vi.mocked(prompts)
-      .mockResolvedValueOnce({
-        name: "my-server",
-        dir: "./my-server",
-        deployTarget: "gcp",
-        database: "sqlite",
-        storage: "local",
-        auth: "oauth",
-        git: "git",
-        docker: false,
-      })
-      .mockResolvedValueOnce({
-        gcpProjectId: "acme-gcp-project",
-        gcpLocation: "europe-west1",
-        domainName: "",
-        identityTenant: "",
-      });
-    const cwd = process.cwd();
-    process.chdir(tmpRoot);
-    try {
-      await runServerInit({});
-    } finally {
-      process.chdir(cwd);
-    }
-
-    const serverCode = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(serverCode).toContain("createPostgresDatabase");
-    expect(serverCode).toContain("createGcsStorage");
-    expect(serverCode).toContain("testing: { runner: captureRunner },");
-    expect(serverCode).not.toContain("cognitoPreset");
-    expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "queue.tf"))).toBe(false);
-    expect(existsSync(join(dir, "terraform", "terraform.tfvars.example"))).toBe(true);
-    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
-      dependencies: Record<string, string>;
-      scripts: Record<string, string>;
-    };
-    expect(pkg.dependencies["@storyshelf/db-postgres"]).toBeDefined();
-    expect(pkg.dependencies["@storyshelf/storage-gcs"]).toBeDefined();
-    expect(pkg.dependencies["@google-cloud/pubsub"]).toBeUndefined();
-    expect(pkg.scripts["infra:plan"]).toBeDefined();
-    expect(pkg.scripts["infra:apply"]).toBeDefined();
-    expect(pkg.scripts["docker:up"]).toBeUndefined();
+  it("writes the Terraform module stub with --cloud and rejects an unknown cloud", async () => {
+    vi.mocked(prompts).mockResolvedValueOnce({
+      name: "shelf",
+      location: "us-east-1",
+      allowedCidrBlocks: "10.0.0.0/8",
+    });
+    await runServerInit({ cloud: "aws", dir: join(tmpRoot, "infra") });
+    expect(existsSync(join(tmpRoot, "infra", "main.tf"))).toBe(true);
+    await expect(runServerInit({ cloud: "fly" })).rejects.toThrow("Unknown --cloud");
   });
 });
 

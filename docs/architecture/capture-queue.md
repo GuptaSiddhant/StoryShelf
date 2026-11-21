@@ -65,7 +65,7 @@ runs, and once the handler stopped (within the reserve) the job is handed back w
 instead (outcome `lost`). Only the current holder hands back: the job-row write is conditional on
 its running attempt, so a superseded holder writes nothing, and a job whose cancel was asked ends
 `cancelled` instead. The stop resolves by `graceMs` even when a hand-back or ack stalls. The app passes the grace through
-`lifecycle.teardown({ graceMs })`; the hosts read `SHUTDOWN_GRACE_SECONDS`, to be set a few seconds
+`lifecycle.teardown({ graceMs })`; the hosts read `SHELF_SHUTDOWN_GRACE_SECONDS`, to be set a few seconds
 below the platform's stop timeout (the Fly host defaults to 3 s, under Fly's 5 s); unset waits for
 every job. The runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
