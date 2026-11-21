@@ -492,10 +492,11 @@ describe("malformedChangesets, unknown packages", () => {
   });
 });
 
+const file = (kind, schema) =>
+  `---\n"@storyshelf/core": minor\n---\n\n${kind}: drops a column\n\nDetails.\n${schema}\n`;
+
 describe("checkSchemaBreak", () => {
   const added = [".changeset/drop-column.md"];
-  const file = (kind, schema) =>
-    `---\n"@storyshelf/core": minor\n---\n\n${kind}: drops a column\n\nDetails.\n${schema}\n`;
   const run = (text, extra = {}) =>
     checkSchemaBreak({ labels: ["schema-break"], added, read: () => text, ...extra });
 
@@ -504,7 +505,10 @@ describe("checkSchemaBreak", () => {
   });
 
   it("passes a Breaking changeset whose Schema line names the step", () => {
-    assert.equal(run(file("Breaking", "Schema: drops builds.legacy_flag (contract step)")).ok, true);
+    assert.equal(
+      run(file("Breaking", "Schema: drops builds.legacy_flag (contract step)")).ok,
+      true,
+    );
   });
 
   it("fails without a changeset, or with a non-Breaking kind", () => {
