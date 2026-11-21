@@ -145,9 +145,10 @@ async function createProjectWithBaseline(): Promise<void> {
   });
   if (!response.ok) throw new Error(`create project answered ${response.status}`);
   SLUG = ((await response.json()) as { slug: string }).slug;
+  // Both shas (this one and the variant's below) must be hex: the API validates them (#1278).
   const baseline = await upload(
     FIXTURE_STATIC,
-    `base${Date.now().toString(16)}`.padEnd(40, "0"),
+    `ba5e${Date.now().toString(16)}`.padEnd(40, "0"),
     "main",
   );
   await settled(baseline);
