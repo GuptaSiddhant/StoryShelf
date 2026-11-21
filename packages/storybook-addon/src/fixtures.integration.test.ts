@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
   Browser,
   chromium as Chromium,
-} from "../../runner-playwright/node_modules/playwright-core/index.js";
+} from "../../runner/node_modules/playwright-core/index.js";
 
 /**
  * Loads the built addon in the built Storybook of each fixture (ADR 0042, decision 4): 8.6, 9 and
@@ -17,8 +17,8 @@ import type {
  */
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
-// Playwright is `runner-playwright`'s dependency; this package declares none of its own.
-const { chromium } = createRequire(join(root, "packages/runner-playwright/package.json"))(
+// Playwright is `runner`'s dependency; this package declares none of its own.
+const { chromium } = createRequire(join(root, "packages/runner/package.json"))(
   "playwright-core",
 ) as { chromium: typeof Chromium };
 const presetFile = join(root, "packages/storybook-addon/dist/preset.mjs");

@@ -6,7 +6,7 @@ import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { azurePlaywright } from "@storyshelf/runner-playwright/remote";
+import { azurePlaywright } from "@storyshelf/runner/remote";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
 import { readFileSync } from "node:fs";

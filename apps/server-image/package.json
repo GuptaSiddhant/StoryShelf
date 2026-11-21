@@ -18,7 +18,7 @@
     "@storyshelf/db-postgres": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
-    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/runner": "workspace:*",
     "@storyshelf/storage-s3": "workspace:*",
     "reflect-metadata": "^0.2.2"
   },
