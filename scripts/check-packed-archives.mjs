@@ -98,7 +98,10 @@ function readTarball(tarball) {
     if (result.status !== 0) {
       throw new Error(`cannot unpack ${tarball}: ${result.stderr}`);
     }
-    const listing = spawnSync("tar", ["-tzf", tarball], { encoding: "utf8", maxBuffer: 1 << 26 });
+    const listing = spawnSync("tar", ["-tzf", tarball], {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
     const files = listing.stdout
       .split("\n")
       .filter((line) => line.startsWith("package/") && !line.endsWith("/"))

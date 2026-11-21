@@ -18,6 +18,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPublicPackageDirs, packagesDir } from "./publish-order.mjs";
 
+/** The export keys of a map, sorted and joined. */
+const keysOf = (map) => Object.keys(map).toSorted().join(",");
+
 /**
  * The manifest with `publishConfig.exports` applied, or `null` when it has none.
  *
@@ -30,8 +33,7 @@ export function materializeExports(pkg) {
     return null;
   }
   const { exports: _unused, ...publishConfig } = pkg.publishConfig;
-  const keys = (map) => Object.keys(map).toSorted().join(",");
-  if (keys(dist) !== keys(pkg.exports ?? {})) {
+  if (keysOf(dist) !== keysOf(pkg.exports ?? {})) {
     throw new Error(`${pkg.name}: publishConfig.exports must have the same keys as exports`);
   }
   return { ...pkg, exports: dist, publishConfig };
