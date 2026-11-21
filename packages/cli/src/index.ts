@@ -8,11 +8,8 @@ import type { InitOptions } from "./commands/init.ts";
 import type { McpInitOptions } from "./commands/mcp/init.ts";
 import type { McpServeOptions } from "./commands/mcp/serve.ts";
 import type { ProtectOptions } from "./commands/protect.ts";
-import type { PurgeOptions } from "./commands/purge.ts";
 import type { RetryOptions } from "./commands/retry.ts";
-import type { ServerCheckStorageOptions } from "./commands/server/check-storage.ts";
 import type { ServerInitOptions } from "./commands/server/init.ts";
-import type { ServerServeOptions } from "./commands/server/serve.ts";
 import type { UploadOptions } from "./commands/upload.ts";
 import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
@@ -36,7 +33,6 @@ export function createProgram(): Command {
     buildCreateCommand(),
     buildServerCommand(),
     buildMcpCommand(),
-    buildPurgeCommand(),
     buildUploadCommand(),
     buildBuildCommand(),
     buildDoctorCommand(),
@@ -103,27 +99,6 @@ function buildServerCommand(): Command {
     .action(
       run<ServerInitOptions>(async () => (await import("./commands/server/init.ts")).runServerInit),
     );
-  const serve = new Command("serve")
-    .description("Run a scaffolded StoryShelf server project")
-    .option("--dir <dir>", "server project directory (default cwd)")
-    .option("--port <port>", "port override (sets PORT)")
-    .action(
-      run<ServerServeOptions>(
-        async () => (await import("./commands/server/serve.ts")).runServerServe,
-      ),
-    );
-  server
-    .command("check-storage")
-    .description("Read-only: report blobs the database references but storage lacks")
-    .requiredOption("--url <url>", "server base URL")
-    .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
-    .option("--sample <n>", "check only the newest n builds", (value) => Math.trunc(Number(value)))
-    .action(
-      run<ServerCheckStorageOptions>(
-        async () => (await import("./commands/server/check-storage.ts")).runServerCheckStorage,
-      ),
-    );
-  server.addCommand(serve, { isDefault: true });
   return server;
 }
 
@@ -146,14 +121,6 @@ function buildMcpCommand(): Command {
     );
   mcp.addCommand(serve, { isDefault: true });
   return mcp;
-}
-
-function buildPurgeCommand(): Command {
-  return new Command("purge")
-    .description("Purge expired builds on a StoryShelf server")
-    .requiredOption("--url <url>", "server base URL")
-    .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
-    .action(run<PurgeOptions>(async () => (await import("./commands/purge.ts")).runPurge));
 }
 
 function buildUploadCommand(): Command {

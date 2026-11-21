@@ -43,11 +43,12 @@ describe("generateServer", () => {
     }
   });
 
-  it("ends with the listener and the shutdown hooks", () => {
+  it("exports the app and leaves listening to storyshelf-server", () => {
     const code = server();
     expect(code).toContain("await app.lifecycle.setup();");
-    expect(code).toContain('for (const signal of ["SIGINT", "SIGTERM"] as const) {');
-    expect(code.endsWith("}\n")).toBe(true);
+    expect(code).not.toContain("node-server");
+    expect(code).not.toContain("SIGTERM");
+    expect(code.endsWith("export default app;\n")).toBe(true);
   });
 
   it("merges imports that share a module into one line", () => {

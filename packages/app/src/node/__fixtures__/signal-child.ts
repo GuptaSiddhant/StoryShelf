@@ -14,7 +14,7 @@ const report = (line: Record<string, unknown>): void => {
   process.stdout.write(`${JSON.stringify(line)}\n`);
 };
 
-const real = realApp();
+const real = realApp({ teardownDelayMs: 500 });
 const before = counts();
 const server = await startServer({
   app: real.app,

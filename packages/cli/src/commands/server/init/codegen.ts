@@ -19,7 +19,6 @@ function mergeImports(lines: string[]): string[] {
 
 function buildImports(answers: Answers): string[] {
   return mergeImports([
-    `import { serve } from "@hono/node-server";`,
     `import { createShelfApp } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
@@ -209,7 +208,6 @@ export function generateServer(answers: Answers): string {
     ...buildImports(answers),
     ``,
     `const dataDir = process.env.SHELF_DATA_DIR || "./data";`,
-    `const port = Number(process.env.PORT) || 3000;`,
     ``,
     ...LOAD_ENV_LINES,
     ...envCheckLines(answers),
@@ -217,15 +215,8 @@ export function generateServer(answers: Answers): string {
     ``,
     ...buildRouterLines(answers),
     ``,
-    `const server = serve({ fetch: app.fetch, port }, () => {`,
-    `  app.lifecycle.logger.info({ port }, "StoryShelf server listening");`,
-    `});`,
-    ``,
-    `for (const signal of ["SIGINT", "SIGTERM"] as const) {`,
-    `  process.once(signal, () => {`,
-    `    app.lifecycle.teardown().finally(() => server.close());`,
-    `  });`,
-    `}`,
+    `// Exported, not started: \`storyshelf-server serve\` (npm start) listens, \`migrate\` and \`purge\` reuse it.`,
+    `export default app;`,
     ``,
   ].join("\n");
 }

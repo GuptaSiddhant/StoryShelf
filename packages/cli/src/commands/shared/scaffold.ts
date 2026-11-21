@@ -4,6 +4,9 @@ import { dirname, join } from "node:path";
 /** Server entry in a scaffolded project (a `src/` dir leaves room for helper modules). */
 export const SERVER_ENTRY = "src/index.ts";
 
+/** The `storyshelf-server` executable of `@storyshelf/app`, for `node --watch` (a bin shim cannot be watched). */
+export const SERVER_BIN = "node_modules/@storyshelf/app/dist/bin.mjs";
+
 /** Dev dependencies every scaffolded project gets (editor + `tsc --noEmit`). */
 export const SCAFFOLD_DEV_DEPENDENCIES: Record<string, string> = {
   "@types/node": "^24.0.0",

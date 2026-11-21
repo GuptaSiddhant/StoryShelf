@@ -62,8 +62,8 @@ describe("generatePackageJson", () => {
 
   it("runs entries with plain node and requires Node 24+", () => {
     const { scripts, engines } = pkg({ database: "postgres", storage: "s3" });
-    expect(scripts["start"]).toBe("node src/index.ts");
-    expect(scripts["dev"]).toBe("node --watch src/index.ts");
+    expect(scripts["start"]).toBe("storyshelf-server serve");
+    expect(scripts["dev"]).toBe("node --watch node_modules/@storyshelf/app/dist/bin.mjs serve");
     expect(scripts["typecheck"]).toBe("tsc");
     // Node 26 rejects --experimental-transform-types; Node 24+ strips types unflagged.
     expect(JSON.stringify(scripts)).not.toContain("experimental");

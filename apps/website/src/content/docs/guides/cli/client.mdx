@@ -190,14 +190,13 @@ storyshelf whoami
 # Project: My Design System (my-design-system)
 ```
 
-## `storyshelf retry` / `purge`
+## `storyshelf retry`
 
 ```bash
 storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id <id> [--token $SHELF_TOKEN]
-storyshelf purge --url http://localhost:3000 --token $SHELF_ADMIN_TOKEN
 ```
 
-`retry` re-runs capture. `purge` runs retention GC. `cancel [--dry-run]` cancels older unfinished builds.
+`retry` re-runs capture. Retention GC is `storyshelf-server purge`, run in the instance project. `cancel [--dry-run]` cancels older unfinished builds.
 
 ## `storyshelf protect`
 

@@ -129,7 +129,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 - **Database.** Flexible Server keeps automated backups; set the retention (up to 35 days) and use geo-redundant backup if you need it.
 - **Storage.** Turn on blob versioning and soft delete on the storage account, so an overwritten or deleted blob can be recovered.
 - **Key Vault.** `deletion_protection` keeps purge protection on; a destroyed vault stays soft-deleted for 7 days.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 
