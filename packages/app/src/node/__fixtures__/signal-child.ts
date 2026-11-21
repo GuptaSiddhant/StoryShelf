@@ -23,7 +23,8 @@ const server = await startServer({
   handleSignals: true,
   shutdownTimeoutMs: 5000,
 });
-report({ event: "listening", port: server.port, handlers: counts(), before });
+// The pid of this node process: `nub` runs it under a wrapper, which must not get the signal.
+report({ event: "listening", pid: process.pid, port: server.port, handlers: counts(), before });
 const result = await server.closed;
 report({ event: "closed", result, teardowns: real.teardowns(), handlers: counts(), before });
 real.cleanup();

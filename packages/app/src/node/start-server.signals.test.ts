@@ -73,9 +73,11 @@ describe("startServer signals (child process)", () => {
       });
       const health = await fetch(`http://127.0.0.1:${String(listening["port"])}/api/v1/health`);
       expect(health.status).toBe(200);
-      run.child.kill(signal);
+      // The server's own node process, not the `nub` wrapper around it.
+      const pid = Number(listening["pid"]);
+      process.kill(pid, signal);
       // A repeated signal during the shutdown joins it instead of starting a second teardown.
-      run.child.kill(signal);
+      process.kill(pid, signal);
       const closed = await run.next("closed");
       expect(closed["result"]).toMatchObject({ complete: true, trigger: signal });
       expect(closed["teardowns"]).toBe(1);
