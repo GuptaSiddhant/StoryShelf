@@ -22,6 +22,7 @@ import {
   describeLoginMethods,
 } from "./engine/login-methods.ts";
 import { sendAuthMail } from "./engine/mail.ts";
+import { engineRateLimit } from "./engine/rate-limit.ts";
 import { readOnlyEngineGuard } from "./engine/read-only.ts";
 import { assertAuthSecret, assertNoLibrarySecretOverride } from "./engine/secret.ts";
 import { SSO_MANAGEMENT_PATHS } from "./engine/sso.ts";
@@ -108,7 +109,7 @@ function buildAuthInstance(options: ShelfAuthOptions, db: DatabaseAdapter): Shel
     // Shelf SSO providers are code-driven recipes; runtime provider
     // management stays off (see SSO_MANAGEMENT_PATHS).
     ...(options.sso ? { disabledPaths: SSO_MANAGEMENT_PATHS } : {}),
-    ...(options.rateLimit ? { rateLimit: { enabled: options.rateLimit.enabled } } : {}),
+    rateLimit: engineRateLimit(options.rateLimit?.enabled ?? null, options.logger ?? null),
     session: { expiresIn, updateAge: 60 * 60 * 24, cookieCache: { enabled: false } },
     advanced: advancedOptions(options),
     databaseHooks: {

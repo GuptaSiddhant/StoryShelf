@@ -137,6 +137,25 @@ describe("engine sign-in is limited per client", () => {
     expect(last).toBe(429);
   });
 
+  it("does not lock requests with no resolvable address out of each other", async () => {
+    const h = await harness();
+    // No socket and no forwarded header: the app can name no client, so the engine limit is skipped.
+    let last = 0;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const form = new FormData();
+      form.set("email", "nobody@example.com");
+      form.set("password", PASSWORD);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential by design
+      const res = await h.app.request("/auth/engine/login", {
+        method: "POST",
+        headers: { origin: BASE_URL },
+        body: form,
+      });
+      last = res.status;
+    }
+    expect(last).toBe(401);
+  });
+
   it("stores the resolved address on the session, never the claimed one", async () => {
     const h = await harness();
     const issued = await h.shelf.adapter.issueInvite({

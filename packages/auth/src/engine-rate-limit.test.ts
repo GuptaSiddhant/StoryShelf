@@ -79,10 +79,19 @@ describe("engine sign-in rate limit", () => {
     expect(res.status).toBe(429);
   });
 
-  it("without a client address every request shares one key (what the app avoids by always setting it)", async () => {
+  it("skips the engine limit for requests that name no client, so none can lock out another", async () => {
     const { shelf } = await limitedEngine();
-    await exhaust(shelf, null);
-    expect((await signIn(shelf, null)).status).toBe(429);
+    const statuses = await exhaust(shelf, null);
+    expect(statuses).not.toContain(429);
+    expect((await signIn(shelf, "203.0.113.40")).status).not.toBe(429);
+  });
+
+  it("treats a header that is not one IP address as naming no client", async () => {
+    const { shelf } = await limitedEngine();
+    for (const claimed of ["not-an-ip", "203.0.113.41, 203.0.113.42"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- sequential by design
+      expect(await exhaust(shelf, claimed)).not.toContain(429);
+    }
   });
 
   it("stores the address the app named on the session", async () => {
