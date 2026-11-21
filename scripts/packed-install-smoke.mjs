@@ -355,7 +355,7 @@ async function createAndUpload(cli, url, sb) {
     "--branch",
     "main",
     "--sha",
-    "packed-1",
+    "abc1234",
   ];
   const uploaded = run(process.execPath, [cli, "upload", ...uploadArgs], {
     cwd: sb,
