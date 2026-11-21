@@ -12,11 +12,8 @@ import type { BuildStateDeps } from "./types.ts";
 /** Earlier builds listed in the comment, newest first. */
 export const EARLIER_BUILDS_SHOWN = 10;
 
-/** Builds read to find those before this one; newer builds of the branch are passed over. */
+/** Builds read first to find those before this one; the read doubles while newer builds fill it. */
 const EARLIER_BUILDS_READ = 50;
-
-/** Removed stories handed to the comment, which lists a few and counts the rest. */
-const REMOVED_READ = 100;
 
 /** The build state by status: a fixed phrase, so the comment never carries stored text. */
 const STATE_BY_STATUS: Readonly<Record<string, string>> = {
@@ -41,7 +38,14 @@ function isBefore(row: Pick<Build, "id" | "createdAt">, build: Build): boolean {
   return row.createdAt === build.createdAt ? row.id < build.id : row.createdAt < build.createdAt;
 }
 
-/** The newest approved build before `build` on its own branch, else on the default branch. */
+/**
+ * The newest approved build before `build` on its own branch, else on the default branch.
+ *
+ * Limitation: the candidates are the builds that are `approved` now, so an older build approved
+ * between two deliveries can change which baseline is picked. The list that follows never names a
+ * story the chosen baseline lacked, but it is not stable across deliveries; that needs the baseline
+ * the capture recorded.
+ */
 async function baselineBuildOf(deps: BuildStateDeps, where: Where): Promise<Build | null> {
   const { build, project } = where;
   const builds = new BuildModel(deps.db);
@@ -101,7 +105,28 @@ export async function removedStoriesOf(
   }
   const present = storiesOf(entries.now);
   const removed = [...storiesOf(entries.was)].filter(([id]) => !present.has(id));
-  return removed.slice(0, REMOVED_READ).map(([, title]) => title);
+  return removed.map(([, title]) => title);
+}
+
+/**
+ * Rows of the branch before `build`, newest first: the read widens while newer builds fill it, until
+ * `wanted` are found or the branch is exhausted.
+ */
+async function buildsBefore(
+  deps: BuildStateDeps,
+  where: Where,
+  read: number,
+): Promise<Awaited<ReturnType<BuildModel["listSummary"]>>> {
+  const { build, project } = where;
+  const rows = await new BuildModel(deps.db).listSummary(project.id, {
+    branch: build.gitBranch,
+    limit: read,
+  });
+  const before = rows.filter((row) => isBefore(row, build));
+  const exhausted = rows.length < read;
+  return before.length >= EARLIER_BUILDS_SHOWN || exhausted
+    ? before
+    : await buildsBefore(deps, where, read * 2);
 }
 
 /**
@@ -112,17 +137,11 @@ export async function earlierBuildsOf(
   deps: BuildStateDeps,
   where: Where & { urls: UrlBuilder },
 ): Promise<BuildStateExtras["earlier"]> {
-  const { build, project, urls } = where;
-  const rows = await new BuildModel(deps.db).listSummary(project.id, {
-    branch: build.gitBranch,
-    limit: EARLIER_BUILDS_READ,
-  });
-  return rows
-    .filter((row) => isBefore(row, build))
-    .slice(0, EARLIER_BUILDS_SHOWN)
-    .map((row) => ({
-      state: STATE_BY_STATUS[row.status] ?? row.status,
-      sha: row.gitSha.slice(0, 7),
-      url: urls.build(project.slug, row.id),
-    }));
+  const { project, urls } = where;
+  const rows = await buildsBefore(deps, where, EARLIER_BUILDS_READ);
+  return rows.slice(0, EARLIER_BUILDS_SHOWN).map((row) => ({
+    state: STATE_BY_STATUS[row.status] ?? row.status,
+    sha: row.gitSha.slice(0, 7),
+    url: urls.build(project.slug, row.id),
+  }));
 }

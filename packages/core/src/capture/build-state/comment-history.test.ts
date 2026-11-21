@@ -94,6 +94,24 @@ describe("removed stories", () => {
     expect(calls[0]).toContain("Gone / Story");
   });
 
+  it("counts every removed story, not only the ones it lists", async () => {
+    const w = await world();
+    const baseline = await approvedBefore(w, "base111");
+    const current = { id: await buildAt(w, "new222", "feature/x") };
+    const gone = Array.from({ length: 150 }, (_, index) =>
+      entry(`g--s${String(index)}`, "Gone", `Story ${String(index)}`),
+    );
+    await writeCatalog(w, baseline, gone);
+    await writeCatalog(w, current.id, []);
+    await review(w, current.id);
+    await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
+    const body = w.git.calls.flatMap((c) =>
+      c.target.kind === "comment" ? [c.target.markdown] : [],
+    )[0];
+    expect(body).toContain("**150 removed stories**");
+    expect(body).toContain("…and 140 more");
+  });
+
   it("names nothing while an index cannot be read", async () => {
     const w = await world();
     const baseline = await approvedBefore(w, "base111");
@@ -139,6 +157,26 @@ describe("earlier builds", () => {
     expect(body).not.toContain("sha0001");
     expect(body).not.toContain("other00");
     expect(links.length).toBeGreaterThanOrEqual(EARLIER_BUILDS_SHOWN);
+  });
+
+  it("finds earlier builds behind more than 50 newer builds of the branch", async () => {
+    const w = await world();
+    await approvedBefore(w, "old0001");
+    await approvedBefore(w, "old0002");
+    const current = { id: await buildAt(w, "cur0000", "feature/x") };
+    for (let index = 0; index < 55; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- each build is created after the one before it
+      await buildAt(w, `new${String(index).padStart(4, "0")}`, "feature/x");
+    }
+    await review(w, current.id);
+    await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
+    const body = w.git.calls.flatMap((c) =>
+      c.target.kind === "comment" ? [c.target.markdown] : [],
+    )[0];
+    expect(body).toContain("2 earlier builds");
+    expect(body).toContain("`old0002`");
+    expect(body).toContain("`old0001`");
+    expect(body).not.toContain("`new0000`");
   });
 
   it("shows none for a branch's first build", async () => {
