@@ -24,7 +24,7 @@ interface StoredPayload {
 
 /** Serialize the version, request id, trace context and kind-specific fields of a job. */
 export function encodePayload(job: QueueJobInput): string | null {
-  const stored: StoredPayload = { v: PAYLOAD_VERSION };
+  const stored: StoredPayload = { v: job.payloadVersion ?? PAYLOAD_VERSION };
   if (job.reqId !== undefined) {
     stored.reqId = job.reqId;
   }

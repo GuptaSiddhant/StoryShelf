@@ -51,8 +51,12 @@ false`. The manifest must name a webhook URL; it points at a path on the server 
   with `hook_attributes.active: false`. GitHub returns to StoryShelf with a one-time code, valid for
   an hour, which the server exchanges for the App ID and private key. Nobody copies a key. The
   exchange also returns a webhook secret and client credentials, which are discarded unused. The
-  site admin then installs the App on the repositories they choose. `[inferred]` The same flow on
-  GitHub Enterprise Server under its own base URL; GitHub's manifest documentation does not say.
+  site admin then installs the App on the repositories they choose. GitHub documents the same flow
+  for GitHub Enterprise Server: the form is on the server's own web host and the exchange on its API
+  base. Checked against GitHub's docs on 2026-11-20 (#1119): `url` and `hook_attributes.url` are
+  required, `hook_attributes.active` defaults to true, `state` returns to `redirect_url`, the flow
+  must finish within an hour, and the exchange (`POST /app-manifests/{code}/conversions`, no
+  authentication) returns `pem`, `webhook_secret`, `client_id` and `client_secret`.
 - **An existing GitHub App, entered by hand.** A site admin who manages their own App (or rotates
   a key) enters its App ID and private key once for the server. This is also how today's
   hand-made per-project Apps move to a connection (decision 8).

@@ -16,11 +16,13 @@ const OPEN: ReadonlySet<BuildStatus> = new Set(OPEN_BUILD_STATUSES);
 /** Newest builds looked at per project. */
 const PER_PROJECT = 25;
 
-/** Narrows {@link requestOpenBuildStates}: one project, and within it one git channel. */
+/** Narrows {@link requestOpenBuildStates}: one project, and within it one git channel or link. */
 export interface OpenBuildScope {
   projectId?: string;
   /** Only this channel is asked (an operator retry); other channels keep what they show. */
   channelId?: string;
+  /** Only this repository link is asked (it was just approved, ADR 0054). */
+  linkId?: string;
 }
 
 /** How a request for open builds ended: how many were asked, or that the lookup itself failed. */
@@ -55,12 +57,10 @@ export async function tryRequestOpenBuildStates(
       projects.map(async (project) => await openBuildIds(deps, project.id)),
     );
     const ids = lists.flat();
-    const { channelId } = scope;
+    const only = onlyOf(scope);
     await Promise.all(
       ids.map(async (id) => {
-        await (channelId === undefined
-          ? publisher.request(id)
-          : publisher.request(id, { channelId }));
+        await (only === undefined ? publisher.request(id) : publisher.request(id, only));
       }),
     );
     return { ok: true, asked: ids.length };
@@ -82,6 +82,12 @@ export async function requestOpenBuildStates(
 ): Promise<number> {
   const result = await tryRequestOpenBuildStates(deps, publisher, scope);
   return result.ok ? result.asked : 0;
+}
+
+/** The one channel or link a scope names, if any. */
+function onlyOf(scope: OpenBuildScope): { channelId: string } | { linkId: string } | undefined {
+  if (scope.channelId !== undefined) return { channelId: scope.channelId };
+  return scope.linkId === undefined ? undefined : { linkId: scope.linkId };
 }
 
 /** The newest builds of a project that have not reached a verdict. */

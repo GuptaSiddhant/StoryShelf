@@ -17,6 +17,7 @@ import {
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import type { GitConnectionModel } from "@storyshelf/core/models";
 import { currentTraceparent } from "@storyshelf/core/telemetry";
 import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
 import {
@@ -45,6 +46,8 @@ export interface CaptureWiring {
 /** What a capture hands its results to. */
 interface Delivery {
   notifiers: NotifierProvider[];
+  /** The server's git connections: approved repository links take part like git channels. */
+  gitConnections?: GitConnectionModel | undefined;
   buildState: BuildStatePublisher;
   /** The resolved public origin (ADR 0007): status links and targets that need a URL use it. */
   publicOrigin: () => Promise<string | undefined>;
@@ -117,6 +120,7 @@ function captureHandlerOptions(
     design: options.design,
     shardSize: options.testing?.shardSize,
     notifiers: delivery.notifiers,
+    gitConnections: delivery.gitConnections,
     buildState: delivery.buildState,
     publicOrigin: delivery.publicOrigin,
     config,

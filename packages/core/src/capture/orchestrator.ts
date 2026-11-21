@@ -11,6 +11,7 @@ import {
   type CaptureAttemptTables,
 } from "../models/capture-attempt.ts";
 import type { CaptureLogTables } from "../models/capture-log.ts";
+import type { GitConnectionModel } from "../models/git-connection.ts";
 import type { ProjectTables } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
@@ -71,6 +72,8 @@ export interface CaptureJobOptions {
    * (`defaultBranchStanding`). None ⇒ every claim is unverified.
    */
   notifiers?: readonly NotifierProvider[] | undefined;
+  /** The server's git connections: approved repository links confirm a default-branch claim too (ADR 0054). */
+  gitConnections?: GitConnectionModel | undefined;
   /** The resolved public origin (ADR 0007, decision 6); targets that need a URL wait for it. */
   publicOrigin?: (() => Promise<string | undefined>) | undefined;
   /** Render budget override (tests use a short fuse). */
