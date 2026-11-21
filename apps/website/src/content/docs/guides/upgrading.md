@@ -7,9 +7,25 @@ This page lists the changes that need something from you, one section per releas
 
 Before any upgrade, [back up](/guides/backup-restore/) the database and the storage, then follow the steps in [Upgrading and support](/guides/support/#upgrading). Coming from 0.12 or older? Read the changelog for each release in between as well.
 
+## Before 2027
+
+Until 1 January 2027, every 0.x release can break things, and nothing old is kept working: no deprecated re-export packages, no aliases for renamed exports, options or environment variables, and no two-step schema changes.
+
+- Read the `Breaking:` lines of each release in the [changelog](/changelog/) before you upgrade.
+- A release whose notes carry a `Schema:` line with a contract step (a dropped or renamed column, a new `NOT NULL`, a unique index) needs a **stop-the-world upgrade**: stop every instance of the old release, then start the new one. Do not run old and new side by side across it.
+- A rollback across such a release is a restore from your [backup](/guides/backup-restore/).
+
+From 2027-01-01 the compatibility rules apply again: one release of rollback, expand-then-contract schema changes and one minor release of deprecated re-exports.
+
 ## 0.15.0 (in progress)
 
-0.15.0 is not released yet. This section lists what is already decided and will change as the release firms up.
+0.15.0 is not released yet. This section lists what is already decided and will change as the release firms up. Each rename below has no alias: the old name stops working in 0.15.0.
+
+### `@storyshelf/storage-local` is removed
+
+**Who is affected:** a server that imports `createLocalStorage` from `@storyshelf/storage-local`.
+
+Local storage is built into core. Import it from `@storyshelf/core/storage/local` (same factory, same options) and remove `@storyshelf/storage-local` from your `package.json`. The package is not published again and is marked deprecated on npm with the new path.
 
 ### `@storyshelf/runner-puppeteer` is removed
 
@@ -100,7 +116,7 @@ To move, set every new name with the old value, unset the old names, then deploy
 
 ### Nothing else is pending
 
-Besides the runner and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
+Besides the runner, local storage and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
 
 ## 0.14.0 (2026-11-21)
 
@@ -216,7 +232,7 @@ A CI step fails on any non-zero exit, so decide what `2` should mean for your pi
 - **`storyshelf create`** on a server with sign-in on creates the project but no longer mints a token that cannot upload. It prints the project's page, where **Get your first build** creates one.
 - **`SHELF_STORYBOOK_HOSTING=sandboxed`** is available to the image. Unset or `trusted` keeps today's behaviour; any other value stops boot. See [Security](/guides/security/).
 - **Times in the app** render in UTC and English, not in the server's time zone.
-- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. The old package re-exports it for one minor release, then is no longer published.
+- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. (0.15.0 removes the package; see [`@storyshelf/storage-local` is removed](#storyshelfstorage-local-is-removed).)
 
 ## Related
 
