@@ -43,7 +43,7 @@ export function pkgVersionGuard(): Plugin {
 function getBaseOptions(): Partial<UserConfig> {
   return {
     platform: "node" as const,
-    sourcemap: true as const,
+    sourcemap: false as const,
     target: "node24" as const,
     treeshake: true,
     unbundle: true,
