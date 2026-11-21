@@ -56,6 +56,12 @@ export interface ShelfAuthOptions {
   hostSessionCookie?: boolean;
   /** Session lifetime in days. Defaults to 7 (current parity). */
   sessionExpiresInDays?: number;
+  /**
+   * The engine's own request limiter (per client, keyed by the `x-forwarded-for` header the app
+   * sets from its client-IP resolver). Defaults to on in production and off elsewhere; tests set
+   * `enabled: true` to exercise it.
+   */
+  rateLimit?: { enabled: boolean };
 }
 
 /** One OAuth/OIDC login method (Keycloak preset or explicit endpoints). */
