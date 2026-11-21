@@ -103,7 +103,7 @@ Capture runs in the background, so the service sets `cpu_idle = false` (CPU stay
 
 ### Shutdown
 
-Cloud Run sends SIGTERM and stops the container 10 seconds later. That window is not configurable. The app drains running captures for `SHELF_SHUTDOWN_GRACE_SECONDS` (`shutdown_grace_seconds`, 1 to 8, default 8), then hands the rest back to the queue. The process forces its exit 1 second after the drain, so even the largest value leaves 1 second of margin. A copy killed anyway loses its lease: the job is retried unless that attempt was its last, in which case the job and its build fail and admins are alerted.
+Cloud Run sends SIGTERM and stops the container 10 seconds later. That window is not configurable. The app drains running captures for `SHELF_SHUTDOWN_GRACE_SECONDS` (`shutdown_grace_seconds`, 1 to 8, default 8), then hands the rest back to the queue. The process exits when that bounded shutdown ends, so even the largest value leaves 2 seconds of margin. A copy killed anyway loses its lease: the job is retried unless that attempt was its last, in which case the job and its build fail and admins are alerted.
 
 ## Sizing and cost
 

@@ -1,8 +1,8 @@
 // Must load first: tsyringe (via @peculiar/x509 in passkey auth) throws at import without it, and the
 // bundler does not preserve the transitive side-effect import.
 import "reflect-metadata";
-import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
+import { startServer } from "@storyshelf/app/node";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
@@ -44,7 +44,7 @@ import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { databaseDeps } from "./demo-viewer-db.ts";
 import { ensureDemoViewer } from "./demo-viewer.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
-import { exitBy, shutdownGraceMs } from "./shutdown.ts";
+import { shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -63,7 +63,7 @@ const authPassword = readSetting(env, "SHELF_ADMIN_PASSWORD");
 const authEmail = readSetting(env, "SHELF_ADMIN_EMAIL") ?? "admin@example.com";
 const adminToken = readSetting(env, "SHELF_ADMIN_TOKEN");
 const publicBaseUrl = readSetting(env, "SHELF_PUBLIC_BASE_URL");
-// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+// Bound of the whole SIGTERM shutdown: jobs still running near it are handed back for another machine (#912).
 const graceMs = shutdownGraceMs(env);
 // Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
 // platform) trust `Fly-Client-IP` unless `SHELF_TRUST_PROXY` says otherwise; `SHELF_TRUST_PROXY=false` opts out.
@@ -223,16 +223,7 @@ const app = createShelfApp({
   },
 });
 
-await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
-if (ignoredOldNames.length > 0) {
-  logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
-}
-
-if (authPassword) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
-}
 
 // The demo's one read-only account (#1275). The password is the Fly secret; it is never logged.
 // Retried each minute because `storyshelf-ui` is created by the first upload, which can come
@@ -246,28 +237,36 @@ async function provisionDemoViewer(): Promise<void> {
     logger.error({ err }, "Demo viewer provisioning failed");
   }
 }
-if (authPassword && env["SHELF_DEMO_VIEWER_PASSWORD"]) {
-  await provisionDemoViewer();
-  setInterval(() => {
-    provisionDemoViewer().catch(() => {}); // Intentionally empty — it logs its own errors
-  }, 60_000).unref();
+
+/** Boot hooks, once the app is ready and before the port opens: the admin, then the demo viewer. */
+async function bootHooks(): Promise<void> {
+  if (ignoredOldNames.length > 0) {
+    logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+  }
+  if (authPassword) {
+    await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+    logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
+  }
+  if (authPassword && env["SHELF_DEMO_VIEWER_PASSWORD"]) {
+    await provisionDemoViewer();
+    setInterval(() => {
+      provisionDemoViewer().catch(() => {}); // Intentionally empty — it logs its own errors
+    }, 60_000).unref();
+  }
 }
 
-const server = serve({ fetch: app.fetch, port }, () => {
-  logger.info({ port, dataDir }, "StoryShelf fly server listening");
+// Ready (a failed boot check stops the server before it listens), boot hooks, then the port. The
+// host owns SIGINT/SIGTERM: SHELF_SHUTDOWN_GRACE_SECONDS bounds the drain and teardown.
+const server = await startServer({
+  app,
+  port,
+  handleSignals: true,
+  ...(graceMs === undefined ? {} : { shutdownTimeoutMs: graceMs }),
+  beforeListen: bootHooks,
 });
+logger.info({ port: server.port, dataDir }, "StoryShelf fly server listening");
 
-// Teardown is idempotent (SHELF_SHUTDOWN_GRACE_SECONDS bounds its job drain) and logs its own errors; close the listener either way.
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    // A bounded drain may leave a stuck handler to its lease: the process must end it, whatever
-    // the rest of the teardown does, so the exit is armed now, not after it.
-    if (graceMs !== undefined) exitBy(graceMs);
-    app.lifecycle
-      .teardown(graceMs === undefined ? {} : { graceMs })
-      .catch(() => {}) // Intentionally empty — teardown errors are already logged
-      .finally(() => {
-        server.close();
-      });
-  });
-}
+// The process ends with the shutdown, so a handler that ignored its release cannot outlive it.
+await server.closed;
+// oxlint-disable-next-line unicorn/no-process-exit -- the executable owns the final exit
+process.exit(0);

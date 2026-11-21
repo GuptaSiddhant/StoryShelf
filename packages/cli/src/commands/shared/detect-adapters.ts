@@ -169,8 +169,7 @@ function detectStorage(dir: string, deps: Set<string>): Pick<DetectedAdapters, "
     const imported = STORAGE_SUBPATHS.find((path) => text.includes(`@storyshelf/storage/${path}`));
     return { storage: marker ?? imported ?? "s3" };
   }
-  // Deprecated re-export of `@storyshelf/core/storage/local` (ADR 0049); still detected as local.
-  return deps.has("@storyshelf/storage-local") ? { storage: "local" } : {};
+  return {};
 }
 
 function detectGit(deps: Set<string>): Pick<DetectedAdapters, "git"> {

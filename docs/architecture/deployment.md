@@ -123,6 +123,23 @@ What this means for configured limits with N instances:
 
 Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
 
+### Node host (`@storyshelf/app/node`)
+
+Every Node server (the product image `apps/server-image`, the Fly demo `apps/fly-app`, the dev server
+`apps/dev-server`) serves its app through `startServer({ app, port, handleSignals, shutdownTimeoutMs,
+beforeListen })` (`packages/app/src/node/`). It takes an app that already exists and owns the rest:
+readiness (`app.lifecycle.setup()`, then `beforeListen` for boot hooks such as the admin account and
+the demo viewer, then the port), the listener and its connections, and one bounded shutdown however it
+starts (a signal, `close()`, an abort, a failed start). The shutdown stops accepting, closes idle
+keep-alive sockets, lets requests in flight finish with `Connection: close` for at most half of
+`shutdownTimeoutMs` (default 30 s) and then destroys their sockets, and calls
+`app.lifecycle.teardown({ graceMs })` with the rest, less a reserve for closing adapters: the #912 job
+drain hands still-running jobs back to the queue within it. It resolves by the deadline and reports an
+incomplete shutdown (`incomplete: "timeout" | "teardown-failed"`). The module has no side effects at
+import, registers only its own SIGINT/SIGTERM handlers and removes them, and never calls
+`process.exit`: each executable exits after `await server.closed`. `@hono/node-server` is a runtime
+dependency of `@storyshelf/app` only.
+
 ### AWS (Terraform module)
 
 The module in `deploy/terraform/aws` runs the published image on ECS Fargate; each task's `db-init` container creates the app database user and grants it `rds_iam` before the app starts. The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.

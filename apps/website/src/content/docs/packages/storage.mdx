@@ -25,4 +25,4 @@ description: Store StoryShelf artifacts in AWS S3 and S3-compatible services, Go
 
 ## When to use it
 
-Choose a cloud backend for cloud or multi-node deployments. Each is a drop-in replacement for [local storage](../storage-local/), and pairs naturally with the [Turso preset](../db-sqlite/#presets-same-schema-different-driver) when the application is deployed without shared local disk. S3-compatible services (R2, MinIO, B2, Wasabi, Tigris) stay on `/s3`; GCS stays native because its S3 interoperability loses workload identity.
+Choose a cloud backend for cloud or multi-node deployments. Each is a drop-in replacement for [local storage](../core/), and pairs naturally with the [Turso preset](../db-sqlite/#presets-same-schema-different-driver) when the application is deployed without shared local disk. S3-compatible services (R2, MinIO, B2, Wasabi, Tigris) stay on `/s3`; GCS stays native because its S3 interoperability loses workload identity.

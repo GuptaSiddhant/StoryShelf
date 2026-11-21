@@ -77,7 +77,6 @@ packages/
   app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
   db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
   db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
-  storage-local/  @storyshelf/storage-local — deprecated re-export of core's `storage/local`
   storage/        @storyshelf/storage       — S3, GCS and Azure Blob storage, plus `/local`; each SDK is an optional peer
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)

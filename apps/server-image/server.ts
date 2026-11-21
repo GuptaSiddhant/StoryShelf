@@ -1,7 +1,7 @@
 // Must load first: tsyringe (via @peculiar/x509 in passkey auth) throws at import without it.
 import "reflect-metadata";
-import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
+import { startServer } from "@storyshelf/app/node";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import {
@@ -51,7 +51,7 @@ import {
   storageFromEnv,
   storybookHostingFromEnv,
 } from "./env.ts";
-import { exitBy, shutdownGraceMs } from "./shutdown.ts";
+import { shutdownGraceMs } from "./shutdown.ts";
 
 const env = process.env;
 
@@ -72,7 +72,7 @@ const port = Number(env["PORT"] ?? 3000);
 const hostname = "0.0.0.0";
 const secret = nonEmpty(readSetting(env, "SHELF_SECRET"));
 const publicBaseUrl = nonEmpty(readSetting(env, "SHELF_PUBLIC_BASE_URL"));
-// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+// Bound of the whole SIGTERM shutdown: jobs still running near it are handed back for another machine (#912).
 const graceMs = shutdownGraceMs(env);
 const trustProxy = parseTrustProxy(readSetting(env, "SHELF_TRUST_PROXY"));
 
@@ -161,34 +161,34 @@ const app = createShelfApp({
   },
 });
 
-// A failed boot check (auth secret, AI, images, adapters) stops the server: it never listens.
-await app.lifecycle.setup();
+// A failed boot check (auth secret, AI, images, adapters) stops the server: it never listens, and
+// the refusal reaches the uncaughtException guard above.
 const logger = app.lifecycle.logger;
-if (ignoredOldNames.length > 0) {
-  logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
-}
-
-if (imageAuth.mode === "password") {
-  await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });
-  logger.info({ email: imageAuth.email }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
-} else if (!isLoopback(hostname)) {
-  logger.warn({ hostname }, "SHELF_AUTH=none on a non-loopback address: every route is open");
-}
-
-const server = serve({ fetch: app.fetch, port, hostname }, () => {
-  logger.info({ port, dataDir, capture: testing !== undefined }, "StoryShelf listening");
+const server = await startServer({
+  app,
+  port,
+  hostname,
+  handleSignals: true,
+  ...(graceMs === undefined ? {} : { shutdownTimeoutMs: graceMs }),
+  beforeListen: async () => {
+    if (ignoredOldNames.length > 0) {
+      logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+    }
+    if (imageAuth.mode === "password") {
+      await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });
+      logger.info(
+        { email: imageAuth.email },
+        "Local admin login enabled from SHELF_ADMIN_PASSWORD",
+      );
+    } else if (!isLoopback(hostname)) {
+      logger.warn({ hostname }, "SHELF_AUTH=none on a non-loopback address: every route is open");
+    }
+  },
 });
+logger.info({ port: server.port, dataDir, capture: testing !== undefined }, "StoryShelf listening");
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    // A bounded drain may leave a stuck handler to its lease: the process must end it, whatever
-    // the rest of the teardown does, so the exit is armed now, not after it.
-    if (graceMs !== undefined) exitBy(graceMs);
-    app.lifecycle
-      .teardown(graceMs === undefined ? {} : { graceMs })
-      .catch(() => {}) // Intentionally empty — teardown errors are already logged
-      .finally(() => {
-        server.close();
-      });
-  });
-}
+// The host drains and tears down within the bound (stuck work is fenced, jobs handed back); the
+// process ends here, so a handler that ignored its release cannot outlive the shutdown.
+await server.closed;
+// oxlint-disable-next-line unicorn/no-process-exit -- the executable owns the final exit
+process.exit(0);

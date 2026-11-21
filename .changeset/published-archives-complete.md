@@ -12,7 +12,6 @@
 "@storyshelf/observability": patch
 "@storyshelf/runner": patch
 "@storyshelf/storage": patch
-"@storyshelf/storage-local": patch
 "@storyshelf/storybook-addon": patch
 ---
 

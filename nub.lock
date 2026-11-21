@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@hono/node-server':
-      specifier: ^1.17.0
-      version: 1.19.17
+      specifier: ^2.1.11
+      version: 2.1.11
     '@hono/otel':
       specifier: ^1.1.2
       version: 1.3.0
@@ -150,9 +150,6 @@ importers:
 
   apps/dev-server:
     dependencies:
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 1.19.17(hono@4.13.14)
       '@storyshelf/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -202,9 +199,6 @@ importers:
       '@ai-sdk/anthropic':
         specifier: 4.0.76
         version: 4.0.76(zod@4.6.7)
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 1.19.17(hono@4.13.14)
       '@storyshelf/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -257,9 +251,6 @@ importers:
       '@aws-sdk/rds-signer':
         specifier: ^3.0.0
         version: 3.1173.0
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 1.19.17(hono@4.13.14)
       '@storyshelf/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -476,6 +467,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.1.11(hono@4.13.14)
       '@hono/otel':
         specifier: 'catalog:'
         version: 1.3.0(hono@4.13.14)
@@ -1004,7 +998,7 @@ importers:
     devDependencies:
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 1.19.17(hono@4.13.14)
+        version: 2.1.11(hono@4.13.14)
       '@storyshelf/app':
         specifier: workspace:*
         version: link:../app
@@ -1085,37 +1079,6 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       'vitest':
-        specifier: 'catalog:'
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
-
-  packages/storage-local:
-    dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.6.5
-      '@vitest/coverage-v8':
-        specifier: 'catalog:'
-        version: 4.1.12(vitest@5.0.5)
-      oxfmt:
-        specifier: 'catalog:'
-        version: 0.65.0
-      oxlint:
-        specifier: 'catalog:'
-        version: 1.90.0(oxlint-tsgolint@7.0.2005)
-      oxlint-tsgolint:
-        specifier: 'catalog:'
-        version: 7.0.2005
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.14(typescript@7.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
@@ -2373,6 +2336,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/node-server@2.1.11':
+    resolution: {integrity: sha512-KzKz9vl4vvr1vgLHamj+g5uonbrj5NwAdO3yzOS6cd2HjALVeOgTgeZOyAzNxejbkfOOPIcvuf/Tg8l1pEFLog==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@hono/otel@1.3.0':
     resolution: {integrity: sha512-x4L9U2O+Z9lD+EAKQfEWSX8iDIR/122IDM6sImGWoWF6KO1s+0icGncpDgwQjm1Iry+Kq94TdoYTpiMfOB5gzw==}
@@ -9813,6 +9782,10 @@ snapshots:
   '@hexagon/base64@1.1.28': {}
 
   '@hono/node-server@1.19.17(hono@4.13.14)':
+    dependencies:
+      hono: 4.13.14
+
+  '@hono/node-server@2.1.11(hono@4.13.14)':
     dependencies:
       hono: 4.13.14
 
