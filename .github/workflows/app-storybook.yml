@@ -128,7 +128,7 @@ jobs:
           fi
           # shellcheck disable=SC2086
           npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH" $mode | tee upload.log
-          build=$(grep -oE 'Build created: [0-9A-Z]+|\(build [0-9A-Z]+\)' upload.log | grep -oE '[0-9A-Z]{26}' | head -n1)
+          build=$(grep -oE '^ *Build: +[0-9A-Z]{26}|Build created: [0-9A-Z]+|\(build [0-9A-Z]+\)' upload.log | grep -oE '[0-9A-Z]{26}' | head -n1)
           base=$(jq -r .url .storybook/storyshelf.json)
           slug=$(jq -r .slug .storybook/storyshelf.json)
           {
