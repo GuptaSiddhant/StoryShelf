@@ -98,6 +98,18 @@ Rules:
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
   instances booting). The unit test pins that PGlite never exposes the capability.
+- MySQL (`db-mysql/src/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
+  `buildReferenceContractSuite`, `retentionActivationContractSuite` and `retentionSkippedContractSuite`
+  only against a real MySQL 8 server, every party on its own pool, plus the mirrored race tests
+  (interrupted preparation, a writer in flight, two instances booting, a claim against preparation)
+  and a use of a hash racing a collector's claim. Gates: `LIVE_CLOUD=1`, `MYSQL_SCHEMA_MUTATION_TEST=1`
+  and `MYSQL_DATABASE_URL` (a user that may `CREATE DATABASE`: the skipped-build cases each get a
+  scratch database). CI runs it on every pull request that touches `packages/db-mysql/`,
+  `packages/core/src/test-helpers/` or `packages/core/src/adapters/database.ts` (job `mysql-lifecycle`,
+  a `mysql:8.0` service container), and the nightly MySQL job runs it with the rest of the live suite.
+  Removing the row locks or the named content locks fails it. The hermetic half
+  (`retention-activation.test.ts`) only refuses: MariaDB, TiDB, Vitess, MySQL other than 8, statement
+  binlogs, non-InnoDB tables, a single injected connection and the PlanetScale and TiDB presets.
 - The boot step that prepares the baseline pins before a dialect exposes the capability (ADR 0039,
   "activation") is proven with `retentionActivationContractSuite`. Activation stays each adapter's
   own step (it is on neither `DatabaseAdapter` nor `BuildReferenceLifecycle`); the dialect hands
@@ -113,7 +125,7 @@ Rules:
   list limits (`clampListLimit`, max 1000).
 - Idempotency is asserted, not assumed: run `setup`, `teardown`, `migrate`,
   and `enqueue`-retry twice.
-- Indirect coverage allowed only for pure mappers (e.g. `notify-git`
+- Indirect coverage allowed only for pure mappers (e.g. the git integration
   `github-mapper.ts` precedent); everything else has a direct colocated suite.
 
 ### 3. Integration (vitest, CI-always)
@@ -191,6 +203,21 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - All fixtures are deterministic (system fonts, no network) and share the same `Button` stories (including `play`/`flaky-test`/`disableSnapshot`/`delay` variants). `storybook-static/` is built on demand, not committed.
 - PNG fixtures for the diff engine.
 - `index.json` fixtures for `discover()`.
+
+## Dependency audit (#47)
+
+`.github/workflows/audit.yml` runs weekly (Monday 06:17 UTC) and on demand (`workflow_dispatch`), one matrix leg per lockfile: `workspace` (`nub.lock`) and `storybook-8`, `storybook-9`, `storybook-10` (the fixtures' own pnpm lockfiles). It has `permissions: contents: read`, no secrets, and no other workflow depends on it, so a red run blocks no merge. It never upgrades, commits or publishes; a failing run is the notification.
+
+`scripts/audit-check.mjs` does the work. `nub audit` reads only the root importer (182 of the lockfile's 1581 packages), so the workspace is audited as `pnpm audit` over a copy of `nub.lock` (pnpm's lockfile format) and the workspace manifests, staged in `.tmp/`; the fixtures run `pnpm audit` in place. It reports advisory ids, packages, versions and advisory links only. A leg fails when:
+
+- an advisory is not a tracked exception for that target;
+- an exception is past its `reviewBy` date;
+- `scripts/audit-exceptions.json` is malformed, or an entry is missing from SECURITY.md, "Known advisories";
+- the audit could not run (registry error, no report). The exit code of `pnpm audit` is not the signal, because it exits 1 whenever it finds anything.
+
+An exception that matches nothing is a notice in the run summary; remove it once the fix is confirmed. The owner alone adds an exception or moves a date, with the reason in SECURITY.md and the tracking issue (#335).
+
+Run it locally with `node scripts/audit-check.mjs` (all targets), `--target storybook-9` for one, and `--today YYYY-MM-DD` to check how an expiry behaves. Its tests (`scripts/audit-check.test.mjs`, `node --test`) run in the `ci.yml` lint step and need no network.
 
 ## Live cloud tests (gated: `LIVE_CLOUD=1`)
 
@@ -313,3 +340,26 @@ timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -pp
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not
 pass `MYSQL_URL` to the tests, so the suite would be skipped (the nightly job uses `--env-mode=loose`).
+
+## Previous-release database job (ADR 0053, decision 8)
+
+`previous-release-db` in `ci.yml` runs on pull requests that touch a schema or migration file, the
+job queue, its consumer or an enqueue path (the `schema` output of the `changes` job), for SQLite
+and Postgres. `scripts/previous-release.sh
+<dialect>` installs the newest `v*` release from npm, migrates an empty database with it and
+seeds a project, migrates the same database with the checkout as the next minor, then starts the
+published release on it and smokes it (health, project list, a write, a read-back, the root page).
+The release must skip its migrations and leave `schema_meta` alone. Postgres also runs the release's
+own `postgres.live.test.ts` from a checkout of its tag.
+
+Step 5 is the mixed-queue test. The checkout enqueues one job of every kind through its own enqueue
+paths, a repository link's `notify` job at payload version 2 among them
+(`scripts/previous-release/mixed-queue-current.ts`). The published release's own queues and
+consumers then run alone for a while, as after a rollback (`mixed-queue-previous.mjs`; handlers
+keep that release's declarations, and `run` only records). They must run every v1 job and hand
+each newer payload back unrun with no attempt spent. Next they run beside the checkout's consumers
+on a second batch, as during a rolling deploy. Every job must end `done`, run exactly once, and
+each newer payload must run on the checkout. A kind added to `CaptureJobKind` and not enqueued
+there fails the typecheck. To reproduce: `DATABASE_URL=… bash scripts/previous-release.sh postgres`
+(`RUN_TAG_SUITES=0` skips step 4, `RUN_MIXED_QUEUE=0` step 5). MySQL (nightly) is not part of it
+yet.

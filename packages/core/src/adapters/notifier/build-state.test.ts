@@ -5,10 +5,12 @@ import {
   statusesForBuild,
   type BuildStateBuild,
   type BuildStateChange,
+  type BuildStateExtras,
   type BuildStateFlags,
   type BuildStateSource,
   type PublishingState,
 } from "./build-state.ts";
+import { ALL_OUTPUTS, type StateOutputs } from "./outputs.ts";
 
 const build = (overrides: Partial<BuildStateBuild> = {}): BuildStateBuild => ({
   id: "b1",
@@ -32,6 +34,8 @@ function run(
     prefix?: string;
     base?: string;
     supersededBy?: { id: string; sha: string };
+    outputs?: StateOutputs;
+    extras?: BuildStateExtras;
   } = {},
 ) {
   return statusesForBuild({
@@ -44,7 +48,9 @@ function run(
     approvals: overrides.approvals,
     changes: overrides.changes,
     supersededBy: overrides.supersededBy,
+    extras: overrides.extras,
     source: overrides.source,
+    outputs: overrides.outputs,
   });
 }
 
@@ -169,7 +175,7 @@ describe("statusesForBuild: storybook", () => {
     expect(status).toMatchObject({
       context: "storyshelf/storybook",
       state: "success",
-      url: "https://shelf.example.com/projects/web/storybook/build/b1/",
+      url: "https://shelf.example.com/projects/web/storybook/build/b1/index.html",
     });
   });
 
@@ -271,18 +277,21 @@ describe("statusesForBuild: the comment", () => {
       url: "https://shelf.example.com/projects/web/builds/b1/diff",
       state: "pending",
     });
+    expect(comment?.markdown).toContain("### 🟡 StoryShelf: 3 visual changes need review");
     expect(comment?.markdown).toContain(
-      "[View build](https://shelf.example.com/projects/web/builds/b1/diff)",
+      "[**Review changes →**](https://shelf.example.com/projects/web/builds/b1/diff)",
     );
-    expect(comment?.markdown).toContain("Visual tests: Review open: 3 changes to review");
-    expect(comment?.markdown).toContain("Snapshots: 10 total, 4 changed, 1 approved, 0 rejected");
-    expect(comment?.markdown).toContain("storybook/build/b1/");
+    expect(comment?.markdown).toContain("6 unchanged");
+    expect(comment?.markdown).toContain(
+      "[Storybook](https://shelf.example.com/projects/web/storybook/build/b1/index.html)",
+    );
+    expect(comment?.markdown).toContain("<sub>Commit `abc123`</sub>");
   });
 
   it("leaves out the Storybook link until published, and the summary without testing or review", () => {
     const { comment } = run({ publishing: "pending", flags: { testing: false, review: false } });
-    expect(comment?.markdown).not.toContain("Storybook:");
-    expect(comment?.markdown).not.toContain("Snapshots:");
+    expect(comment?.markdown).not.toContain("[Storybook]");
+    expect(comment?.markdown).not.toContain("unchanged");
   });
 });
 
@@ -427,7 +436,7 @@ describe("statusesForBuild: a superseded build (ADR 0045)", () => {
       expect(gate(set)).toMatchObject({ state: "cancelled", description: "Superseded by def4567" });
       expect(set.comment?.state).toBe("cancelled");
       expect(set.comment?.markdown).toContain(
-        "Superseded by [def4567](https://shelf.example.com/projects/web/builds/b2/diff)",
+        "Cancelled: superseded by [`def4567`](https://shelf.example.com/projects/web/builds/b2/diff)",
       );
     }
   });
@@ -496,7 +505,7 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
     expect(linked.statuses.find((status) => status.name === "storybook")).toMatchObject({
       state: "success",
       informational: true,
-      url: "https://shelf.example.com/projects/web/storybook/build/src1/",
+      url: "https://shelf.example.com/projects/web/storybook/build/src1/index.html",
     });
     const gone = skippedRun({ source: skippedSource({ available: false }) });
     expect(gone.statuses.map((status) => status.name)).toEqual(["testing"]);
@@ -517,8 +526,9 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
     expect(markdown.split("\n")).toHaveLength(1);
     expect(markdown).toContain("(https://shelf.example.com/projects/web/builds/sk1/diff)");
     expect(markdown).toContain(
-      "[1234567](https://shelf.example.com/projects/web/builds/src1/diff)",
+      "[`1234567`](https://shelf.example.com/projects/web/builds/src1/diff)",
     );
+    expect(markdown).toContain("⏭️ StoryShelf: Skipped: no story changed since");
   });
 
   it("says so in the comment when the source is gone", () => {
@@ -539,5 +549,98 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
       statuses: [],
       comment: null,
     });
+  });
+});
+
+const names = (set: ReturnType<typeof run>) => set.statuses.map((status) => status.name);
+const commentOutputs = (comment: StateOutputs["comment"]): StateOutputs => ({
+  ...ALL_OUTPUTS,
+  comment,
+});
+
+describe("statusesForBuild: a repository link's outputs (ADR 0054, decision 10)", () => {
+  const reviewing: { build: Partial<BuildStateBuild>; changes: BuildStateChange[] } = {
+    build: { status: "reviewing" },
+    changes: [change(1)],
+  };
+
+  it("posts everything with every output on, as a per-project channel does", () => {
+    expect(run({ ...reviewing, outputs: ALL_OUTPUTS })).toEqual(run(reviewing));
+  });
+
+  it("always keeps the gate; the Storybook status and annotations can be off", () => {
+    const set = run({
+      ...reviewing,
+      outputs: { storybook: false, comment: "always", annotations: false },
+    });
+    expect(names(set)).toEqual(["testing"]);
+    expect(gate(set)?.annotations).toBeUndefined();
+    expect(set.comment).not.toBeNull();
+  });
+
+  it("keeps the comment always, only for a build with changes, or never", () => {
+    expect(run({ ...reviewing, outputs: commentOutputs("off") }).comment).toBeNull();
+    expect(run({ ...reviewing, outputs: commentOutputs("on-changes") }).comment).not.toBeNull();
+    expect(
+      run({ build: { status: "approved", changedCount: 0 }, outputs: commentOutputs("on-changes") })
+        .comment,
+    ).toBeNull();
+  });
+
+  it("keeps the review gate of a hosting-only project", () => {
+    const set = run({
+      flags: { testing: false, review: true },
+      outputs: { storybook: false, comment: "off", annotations: false },
+    });
+    expect(names(set)).toEqual(["review"]);
+  });
+});
+
+const withChanges = (overrides: Partial<Parameters<typeof run>[0]> = {}) =>
+  run({
+    build: { status: "reviewing" },
+    publishing: "success",
+    changes: [
+      change(1, { storyId: "button--s1", diffRatio: 0.024 }),
+      change(2, { status: "new", storyId: "button--s2" }),
+      change(3, { status: "unchanged" }),
+    ],
+    ...overrides,
+  });
+
+describe("statusesForBuild: the comment's changed stories", () => {
+  it("lists changed and new stories with the review page and the story in the Storybook", () => {
+    const markdown = withChanges().comment?.markdown ?? "";
+    expect(markdown).toContain(
+      "| Button / Story 1 | chromium, desktop | 2.4 % | [review](https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S1) · [story](https://shelf.example.com/projects/web/storybook/build/b1/index.html?path=/story/button--s1) |",
+    );
+    expect(markdown).toContain("| Button / Story 2 | chromium, desktop | new |");
+    expect(markdown).not.toContain("Story 3");
+    expect(markdown).not.toContain("iframe.html");
+  });
+
+  it("links no story until the Storybook is published, and lists none without testing", () => {
+    expect(withChanges({ publishing: "pending" }).comment?.markdown).not.toContain("[story]");
+    const hosting = withChanges({ flags: { testing: false, review: true } }).comment?.markdown;
+    expect(hosting).not.toContain("| Story |");
+  });
+
+  it("gives the gate, not the Storybook status, the comment as its check-run summary", () => {
+    const set = withChanges();
+    for (const status of set.statuses) {
+      expect(status.summary).toBe(status.name === "storybook" ? undefined : set.comment?.markdown);
+    }
+  });
+
+  it("reports a partial capture with the commit's update time and the extras", () => {
+    const markdown =
+      withChanges({
+        build: { status: "reviewing", inheritedCount: 8, updatedAt: "2026-11-20T16:42:00Z" },
+        extras: { failedTests: ["Form / Submit"], a11yCount: 2 },
+      }).comment?.markdown ?? "";
+    expect(markdown).toContain("partial capture (2 of 10 stories)");
+    expect(markdown).toContain("updated 16:42 UTC");
+    expect(markdown).toContain("1 failing Storybook test");
+    expect(markdown).toContain("2 a11y findings");
   });
 });

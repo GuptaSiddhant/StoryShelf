@@ -10,6 +10,9 @@ import {
   type ShelfOptions,
 } from "./config.ts";
 import { assertPortalOutsideContentHosts, storybookHostingOf } from "./content-hosts.ts";
+import { offerIntegrations } from "./integrations/availability.ts";
+import { BUILT_IN_INTEGRATIONS } from "./integrations/built-in.ts";
+import { assertGitOptions } from "./integrations/git/connections/define.ts";
 import { resolveShelfIntegrations } from "./integrations/index.ts";
 import { validateStorybookHosting } from "./storybook-hosting.ts";
 
@@ -24,7 +27,8 @@ export const DEFAULT_SCRATCH_DIR: string = join(tmpdir(), "storyshelf");
  * - `config.scratchDir` defaults to {@link DEFAULT_SCRATCH_DIR}: publishing extracts zips there,
  *   with or without `testing`.
  * - `design`, `notifications.notifiers` and `notifications.email` resolve to lists against the
- *   built-in integrations (ADR 0049); a broken provider or a repeated provider kind throws.
+ *   built-in integrations (ADR 0049); a broken provider or a repeated provider kind throws. Only
+ *   available providers stay in `design` and `notifiers`; `integrations` reports every kind.
  */
 export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions {
   assertThreads(options.testing?.compare?.threads);
@@ -32,7 +36,7 @@ export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions
   assertStorybookUrlRateLimit(options.storybookUrlRateLimit, "storybookUrlRateLimit");
   assertStorybookHosting(options);
   assertTestingBackable(options);
-  assertNotificationsConfig(options.notifications?.config);
+  assertIntegrationOptions(options);
   const resolved = withIntegrations(options);
   if (options.config?.scratchDir !== undefined) {
     return resolved;
@@ -40,14 +44,29 @@ export function resolveShelfOptions(options: ShelfOptions): ResolvedShelfOptions
   return { ...resolved, config: { ...options.config, scratchDir: DEFAULT_SCRATCH_DIR } };
 }
 
-/** `options` with its integration groups resolved into lists. */
+/** The notification settings and the configured git connections and links (ADR 0054). */
+function assertIntegrationOptions(options: ShelfOptions): void {
+  assertNotificationsConfig(options.notifications?.config);
+  assertGitOptions(options.git ?? {});
+}
+
+/**
+ * `options` with its integration groups resolved into lists, keeping only the providers the server
+ * can deliver (issue #1126); the rest are reported in `integrations`.
+ */
 function withIntegrations(options: ShelfOptions): ResolvedShelfOptions {
-  const { notifiers, email, design } = resolveShelfIntegrations({
+  const resolved = resolveShelfIntegrations({
     notifiers: options.notifications?.notifiers,
     email: options.notifications?.email,
     design: options.design,
   });
-  return { ...options, design, notifications: { ...options.notifications, notifiers, email } };
+  const { notifiers, design, statuses } = offerIntegrations(resolved, BUILT_IN_INTEGRATIONS);
+  return {
+    ...options,
+    design,
+    notifications: { ...options.notifications, notifiers, email: resolved.email },
+    integrations: statuses,
+  };
 }
 
 /**

@@ -1,40 +1,56 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { edgeFade } from "./edge-fade.ts";
 import { Icon } from "./icons/icon.tsx";
 import type { IconName } from "./icons/paths.ts";
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-secondary" | "outline";
-type ButtonSize = "md" | "sm";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "danger-secondary"
+  | "outline";
+export type ButtonSize = "md" | "sm";
 
 const btnBase = css`
   /* btn */
   appearance: none;
   border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: 0.55rem 0.9rem;
-  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-base);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: var(--space-2);
   line-height: 1.2;
   /* Top-aligned so a button in a <form> (a block with a line box) is exactly
      as tall as the button instead of picking up a baseline strut. */
   vertical-align: top;
-  min-height: 40px;
+  min-height: var(--control-md);
   transition:
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease),
     filter var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
-  &:active:not(:disabled) {
+  &:active:not(:disabled):not([aria-disabled="true"]) {
     transform: translateY(1px);
   }
-  &:disabled {
-    opacity: 0.55;
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 1;
+    background: var(--surface-muted);
+    border-color: var(--border);
+    color: var(--text-secondary);
+    box-shadow: none;
+    filter: none;
     cursor: not-allowed;
+  }
+  &[aria-disabled="true"] {
+    pointer-events: none;
   }
 `;
 
@@ -54,9 +70,9 @@ const btnPrimary = css`
 const btnPrimarySm = css`
   /* btn-primary-sm */
   ${btnPrimary}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 const btnSecondary = css`
@@ -75,9 +91,9 @@ const btnSecondary = css`
 const btnSecondarySm = css`
   /* btn-secondary-sm */
   ${btnSecondary}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 const btnOutline = css`
@@ -92,9 +108,9 @@ const btnOutline = css`
 const btnOutlineSm = css`
   /* btn-outline-sm */
   ${btnOutline}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 const btnGhost = css`
@@ -113,17 +129,17 @@ const btnGhost = css`
 const btnGhostSm = css`
   /* btn-ghost-sm */
   ${btnGhost}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 const btnDanger = css`
   /* btn-danger */
   ${btnBase}
-  background: color-mix(in srgb, var(--status-rejected) 82%, #000);
-  color: #fff;
-  border-color: color-mix(in srgb, var(--status-rejected) 82%, #000);
+  background: var(--status-rejected-solid);
+  color: var(--status-rejected-contrast);
+  border-color: var(--status-rejected-solid);
   &:hover {
     filter: brightness(1.06);
     text-decoration: none;
@@ -133,9 +149,9 @@ const btnDanger = css`
 const btnDangerSm = css`
   /* btn-danger-sm */
   ${btnDanger}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 /** A destructive action that is not the main one: secondary weight, danger text (e.g. Reject). */
@@ -153,9 +169,9 @@ const btnDangerSecondary = css`
 const btnDangerSecondarySm = css`
   /* btn-danger-secondary-sm */
   ${btnDangerSecondary}
-  padding: 0.35rem 0.6rem;
-  font-size: 0.8rem;
-  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: var(--control-sm);
 `;
 
 const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
@@ -169,22 +185,26 @@ const btnClasses: Record<ButtonVariant, Record<ButtonSize, Promise<string>>> = {
 
 const tabsNav = css`
   /* tabs */
+  ${edgeFade}
+  position: relative;
   display: flex;
-  gap: 0.25rem;
+  gap: var(--space-1);
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1rem;
   overflow-x: auto;
 `;
 
 const tabsLink = css`
   /* tabs-link */
-  padding: 0.55rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 2px solid transparent;
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   text-decoration: none;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   &:hover {
     color: var(--text-primary);
     text-decoration: none;
@@ -246,7 +266,7 @@ export const Tabs: FC<{
   label?: string;
 }> = ({ tabs, label = "Sections" }) => {
   return (
-    <nav class={tabsNav} aria-label={label}>
+    <nav class={tabsNav} aria-label={label} data-scroll-active>
       {tabs.map((tab) => (
         <a
           class={tab.active ? tabsLinkActive : tabsLink}

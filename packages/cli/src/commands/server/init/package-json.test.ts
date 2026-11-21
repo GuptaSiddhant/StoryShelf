@@ -55,6 +55,11 @@ describe("generatePackageJson", () => {
     expect(pkg().dependencies["@storyshelf/app"]).toBe("0.0.0");
   });
 
+  it("pins @hono/node-server past GHSA-rmxm-3fg6-px4f", () => {
+    const { dependencies } = pkg({ database: "sqlite", storage: "local" });
+    expect(dependencies["@hono/node-server"]).toBe("^2.1.11");
+  });
+
   it("runs entries with plain node and requires Node 24+", () => {
     const { scripts, engines } = pkg({ database: "postgres", storage: "s3" });
     expect(scripts["start"]).toBe("node src/index.ts");
@@ -143,6 +148,17 @@ describe("generatePackageJson", () => {
     expect(scripts["docker:run"]).toContain("docker run");
     expect(scripts["docker:up"]).toBeUndefined();
     expect(scripts["infra:plan"]).toBeUndefined();
+  });
+
+  it("forwards SECRET, and AUTH_PASSWORD for password auth, from the shell to docker:run", () => {
+    const open = pkg({ deployTarget: "docker", docker: true }).scripts["docker:run"];
+    const password = pkg({ deployTarget: "docker", docker: true, auth: "password" }).scripts[
+      "docker:run"
+    ];
+    expect(open).toMatch(/ -e SECRET /u);
+    expect(open).not.toContain("AUTH_PASSWORD");
+    expect(password).toMatch(/ -e SECRET -e AUTH_PASSWORD /u);
+    expect(`${open} ${password}`).not.toMatch(/SECRET=|change-me/u);
   });
 
   it("has compose scripts when the stack has more than one service", () => {

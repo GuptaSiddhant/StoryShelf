@@ -23,15 +23,18 @@ import type { AuthUser } from "@storyshelf/core/types";
 import { sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
+import { unofferedIntegrations, unofferedReason } from "../integrations.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
 import {
   insightsShown,
   renderProjectSettingsPage,
   type SettingsFormState,
+  type SettingsUnoffered,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
 import type { SettingsDesignData, SettingsDesignProvider } from "../pages/settings-design.tsx";
+import type { SettingsGitData } from "../pages/settings-git.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
@@ -50,6 +53,7 @@ import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
 import { isSiteAdmin } from "./insights.handlers.ts";
+import { loadGitSection } from "./settings-git-data.ts";
 import { loadSettingsInsights } from "./settings-insights.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
@@ -66,6 +70,7 @@ export interface SettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  git: SettingsGitData | null;
 }
 
 /** Tokens without hashes for the settings UI. */
@@ -151,7 +156,9 @@ async function loadNotificationChannels(
   notifiers: readonly NotifierProvider[],
 ): Promise<SettingsNotificationChannel[]> {
   const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
-  return rows.map((row) => ({
+  // A channel of a kind the server does not offer is hidden, not deleted; System lists it (#1126).
+  const offered = rows.filter((row) => unofferedReason(row.provider) === undefined);
+  return offered.map((row) => ({
     id: row.id,
     provider: row.provider,
     delivery: deliveryOf(notifiers, row.provider),
@@ -322,7 +329,15 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
   const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
-  return { project, ...inventory, ...notifications, ...linksSection, design, isAdmin };
+  return {
+    project,
+    ...inventory,
+    ...notifications,
+    ...linksSection,
+    design,
+    isAdmin,
+    git: await loadGitSection(project),
+  };
 }
 
 /**
@@ -362,12 +377,26 @@ export async function renderSettingsPage(
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
+      git: data.git ?? undefined,
       notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
       targets: await runnerTargets(),
+      unoffered: unofferedFor(c),
     },
     formState,
   );
+}
+
+/** What a site admin is told the server does not offer projects (issue #1126); nobody else is. */
+function unofferedFor(c: Context): SettingsUnoffered | undefined {
+  if (!isSiteAdmin(c)) {
+    return undefined;
+  }
+  return {
+    notifications: unofferedIntegrations("notifiers"),
+    design: unofferedIntegrations("design"),
+    git: true,
+  };
 }
 
 /** AI availability and profile choices for the settings AI tab. */

@@ -81,6 +81,11 @@ export class DiffPool {
     this.onWorkerEvent = options.onWorkerEvent ?? warnWorkerEvent;
   }
 
+  /** Whether diffs run on the calling thread: no workers configured, or the workers cannot be used. */
+  get inThread(): boolean {
+    return this.size === 0 || this.broken;
+  }
+
   /**
    * Diff two PNGs. The inputs may be detached (transferred) when a worker runs the diff, so
    * callers must not reuse them afterwards.

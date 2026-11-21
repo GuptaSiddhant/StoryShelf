@@ -69,6 +69,62 @@ describe("keepJobLease", () => {
     expect(queue.extend).toHaveBeenCalledTimes(1);
   });
 
+  it("aborts the signal when the lease is lost, so the work stops (#1154)", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue("lost");
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    expect(keeper.signal.aborted).toBe(false);
+    await clock.advance(RENEW_THROTTLE_MS);
+    await expect(keeper.ended).resolves.toBe("lost");
+    expect(keeper.signal.aborted).toBe(true);
+    expect((keeper.signal.reason as Error).message).toBe("job lease lost");
+  });
+
+  it("aborts the signal when the job is cancelled, within one check (#1154)", async () => {
+    const clock = createManualClock();
+    const { queue, state } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    await clock.advance(CANCEL_CHECK_MS);
+    expect(keeper.signal.aborted).toBe(false);
+    state.inspect = "cancelled";
+    await clock.advance(CANCEL_CHECK_MS);
+    expect(keeper.signal.aborted).toBe(true);
+    expect((keeper.signal.reason as Error).message).toBe("job cancelled");
+  });
+
+  it("never aborts the signal when stopped after the job finished", async () => {
+    const clock = createManualClock();
+    const { queue, state } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    keeper.stop();
+    state.inspect = "cancelled";
+    await clock.advance(CANCEL_CHECK_MS * 3);
+    expect(keeper.signal.aborted).toBe(false);
+  });
+
+  it("ends with released and aborts its signal on release, and stops renewing (#912)", async () => {
+    const clock = createManualClock();
+    const { queue } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    keeper.release();
+    expect(await keeper.ended).toBe("released");
+    expect(keeper.signal.aborted).toBe(true);
+    expect((keeper.signal.reason as Error).message).toBe("job handed back on shutdown");
+    await clock.advance(RENEW_THROTTLE_MS * 3);
+    expect(queue.extend).not.toHaveBeenCalled();
+    expect(queue.inspect).not.toHaveBeenCalled();
+  });
+
+  it("ignores a release once the job already ended", async () => {
+    const clock = createManualClock();
+    const { queue, state } = fakeQueue();
+    const keeper = keepJobLease(queue, job, { now: clock.now, timers: clock.timers });
+    state.inspect = "cancelled";
+    await clock.advance(CANCEL_CHECK_MS);
+    keeper.release();
+    expect(await keeper.ended).toBe("cancelled");
+  });
+
   it("derives the throttle from a short lease", async () => {
     const clock = createManualClock();
     const { queue } = fakeQueue();

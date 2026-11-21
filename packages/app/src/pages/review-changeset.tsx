@@ -15,6 +15,7 @@ import {
   SectionTitle,
   Table,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -115,7 +116,7 @@ function ChangeRow(props: {
         </Meta>
       </td>
       <td>
-        <Badge tone={KIND_TONE[kind]}>{kind}</Badge>
+        <Badge tone={KIND_TONE[kind]}>{statusLabel(kind)}</Badge>
       </td>
       <td>
         {item.previousStoryCount !== undefined && item.previousStoryCount !== item.storyCount

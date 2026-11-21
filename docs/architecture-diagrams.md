@@ -98,7 +98,7 @@ flowchart TB
     end
 
     subgraph GitAdapters["Git Notifiers"]
-        ghub["@storyshelf/notify-git\nGitHub / GitLab / git-log (state delivery)"]
+        ghub["core/integrations/git\nGitHub / GitLab / git-log (state delivery)"]
     end
 
     subgraph Apps["Apps (deployables)"]

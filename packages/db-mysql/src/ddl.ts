@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS builds (
   message TEXT,
   public TINYINT(1) NOT NULL DEFAULT false,
   status VARCHAR(32) NOT NULL DEFAULT 'pending',
+  retention_state VARCHAR(16) NOT NULL DEFAULT 'available',
   snapshot_count INTEGER NOT NULL DEFAULT 0,
   changed_count INTEGER NOT NULL DEFAULT 0,
   approved_count INTEGER NOT NULL DEFAULT 0,
@@ -68,6 +69,44 @@ CREATE TABLE IF NOT EXISTS builds (
 CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha);
 CREATE INDEX builds_project_created_idx ON builds (project_id, created_at);
 CREATE INDEX builds_project_branch_created_idx ON builds (project_id, git_branch, created_at);
+CREATE TABLE IF NOT EXISTS build_references (
+  project_id VARCHAR(64) NOT NULL,
+  owner_type VARCHAR(32) NOT NULL,
+  owner_id VARCHAR(64) NOT NULL,
+  build_id VARCHAR(64) NOT NULL,
+  PRIMARY KEY (project_id, owner_type, owner_id, build_id),
+  CONSTRAINT build_references_owner_type_check CHECK (owner_type IN ('baseline', 'investigation')),
+  CONSTRAINT fk_build_references_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_build_references_build_id FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE RESTRICT
+);
+CREATE INDEX build_references_build_idx ON build_references (build_id);
+CREATE TABLE IF NOT EXISTS build_reference_generations (
+  project_id VARCHAR(64) NOT NULL,
+  owner_type VARCHAR(32) NOT NULL,
+  owner_id VARCHAR(64) NOT NULL,
+  generation BIGINT NOT NULL,
+  PRIMARY KEY (project_id, owner_type, owner_id),
+  CONSTRAINT build_reference_generations_owner_type_check CHECK (owner_type IN ('baseline', 'investigation')),
+  CONSTRAINT build_reference_generations_generation_check CHECK (generation >= 0),
+  CONSTRAINT fk_build_reference_generations_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS build_deletions (
+  build_id VARCHAR(64) PRIMARY KEY,
+  project_id VARCHAR(64) NOT NULL,
+  content_released_at DATETIME(3) NULL,
+  storage_deleted_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_build_deletions_build_id FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE,
+  CONSTRAINT fk_build_deletions_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS build_content_releases (
+  build_id VARCHAR(64) NOT NULL,
+  content_hash VARCHAR(128) NOT NULL,
+  released_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (build_id, content_hash),
+  CONSTRAINT fk_build_content_releases_build_id FOREIGN KEY (build_id) REFERENCES builds(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS capture_attempts (
   id VARCHAR(64) PRIMARY KEY,
   project_id VARCHAR(64) NOT NULL,
@@ -519,6 +558,43 @@ CREATE TABLE IF NOT EXISTS content_uses (
   PRIMARY KEY (build_id, content_hash)
 );
 CREATE INDEX content_uses_hash_idx ON content_uses (content_hash);
+CREATE TABLE IF NOT EXISTS git_connections (
+  id VARCHAR(64) PRIMARY KEY,
+  provider VARCHAR(32) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  api_base TEXT,
+  config TEXT NOT NULL,
+  secret_encrypted TEXT,
+  created_by VARCHAR(64),
+  state VARCHAR(32) NOT NULL DEFAULT 'active',
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL
+);
+CREATE TABLE IF NOT EXISTS git_repository_links (
+  id VARCHAR(64) PRIMARY KEY,
+  project_id VARCHAR(64) NOT NULL,
+  connection_id VARCHAR(64) NOT NULL,
+  host VARCHAR(255) NOT NULL,
+  owner VARCHAR(128) NOT NULL,
+  repo VARCHAR(128) NOT NULL,
+  host_repository_id VARCHAR(128),
+  prefix VARCHAR(64) NOT NULL DEFAULT '',
+  state VARCHAR(32) NOT NULL DEFAULT 'pending',
+  reason TEXT,
+  outputs TEXT NOT NULL,
+  installation_id VARCHAR(64),
+  requested_by VARCHAR(64),
+  approved_by VARCHAR(64),
+  approved_at DATETIME(3),
+  last_delivered_at DATETIME(3),
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_git_repository_links_project_id FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_git_repository_links_connection_id FOREIGN KEY (connection_id) REFERENCES git_connections(id)
+);
+CREATE UNIQUE INDEX git_repository_links_repository_idx ON git_repository_links (host, owner, repo, prefix);
+CREATE INDEX git_repository_links_project_id_idx ON git_repository_links (project_id);
+CREATE INDEX git_repository_links_connection_id_idx ON git_repository_links (connection_id);
 CREATE TABLE IF NOT EXISTS \`user\` (
   id VARCHAR(64) PRIMARY KEY,
   name TEXT NOT NULL,

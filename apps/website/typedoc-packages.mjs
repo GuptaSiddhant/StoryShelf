@@ -13,7 +13,6 @@ const SLUGS = [
   "core",
   "app",
   "affected",
-  "image",
   "observability",
   "auth",
   "ai",
@@ -27,10 +26,6 @@ const SLUGS = [
   "storage-gcs",
   "runner-playwright",
   "runner-puppeteer",
-  "design-figma",
-  "notify-chat",
-  "notify-email",
-  "notify-git",
 ];
 
 /**

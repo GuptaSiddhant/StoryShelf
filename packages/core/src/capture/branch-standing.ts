@@ -9,6 +9,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotifierProvider, StateNotifierAdapter } from "../adapters/notifier/provider.ts";
 import type { Logger } from "../logger.ts";
 import type { BuildModel } from "../models/build.ts";
+import type { GitConnectionModel } from "../models/git-connection.ts";
 import type { BranchVerification, Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
@@ -21,6 +22,8 @@ export interface StandingDeps {
   notifiers?: readonly NotifierProvider[] | undefined;
   secret?: SecretInput | undefined;
   logger?: Logger | undefined;
+  /** The server's git connections: a project's approved repository links answer too (ADR 0054, decision 10). */
+  gitConnections?: GitConnectionModel | undefined;
 }
 
 /** A build's standing: whether it counts as default, and the host's answer that decided it. */
@@ -40,7 +43,8 @@ interface Verifier {
  * The one decision on a build's default-branch claim. Not claimed: not default. Claimed: every
  * enabled git channel whose provider can check is asked; one confirmation makes it `verified`. A
  * host that says no makes it `refused`, and a host that cannot answer makes it `unreachable`: both
- * fail closed. With no channel that can check, the claim is `unverified`, and it counts only when
+ * fail closed. Approved repository links ask through their connection like a channel. With no
+ * channel or link that can check, the claim is `unverified`, and it counts only when
  * the project turned `requireVerifiedDefault` off.
  */
 export async function defaultBranchStanding(

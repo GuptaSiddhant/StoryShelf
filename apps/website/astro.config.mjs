@@ -47,12 +47,15 @@ export default defineConfig({
         alt: "",
       },
       components: {
+        Footer: "./src/components/overrides/Footer.astro",
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
         Sidebar: "./src/components/overrides/Sidebar.astro",
         PageTitle: "./src/components/overrides/PageTitle.astro",
       },
       customCss: ["./src/styles/custom.css"],
+      // Adds the Markdown copy of each page to its <head> (see the file).
+      routeMiddleware: "./src/routeData.ts",
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
       social: [{ label: "GitHub", href: REPO, icon: "github" }],
@@ -117,9 +120,13 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
+            { label: "Set up with an AI agent", slug: "guides/ai-agent-setup" },
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "When the browser changes", slug: "guides/browser-changes" },
+            { label: "Upgrading guide", slug: "guides/upgrading" },
+            { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
               collapsed: true,
@@ -248,16 +255,7 @@ export default defineConfig({
           label: "Packages",
           items: [
             { label: "Overview", slug: "packages" },
-            packageGroup("Core", [
-              "core",
-              "app",
-              "affected",
-              "image",
-              "observability",
-              "auth",
-              "ai",
-              "mcp",
-            ]),
+            packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [
               "storage-local",
@@ -266,8 +264,6 @@ export default defineConfig({
               "storage-gcs",
             ]),
             packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
-            packageGroup("Design", ["design-figma"]),
-            packageGroup("Notifications", ["notify-chat", "notify-email", "notify-git"]),
           ],
         },
       ],

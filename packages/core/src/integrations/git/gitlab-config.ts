@@ -8,4 +8,9 @@ export const gitlabConfigSchema = z.object({
   // oxlint-disable-next-line typescript/no-deprecated -- z.string().url() kept for zod v3 API compat
   host: z.string().url().optional(),
   prefix: statusPrefixSchema.optional(),
+  /**
+   * The project's numeric id. Set by a repository link (ADR 0054): every request addresses the
+   * project by it. Never set on a per-project channel.
+   */
+  projectId: z.string().regex(/^\d+$/u, "Use the numeric project ID").optional(),
 });

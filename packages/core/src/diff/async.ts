@@ -1,5 +1,6 @@
 /** `diffImagesAsync`: `diffImages` on a lazily created, process-wide worker pool, plus `configureImages`. */
 import { availableParallelism } from "node:os";
+import type { ImageEngine } from "./codec.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import { DiffPool } from "./pool.ts";
 import {
@@ -54,6 +55,26 @@ export async function diffImagesAsync(
     engine: currentImageEngine(),
   });
   return await pool.run(baseline, current, options);
+}
+
+/** What the diff path runs on now (read-only; starts nothing). */
+export interface ImageEngineState {
+  /** The image library in effect: `pngjs` or `sharp`. */
+  engine: ImageEngine;
+  /** Configured worker threads (`0` = in-thread by choice). */
+  workers: number;
+  /** Whether diffs run on the calling thread: by choice, or because workers could not start. */
+  inThread: boolean;
+}
+
+/** The engine and pool size in effect, for the admin health report. Starts no worker. */
+export function imageEngineState(): ImageEngineState {
+  const workers = configuredThreadCount() ?? resolveDiffWorkers(process.env);
+  return {
+    engine: currentImageEngine(),
+    workers,
+    inThread: workers === 0 || pool?.inThread === true,
+  };
 }
 
 /** Stop the shared pool's workers. A later `diffImagesAsync` starts a fresh pool. */

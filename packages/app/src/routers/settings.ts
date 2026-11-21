@@ -1,15 +1,16 @@
 import type { ShelfRouter } from "../app-types.ts";
 import { registerAiSettings } from "./settings-ai.ts";
 import { registerCaptureSettings } from "./settings-capture.ts";
-import { registerDesignSettings } from "./settings-design.ts";
-import { registerGeneralSettings } from "./settings-general.ts";
+import { registerDesignSettings } from "./settings-design.tsx";
+import { registerGeneralSettings } from "./settings-general.tsx";
+import { registerGitSettings } from "./settings-git.ts";
 import { registerLabelSettings } from "./settings-labels.ts";
 import { registerLinkSettings } from "./settings-links.ts";
-import { registerMemberSettings } from "./settings-members.ts";
-import { registerNotificationSettings } from "./settings-notifications.ts";
+import { registerMemberSettings } from "./settings-members.tsx";
+import { registerNotificationSettings } from "./settings-notifications.tsx";
 import { registerSettingsTabs } from "./settings-tabs.ts";
-import { registerTokenSettings } from "./settings-tokens.ts";
-import { registerWebhookSettings } from "./settings-webhooks.ts";
+import { registerTokenSettings } from "./settings-tokens.tsx";
+import { registerWebhookSettings } from "./settings-webhooks.tsx";
 
 /** Register the server-rendered project settings pages and their form handlers. */
 export function registerSettingsPages(app: ShelfRouter): void {
@@ -19,6 +20,7 @@ export function registerSettingsPages(app: ShelfRouter): void {
   registerTokenSettings(app);
   registerWebhookSettings(app);
   registerNotificationSettings(app);
+  registerGitSettings(app);
   registerMemberSettings(app);
   registerAiSettings(app);
 }

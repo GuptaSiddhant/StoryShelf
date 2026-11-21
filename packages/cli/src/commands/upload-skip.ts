@@ -1,6 +1,7 @@
 import { computeAffected } from "@storyshelf/affected";
 import { randomUUID } from "node:crypto";
 import {
+  buildPageUrl,
   RequestError,
   type createClient,
   type SkippedBuildCreated,
@@ -12,6 +13,7 @@ import { parseLabels } from "./labels.ts";
 
 /** What the skip path needs from the resolved upload options. */
 export interface SkipContext {
+  url?: string;
   slug: string;
   sha: string;
   branch: string;
@@ -23,6 +25,8 @@ export interface SkipContext {
   authorEmail?: string;
   authorName?: string;
   label?: string[];
+  /** Called with the skipped build the server recorded. */
+  onSkipped?: (created: SkippedBuildCreated) => void;
 }
 
 /** Attempts at the POST: one, plus retries after a network failure with the same key. */
@@ -98,6 +102,9 @@ async function recordSkip(
   printLine(
     `Skipped: no story changed since ${source.sha.slice(0, 7)} (build ${created.build.id})`,
   );
+  ctx.onSkipped?.(created);
+  const link = buildPageUrl(ctx.url, created.buildUrl);
+  if (link !== null) printLine(`View the build: ${link}`);
   return true;
 }
 

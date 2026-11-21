@@ -139,6 +139,33 @@ describe("capture settings tab", () => {
   });
 });
 
+describe("browser extras fragment", () => {
+  it("leaves the primary out and keeps the ticks already made", async () => {
+    const { app } = await setup();
+    const res = await app.request(
+      "/projects/capture-project/settings/capture/extras?browser=firefox&extra_webkit=webkit",
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain('name="extra_firefox"');
+    expect(html).toMatch(/name="extra_webkit"[^>]*checked|checked[^>]*name="extra_webkit"/u);
+    expect(html).toContain('name="extra_chromium"');
+  });
+
+  it("refuses an unknown browser", async () => {
+    const { app } = await setup();
+    const res = await app.request("/projects/capture-project/settings/capture/extras?browser=nope");
+    expect(res.status).toBe(400);
+  });
+
+  it("wires the primary select to the fragment", async () => {
+    const { app } = await setup();
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain('hx-get="/projects/capture-project/settings/capture/extras"');
+    expect(html).toContain('id="browser-extras"');
+  });
+});
+
 describe("diff thresholds", () => {
   it("shows the thresholds on the capture tab and saves them", async () => {
     const { app, saveThresholds, project } = await setup();
