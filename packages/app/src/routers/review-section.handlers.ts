@@ -71,6 +71,10 @@ export async function reviewCapabilities(project: Project): Promise<ReviewCapabi
   if (!getStore().authEnabled) {
     return { canComment: true, canVerdict: true };
   }
+  // A read-only shared account (#1274) is shown no review control; its writes are refused anyway.
+  if (getStore().user?.readOnly === true) {
+    return { canComment: false, canVerdict: false };
+  }
   const role = await currentProjectRole(project.id);
   return {
     canComment: role === "developer" || role === "approver" || role === "admin",

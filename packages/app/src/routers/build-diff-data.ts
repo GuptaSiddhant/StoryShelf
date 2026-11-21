@@ -52,7 +52,7 @@ export async function loadBuildDiffData(
     snapshots,
     comments,
     selectedId: view.snapshotId,
-    canReview: !authEnabled || Boolean(user),
+    canReview: !authEnabled || (Boolean(user) && user?.readOnly !== true),
     canTriage: canManage || isBuildAuthor(build),
     canManage,
     names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),

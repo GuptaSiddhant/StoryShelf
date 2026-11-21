@@ -1,6 +1,6 @@
 ---
 title: Auth configuration
-description: Secrets, config-as-code, session settings, and login text.
+description: Secrets, config-as-code, session settings, login text and read-only shared accounts.
 ---
 
 ## Config-as-code and secrets
@@ -49,5 +49,22 @@ Available keys: `title`, `subtitle`, `passwordLabel`, `passwordPlaceholder`, `su
 ## Profile
 
 Every logged-in user gets `/profile`: avatar, editable display name, email, site role, provider, project memberships, and sign-out — plus **Devices** (per-device revoke, sign out others), **Passkeys** (list, delete, register), and password change for local accounts. A user-edited display name survives IdP refresh (`display_name_override`).
+
+## Read-only shared accounts
+
+A demo instance can publish the email and password of one account and still trust it: list the account in `readOnlyAccounts` and it may only sign in, sign out and read what its project role allows.
+
+```ts
+const shelf = createShelfAuth({
+  ...authOptions,
+  readOnlyAccounts: ["demo@example.com"],
+});
+```
+
+The server image and the Fly app read the same list from `SHELF_READ_ONLY_ACCOUNTS` (comma-separated emails). Emails compare case-insensitively, and the list lives in configuration, never in the database.
+
+Every write such an account attempts is refused with a `403` and one fixed message: the profile, password, devices, passkeys, notification settings, comments, verdicts, tokens and every other `POST`, `PUT`, `PATCH` or `DELETE` its role would allow. The app refuses its page and API routes in one middleware, whether the account arrives with its session or with a bearer token it owns, and the auth engine refuses its own endpoints (password change and reset, email change, profile update, account deletion, passkeys, session revocation). Pages show a quiet "Shared demo account: read-only" banner and hide the controls that would change something. Connecting a design account is refused too (its `GET` callback stores tokens), and the profile lists only the visitor's own session, never the other visitors' devices.
+
+Emails are compared after Unicode NFKC normalization. At boot the server warns, without the address, about each listed account that has no user yet, because an account that doesn't match is not protected. Give the account the `viewer` role on the projects it should see. Its password is still a credential: keep it out of logs and use a test domain in fixtures.
 
 See also [Auth concepts](/concepts/auth/).

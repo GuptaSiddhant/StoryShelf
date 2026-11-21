@@ -106,8 +106,12 @@ async function loadEngineSecurity(
     auth.hasPassword(user.id),
   ]);
   const current = readSessionToken(c);
+  // Every visitor of a read-only shared account (#1274) shares its user id: show only their own
+  // session, never the others' devices, addresses and sign-in times.
+  const shown =
+    user.readOnly === true ? sessions.filter((session) => session.token === current) : sessions;
   return {
-    sessions: sessions.map((session) => ({
+    sessions: shown.map((session) => ({
       id: session.id,
       ipAddress: session.ipAddress,
       userAgent: session.userAgent,
