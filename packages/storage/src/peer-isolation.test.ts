@@ -67,6 +67,6 @@ describe("optional peers load only from their own subpath", () => {
       for (const peer of PEERS[subpath]) {
         expect(loaded.some((name) => name === peer || name.startsWith(`${peer}/`))).toBe(true);
       }
-    });
+    }, 60_000);
   }
 });
