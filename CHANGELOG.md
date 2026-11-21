@@ -53,6 +53,12 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
 ### Added
 
+- The pull-request comment lists removed stories and earlier builds
+
+  A delivery now diffs the baseline build's catalog against this build's and lists the stories that are gone (the newest approved build before this one on its branch, else on the default branch; nothing while either catalog cannot be read). It also links the project's earlier builds on the same branch, newest first, at most 10, each with a fixed state phrase and a link from the confirmed origin. Story names are escaped.
+
+  Schema: none
+
 - An rds-iam Postgres preset for RDS IAM authentication
 
   `@storyshelf/db-postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token from the optional `@aws-sdk/rds-signer` peer, minted for every new connection so the pool never reuses a stale one. TLS is required, and a missing peer fails at startup with an install hint.
