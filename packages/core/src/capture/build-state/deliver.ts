@@ -84,17 +84,24 @@ async function statesOf(
   const { build, project } = loaded;
   const flags = deps.flags(project);
   const snapshots = await snapshotsOf(deps, build, flags.testing);
+  const urls = createUrlBuilder(where.origin, contentHostSuffix(deps.config));
   return statusesForBuild({
     build,
     projectSlug: project.slug,
     prefix: channelPrefix(where.target.channel),
-    urls: createUrlBuilder(where.origin, contentHostSuffix(deps.config)),
+    urls,
     flags,
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     source: (await skipSourceOf(deps, build)) ?? undefined,
     approvals: await approvalsOf(deps, build, project),
     changes: snapshots.changes,
-    extras: await extrasOf(deps, { build, testing: flags.testing, snapshots: snapshots.all }),
+    extras: await extrasOf(deps, {
+      build,
+      project,
+      urls,
+      testing: flags.testing,
+      snapshots: snapshots.all,
+    }),
     supersededBy: await supersededByOf(deps, build),
     outputs: where.target.link?.outputs,
   });
