@@ -107,7 +107,9 @@ async function upload(buildDir: string, sha: string): Promise<string> {
     "--full",
   ];
   const { stdout } = await run(process.execPath, args);
-  const id = /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
+  const id =
+    /^\s*Build:\s+(?<id>[0-9A-Z]{26})\s*$/mu.exec(stdout)?.groups?.["id"] ??
+    /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
   if (!id) throw new Error(`no build id in CLI output: ${stdout}`);
   return id;
 }
