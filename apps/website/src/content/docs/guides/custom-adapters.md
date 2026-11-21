@@ -22,7 +22,7 @@ Before 1.0, a minor release may change an adapter interface. The change is liste
 | Email sender     | `EmailSender` from `@storyshelf/core/adapter/email-sender`         | SMTP, HTTP, Mailpit and log presets (`@storyshelf/core/integrations`) | A mail API the presets do not reach.                                                                                    |
 | Capture runner   | `CaptureRunner` from `@storyshelf/core/adapter/capture-runner`     | [Playwright](/packages/runner-playwright/)                            | Rarely: a different rendering engine.                                                                                   |
 | Capture queue    | `CaptureQueue` from `@storyshelf/core/adapter/capture-queue`       | The database job queue                                                | Rarely: you must run jobs on a queue service you already operate.                                                       |
-| Database         | `DatabaseAdapter` from `@storyshelf/core/adapter/database`         | [SQLite, Postgres, MySQL](/packages/#databases)                       | **Not recommended before 1.0.**                                                                                         |
+| Database         | `DatabaseAdapter` from `@storyshelf/core/adapter/database`         | [SQLite, Postgres, MySQL](/packages/#databases)                       | A new driver for an existing dialect: see [Databases](#databases).                                                      |
 
 The built-in notifiers and the Figma provider are registered by `createShelfApp` unless you say otherwise (`notifications.notifiers` and `design` each take an array, a function of the built-ins, or `false`). You pass storage, database and the capture runner as values.
 
@@ -31,7 +31,13 @@ Two things are not adapters:
 - **A remote browser** is configuration. Use `defineRemote` and a preset, as described in [Remote browsers](/guides/remote-browsers/) (ADR 0007).
 - **Authentication** is one engine, configured in code, not a family of adapters.
 
-**Do not write a database adapter yet.** The tables are defined three times today (each dialect's DDL, its Drizzle schema, and the core row types) and ADR 0041 moves that to one source of truth. A custom adapter would have to follow every table change in every minor.
+### Databases
+
+What you can do depends on what you want to add:
+
+- **A new driver or host for an existing dialect** (another serverless Postgres, a hosted MySQL, a SQLite variant) can be your own package, once core exposes a public entry point to bring your own Drizzle client for that dialect. That entry point is planned in [#1242](https://github.com/GuptaSiddhant/StoryShelf/issues/1242) and does not exist yet. Until it lands, use one of the built-in presets.
+- **A new SQL dialect** (MSSQL, Oracle and so on) goes into core as a pull request, not as a third-party adapter. It needs a `Dialect` implementation ([#1229](https://github.com/GuptaSiddhant/StoryShelf/issues/1229)) with the fenced retention lifecycle ([ADR 0039](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0039-build-retention-lifecycle.md)), DDL and migration generation ([#1228](https://github.com/GuptaSiddhant/StoryShelf/issues/1228), [#1230](https://github.com/GuptaSiddhant/StoryShelf/issues/1230)), and it has to follow the expand and contract steps of every release ([ADR 0053](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0053-migrations-keep-previous-release-working.md)). The bar is `databaseContractSuite` plus the lifecycle contract suites, all exported from `@storyshelf/core/test-helpers`.
+- **A non-SQL store is not supported.** The models, the job queue and retention fencing assume SQL transactions.
 
 ## The contract every adapter follows
 
