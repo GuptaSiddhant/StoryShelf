@@ -9,7 +9,7 @@ Statements marked `[inferred]` were not read in the code and must be confirmed b
 ## Context
 
 A capture loads a fresh document for every story and viewport. `runCapture`
-(`packages/runner-playwright/src/screenshot.ts`) calls `page.goto(buildUrl(...), { waitUntil:
+(`packages/runner/src/screenshot.ts`) calls `page.goto(buildUrl(...), { waitUntil:
 "networkidle" })`, waits for Storybook's own events (`settle.ts`), optionally runs the play function,
 runs axe, masks ignore regions, sizes the page and takes the screenshot. Every story therefore pays
 for the document, the preview bundle's parse and run, and Storybook's start-up.

@@ -37,7 +37,7 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 import { createShelfApp } from "@storyshelf/app";
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
 import { createS3Storage } from "@storyshelf/storage-s3";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 
 const database = createTursoDatabase({
   url: process.env.TURSO_URL!,
@@ -50,7 +50,7 @@ const storage = createS3Storage({
   accessKeyId: process.env.S3_ACCESS_KEY_ID!,
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
 });
-const capture = createPlaywrightCaptureRunner();
+const capture = createCaptureRunner();
 
 export const app = createShelfApp({
   database, storage, testing: { runner: capture, concurrency: 2 },

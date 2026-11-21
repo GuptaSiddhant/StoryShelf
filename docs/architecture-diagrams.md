@@ -25,7 +25,7 @@ flowchart TB
     GH["Git Provider\nGitHub / GitLab\n(status checks, MR comments)"]
     Store["Storage\nLocal FS / S3 / R2 / MinIO"]
     DB["Database\nSQLite (node:sqlite) / Turso"]
-    Browser["Playwright Chromium\n@storyshelf/runner-playwright"]
+    Browser["Playwright Chromium\n@storyshelf/runner"]
 
     SB["Storybook Static Build\n(storybook-static/)"]
 
@@ -93,7 +93,7 @@ flowchart TB
     end
 
     subgraph CaptureAdapters["Capture Adapters"]
-        runner["@storyshelf/runner-playwright\npure CaptureRunner"]
+        runner["@storyshelf/runner\npure CaptureRunner"]
         qmem["Database queue (capture_jobs)\ncore/capture (default)"]
     end
 
@@ -250,7 +250,7 @@ sequenceDiagram
     participant Q as CaptureQueue<br/>core/capture (database queue)
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
-    participant Runner as CaptureRunner<br/>runner-playwright
+    participant Runner as CaptureRunner<br/>runner
     participant Diff as Diff Engine<br/>core/diff (pixelmatch)
     participant Git as Git notifier (state delivery)
 
@@ -901,7 +901,7 @@ Uses same libs Playwright does internally ([Pixel Diff Engine](./architecture/di
 | 2   | Package Map         | flowchart    | `package.json` workspaces, `repo-structure.md`                                                                                                                    |
 | 3   | Adapter Composition | flowchart    | `packages/app/src/index.tsx:44`, `core/config.ts:146`                                                                                                             |
 | 4   | Middleware Chain    | sequence     | `packages/app/src/index.tsx:74`, `app/middleware/*`                                                                                                               |
-| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner-playwright`                                                                                                            |
+| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner`                                                                                                            |
 | 6   | Baseline Resolution | flowchart    | [Baseline Resolution & Review Workflow](./architecture/review.md#baseline-resolution--review-workflow), ADR 0009                                                  |
 | 7   | State Machine       | stateDiagram | [Entity Model](./architecture/data-model.md#entity-model)                                                                                                         |
 | 8   | ER Model            | erDiagram    | [Entity Model](./architecture/data-model.md#entity-model), `core/schema/*`                                                                                        |

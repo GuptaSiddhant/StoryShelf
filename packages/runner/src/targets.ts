@@ -24,7 +24,7 @@ export interface LocalBrowser {
 
 /**
  * One entry of `browsers`: a bare engine name, {@link local}, or a remote service from
- * `@storyshelf/runner-playwright/remote` (`playwrightServer(...)`, `remote(...)`, ...), which
+ * `@storyshelf/runner/remote` (`playwrightServer(...)`, `remote(...)`, ...), which
  * stands for one target per engine.
  */
 export type BrowserEntry = BrowserName | LocalBrowser | RemoteBrowser;

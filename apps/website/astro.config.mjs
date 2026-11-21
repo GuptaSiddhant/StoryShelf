@@ -34,6 +34,8 @@ export default defineConfig({
     "/openapi": "/api/",
     "/guides/ai-insights": "/ai/",
     "/guides/ai-testing": "/ai/testing/",
+    "/packages/runner-playwright": "/packages/runner/",
+    "/reference/runner-playwright": "/reference/runner/",
   },
   markdown: { remarkPlugins: [remarkReferenceLinks, remarkReadmeSection] },
   integrations: [
@@ -259,7 +261,7 @@ export default defineConfig({
             packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", ["storage-s3", "storage-azure", "storage-gcs"]),
-            packageGroup("Capture runners", ["runner-playwright"]),
+            packageGroup("Capture runners", ["runner"]),
           ],
         },
       ],

@@ -17,7 +17,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Fly demo server — SQLite on the volume, objects on the volume or in S3-compatible storage.
  *
@@ -28,7 +28,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {DATA_DIR}/shelf.db
  *  - @storyshelf/core/storage/local → DATA_DIR, or @storyshelf/storage-s3 (Tigris) when AWS_BUCKET is set
- *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
+ *  - @storyshelf/runner → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
@@ -122,7 +122,7 @@ const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 // With FLY_SPRITES_TOKEN and SPRITE_BROWSER_SECRET set, `chromium@sprite` (a hibernating Fly Sprite,
 // apps/fly-app/sprite/) is selectable beside the VM's own Chromium; unset, only the latter.
 const sprite = spriteFromEnv(env);
-const captureRunner = createPlaywrightCaptureRunner({
+const captureRunner = createCaptureRunner({
   browsers: browsersFor(sprite),
   // Unset: sized from the VM's detected CPU and memory.
   concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
@@ -226,7 +226,8 @@ if (authPassword) {
 async function provisionDemoViewer(): Promise<void> {
   try {
     const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
-    if (done.userCreated || done.memberAdded) logger.info(done, "Demo viewer provisioned");
+    if (done.userCreated || done.memberAdded || done.credentialSet)
+      logger.info(done, "Demo viewer provisioned");
   } catch (err) {
     logger.error({ err }, "Demo viewer provisioning failed");
   }
