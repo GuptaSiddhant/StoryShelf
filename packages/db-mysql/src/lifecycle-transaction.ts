@@ -11,7 +11,6 @@ import type { TxStore } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/mysql2";
 import { transactionStore } from "./drizzle-factory-mysql.ts";
 import { toMySqlDateTime } from "./schema/datetime.ts";
-import { schema } from "./schema/index.ts";
 
 /** One row, keyed by column name. */
 export type Row = Record<string, unknown>;

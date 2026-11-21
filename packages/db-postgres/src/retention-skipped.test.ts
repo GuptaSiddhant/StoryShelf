@@ -5,7 +5,6 @@ import { drizzle } from "drizzle-orm/pglite";
 import { vi } from "vitest";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
 import { createPgliteDatabase } from "./pglite.ts";
-import { schema } from "./schema/index.ts";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 

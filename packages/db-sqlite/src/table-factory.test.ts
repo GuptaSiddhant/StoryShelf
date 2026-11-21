@@ -17,15 +17,12 @@ const resolverOf = (tables: Record<string, unknown>) =>
   ns.resolverOf({ ...external, ...tables } as never);
 const TABLES = ns.SPIKE_TABLES.map((table) => table.name);
 
-/** Every remaining difference, `today → generated`, with its classification. */
-const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] = [
-  {
-    // drizzle-kit writes a column's UNIQUE as a named unique index; ddl.ts's inline UNIQUE gets
-    // SQLite's own autoindex. Same constraint; nothing refers to either name.
-    difference: "users unique (email): name sqlite_autoindex_users_1 → users_email_unique",
-    kind: "equivalent",
-  },
-];
+/**
+ * Every remaining difference, `today → generated`, with its classification. None remain: drizzle-kit
+ * 1.0 writes a column's UNIQUE inline, as ddl.ts does (0.31 wrote a named unique index).
+ */
+const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] =
+  [];
 
 async function generatedDdl(): Promise<string> {
   const built = ns.buildAll(ns.SPIKE_TABLES, sqliteTableOf, external);

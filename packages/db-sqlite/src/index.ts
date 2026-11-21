@@ -1,6 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
-import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { DatabaseSync } from "node:sqlite";
 import { CAPTURE_JOB_BACKFILL } from "./capture-job-backfill.ts";
 import { commentsRebuildStatements } from "./comments-rebuild.ts";
@@ -17,7 +16,7 @@ import {
   toleratedFor,
 } from "./migration-errors.ts";
 import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.ts";
-import { BUSY_WAIT_MS, createExecutors } from "./proxy-executors.ts";
+import { BUSY_WAIT_MS, drizzleOver } from "./proxy-executors.ts";
 import {
   activateRetention,
   attachRetention,
@@ -47,7 +46,7 @@ export function createSqliteDatabase(
   applyConnectionPragmas((sql) => {
     sqlite.exec(sql);
   }, options);
-  const db = drizzle(createExecutors(sqlite, BUSY_WAIT_MS));
+  const db = drizzleOver(sqlite, BUSY_WAIT_MS);
   const retention: RetentionActivation = {};
 
   const adapter = createDrizzleAdapter(
@@ -74,8 +73,9 @@ export function createSqliteDatabase(
         sqlite.prepare("SELECT 1").get();
       },
     },
-    // One connection: plain statements take their turn behind an open transaction.
-    { isolateStatements: true },
+    // One connection: plain statements take their turn behind an open transaction. Raw reads
+    // answer arrays, as this adapter always has.
+    { isolateStatements: true, rawRows: "arrays" },
   );
   return attachRetention(adapter, retention);
 }

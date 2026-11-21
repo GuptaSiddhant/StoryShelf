@@ -5,6 +5,7 @@
  */
 import type { ListOptions, TxStore } from "@storyshelf/core/adapter/database";
 import { listPage, listSelection } from "@storyshelf/core/adapter/database";
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
@@ -13,52 +14,52 @@ export async function updateWhereOne<T extends AnySQLiteTable>(
   drizzle: DrizzleLike,
   table: T,
   id: string,
-  values: { [K in keyof T["$inferInsert"]]?: T["$inferInsert"][K] },
+  values: { [K in keyof InferInsertModel<T>]?: InferInsertModel<T>[K] },
   where: SQL,
-): Promise<T["$inferSelect"] | null> {
+): Promise<InferSelectModel<T> | null> {
   const updated = (await drizzle
     .update(table)
     .set(values)
     .where(and(eq(idOf(table), id), where) ?? where)
     .returning()
-    .get()) as T["$inferSelect"] | undefined;
+    .get()) as InferSelectModel<T> | undefined;
   return updated ?? (await getOne(drizzle, table, id));
 }
 
 export async function insertOne<T extends Table>(
   drizzle: DrizzleLike,
   table: T,
-  values: T["$inferInsert"],
-): Promise<T["$inferSelect"]> {
-  return (await drizzle.insert(table).values(values).returning().get()) as T["$inferSelect"];
+  values: InferInsertModel<T>,
+): Promise<InferSelectModel<T>> {
+  return (await drizzle.insert(table).values(values).returning().get()) as InferSelectModel<T>;
 }
 
 export async function updateOne<T extends Table>(
   drizzle: DrizzleLike,
   table: T,
   id: string,
-  values: Partial<T["$inferInsert"]>,
-): Promise<T["$inferSelect"]> {
+  values: Partial<InferInsertModel<T>>,
+): Promise<InferSelectModel<T>> {
   return (await drizzle
     .update(table)
     .set(values)
     .where(eq(idOf(table as AnySQLiteTable), id))
     .returning()
-    .get()) as T["$inferSelect"];
+    .get()) as InferSelectModel<T>;
 }
 
 export async function getOne<T extends Table>(
   drizzle: DrizzleLike,
   table: T,
   id: string,
-): Promise<T["$inferSelect"] | null> {
+): Promise<InferSelectModel<T> | null> {
   return (
     ((await drizzle
       .select()
       .from(table)
       .where(eq(idOf(table as AnySQLiteTable), id))
       .limit(1)
-      .get()) as T["$inferSelect"] | undefined) ?? null
+      .get()) as InferSelectModel<T> | undefined) ?? null
   );
 }
 
@@ -73,14 +74,14 @@ export async function listMany<T extends Table>(
   drizzle: DrizzleLike,
   table: T,
   opts: ListOptions = {},
-): Promise<T["$inferSelect"][]> {
+): Promise<InferSelectModel<T>[]> {
   const query = applyListOptions(
     drizzle.select(listSelection(table, opts.columns)).from(table),
     opts,
     idOf(table),
   );
   const rows: unknown = await query.all();
-  return rows as T["$inferSelect"][];
+  return rows as InferSelectModel<T>[];
 }
 
 /** The `where`, `orderBy` (with an `id` tie-break), `limit` and `offset`, in that order. */
@@ -136,6 +137,9 @@ interface DrizzleSelectChain {
  * pass their dialect instance as `unknown`; the cast lives here, once, so
  * driver packages stay fully typed. Covered by the adapter contract tests.
  */
+/** The row shape a raw `all` answers in: `arrays` (Drizzle's `values`) or `objects` keyed by column. */
+export type RawRows = "arrays" | "objects";
+
 export interface DrizzleLike {
   insert(table: AnySQLiteTable): {
     values(values: unknown): { returning(): { get(): MaybePromise<unknown> } };
@@ -146,7 +150,7 @@ export interface DrizzleLike {
   select(fields?: Record<string, unknown>): { from(table: AnySQLiteTable): DrizzleSelectChain };
   delete(table: AnySQLiteTable): { where(where: SQL): { run(): MaybePromise<unknown> } };
   $count(table: AnySQLiteTable, where?: SQL): MaybePromise<number>;
-  all<T>(query: SQL): MaybePromise<T[]>;
+  all<T>(query: SQL, mode?: RawRows): MaybePromise<T[]>;
   transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R>;
 }
 

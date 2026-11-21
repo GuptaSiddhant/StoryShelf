@@ -31,7 +31,7 @@ declare const __PKG_VERSION__: string | undefined;
 
 type LibsqlClient = Client;
 type CreateClient = typeof import("@libsql/client").createClient;
-type Construct = (client: LibsqlClient, config: { schema: typeof schema }) => unknown;
+type Construct = (client: LibsqlClient) => unknown;
 
 // `driver-core` exports `construct` at runtime but omits it from its typings.
 const construct = (drizzleLibsqlCore as unknown as { construct: Construct }).construct;

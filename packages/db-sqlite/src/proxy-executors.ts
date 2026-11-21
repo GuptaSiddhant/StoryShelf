@@ -4,7 +4,12 @@
  * in a row mode (`array` for the queries it maps, `object` otherwise), and gets it; the connection
  * itself keeps returning arrays, which the adapter's own statements read.
  */
-import type { SqliteProxyExecutors } from "drizzle-orm/sqlite-proxy";
+import { nodeSQLiteCodecs } from "drizzle-orm/node-sqlite";
+import {
+  drizzle,
+  type SqliteProxyExecutors,
+  type SqliteRemoteDatabase,
+} from "drizzle-orm/sqlite-proxy";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -14,6 +19,15 @@ const BUSY_POLL_MS = 10;
 
 type Method = "run" | "get" | "all";
 type RowMode = "array" | "object";
+
+/**
+ * Drizzle over a `node:sqlite` connection through the executors below. The proxy driver decodes
+ * nothing by default, so it takes `node:sqlite`'s own codecs: the rows it reads are the rows that
+ * connection hands over (booleans from `0`/`1`, as Drizzle 0.45's column mappers did).
+ */
+export function drizzleOver(sqlite: DatabaseSync, busyWaitMs = 0): SqliteRemoteDatabase {
+  return drizzle(createExecutors(sqlite, busyWaitMs), { codecs: nodeSQLiteCodecs });
+}
 
 /**
  * The executors for `drizzle(executors)`. With `busyWaitMs` > 0 a statement that finds the file

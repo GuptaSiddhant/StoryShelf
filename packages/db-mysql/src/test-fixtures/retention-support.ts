@@ -4,7 +4,7 @@ import type {
   BuildReferenceContractFixture,
   RetentionActivationHarness,
 } from "@storyshelf/core/test-helpers";
-import { sql } from "drizzle-orm";
+import { sql, type InferInsertModel } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { expect } from "vitest";
 import { schema } from "../schema/index.ts";
@@ -222,7 +222,7 @@ export function baselineInsert(row: {
   storyId?: string;
   sourceBuildId?: string | null;
   snapshotId?: string | null;
-}): typeof schema.baselines.$inferInsert {
+}): InferInsertModel<typeof schema.baselines> {
   return {
     ...baselineRow,
     storyId: row.storyId ?? row.id,

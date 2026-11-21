@@ -1,4 +1,5 @@
 import { SpanStatusCode } from "@opentelemetry/api";
+import type { InferSelectModel } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,12 +30,12 @@ function createFakeDb(): DatabaseAdapter & { setLoggerMock: (logger: Logger) => 
     tables: {} as Tables,
     setLoggerMock,
     setLogger: setLoggerMock,
-    insert: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
-    update: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
-    updateWhere: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
-    get: async <T extends Table>() => ({ id: "row-1" }) as T["$inferSelect"],
+    insert: async <T extends Table>() => ({ id: "row-1" }) as InferSelectModel<T>,
+    update: async <T extends Table>() => ({ id: "row-1" }) as InferSelectModel<T>,
+    updateWhere: async <T extends Table>() => ({ id: "row-1" }) as InferSelectModel<T>,
+    get: async <T extends Table>() => ({ id: "row-1" }) as InferSelectModel<T>,
     remove: async () => {},
-    list: async <T extends Table>() => [{ id: "row-1" }] as T["$inferSelect"][],
+    list: async <T extends Table>() => [{ id: "row-1" }] as InferSelectModel<T>[],
     count: async () => 1,
     all: async <T>() => [{ id: "row-1" }] as T[],
   };
