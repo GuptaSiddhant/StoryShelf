@@ -5,11 +5,10 @@
  * for each environment. A split of the module can then be shown to resolve the same things.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { devNull, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectGitDefaultBranch,
@@ -209,14 +208,11 @@ describe("config resolution", () => {
     }).toMatchSnapshot();
   });
 
-  it("points the default $schema at the schema file shipped in the CLI package", () => {
-    // Resolved from this module's own location, so it must not move when the module is split.
-    const reference = schemaReference(dir);
-    expect(reference.startsWith(".")).toBe(true);
-    expect(resolve(dir, reference)).toBe(
-      fileURLToPath(new URL("../schema/storyshelf-config.json", import.meta.url)),
+  it("never points the default $schema outside the project's node_modules", () => {
+    // Run from the repository (not an installed copy), so there is no stable local path.
+    expect(schemaReference(dir, { version: "1.2.3" })).toBe(
+      "https://unpkg.com/storyshelf@1.2.3/schema/storyshelf-config.json",
     );
-    expect(existsSync(resolve(dir, reference))).toBe(true);
   });
 
   it.each(MAIN_TABLE)("reads Storybook metadata from %s", async (_name, source) => {
