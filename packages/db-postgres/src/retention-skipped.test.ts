@@ -16,7 +16,7 @@ retentionSkippedContractSuite("pglite", async (use) => {
   try {
     const adapter = createPgliteDatabase({ client });
     await adapter.lifecycle?.setup({ config: {}, logger: createShelfLogger({ level: "silent" }) });
-    const lifecycle = createBuildReferenceLifecycle(drizzle(client));
+    const lifecycle = createBuildReferenceLifecycle(drizzle({ client }));
     await use({ ...adapter, buildReferenceLifecycle: lifecycle });
   } finally {
     await client.close();

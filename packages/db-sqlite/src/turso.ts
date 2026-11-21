@@ -61,7 +61,7 @@ export interface TursoDatabaseOptions {
  */
 export function createTursoDatabase(options: TursoDatabaseOptions): DatabaseAdapter {
   const { client, owned } = resolveClient(options);
-  const db = construct(client, { schema });
+  const db = construct(client);
 
   return createDrizzleAdapter(db, {
     metadata: {

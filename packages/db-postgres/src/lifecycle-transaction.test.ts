@@ -1,7 +1,15 @@
 /** The pure helpers of the lifecycle transaction: result shapes, timestamps and bound lists. */
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { instant, isoOf, rowsOf, textArray, textRows, valueList } from "./lifecycle-transaction.ts";
+import {
+  instant,
+  isoOf,
+  jsonText,
+  rowsOf,
+  textArray,
+  textRows,
+  valueList,
+} from "./lifecycle-transaction.ts";
 
 const dialect = new PgDialect();
 
@@ -51,7 +59,7 @@ describe("bound lists", () => {
   it("binds a set of any size as one JSON parameter", () => {
     const hashes = Array.from({ length: 70_000 }, (_, index) => `h${index}`);
     const query = dialect.sqlToQuery(textRows(hashes));
-    expect(query.sql).toBe("jsonb_array_elements_text($1::jsonb)");
+    expect(query.sql).toBe("jsonb_array_elements_text($1::text::jsonb)");
     expect(query.params).toHaveLength(1);
     expect(JSON.parse(String(query.params[0]))).toEqual(hashes);
   });
@@ -59,9 +67,16 @@ describe("bound lists", () => {
   it("binds a set as one array built once, whatever its size", () => {
     const hashes = Array.from({ length: 70_000 }, (_, index) => `h${index}`);
     const query = dialect.sqlToQuery(textArray(hashes));
-    expect(query.sql).toBe("ARRAY(SELECT jsonb_array_elements_text($1::jsonb))");
+    expect(query.sql).toBe("ARRAY(SELECT jsonb_array_elements_text($1::text::jsonb))");
     expect(query.params).toHaveLength(1);
     expect(JSON.parse(String(query.params[0]))).toEqual(hashes);
+  });
+
+  it("binds encoded JSON as text for the server to cast, so no driver encodes it again", () => {
+    expect(dialect.sqlToQuery(jsonText('[{"hash":"a"}]'))).toMatchObject({
+      sql: "$1::text::jsonb",
+      params: ['[{"hash":"a"}]'],
+    });
   });
 
   it("binds an instant as a timestamptz", () => {

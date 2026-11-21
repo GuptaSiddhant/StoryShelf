@@ -59,7 +59,7 @@ const pgPreset: Preset = {
   name: "pg",
   pool: () => new PgPool({ connectionString: url, max: 3 }),
   adapter: (pool) => createPgDatabase({ client: pool }),
-  database: (pool) => drizzlePg(pool),
+  database: (pool) => drizzlePg({ client: pool }),
   count: async (pool, name) =>
     ((await (pool as PgPool).query(COUNT, [name])).rows[0] as { n: number }).n,
 };
@@ -75,7 +75,7 @@ const neonPreset: Preset = {
   name: "neon",
   pool: () => new NeonPool({ connectionString: url, max: 3, ...WEBSOCKET_DEADLINES }),
   adapter: (pool) => createNeonDatabase({ client: pool }),
-  database: (pool) => drizzleNeon(pool),
+  database: (pool) => drizzleNeon({ client: pool }),
   count: async (pool, name) =>
     ((await (pool as NeonPool).query(COUNT, [name])).rows[0] as { n: number }).n,
 };

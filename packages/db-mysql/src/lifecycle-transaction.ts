@@ -91,7 +91,7 @@ export async function transaction<R>(
   try {
     const result = await fn({
       ...statementsOn(connection),
-      store: transactionStore(drizzle(connection as never)),
+      store: transactionStore(drizzle({ client: connection as never })),
     });
     await connection.query("COMMIT");
     return result;

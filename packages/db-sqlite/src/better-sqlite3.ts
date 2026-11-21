@@ -65,7 +65,7 @@ export function createBetterSqlite3Database(
       client.exec(sql);
     }, options);
   }
-  const db = drizzle(client);
+  const db = drizzle({ client });
 
   const adapter = createDrizzleAdapter(db, {
     metadata: {

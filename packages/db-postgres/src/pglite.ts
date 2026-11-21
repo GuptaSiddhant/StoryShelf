@@ -38,7 +38,7 @@ export interface PgliteDatabaseOptions {
 export function createPgliteDatabase(options: PgliteDatabaseOptions = {}): DatabaseAdapter {
   const owned = !options.client;
   const client = options.client ?? new PGlite(options.dataDir ?? "memory://");
-  const db = drizzle(client);
+  const db = drizzle({ client });
 
   return createDrizzlePgAdapter(db, {
     metadata: {
