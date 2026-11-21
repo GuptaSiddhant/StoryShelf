@@ -10,6 +10,7 @@ import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import {
   captureDispatchDeps,
+  reachabilityOf,
   DEFAULT_RETRIES,
   type BuildStatePublisher,
   type CaptureHandlerOptions,
@@ -19,7 +20,7 @@ import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config"
 import type { Logger } from "@storyshelf/core/logger";
 import type { GitConnectionModel } from "@storyshelf/core/models";
 import { currentTraceparent } from "@storyshelf/core/telemetry";
-import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
+import { notifyCaptureFailed, notifyCaptureStuck, notifyTargetChange } from "./capture-alerts.ts";
 import {
   alerting,
   handlerFor,
@@ -27,6 +28,7 @@ import {
   type CaptureAlerts,
   type CaptureHandler,
 } from "./capture-handlers.ts";
+import { reportingReachability } from "./capture-reachability.ts";
 import { recordShardRepeated } from "./consumer-setup.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
@@ -97,7 +99,7 @@ export function setupCapture(
   return {
     queue,
     enqueueCapture: enqueuerFor(queue),
-    handler: alerting(handler, retries, alert.failed),
+    handler: alerting(reporting(handler, options, config, delivery, logger), retries, alert.failed),
   };
 }
 
@@ -128,4 +130,23 @@ function captureHandlerOptions(
     maxRetries: options.testing?.retries,
     onShardRepeated: recordShardRepeated,
   };
+}
+
+/** Report launch outcomes to the runner's reachability record; a change alerts admins once. */
+function reporting(
+  handler: CaptureHandler,
+  options: ResolvedShelfOptions,
+  config: ShelfConfig,
+  delivery: Delivery,
+  logger: Logger,
+): CaptureHandler {
+  const runner = options.testing?.runner;
+  if (runner === undefined) {
+    return handler;
+  }
+  const reach = reachabilityOf(runner);
+  reach.onChange = async (change): Promise<void> => {
+    await notifyTargetChange(options, config, logger, change, delivery.publicOrigin);
+  };
+  return reportingReachability(handler, reach, options.database, logger);
 }
