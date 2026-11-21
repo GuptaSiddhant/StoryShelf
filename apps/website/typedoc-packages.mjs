@@ -21,9 +21,7 @@ const SLUGS = [
   "db-postgres",
   "db-mysql",
   "storage-local",
-  "storage-s3",
-  "storage-azure",
-  "storage-gcs",
+  "storage",
   "runner",
 ];
 

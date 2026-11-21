@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Real Blob suites. Hermetic tests in the same packages also run (they must
+  # Real Blob suites. Hermetic tests in this subpath also run (they must
   # stay green); live files skip without LIVE_CLOUD=1.
   live-azure:
     runs-on: ubuntu-latest
@@ -56,7 +56,7 @@ jobs:
 
       - name: Run Blob suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-azure' --force
+        run: nubx turbo test --filter='@storyshelf/storage' --force -- src/azure
 
   # The customer path (#893, ADR 0050): apply the Azure module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real Azure, billed: it runs only when the

@@ -121,7 +121,9 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/storage-s3": "0.3.2" } }),
+      JSON.stringify({
+        dependencies: { "@storyshelf/storage": "0.3.2", "@aws-sdk/client-s3": "3.700.0" },
+      }),
     );
     expect(detectInstalledAdapters(dir).storage).toBe("s3");
     rmSync(dir, { recursive: true, force: true });
@@ -131,7 +133,9 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/storage-azure": "0.3.2" } }),
+      JSON.stringify({
+        dependencies: { "@storyshelf/storage": "0.3.2", "@azure/storage-blob": "12.26.0" },
+      }),
     );
     expect(detectInstalledAdapters(dir).storage).toBe("azure");
     rmSync(dir, { recursive: true, force: true });
@@ -141,7 +145,23 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/storage-gcs": "0.3.2" } }),
+      JSON.stringify({
+        dependencies: { "@storyshelf/storage": "0.3.2", "@google-cloud/storage": "7.13.0" },
+      }),
+    );
+    expect(detectInstalledAdapters(dir).storage).toBe("gcs");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads the storage backend from the generated server when no SDK is listed", () => {
+    const dir = makeTmp();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/storage": "0.3.2" } }),
+    );
+    writeFileSync(
+      join(dir, "server.ts"),
+      'import { createGcsStorage } from "@storyshelf/storage/gcs";',
     );
     expect(detectInstalledAdapters(dir).storage).toBe("gcs");
     rmSync(dir, { recursive: true, force: true });

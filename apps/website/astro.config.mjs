@@ -261,12 +261,7 @@ export default defineConfig({
             { label: "Overview", slug: "packages" },
             packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
-            packageGroup("Storage", [
-              "storage-local",
-              "storage-s3",
-              "storage-azure",
-              "storage-gcs",
-            ]),
+            packageGroup("Storage", ["storage-local", "storage"]),
             packageGroup("Capture runners", ["runner"]),
           ],
         },

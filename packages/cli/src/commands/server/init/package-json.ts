@@ -43,10 +43,13 @@ const DB_PACKAGE: Record<DatabaseChoice, string> = {
 };
 
 /** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
-const STORAGE_PACKAGE: Record<Exclude<StorageChoice, "local">, string> = {
-  s3: "@storyshelf/storage-s3",
-  azure: "@storyshelf/storage-azure",
-  gcs: "@storyshelf/storage-gcs",
+const STORAGE_PACKAGE = "@storyshelf/storage";
+
+/** The cloud SDKs a backend needs: optional peers of `@storyshelf/storage`, so the scaffold installs them (must match its peerDependencies). */
+const STORAGE_SDKS: Record<Exclude<StorageChoice, "local">, Record<string, string>> = {
+  s3: { "@aws-sdk/client-s3": "^3.700.0", "@aws-sdk/lib-storage": "3.700.0" },
+  azure: { "@azure/identity": "^4.14.1", "@azure/storage-blob": "^12.26.0" },
+  gcs: { "@google-cloud/storage": "^7.13.0" },
 };
 
 const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
@@ -91,7 +94,7 @@ function coreNames(answers: Answers): string[] {
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
   return [
-    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
+    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE]),
     "@storyshelf/runner",
     ...(auth === null ? [] : [auth]),
   ];
@@ -104,6 +107,7 @@ function buildDeps(answers: Answers): Record<string, string> {
     ...ownPackages(coreNames(answers)),
     ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),
+    ...(answers.storage === "local" ? {} : STORAGE_SDKS[answers.storage]),
     ...(wantsNotifications(answers) ? { nodemailer: NODEMAILER_SDK } : {}),
   };
 }

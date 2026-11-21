@@ -1,0 +1,28 @@
+---
+title: "@storyshelf/storage"
+description: Store StoryShelf artifacts in AWS S3 and S3-compatible services, Google Cloud Storage, Azure Blob Storage or local disk, one subpath per backend.
+---
+
+`@storyshelf/storage` holds every storage backend StoryShelf ships outside core, one subpath each: `/s3`, `/gcs`, `/azure` and `/local`. Each cloud SDK is an optional peer that only its own subpath loads, so a server that uses S3 never installs the Google or Azure SDK.
+
+## Install
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/storage) — install tarballs and version history.
+- [Public API reference](/reference/storage/) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storage) — package directory on `main`.
+
+<Readme heading="Install" />
+
+## Configure
+
+<Readme heading="Quick start" />
+
+<Readme heading="S3-compatible stores (/s3)" />
+
+<Readme heading="Google Cloud Storage (/gcs)" />
+
+<Readme heading="Azure Blob Storage (/azure)" />
+
+## When to use it
+
+Choose a cloud backend for cloud or multi-node deployments. Each is a drop-in replacement for [local storage](../storage-local/), and pairs naturally with the [Turso preset](../db-sqlite/#presets-same-schema-different-driver) when the application is deployed without shared local disk. S3-compatible services (R2, MinIO, B2, Wasabi, Tigris) stay on `/s3`; GCS stays native because its S3 interoperability loses workload identity.

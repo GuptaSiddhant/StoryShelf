@@ -33,7 +33,7 @@ import { createCaptureRunner } from "@storyshelf/runner";
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {SHELF_DATA_DIR}/shelf.db
- *  - @storyshelf/storage-local → SHELF_DATA_DIR, or @storyshelf/storage-s3 (Tigris) when SHELF_S3_BUCKET is set
+ *  - @storyshelf/core/storage/local → SHELF_DATA_DIR, or @storyshelf/storage/s3 (Tigris) when SHELF_S3_BUCKET is set
  *  - @storyshelf/runner → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where

@@ -36,9 +36,9 @@ The interface has no containers and no MIME types. Backends:
 - `@storyshelf/storage-local` (default): a `--data-dir` on the filesystem; one `docker run` to
   self-host. Writes go through a temporary file and a rename, so a write cut short never leaves a
   torn file at a content address, and keys are listed `/`-separated on every host.
-- `@storyshelf/storage-s3`: AWS S3, Cloudflare R2, MinIO and DigitalOcean Spaces, with an optional
+- `@storyshelf/storage/s3`: AWS S3, Cloudflare R2, MinIO and DigitalOcean Spaces, with an optional
   key prefix and endpoint.
-- `@storyshelf/storage-azure` (Azure Blob) and `@storyshelf/storage-gcs` (Google Cloud Storage).
+- `@storyshelf/storage/azure` (Azure Blob) and `@storyshelf/storage/gcs` (Google Cloud Storage).
 
 Adapter packages follow the layout in the `adapter-layout` skill. Switching backends changes one
 adapter. Backup is a copy of the data directory (plus the SQLite file) or bucket versioning. Retention
