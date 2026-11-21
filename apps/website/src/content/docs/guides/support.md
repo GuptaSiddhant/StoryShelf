@@ -12,9 +12,9 @@ description: What every release promises about upgrades, rollbacks, breaking cha
 
 ## Supported at launch
 
-| Area | Supported | Preview |
-| --- | --- | --- |
-| Database | SQLite, Postgres | MySQL |
+| Area           | Supported                                                     | Preview          |
+| -------------- | ------------------------------------------------------------- | ---------------- |
+| Database       | SQLite, Postgres                                              | MySQL            |
 | How you run it | The Docker image, the npm scaffold (`storyshelf server init`) | Terraform stacks |
 
 A preview works and is documented, but may change between releases and gets fixes after the supported setups.

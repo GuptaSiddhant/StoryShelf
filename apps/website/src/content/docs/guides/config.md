@@ -22,17 +22,17 @@ Created by `storyshelf init` or `storyshelf create` (both fail if `.storybook/ma
 }
 ```
 
-| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                        |
-| ----------------- | ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                            |
-| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                         |
-| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                   |
-| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                |
-| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                  |
-| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST` |
-| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                 |
-| `buildStats`      | `--no-build-stats` (opt-out)  | —                             | Append `--stats-json` to the build script when affected capture is on (default `true`). Set `false` for a script that rejects the flag |
-| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                            |
+| Field             | CLI flag                     | Env fallback                  | Description                                                                                                                            |
+| ----------------- | ---------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`            | `--slug`                     | `STORYSHELF_SLUG`             | Project slug (required)                                                                                                                |
+| `url`             | `--url`                      | `STORYSHELF_URL`              | Server URL                                                                                                                             |
+| `buildDir`        | `--build-dir` / `-d`         | —                             | Built Storybook directory (default `storybook-static`). If missing or empty, `upload` will build                                       |
+| `buildCommand`    | `--build-command`            | —                             | Custom build command (e.g. `nx run app:build-storybook`). Mutually exclusive with `buildScriptName`                                    |
+| `buildScriptName` | `--build-script-name` / `-b` | —                             | package script to run (default `build-storybook`)                                                                                      |
+| `skip`            | `--skip`                     | —                             | Glob to skip upload (e.g. `"main"`, `"release/*"`). `branch` matched via `picomatch`; when matched `upload` exits 0 without `POST`     |
+| `affectedOnly`    | `--full` (opt-out)           | `STORYSHELF_FULL=1` (opt-out) | Render only impacted stories (default `true`). See [Affected capture](/concepts/affected-capture/)                                     |
+| `buildStats`      | `--no-build-stats` (opt-out) | —                             | Append `--stats-json` to the build script when affected capture is on (default `true`). Set `false` for a script that rejects the flag |
+| `untraced`        | `--untraced` (union)         | —                             | Trace exclusions, combined with `--untraced` flags. See [Affected capture](/concepts/affected-capture/)                                |
 
 **Note:** `buildDir` default is Storybook's default `storybook-static` unless `buildDir` is set in file. `buildCommand` and `buildScriptName` are mutually exclusive (validated by `zod` `refine`).
 
@@ -114,7 +114,7 @@ createShelfApp({ database, storage, testing: { runner, compare: { threads: 2 }, 
 ### Capture performance tuning
 
 - `testing.concurrency` (a `createShelfApp` option, formerly `config.captureConcurrency`) sets how many jobs this instance runs at once.
-- The Playwright and Puppeteer runners' own `concurrency` option pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
+- The Playwright runner's own `concurrency` option pins how many pages render at once. Left unset, the runner starts from a CPU/memory-sized budget (Firefox and WebKit pages count as two Chromium slots) and adapts: it raises the limit while capture latency and event-loop lag stay flat, halves it on timeouts, and logs every change as `capture concurrency adjusted`.
 - `testing.compare.threads` (a `createShelfApp` option) or `STORYSHELF_DIFF_WORKERS` sets how many worker threads compare screenshots (default: CPU count minus one, minimum 1; the option wins over the variable). `0` diffs on the main thread. The pool serves both capture and the re-diff endpoint, so it matters on servers that never render.
 
 - `config.captureAssets.cacheMaxAgeSeconds` (`0` to `3600`, default `0`) lets a remote browser's own cache keep a render's signed Storybook assets for that many seconds at most, never past the token's lifetime. It is off by default and trades faster long runs for the fact that revoked access cannot reclaim bytes already cached. See [Browser caching of capture assets](/guides/remote-browsers/#browser-caching-of-capture-assets-opt-in).
@@ -152,8 +152,8 @@ File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys
 
 `storyshelf init` stamps a `$schema` pointer into new configs for autocomplete, hover docs, and inline validation:
 
-- **Local install** (CLI on disk): a path relative to the config file, e.g. `"../../node_modules/storyshelf/schema/storyshelf-config.json"` — exact version match, works offline.
-- **Otherwise** (global install, `npx`): a versioned URL, e.g. `"https://unpkg.com/storyshelf@0.5.2/schema/storyshelf-config.json"` (unversioned `…/storyshelf/schema/…` when the version is unknown).
+- **Installed in the project** (`storyshelf` in a `node_modules` folder of the project or a parent): a path relative to the config file, e.g. `"../node_modules/storyshelf/schema/storyshelf-config.json"` — exact version match, works offline.
+- **Otherwise** (global install, `npx`, whose cache path is machine-specific): a versioned URL, e.g. `"https://unpkg.com/storyshelf@0.5.2/schema/storyshelf-config.json"` (unversioned `…/storyshelf/schema/…` when the version is unknown).
 
 `storyshelf create` and config merges preserve an existing stamp; `init` refreshes it. To add it to an existing file by hand, use either form above. The schema ships inside the CLI package, so it always describes the parser that enforces it.
 
