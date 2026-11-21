@@ -1,7 +1,8 @@
 import { contentHostSuffix } from "@storyshelf/core/config";
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { visibleProjects } from "../project-visibility.ts";
 import { canManageJobs } from "../routers/settings-insights.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore, testingEnabled } from "../store.ts";
@@ -292,7 +293,7 @@ export async function renderProjectBuildsPage(
   rawQuery: BuildFilters = {},
 ): Promise<RenderedContent | null> {
   const query = effectiveFilters(rawQuery);
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await visibleProjects();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;

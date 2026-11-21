@@ -1,7 +1,7 @@
 import { contentHostSuffix } from "@storyshelf/core/config";
-import { ProjectModel } from "@storyshelf/core/models";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
+import { visibleProjects } from "../project-visibility.ts";
 import { getStore } from "../store.ts";
 import { Button } from "../ui/buttons.tsx";
 import { css } from "../ui/css.ts";
@@ -164,7 +164,7 @@ interface PickerProject {
 
 async function listProjects(): Promise<PickerProject[]> {
   try {
-    const projects = await new ProjectModel(getStore().db).list();
+    const projects = await visibleProjects();
     return projects.map((project) => ({ slug: project.slug, name: project.name }));
   } catch {
     // The picker is a convenience; never fail a page render over it.

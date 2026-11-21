@@ -8,8 +8,11 @@ import type { DemoViewerDeps } from "./demo-viewer.ts";
 export function databaseDeps(db: DatabaseAdapter): DemoViewerDeps {
   return {
     findUserId: async (email) => (await new UserModel(db).getByEmail(email))?.id ?? null,
+    // Site role `member`, not `viewer`: a site viewer reads every project, and the demo account
+    // may read `storyshelf-ui` only (its one membership, `addViewer`). Writes, project creation
+    // included, are refused by `SHELF_READ_ONLY_ACCOUNTS`, which matches the email.
     createUser: async (email, password) => {
-      const invite = await issueInvite(db, { email, name: "Demo viewer", role: "viewer" });
+      const invite = await issueInvite(db, { email, name: "Demo viewer", role: "member" });
       return (await acceptInvite(db, { ...invite, password })).id;
     },
     hasCredential: async (userId) => await hasPasswordCredential(db, userId),

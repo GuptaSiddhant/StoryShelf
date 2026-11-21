@@ -3,9 +3,10 @@
  *
  * The password comes from the `SHELF_DEMO_VIEWER_PASSWORD` Fly secret, never from a committed file
  * and never into a log. The user is created through the invite path (`issueInvite` + `acceptInvite`,
- * the same one a person's invite uses) with the site role `viewer`, then made a project `viewer` of
- * `storyshelf-ui` only. Every step is idempotent, so the boot and the periodic retry (the project
- * is created by the first upload, which may come after the boot) are safe to repeat.
+ * the same one a person's invite uses) with the site role `member` (a site `viewer` reads every
+ * project), then made a project `viewer` of `storyshelf-ui`, its only grant; `SHELF_READ_ONLY_ACCOUNTS`
+ * refuses its writes. Every step is idempotent, so the boot and the periodic retry (the project is
+ * created by the first upload, which may come after the boot) are safe to repeat.
  */
 export const DEMO_VIEWER_EMAIL = "demo@storyshelf.js.org";
 export const DEMO_PROJECT_SLUG = "storyshelf-ui";

@@ -49,6 +49,7 @@ import {
   type SettingsTab,
 } from "../pages/settings-tabs.ts";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
+import { filterVisible } from "../project-visibility.ts";
 import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
@@ -237,6 +238,8 @@ async function loadLinksSection(
   db: DatabaseAdapter,
   project: Project,
 ): Promise<{ links: SettingsLink[]; linkCandidates: SettingsLinkCandidate[] }> {
+  // Existing links name their upstream from the full list (they are this project's own
+  // settings); only the picker of new upstreams is limited to projects the viewer can open.
   const projects = await new ProjectModel(db).list();
   const byId = new Map(projects.map((candidate) => [candidate.id, candidate]));
   const rows = await new PackageUsageModel(db).listLinks(project.id);
@@ -246,7 +249,7 @@ async function loadLinksSection(
       ? [{ packageName: row.packageName, upstreamSlug: upstream.slug, upstreamName: upstream.name }]
       : [];
   });
-  const linkCandidates = projects
+  const linkCandidates = (await filterVisible(db, getStore(), projects))
     .filter((candidate) => candidate.id !== project.id)
     .map((candidate) => ({ slug: candidate.slug, name: candidate.name }));
   return { links, linkCandidates };

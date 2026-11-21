@@ -1875,7 +1875,7 @@
         "summary": "List projects",
         "responses": {
           "200": {
-            "description": "List projects",
+            "description": "The projects the signed-in user can open (all with auth off, or for a site admin or viewer)",
             "content": {
               "application/json": {
                 "schema": {
