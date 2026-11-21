@@ -21,7 +21,7 @@ Internet ──▶ Cloud Run service (app + capture)
 ```
 
 - One container service runs the UI, the API and capture (the image bundles Chromium). Every copy also consumes the database queue, so scaling means more identical copies.
-- Cloud SQL for PostgreSQL has no public IP and requires TLS (`ENCRYPTED_ONLY`). Cloud Run reaches it by Direct VPC egress, and only private traffic uses the VPC.
+- Cloud SQL for PostgreSQL has no public IP and requires TLS (`ENCRYPTED_ONLY`), and the app verifies its certificate. Cloud Run reaches it by Direct VPC egress, and only private traffic uses the VPC.
 - Cloud Run cannot pull from ghcr.io, so the module creates an Artifact Registry remote repository that proxies it (or you pass your own mirror as `image_repository`).
 - Secrets come from Secret Manager as references, never as plain outputs.
 
@@ -40,62 +40,62 @@ module "storyshelf" {
 }
 ```
 
-Or let the CLI write this for you: `storyshelf server init --cloud gcp` writes a module stub, a `main.tf` that uses the module at the CLI's own version, and a `terraform.tfvars` with your answers. Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub.
+Or let the CLI write this for you: `storyshelf server init --cloud gcp` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub.
 
 ### Inputs
 
-| Name | Default | Meaning |
-| --- | --- | --- |
-| `name` | required | Name prefix, 2 to 20 characters |
-| `project_id` | required | The GCP project |
-| `image_version` | required | Release version of the image (no `v`) |
-| `region` | `us-central1` | Must match the provider's region |
-| `image_repository` | `""` | A full registry path (your mirror). Empty creates the ghcr.io proxy |
-| `public_base_url` | `""` | `PUBLIC_BASE_URL`, for a domain you map yourself |
-| `network`, `subnetwork` | `""` | An existing VPC and subnet (self links). Empty creates them |
-| `cpu`, `memory` | `2`, `4Gi` | Capture renders in the container, so do not go much lower |
-| `min_instances`, `max_instances` | `1`, `1` | Identical copies. At least 1 (validated). See [Running several instances](/guides/deployment/#running-several-instances) |
-| `database_pool_size` | `10` | Connections per copy. `max_instances` × this must fit the database's limit |
-| `shutdown_grace_seconds` | `8` | Sets `SHUTDOWN_GRACE_SECONDS`, 1 to 9 (see [Shutdown](#shutdown)) |
-| `existing_database_url_secret_id` | `""` | A Postgres URL in Secret Manager. No database is created |
-| `database_tier`, `database_disk_size_gb` | `db-custom-1-3840`, `10` | Created database only |
-| `deletion_protection` | `true` | Protects the database and service. `false` also empties the bucket on destroy |
-| `remote_browser_endpoint_secret_id`, `remote_browser_token_secret_id` | `""` | Optional [remote browser](/guides/remote-browsers/), as secret references |
-| `labels` | `{}` | Added to every resource that supports them |
+| Name                                     | Default                  | Meaning                                                                                                                  |
+| ---------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `name`                                   | required                 | Name prefix, 2 to 20 characters                                                                                          |
+| `project_id`                             | required                 | The GCP project                                                                                                          |
+| `image_version`                          | required                 | Release version of the image (no `v`)                                                                                    |
+| `region`                                 | `us-central1`            | Must match the provider's region                                                                                         |
+| `image_repository`                       | `""`                     | A full registry path (your mirror). Empty creates the ghcr.io proxy                                                      |
+| `public_base_url`                        | `""`                     | `PUBLIC_BASE_URL`, for a domain you map yourself; empty means the service's `run.app` URL                                |
+| `auth_email`                             | `admin@example.com`      | Local admin login email (`AUTH_EMAIL`)                                                                                   |
+| `network`, `subnetwork`                  | `""`                     | An existing VPC and subnet (self links). Empty creates them                                                              |
+| `cpu`, `memory`                          | `2`, `4Gi`               | Capture renders in the container, so do not go much lower                                                                |
+| `min_instances`, `max_instances`         | `1`, `1`                 | Identical copies. At least 1 (validated). See [Running several instances](/guides/deployment/#running-several-instances) |
+| `database_pool_size`                     | `10`                     | Connections per copy. `max_instances` × this must fit the database's limit                                               |
+| `shutdown_grace_seconds`                 | `8`                      | Sets `SHUTDOWN_GRACE_SECONDS`, 1 to 9 (see [Shutdown](#shutdown))                                                        |
+| `existing_database_url_secret_id`        | `""`                     | A Postgres URL in Secret Manager. No database is created                                                                 |
+| `database_tier`, `database_disk_size_gb` | `db-custom-1-3840`, `10` | Created database only                                                                                                    |
+| `deletion_protection`                    | `true`                   | Protects the database and service. `false` also empties the bucket on destroy                                            |
+| `labels`                                 | `{}`                     | Added to every resource that supports them                                                                               |
 
 ### Outputs
 
-| Output | Meaning |
-| --- | --- |
-| `url` | The Cloud Run service URL |
-| `service_name`, `service_account_email` | The service and the identity it runs as |
-| `gcs_bucket` | The Storybook bucket |
-| `db_instance`, `db_private_ip` | The Cloud SQL instance and its private address |
-| `database_url_secret_id`, `admin_token_secret_id` | Secret Manager ids (references), never values |
-| `service_account_roles` | The exact grants (next section) |
+| Output                                                                       | Meaning                                        |
+| ---------------------------------------------------------------------------- | ---------------------------------------------- |
+| `url`                                                                        | The Cloud Run service URL                      |
+| `service_name`, `service_account_email`                                      | The service and the identity it runs as        |
+| `gcs_bucket`                                                                 | The Storybook bucket                           |
+| `db_instance`, `db_private_ip`                                               | The Cloud SQL instance and its private address |
+| `database_url_secret_id`, `admin_token_secret_id`, `auth_password_secret_id` | Secret Manager ids (references), never values  |
+| `service_account_roles`                                                      | The exact grants (next section)                |
 
 ## Permissions
 
 The service runs as its own service account, `service_account_email`, with exactly these grants (output `service_account_roles`). Nothing is granted at project level:
 
-| Resource | Role |
-| --- | --- |
-| The Storybook bucket | `roles/storage.objectUser` |
-| Each app secret (`SECRET`, `ADMIN_TOKEN`, the database URL, any remote-browser secrets) | `roles/secretmanager.secretAccessor` |
+| Resource                                                                                      | Role                                 |
+| --------------------------------------------------------------------------------------------- | ------------------------------------ |
+| The Storybook bucket                                                                          | `roles/storage.objectUser`           |
+| Each app secret (`SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, the database URL, any git secrets) | `roles/secretmanager.secretAccessor` |
 
-Cloud Run writes the container's logs itself, and the database is reached over its private IP with a password from Secret Manager, so no logging or Cloud SQL role is needed. The service is public (`allUsers` has `roles/run.invoker`) because the app has its own sign-in. The identity running Terraform needs enough rights to enable the APIs the module uses (`run`, `storage`, `secretmanager`, `artifactregistry`, and `sqladmin`, `servicenetworking`, `compute` for the database), which stay on at destroy.
+Cloud Run writes the container's logs itself, and the database is reached over its private IP with a password from Secret Manager, so no logging or Cloud SQL role is needed. Anyone can reach the service (`allUsers` has `roles/run.invoker`), so the app's sign-in is its only gate: the module generates `AUTH_PASSWORD`, and the image refuses to boot without it. The identity running Terraform needs enough rights to enable the APIs the module uses (`run`, `storage`, `secretmanager`, `artifactregistry`, and `sqladmin`, `servicenetworking`, `compute` for the database), which stay on at destroy.
 
 Review these with your platform team before the first apply. They are also what you copy if you [adapt it to your own platform](#adapt-it-to-your-own-platform).
 
 ## Database and secrets
 
-- **Private database.** Cloud SQL has no public IP, takes a private address from a reserved range through private services access, and requires TLS. The module's URL uses `?sslmode=require`, which encrypts but does not verify the certificate: use `?sslmode=verify-full` and set `DATABASE_CA` or `DATABASE_CA_FILE` to the instance's server CA. See [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
-- **Secrets.** `SECRET`, `ADMIN_TOKEN` and the database password are generated, and reach Cloud Run as Secret Manager references. Their values are also in the Terraform state, so keep the state in an encrypted backend with restricted access. Read the admin token with `gcloud secrets versions access latest --secret "$(terraform output -raw admin_token_secret_id)"`.
+- **Private database.** Cloud SQL has no public IP, takes a private address from a reserved range through private services access, and requires TLS. The instance uses a CAS-issued server certificate, which names its private IP; the module's URL says `?sslmode=verify-full` and passes the instance's CA as `DATABASE_CA`, so the app verifies the certificate. No live run has confirmed this yet. With your own database URL, see [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
+- **Secrets.** `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN` and the database password are generated, and reach Cloud Run as Secret Manager references. Their values are also in the Terraform state, so keep the state in an encrypted backend with restricted access. Sign in as `admin@example.com` (or `auth_email`) with the password from `gcloud secrets versions access latest --secret "$(terraform output -raw auth_password_secret_id)"`; the break-glass admin token is `admin_token_secret_id`.
 - **Existing database.** Put a `postgres://` URL in a secret and pass its id as `existing_database_url_secret_id`. The module creates no database or private services range. Set `network` and `subnetwork` if the database is private; the network path is yours.
 
 ## Domain and TLS
 
-The service has the `*.run.app` HTTPS origin. For your own domain, map it yourself (a load balancer or a Cloud Run domain mapping) and pass `public_base_url`.
+The service has the `*.run.app` HTTPS origin. For your own domain, map it yourself (a load balancer or a Cloud Run domain mapping) and pass `public_base_url`. Without it the app uses the service's deterministic `run.app` URL, so session cookies are `Secure`.
 
 ## Keep one instance running and shutdown
 
@@ -122,13 +122,13 @@ If your team won't use the module, you need three things:
 1. **The image.** `ghcr.io/guptasiddhant/storyshelf:<version>` (`amd64` and `arm64`). It listens on port 3000 and bundles Chromium. Use at least 2 vCPU and 4 GB for capture, CPU always allocated and one instance minimum; the `-hosting` variant has no browser, for hosting without capture.
 2. **The environment.** This is what the module passes:
 
-   | Variable | Value |
-   | --- | --- |
+   | Variable                             | Value                                                                                                                                                   |
+   | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
    | `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT` | The bucket and project. Credentials come from the service account (Application Default Credentials). Setting another storage backend too stops the boot |
-   | `PUBLIC_BASE_URL`, `TRUST_PROXY` | The public `https://` origin, and `1` behind a proxy |
-   | `SECRET`, `ADMIN_TOKEN` | At least 32 random characters, the same on every copy (secret references) |
-   | `DATABASE_URL`, `DATABASE_POOL_MAX` | A Postgres URL (the Cloud SQL private IP), and connections per copy |
-   | `SHUTDOWN_GRACE_SECONDS` | Drain time on SIGTERM, below the platform's 10 second window |
+   | `PUBLIC_BASE_URL`, `TRUST_PROXY`     | The public `https://` origin, and `1` behind a proxy                                                                                                    |
+   | `SECRET`, `ADMIN_TOKEN`              | At least 32 random characters, the same on every copy (secret references)                                                                               |
+   | `DATABASE_URL`, `DATABASE_POOL_MAX`  | A Postgres URL (the Cloud SQL private IP), and connections per copy                                                                                     |
+   | `SHUTDOWN_GRACE_SECONDS`             | Drain time on SIGTERM, below the platform's 10 second window                                                                                            |
 
 3. **The permissions** in the section above, attached to the container's own identity. Never put cloud access keys in environment files.
 

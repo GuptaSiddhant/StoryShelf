@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import prompts from "prompts";
 import { cliVersion } from "../../../config.ts";
 import { printError, printLine } from "../../../output.ts";
+import { STATE_WARNING, writeStateGitignore } from "./state-files.ts";
 
 /** The clouds that have a Terraform module under `deploy/terraform/` (ADR 0050). */
 export const CLOUDS = ["aws", "gcp", "azure"] as const;
@@ -162,7 +163,13 @@ async function writeStub(cloud: Cloud, answers: CloudAnswers): Promise<void> {
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, "main.tf"), generateMainTf(cloud, cliVersion() ?? "0.0.0-dev"));
   await writeFile(join(outDir, "terraform.tfvars"), generateTfvars(cloud, answers));
-  printLine(`Created main.tf, terraform.tfvars in ${outDir}`);
-  printLine(`\nNext steps:\n  cd ${answers.dir}\n  terraform init\n  terraform plan -out=tfplan`);
+  await writeStateGitignore(join(outDir, ".gitignore"));
+  printNextSteps(outDir, answers.dir);
+}
+
+function printNextSteps(outDir: string, dir: string): void {
+  printLine(`Created main.tf, terraform.tfvars, .gitignore in ${outDir}`);
+  printLine(STATE_WARNING);
+  printLine(`\nNext steps:\n  cd ${dir}\n  terraform init\n  terraform plan -out=tfplan`);
   printLine(`  terraform apply tfplan`);
 }

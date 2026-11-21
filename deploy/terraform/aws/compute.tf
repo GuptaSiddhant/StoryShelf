@@ -63,11 +63,6 @@ locals {
     }
   }] : []
 
-  remote_browser_secrets = concat(
-    var.remote_browser_endpoint_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_ENDPOINT", valueFrom = var.remote_browser_endpoint_secret_arn }],
-    var.remote_browser_token_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_TOKEN", valueFrom = var.remote_browser_token_secret_arn }],
-  )
-
   # Git connections (ADR 0054): each is on only when its reference is set. The key and the token
   # reach the task as secret references (the execution role reads them), never as plain values.
   git_environment = concat(
@@ -84,10 +79,11 @@ locals {
 }
 
 resource "aws_lb" "main" {
-  name               = "${var.name}-alb"
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = local.public_subnet_ids
+  name                       = "${var.name}-alb"
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.alb.id]
+  subnets                    = local.public_subnet_ids
+  drop_invalid_header_fields = true
 
   tags = var.tags
 
@@ -151,6 +147,7 @@ resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
 
   default_action {
@@ -203,7 +200,7 @@ resource "aws_ecs_task_definition" "app" {
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "AUTH_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
-    ], local.oidc_secrets, local.database_secrets, local.remote_browser_secrets, local.git_secrets)
+    ], local.oidc_secrets, local.database_secrets, local.git_secrets)
     logConfiguration = {
       logDriver = "awslogs"
       options = {

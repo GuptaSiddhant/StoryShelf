@@ -35,6 +35,11 @@ resource "random_password" "admin_token" {
   special = false
 }
 
+resource "random_password" "auth_password" {
+  length  = 32
+  special = false
+}
+
 resource "azurerm_key_vault_secret" "shelf_secret" {
   name         = "SECRET"
   value        = random_password.shelf_secret.result
@@ -46,6 +51,15 @@ resource "azurerm_key_vault_secret" "shelf_secret" {
 resource "azurerm_key_vault_secret" "admin_token" {
   name         = "ADMIN-TOKEN"
   value        = random_password.admin_token.result
+  key_vault_id = azurerm_key_vault.main.id
+
+  depends_on = [time_sleep.role_propagation]
+}
+
+# The local admin's password: sign-in is on from the first boot, and the image refuses to boot without it.
+resource "azurerm_key_vault_secret" "auth_password" {
+  name         = "AUTH-PASSWORD"
+  value        = random_password.auth_password.result
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [time_sleep.role_propagation]
@@ -64,10 +78,12 @@ resource "azurerm_key_vault_secret" "oidc_client_secret" {
   depends_on = [time_sleep.role_propagation]
 }
 
+# verify-full: the server's certificate chains to a public root and names this FQDN, so the app
+# checks it against the system CAs and never sends the password to an unverified peer.
 resource "azurerm_key_vault_secret" "database_url" {
   count        = local.create_database ? 1 : 0
   name         = "DATABASE-URL"
-  value        = "postgresql://shelf:${random_password.database[0].result}@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/shelf?sslmode=require"
+  value        = "postgresql://shelf:${random_password.database[0].result}@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/shelf?sslmode=verify-full"
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [time_sleep.role_propagation, azurerm_postgresql_flexible_server_database.shelf]
@@ -79,6 +95,7 @@ locals {
     {
       "shelf-secret"       = azurerm_key_vault_secret.shelf_secret.versionless_id
       "admin-token"        = azurerm_key_vault_secret.admin_token.versionless_id
+      "auth-password"      = azurerm_key_vault_secret.auth_password.versionless_id
       "oidc-client-secret" = azurerm_key_vault_secret.oidc_client_secret.versionless_id
       "database-url"       = local.create_database ? azurerm_key_vault_secret.database_url[0].versionless_id : var.existing_database_url_secret_id
     },
@@ -95,6 +112,7 @@ locals {
     {
       "SECRET"             = "shelf-secret"
       "ADMIN_TOKEN"        = "admin-token"
+      "AUTH_PASSWORD"      = "auth-password"
       "OIDC_CLIENT_SECRET" = "oidc-client-secret"
       "DATABASE_URL"       = "database-url"
     },

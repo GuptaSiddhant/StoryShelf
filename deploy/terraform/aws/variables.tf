@@ -151,9 +151,9 @@ variable "database_backup_retention_days" {
 }
 
 variable "database_init_image" {
-  description = "Image of the db-init container that creates the app's database user before the app starts (it needs psql). Override it to pull from a mirror."
+  description = "Image of the db-init container that creates the app's database user before the app starts (it needs psql). It receives the RDS master credentials, so the default is pinned by digest; pin a mirror by digest too."
   type        = string
-  default     = "public.ecr.aws/docker/library/postgres:16-alpine"
+  default     = "public.ecr.aws/docker/library/postgres:16-alpine@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857"
 }
 
 variable "enable_cognito" {
@@ -166,18 +166,6 @@ variable "auth_email" {
   description = "Email of the local admin login created from AUTH_PASSWORD (AUTH_EMAIL)."
   type        = string
   default     = "admin@example.com"
-}
-
-variable "remote_browser_endpoint_secret_arn" {
-  description = "Optional Secrets Manager ARN of a remote-browser endpoint, passed as REMOTE_BROWSER_ENDPOINT. Capture runs in the container when unset. The module builds no browser service."
-  type        = string
-  default     = ""
-}
-
-variable "remote_browser_token_secret_arn" {
-  description = "Optional Secrets Manager ARN of the remote-browser access token, passed as REMOTE_BROWSER_TOKEN."
-  type        = string
-  default     = ""
 }
 
 variable "log_retention_days" {

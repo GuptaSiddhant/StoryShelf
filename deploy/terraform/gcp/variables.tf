@@ -36,7 +36,7 @@ variable "image_repository" {
 }
 
 variable "public_base_url" {
-  description = "Public origin of the app (PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty lets the app use the Cloud Run origin."
+  description = "Public origin of the app (PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty means the service's deterministic Cloud Run URL (https://<name>-app-<project number>.<region>.run.app)."
   type        = string
   default     = ""
 }
@@ -128,18 +128,6 @@ variable "deletion_protection" {
   default     = true
 }
 
-variable "remote_browser_endpoint_secret_id" {
-  description = "Optional Secret Manager secret id of a remote-browser endpoint, passed as REMOTE_BROWSER_ENDPOINT. Capture runs in the container when unset. The module builds no browser service."
-  type        = string
-  default     = ""
-}
-
-variable "remote_browser_token_secret_id" {
-  description = "Optional Secret Manager secret id of the remote-browser access token, passed as REMOTE_BROWSER_TOKEN."
-  type        = string
-  default     = ""
-}
-
 variable "labels" {
   description = "Labels added to every resource that supports them."
   type        = map(string)
@@ -193,4 +181,10 @@ variable "gitlab_host" {
   description = "GitLab base URL, passed as SHELF_GITLAB_HOST. Empty means https://gitlab.com."
   type        = string
   default     = ""
+}
+
+variable "auth_email" {
+  description = "Email of the local admin login created from the generated AUTH_PASSWORD (AUTH_EMAIL)."
+  type        = string
+  default     = "admin@example.com"
 }

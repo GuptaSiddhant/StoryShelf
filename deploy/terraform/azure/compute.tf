@@ -70,6 +70,10 @@ resource "azurerm_container_app" "app" {
         value = "1"
       }
       env {
+        name  = "AUTH_EMAIL"
+        value = var.auth_email
+      }
+      env {
         name  = "SHUTDOWN_GRACE_SECONDS"
         value = tostring(var.shutdown_grace_seconds)
       }

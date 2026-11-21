@@ -38,6 +38,11 @@ output "admin_token_secret_id" {
   value       = azurerm_key_vault_secret.admin_token.versionless_id
 }
 
+output "auth_password_secret_id" {
+  description = "Versionless Key Vault id of the generated admin password (read it with the Azure CLI; it is not an output value)."
+  value       = azurerm_key_vault_secret.auth_password.versionless_id
+}
+
 output "oidc_client_secret_id" {
   description = "Versionless Key Vault id to put the real OIDC client secret into."
   value       = azurerm_key_vault_secret.oidc_client_secret.versionless_id

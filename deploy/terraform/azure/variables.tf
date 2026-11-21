@@ -193,3 +193,9 @@ variable "gitlab_host" {
   type        = string
   default     = ""
 }
+
+variable "auth_email" {
+  description = "Email of the local admin login created from the generated AUTH_PASSWORD (AUTH_EMAIL)."
+  type        = string
+  default     = "admin@example.com"
+}

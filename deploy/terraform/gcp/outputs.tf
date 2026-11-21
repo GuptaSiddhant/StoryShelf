@@ -1,6 +1,6 @@
 output "url" {
-  description = "Public base URL of the app (the Cloud Run origin, or public_base_url when set)."
-  value       = var.public_base_url != "" ? var.public_base_url : google_cloud_run_v2_service.app.uri
+  description = "Public base URL of the app (public_base_url, or the service's deterministic Cloud Run URL)."
+  value       = local.public_base_url
 }
 
 output "service_name" {
@@ -44,4 +44,9 @@ output "service_account_roles" {
     [{ resource = "bucket ${google_storage_bucket.storybook.name}", role = "roles/storage.objectUser" }],
     [for id in local.app_secret_ids : { resource = "secret ${id}", role = "roles/secretmanager.secretAccessor" }],
   )
+}
+
+output "auth_password_secret_id" {
+  description = "Secret Manager id of the generated admin password (read it with gcloud; it is not an output value)."
+  value       = google_secret_manager_secret.auth_password.secret_id
 }

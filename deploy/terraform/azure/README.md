@@ -28,15 +28,15 @@ changing both versions together and reading the release notes. A runnable exampl
 
 ## What it creates
 
-| Part     | Resources                                                                            |
-| -------- | ------------------------------------------------------------------------------------ |
-| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                    |
-| Compute  | Container Apps environment (Consumption profile), one app of identical copies        |
-| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL) |
-| Storage  | Storage account and a private `storybook` Blob container                             |
-| Identity | One user-assigned managed identity for the app                                       |
-| Secrets  | Key Vault (RBAC): `SECRET`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL`      |
-| Logs     | Log Analytics workspace                                                              |
+| Part     | Resources                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                |
+| Compute  | Container Apps environment (Consumption profile), one app of identical copies                    |
+| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)             |
+| Storage  | Storage account and a private `storybook` Blob container                                         |
+| Identity | One user-assigned managed identity for the app                                                   |
+| Secrets  | Key Vault (RBAC): `SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL` |
+| Logs     | Log Analytics workspace                                                                          |
 
 The app is served on the Container Apps default domain over HTTPS; `allowed_cidr_blocks` becomes its
 ingress IP restrictions. A custom domain and sign-in federation (Entra) are not part of the module.
@@ -63,13 +63,14 @@ The database has no public endpoint: only the VNet reaches it.
 | `github_api_url`                                               | `""`                               | GitHub Enterprise Server API base; empty means github.com               |
 | `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                               | Server-wide GitLab connection (both or none)                            |
 | `gitlab_host`                                                  | `""`                               | GitLab base URL; empty means gitlab.com                                 |
+| `auth_email`                                                   | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                  |
 | `log_retention_days`                                           | `30`                               | Log Analytics retention                                                 |
 | `tags`                                                         | `{}`                               | Added to every taggable resource                                        |
 
 ## Outputs
 
 `url`, `resource_group_name`, `container_app_name`, `storage_account_name`, `storage_container_name`,
-`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `oidc_client_secret_id`,
+`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `auth_password_secret_id`, `oidc_client_secret_id`,
 `identity_principal_id`, `identity_client_id` and `role_assignments`. Secret outputs are Key Vault
 ids (references), never values.
 
@@ -78,10 +79,14 @@ ids (references), never values.
 The app gets every secret as a Container Apps secret that is a **Key Vault reference** resolved by its
 managed identity. No output carries a value.
 
-- **`SECRET`, `ADMIN-TOKEN`** are generated. Their values, the database password and the storage
-  account's access keys and connection strings are also in the Terraform state (the provider records
-  them as computed attributes of the account, whether or not anything uses them): keep the state in an encrypted backend with
-  restricted access.
+- **`SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`** are generated. Their values, the database password,
+  the storage account's access keys and connection strings, and the Log Analytics workspace's shared
+  keys are also in the Terraform state (the provider records the keys as computed attributes, whether
+  or not anything uses them): keep the state in an encrypted backend with restricted access.
+- **Sign-in.** The image turns sign-in on from `AUTH_PASSWORD` and `SECRET`, and the module always
+  sets both, so the app never boots open. Read the password with
+  `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`
+  and sign in as `admin@example.com` (or `auth_email`).
 - **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
 
@@ -164,7 +169,8 @@ az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --
 | Variable                                                                                         | Source                          | Status |
 | ------------------------------------------------------------------------------------------------ | ------------------------------- | ------ |
 | `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`                                       | module                          | read   |
-| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                                    | Key Vault                       | read   |
+| `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                   | Key Vault                       | read   |
+| `AUTH_EMAIL`                                                                                     | `auth_email`                    | read   |
 | `DATABASE_URL`, `DATABASE_POOL_MAX`                                                              | Key Vault, `database_pool_size` | read   |
 | `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`                                      | Key Vault references (optional) | read   |
 | `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID`                            | the module                      | read   |
@@ -176,6 +182,13 @@ or `AZURE_STORAGE_CONNECTION` for a host without one. Setting more than one stor
 boot. The module's live apply stays behind the repository variable `LIVE_AZURE_MODULE_APPLY`: it is
 billed, so the owner turns it on. No live Azure run has confirmed this path yet; the adapter is tested
 against a faked SDK.
+
+## Database TLS
+
+The module's `DATABASE_URL` says `sslmode=verify-full` and connects by the server's FQDN. Flexible
+Server certificates chain to public roots and name that FQDN, so the app verifies the certificate
+against the system CAs and never sends the password to an unverified peer. _Unverified:_ no live run
+has confirmed the check over the private DNS zone yet.
 
 ## Existing database
 
