@@ -61,6 +61,24 @@ describe("a11yCountOf and failedTestsOf", () => {
     ]);
     expect(failedTestsOf({ testResults })).toEqual(["Button / clicks"]);
   });
+
+  it("names nothing when the results are missing, empty or unreadable", () => {
+    const unreadable = ["{not json", JSON.stringify({ not: "an array" }), "", "null"];
+    for (const testResults of [null, undefined, "[]", ...unreadable]) {
+      expect(failedTestsOf({ testResults })).toEqual([]);
+    }
+  });
+
+  it("skips entries that are not well-formed results", () => {
+    const testResults = JSON.stringify([
+      null,
+      "text",
+      { id: "a:z", title: "Card", name: "no status" },
+      { id: "a:w", title: "Card", name: "bad status", status: "skipped" },
+      { id: "a:v", title: "Card", name: "opens", status: "failed" },
+    ]);
+    expect(failedTestsOf({ testResults })).toEqual(["Card / opens"]);
+  });
 });
 
 describe("publicNameOf", () => {
