@@ -128,7 +128,10 @@ async function handleApprove(c: Context): Promise<Response> {
  * Approve what the dialog showed: a link edited since is still pending with the same id, so the
  * post carries the row's `updatedAt` and a different one means it moved.
  */
-async function approveShown(c: Context, row: GitRepositoryLinkRow) {
+async function approveShown(
+  c: Context,
+  row: GitRepositoryLinkRow,
+): Promise<"approved" | "moved" | "refused"> {
   const seen = (await c.req.parseBody())["updatedAt"];
   return seen === row.updatedAt ? await approve(row) : "moved";
 }
