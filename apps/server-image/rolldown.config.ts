@@ -50,7 +50,7 @@ export default defineConfig({
       "@storyshelf/core": resolve(root, "packages/core/src/index.tsx"),
       "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
       "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
-      "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
+      "@storyshelf/runner": resolve(root, "packages/runner/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
       // The preset loads the signer with a dynamic import; the runtime image carries only the
       // root `node_modules`, where the isolated linker does not put it, so inline this copy.

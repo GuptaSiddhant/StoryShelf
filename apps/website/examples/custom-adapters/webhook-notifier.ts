@@ -3,7 +3,7 @@ import type {
   MessageNotifierProvider,
 } from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
-import { httpText } from "@storyshelf/core/utils";
+import { httpStatus } from "@storyshelf/core/utils";
 import { z } from "zod";
 
 /** What a project admin may set on a channel of this kind; the URL is the secret, not config. */
@@ -29,7 +29,9 @@ export const jsonWebhookNotifier: MessageNotifierProvider = {
         if (!url) throw new Error("JSON webhook channel is missing its URL secret");
         const subject = config.prefix ? `${config.prefix} ${formatted.subject}` : formatted.subject;
         // The URL was set by a project admin, so mark it `project`: https and public only.
-        await httpText(url, {
+        // `httpStatus` never reads the response body: a receiver that echoes the URL (the secret)
+        // in an error cannot get it into the thrown `HTTP <status>` message.
+        await httpStatus(url, {
           method: "POST",
           json: { subject, text: formatted.text },
           destination: "project",

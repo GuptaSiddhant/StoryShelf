@@ -177,7 +177,7 @@ the channel.
 Flow: phase `rendering` → `playing` → run `play({ canvasElement })` → on throw emit
 `PLAY_FUNCTION_THREW_EXCEPTION` → phase `play-failed` → then `STORY_FINISHED` with the error.
 
-**Read `packages/runner-playwright/src/play.ts` (`inPagePlay`) with this in mind.** In one
+**Read `packages/runner/src/play.ts` (`inPagePlay`) with this in mind.** In one
 `page.evaluate` it:
 
 1. reads `window.__STORYBOOK_PREVIEW__` (the `PreviewWeb` instance) and returns when it is absent,

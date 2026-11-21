@@ -45,8 +45,8 @@ function stripSuffix(href) {
 
 // 1. Relative ./ and ../ hrefs: resolve against the containing file's
 //    directory (exactly as a browser resolves page URL + href).
-//    E.g. dist/guides/ci/index.html + ../packages/runner-playwright/
-//    -> dist/packages/runner-playwright/
+//    E.g. dist/guides/ci/index.html + ../packages/runner/
+//    -> dist/packages/runner/
 function isRelativeLink(target, filePath) {
   try {
     statSync(join(dirname(filePath), target));
