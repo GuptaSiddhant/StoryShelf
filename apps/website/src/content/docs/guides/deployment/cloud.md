@@ -9,11 +9,11 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 | Platform               | Database                                                      | Storage                               | Testing                       | Auth               | Server entry                   |
 | ---------------------- | ------------------------------------------------------------- | ------------------------------------- | ----------------------------- | ------------------ | ------------------------------ |
-| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage-s3` (R2/S3)      | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
-| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Workers entry           |
-| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Azure Functions handler |
-| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Lambda handler          |
-| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `core/storage/local` or `storage-s3`  | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
+| **Vercel**             | `@storyshelf/db-sqlite/turso` (Turso/libSQL)                  | `@storyshelf/storage/s3` (R2/S3)      | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + `@hono/vercel-edge`     |
+| **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage/s3` (R2)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Workers entry           |
+| **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage/s3` (Azure Blob) | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Azure Functions handler |
+| **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage/s3` (S3)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Lambda handler          |
+| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `core/storage/local` or `@storyshelf/storage/s3`  | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
 
 ## Serverless: Storybook hosting only
 
@@ -36,7 +36,7 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 ```ts
 import { createShelfApp } from "@storyshelf/app";
 import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";
-import { createS3Storage } from "@storyshelf/storage-s3";
+import { createS3Storage } from "@storyshelf/storage/s3";
 import { createCaptureRunner } from "@storyshelf/runner";
 
 const database = createTursoDatabase({

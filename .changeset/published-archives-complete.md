@@ -11,9 +11,7 @@
 "@storyshelf/mcp": patch
 "@storyshelf/observability": patch
 "@storyshelf/runner": patch
-"@storyshelf/storage-azure": patch
-"@storyshelf/storage-gcs": patch
-"@storyshelf/storage-s3": patch
+"@storyshelf/storage": patch
 "@storyshelf/storybook-addon": patch
 ---
 
