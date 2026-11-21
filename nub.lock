@@ -332,7 +332,7 @@ importers:
         version: 12.2.0
       sharp:
         specifier: ^0.35.5
-        version: 0.35.5
+        version: 0.35.5(@types/node@26.6.5)
       starlight-image-zoom:
         specifier: 0.16.2
         version: 0.16.2(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(typescript@5.9.3)))(@types/node@26.6.5)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(typescript@5.9.3))(yaml@2.9.1)
@@ -346,6 +346,15 @@ importers:
         specifier: 0.13.0
         version: 0.13.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(typescript@5.9.3)))(@types/node@26.6.5)(yaml@2.9.1)
     devDependencies:
+      '@storyshelf/app':
+        specifier: workspace:*
+        version: link:../../packages/app
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       axe-core:
         specifier: ^4.13.0
         version: 4.13.0
@@ -354,7 +363,7 @@ importers:
         version: 6.0.4
       playwright-core:
         specifier: 1.63.0
-        version: 1.63.0
+        version: 1.63.0(zod@4.6.7)
       rehype-parse:
         specifier: 9.0.1
         version: 9.0.1
@@ -385,6 +394,12 @@ importers:
       unified:
         specifier: 11.0.5
         version: 11.0.5
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
 
   packages/affected:
     devDependencies:
@@ -11991,7 +12006,7 @@ snapshots:
       yargs-parser: 22.0.0
       zod: 4.6.7
     optionalDependencies:
-      sharp: 0.35.5
+      sharp: 0.35.5(@types/node@26.6.5)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -12006,7 +12021,6 @@ snapshots:
       - '@img/sharp-wasm32'
       - '@netlify/blobs'
       - '@planetscale/database'
-      - '@types/node'
       - '@upstash/redis'
       - '@vercel/blob'
       - '@vercel/functions'
@@ -15310,38 +15324,6 @@ snapshots:
   set-cookie-parser@3.2.1: {}
 
   setprototypeof@1.2.0: {}
-
-  sharp@0.35.5:
-    dependencies:
-      '@img/colour': 1.1.0
-      detect-libc: 2.1.2
-      semver: 7.8.5
-    optionalDependencies:
-      '@img/sharp-darwin-arm64': 0.35.5
-      '@img/sharp-darwin-x64': 0.35.5
-      '@img/sharp-freebsd-wasm32': 0.35.5
-      '@img/sharp-libvips-darwin-arm64': 1.3.4
-      '@img/sharp-libvips-darwin-x64': 1.3.4
-      '@img/sharp-libvips-linux-arm': 1.3.4
-      '@img/sharp-libvips-linux-arm64': 1.3.4
-      '@img/sharp-libvips-linux-ppc64': 1.3.4
-      '@img/sharp-libvips-linux-riscv64': 1.3.4
-      '@img/sharp-libvips-linux-s390x': 1.3.4
-      '@img/sharp-libvips-linux-x64': 1.3.4
-      '@img/sharp-libvips-linuxmusl-arm64': 1.3.4
-      '@img/sharp-libvips-linuxmusl-x64': 1.3.4
-      '@img/sharp-linux-arm': 0.35.5
-      '@img/sharp-linux-arm64': 0.35.5
-      '@img/sharp-linux-ppc64': 0.35.5
-      '@img/sharp-linux-riscv64': 0.35.5
-      '@img/sharp-linux-s390x': 0.35.5
-      '@img/sharp-linux-x64': 0.35.5
-      '@img/sharp-linuxmusl-arm64': 0.35.5
-      '@img/sharp-linuxmusl-x64': 0.35.5
-      '@img/sharp-webcontainers-wasm32': 0.35.5
-      '@img/sharp-win32-arm64': 0.35.5
-      '@img/sharp-win32-ia32': 0.35.5
-      '@img/sharp-win32-x64': 0.35.5
 
   sharp@0.35.5(@types/node@26.6.5):
     dependencies:

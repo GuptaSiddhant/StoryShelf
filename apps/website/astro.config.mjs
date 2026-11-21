@@ -190,6 +190,7 @@ export default defineConfig({
             { label: "Cloud assembly", slug: "guides/deployment/cloud" },
             { label: "Migrate a Terraform stack", slug: "guides/deployment/migrate-terraform" },
             { label: "Server configuration", slug: "guides/config" },
+            { label: "Write your own adapter", slug: "guides/custom-adapters" },
             { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
             { label: "Observability", slug: "guides/observability" },
           ],
