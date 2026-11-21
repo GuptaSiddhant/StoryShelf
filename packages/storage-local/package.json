@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage-local",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Deprecated: local storage is built into @storyshelf/core/storage/local. A re-export kept for one minor release.",
   "keywords": [
     "filesystem",
