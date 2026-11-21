@@ -92,7 +92,7 @@ describe("the comment's extra facts", () => {
     await new BuildReviewModel(w.db).add(w.build.id, "u1", "approved");
     await w.builds.setStatus(w.build.id, "approved");
     const body = await commentOf(w);
-    expect(body).toContain("Approved by `@Ada L`");
+    expect(body).toContain("Approved by `Ada L`");
     expect(body).not.toContain("corp.example");
   });
 

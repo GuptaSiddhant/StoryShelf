@@ -69,14 +69,14 @@ describe("buildCommentMarkdown: testing on", () => {
     expect(
       buildCommentMarkdown(input({ status: "approved", reviewer: "ada" })),
     ).toMatchInlineSnapshot(
-      `"### ✅ StoryShelf: Approved by \`@ada\` · [**Review changes →**](https://s/diff) · [Storybook](https://s/sb/b1/index.html) · [Build](https://s/build)"`,
+      `"### ✅ StoryShelf: Approved by \`ada\` · [**Review changes →**](https://s/diff) · [Storybook](https://s/sb/b1/index.html) · [Build](https://s/build)"`,
     );
   });
 
   it("names who rejected", () => {
     expect(buildCommentMarkdown(input({ status: "rejected", reviewer: "ada" })))
       .toMatchInlineSnapshot(`
-      "### ❌ StoryShelf: Rejected by \`@ada\`
+      "### ❌ StoryShelf: Rejected by \`ada\`
 
       [**Review changes →**](https://s/diff) · [Storybook](https://s/sb/b1/index.html) · [Build](https://s/build)
 
@@ -203,6 +203,23 @@ describe("buildCommentMarkdown: hosting only", () => {
 
       <sub>Commit \`454d6e4\` · updated 16:42 UTC</sub>"
     `);
+  });
+});
+
+const headline = (reviewer: string): string =>
+  buildCommentMarkdown(input({ status: "approved", reviewer })).split("\n")[0] ?? "";
+
+describe("buildCommentMarkdown: the reviewer's name", () => {
+  it("collapses every whitespace run, newlines included, so the code span cannot end early", () => {
+    const line = headline("Ada\n\nLovelace \t `x`");
+    expect(line).toContain("Approved by `Ada Lovelace x`");
+    expect(line).not.toContain("\n");
+  });
+
+  it("is a display name, not a handle: no @ prefix, and no byline for an empty name", () => {
+    expect(headline("Ada L")).toContain("Approved by `Ada L`");
+    expect(headline("Ada L")).not.toContain("`@");
+    expect(headline(" \n ")).toMatch(/Approved ·/u);
   });
 });
 
