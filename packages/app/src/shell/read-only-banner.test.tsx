@@ -47,7 +47,8 @@ async function page(path: string, user: AuthUser): Promise<string> {
     logger: createShelfLogger({ level: "silent" }),
   });
   try {
-    return await (await app.request(path)).text();
+    // The browser holds the first session (`t1`); `t2` is another visitor's.
+    return await (await app.request(path, { headers: { cookie: "storyshelf_session=t1" } })).text();
   } finally {
     await app.lifecycle.teardown();
   }
@@ -75,10 +76,17 @@ describe("read-only shared account UI (#1274)", () => {
     expect(html).toContain('action="/auth/logout"');
   });
 
+  it("shows the read-only account its own session only, never another visitor's", async () => {
+    const html = await page("/profile", DEMO);
+    expect(html).toContain("This browser");
+    expect(html).not.toContain("Another browser");
+  });
+
   it("keeps the profile controls for every other account", async () => {
     const html = await page("/profile", ADA);
     expect(html).toContain('action="/profile"');
     expect(html).toContain('action="/profile/password"');
     expect(html).toContain('action="/profile/sessions/revoke-others"');
+    expect(html).toContain("Another browser");
   });
 });

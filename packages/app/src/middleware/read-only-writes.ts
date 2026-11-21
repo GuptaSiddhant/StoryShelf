@@ -19,6 +19,21 @@ import { jsonRefusal } from "./api-errors.ts";
 const READ_ONLY_ALLOWED_WRITES =
   /^\/(?:auth\/(?:logout|engine\/login)|api\/auth\/(?:sign-in\/[^/]+|sign-out|callback\/[^/]+|sso\/callback(?:\/[^/]+)?|sso\/saml2\/sp\/acs\/[^/]+|passkey\/verify-authentication))$/u;
 
+/**
+ * Reads that change state, refused like a write: the connection flow's `GET` start and callback
+ * store the visitor's provider tokens on the shared account (#1274), where every other visitor
+ * would use them and none could disconnect them.
+ */
+const READ_ONLY_REFUSED_READS = /^\/connections\/[^/]+\/(?:start|callback)$/u;
+
+/** Whether the read-only rule judges this request: a refused read, or a write outside the allow-list. */
+function judged(c: Context): boolean {
+  if (READ_ONLY_REFUSED_READS.test(c.req.path)) {
+    return true;
+  }
+  return WRITE_METHODS.has(c.req.method) && !READ_ONLY_ALLOWED_WRITES.test(c.req.path);
+}
+
 /** The secret of a `Bearer` header, or undefined. */
 function bearerSecret(c: Context): string | undefined {
   const header = c.req.header("authorization");
@@ -76,21 +91,16 @@ function refuse(c: Context): Response {
 
 /**
  * Refuse (403) every `POST`, `PUT`, `PATCH` or `DELETE` made as a read-only account, except signing
- * in and out (`READ_ONLY_ALLOWED_WRITES`). The account is recognised by the session user, by the
+ * in and out (`READ_ONLY_ALLOWED_WRITES`), and the reads that write (`READ_ONLY_REFUSED_READS`). The account is recognised by the session user, by the
  * session cookie when an `Authorization` header rides beside it, and by the owner of a bearer token,
- * so a token the account somehow holds maps to the same refusal. Reads pass untouched. Without an
+ * so a token the account somehow holds maps to the same refusal. Other reads pass untouched. Without an
  * auth adapter, or one without read-only accounts, it does nothing. Mount it inside the store scope.
  */
 export function readOnlyWrites(auth: Auth | undefined): MiddlewareHandler {
   const isReadOnly = auth?.isReadOnlyAccount;
   // oxlint-disable-next-line typescript/no-invalid-void-type -- Hono middleware may not return Response
   return async (c: Context, next: Next): Promise<Response | void> => {
-    if (
-      !auth ||
-      !isReadOnly ||
-      !WRITE_METHODS.has(c.req.method) ||
-      READ_ONLY_ALLOWED_WRITES.test(c.req.path)
-    ) {
+    if (!auth || !isReadOnly || !judged(c)) {
       await next();
       return;
     }

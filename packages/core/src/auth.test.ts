@@ -31,6 +31,17 @@ describe("readOnlyAccountMatcher", () => {
     expect(isReadOnly()).toBe(false);
   });
 
+  it("compares in Unicode NFKC on both sides", () => {
+    // "é" as one code point (NFC) and as "e" plus a combining accent (NFD).
+    const nfc = "ren\u00E9@example.test";
+    const nfd = "rene\u0301@example.test";
+    expect(readOnlyAccountMatcher([nfc])(nfd)).toBe(true);
+    expect(readOnlyAccountMatcher([nfd])(nfc)).toBe(true);
+    // A compatibility form (full-width letters) folds to the plain address.
+    expect(isReadOnly("\uFF24emo@example.test")).toBe(true);
+    expect(parseReadOnlyAccounts(nfd)).toEqual([nfc]);
+  });
+
   it("matches nothing without accounts", () => {
     expect(readOnlyAccountMatcher()("demo@example.test")).toBe(false);
   });

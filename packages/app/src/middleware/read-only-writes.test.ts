@@ -75,10 +75,20 @@ function concretePath(pattern: string): string {
 
 const keyOf = (route: RegisteredRoute): string => `${route.method} ${route.path}`;
 
-/** Every registered state-changing route; the auth engine's `app.all` counts as a write. */
+/** The reads that change state, refused like writes (the connection flow stores provider tokens). */
+const REFUSED_READS = new Set([
+  "GET /connections/:service/start",
+  "GET /connections/:service/callback",
+]);
+
+/**
+ * Every registered state-changing route, plus the reads that write; the auth engine's `app.all`
+ * counts as a write.
+ */
 function writeRoutes(app: App): RegisteredRoute[] {
   return listRegisteredRoutes(app).filter(
-    (route) => WRITE_METHODS.has(route.method) || route.method === "ALL",
+    (route) =>
+      WRITE_METHODS.has(route.method) || route.method === "ALL" || REFUSED_READS.has(keyOf(route)),
   );
 }
 
@@ -87,15 +97,16 @@ async function send(
   route: RegisteredRoute,
   headers: Record<string, string>,
 ): Promise<Response> {
+  const method = route.method === "ALL" ? "POST" : route.method;
   return await app.request(concretePath(route.path), {
-    method: route.method === "ALL" ? "POST" : route.method,
+    method,
     headers: {
       "content-type": "application/x-www-form-urlencoded",
       "sec-fetch-site": "same-origin",
       "x-csrf-token": CSRF,
       ...headers,
     },
-    body: "",
+    ...(method === "GET" ? {} : { body: "" }),
   });
 }
 
@@ -119,6 +130,18 @@ describe("read-only shared accounts (#1274)", () => {
   it("refuses every classified write route made with the account's session", async () => {
     const app = await boot(DEMO);
     expect(await notRefused(app, { cookie: COOKIE })).toEqual([]);
+  });
+
+  it("walks the connection flow's GET start and callback with the writes", async () => {
+    const app = await boot(DEMO);
+    const walked = writeRoutes(app).map((route) => keyOf(route));
+    expect(walked).toEqual(expect.arrayContaining([...REFUSED_READS]));
+    for (const path of ["/connections/figma/start", "/connections/figma/callback?code=c&state=s"]) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- two paths, one after the other
+      const response = await app.request(path, { headers: { cookie: COOKIE } });
+      // oxlint-disable-next-line eslint/no-await-in-loop -- two paths, one after the other
+      expect(await isReadOnlyRefusal(response), path).toBe(true);
+    }
   });
 
   it("still lets the account sign in and sign out", async () => {

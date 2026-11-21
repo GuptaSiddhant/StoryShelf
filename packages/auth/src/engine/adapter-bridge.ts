@@ -1,6 +1,11 @@
 /** The `Auth` singleton over the Better Auth instance: user mirror, session resolve and revoke, disable. */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { readOnlyAccountMatcher, type Auth, type EngineLoginMethod } from "@storyshelf/core/auth";
+import {
+  normalizeAccountEmail,
+  readOnlyAccountMatcher,
+  type Auth,
+  type EngineLoginMethod,
+} from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
 import { hasPasswordCredential, listUserPasskeys } from "../passkeys.ts";
@@ -166,6 +171,10 @@ export function buildAdapter(
     check: async (request: Request): Promise<AuthUser | null> =>
       await resolveAuthUser(shelf, db, request, isReadOnly),
     isReadOnlyAccount: (email: string): boolean => isReadOnly(email),
+    readOnlyAccounts: (): string[] =>
+      (options.readOnlyAccounts ?? [])
+        .map((email) => normalizeAccountEmail(email))
+        .filter((email) => email !== ""),
     // eslint-disable-next-line require-await -- interface is async; minting forbidden by design
     createSession: async (): Promise<string> => {
       throw new Error(
