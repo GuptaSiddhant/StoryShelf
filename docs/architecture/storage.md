@@ -2,6 +2,8 @@
 
 > Part of the [StoryShelf architecture spec](./README.md).
 
+The local filesystem adapter is built into core as `@storyshelf/core/storage/local` (`createLocalStorage(dataDir)`, ADR 0049 amendment 2026-11-21). The S3, Azure and GCS adapters are separate packages. All implement `StorageAdapter`.
+
 ## Storage Layout
 
 The layout below is what new installs write. The legacy paths, which are still read, are in their own block after it.
