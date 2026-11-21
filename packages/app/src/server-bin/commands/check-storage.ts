@@ -1,7 +1,6 @@
-import { adminCall } from "../admin-call.ts";
-import type { ServerFlags } from "../args.ts";
-import { loadInstance } from "../instance.ts";
+import { adminCall, adminTokenOf } from "../admin-call.ts";
 import type { Io } from "../io.ts";
+import { withInstance, type CommandContext } from "./context.ts";
 
 /** The consistency report of `/api/v1/admin/check-storage`. */
 export interface StorageReport {
@@ -35,19 +34,17 @@ export function printStorageReport(report: StorageReport, io: Io): void {
   if (problemsIn(report) === 0) io.out("Storage is consistent with the database.");
 }
 
-/** `check-storage`: read-only; exits 1 when a blob or baseline image is missing or a manifest unreadable. */
-export async function checkStorage(flags: ServerFlags, io: Io): Promise<number> {
-  const { app } = await loadInstance(flags.dir ?? process.cwd());
-  try {
-    await app.lifecycle.setup();
+/** `check-storage`: read-only, a `tool`; exits 1 when a blob or baseline image is missing or a manifest unreadable. */
+export async function checkStorage(ctx: CommandContext): Promise<number> {
+  return await withInstance(ctx, "tool", async ({ app, options }) => {
+    const { sample } = ctx.flags;
     const report = await adminCall<StorageReport>(
       app,
+      adminTokenOf(options, ctx.env),
       "/api/v1/admin/check-storage",
-      flags.sample === undefined ? {} : { sample: flags.sample },
+      sample === undefined ? {} : { sample },
     );
-    printStorageReport(report, io);
+    printStorageReport(report, ctx.io);
     return problemsIn(report) > 0 ? 1 : 0;
-  } finally {
-    await app.lifecycle.teardown();
-  }
+  });
 }

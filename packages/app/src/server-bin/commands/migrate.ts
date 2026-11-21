@@ -1,18 +1,14 @@
-import type { ServerFlags } from "../args.ts";
-import { loadInstance } from "../instance.ts";
-import type { Io } from "../io.ts";
+import { withInstance, type CommandContext } from "./context.ts";
 
 /**
- * `migrate`: run the adapters' setup, which applies the database migrations (ADR 0053: migrate,
- * then roll the new version out), and exit without listening. Setup is idempotent.
+ * `migrate`: create the app in `migrate` mode and run its setup, which is the database's setup (the
+ * migrations) and nothing else: no storage or runner setup, no consumer, no timers (ADR 0053:
+ * migrate, then roll the new version out). Setup is idempotent.
  */
-export async function migrate(flags: ServerFlags, io: Io): Promise<number> {
-  const { app } = await loadInstance(flags.dir ?? process.cwd());
-  try {
+export async function migrate(ctx: CommandContext): Promise<number> {
+  return await withInstance(ctx, "migrate", async ({ app }) => {
     await app.lifecycle.setup();
-    io.out("Migrations and adapter setup completed.");
+    ctx.io.out("Migrations completed.");
     return 0;
-  } finally {
-    await app.lifecycle.teardown();
-  }
+  });
 }

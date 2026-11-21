@@ -16,7 +16,7 @@ import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
-import type { ShelfRouter, ShelfLifecycle } from "./app-types.ts";
+import type { ShelfAppMode, ShelfRouter, ShelfLifecycle } from "./app-types.ts";
 import { settleInsightJobs } from "./insights/job.ts";
 import { packageVersion } from "./package-version.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
@@ -24,6 +24,8 @@ import type { ServerRuntime } from "./runtime.ts";
 
 /** Mutable setup-settlement cell shared by the gate, health, and `setup()`. */
 export interface LifecycleCell {
+  /** What this app does by itself (default `serve`). */
+  mode?: ShelfAppMode;
   ready: Promise<AdapterSetupResult>;
   settled: AdapterSetupResult | null;
   /** The boot checks' outcome (auth secret, AI, images): `setup()` throws while it is a failure. */
@@ -164,7 +166,15 @@ async function runAdapterPhase(
   options: ResolvedShelfOptions,
   ctx: AdapterSetupContext,
   logger: Logger,
+  mode: ShelfAppMode = "serve",
 ): Promise<AdapterSetupResult> {
+  if (mode === "migrate") {
+    // The database's setup is its migrations: nothing else is set up, purged or checked.
+    const entries = collectSetups(adapterSourcesOf(options)).filter(
+      (entry) => entry.category === "database",
+    );
+    return await runAdapterSetups(entries, ctx, logger);
+  }
   const result = await runAdapterSetups(collectSetups(adapterSourcesOf(options)), ctx, logger);
   return result.ok ? ((await runAiPurge(options)) ?? result) : result;
 }
@@ -178,7 +188,8 @@ function kickSetup(
 ): void {
   // Auth is not an adapter: its one-shot boot validation runs first, then
   // the adapter setups. A failing secret check fails readiness, like others.
-  const bootFailure = firstBootFailure(options, logger);
+  const migrateOnly = cell.mode === "migrate";
+  const bootFailure = migrateOnly ? Promise.resolve(null) : firstBootFailure(options, logger);
   cell.bootFailure = bootFailure;
   bootFailure.then(
     (result) => {
@@ -194,7 +205,7 @@ function kickSetup(
     }
     // Teardown overtook the boot checks: never run adapter hooks on adapters being closed.
     return generationOf(cell) === generation
-      ? await runAdapterPhase(options, ctx, logger)
+      ? await runAdapterPhase(options, ctx, logger, cell.mode)
       : { ok: false, failures: [] };
   })();
   cell.eager = cell.ready;
@@ -225,6 +236,23 @@ function logAuthMode(options: ResolvedShelfOptions, logger: Logger): void {
   logger.info({ loginMethods: methods }, "auth enabled");
 }
 
+/** The eager run of this app's mode: none for a `tool`, which uses its adapters as they are. */
+function startEagerSetup(
+  options: ResolvedShelfOptions,
+  ctx: AdapterSetupContext,
+  logger: Logger,
+  cell: LifecycleCell,
+): void {
+  if (cell.mode !== "tool") {
+    kickSetup(options, ctx, logger, cell);
+    return;
+  }
+  const idle: AdapterSetupResult = { ok: true, failures: [] };
+  cell.ready = Promise.resolve(idle);
+  cell.settled = idle;
+  cell.bootChecked = null;
+}
+
 /** Kick eager setup and attach the `app.lifecycle` namespace (single run). */
 export function attachLifecycle(
   app: ShelfRouter,
@@ -240,8 +268,9 @@ export function attachLifecycle(
   bindAdapterLoggers(options, runtime.logger);
   options.ai?.setLogger?.(runtime.logger.child({ component: "ai" }));
   logAuthMode(options, runtime.logger);
-  kickSetup(options, setupCtx, runtime.logger, cell);
-  const timer = startBranchGcInterval(options, runtime, cell);
+  startEagerSetup(options, setupCtx, runtime.logger, cell);
+  const timer =
+    (cell.mode ?? "serve") === "serve" ? startBranchGcInterval(options, runtime, cell) : null;
   Object.assign(app, {
     lifecycle: createLifecycle(options, setupCtx, runtime.logger, cell, timer),
   });
@@ -408,7 +437,7 @@ async function rerunSetup(
   logger: Logger,
   cell: LifecycleCell,
 ): Promise<AdapterSetupResult> {
-  const running = runAdapterPhase(options, ctx, logger);
+  const running = runAdapterPhase(options, ctx, logger, cell.mode);
   cell.ready = running;
   trackBackground(cell, running);
   const result = await running;
@@ -432,6 +461,15 @@ function resumeAfterSetup(
   startConsumer(cell, logger);
 }
 
+/** A `tool` app never sets its adapters up; asking it to is a mistake of the caller's. */
+function refuseToolSetup(cell: LifecycleCell): void {
+  if (cell.mode === "tool") {
+    throw new Error(
+      "A tool-mode app never sets its adapters up: create it in serve or migrate mode.",
+    );
+  }
+}
+
 /** Build the `app.lifecycle` namespace closing over one settlement cell. */
 function createLifecycle(
   options: ResolvedShelfOptions,
@@ -441,11 +479,13 @@ function createLifecycle(
   timer: { stop(): void } | null = null,
 ): ShelfLifecycle {
   return {
+    mode: cell.mode ?? "serve",
     get ready() {
       return cell.ready;
     },
     logger,
     setup: async () => {
+      refuseToolSetup(cell);
       const generation = generationOf(cell);
       const checking = refuseFailedBoot(options, cell);
       if (checking) {

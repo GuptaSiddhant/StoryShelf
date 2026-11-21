@@ -1,22 +1,27 @@
 /** `storyshelf-server --help`: the instance commands. Static text, so help loads nothing. */
 export const SERVER_HELP = `Usage: storyshelf-server <command> [options]
 
-Operate a StoryShelf instance. Run it in the instance project (the one that creates the app),
-with the instance's own environment: it reads no .storybook/storyshelf.json.
+Operate a StoryShelf instance. Run it in the instance project, with the instance's own
+environment (a .env next to it is loaded; the shell's variables win). It reads no
+.storybook/storyshelf.json.
 
 Commands:
-  serve           Start the instance (--port, default PORT or 3000)
-  migrate         Run the database migrations and adapter setup, then exit (migrate, then roll)
-  purge           Purge expired builds (--ttl-days; needs SHELF_ADMIN_TOKEN)
+  serve           Start the instance (--port, default PORT or 3000; --watch restarts on changes)
+  migrate         Run the database migrations and exit: setup of the database only (migrate, then roll)
+  purge           Purge expired builds (--ttl-days)
   check-storage   Read-only: report blobs the database references but storage lacks
-                  (--sample <n>; needs SHELF_ADMIN_TOKEN; exits 1 when something is missing)
-  doctor          Check the instance's module, adapters and settings (no side effects)
+                  (--sample <n>; exits 1 when something is missing)
+  doctor          Check the instance module, its settings and the schema level (no side effects)
+
+purge, check-storage and doctor never migrate and start no job consumer, timer or replay.
 
 Options:
   --dir <dir>     Instance project directory (default: the current directory)
+  --entry <file>  The instance module, relative to --dir (default: "storyshelf": { "server": ... }
+                  in package.json, then src/index.ts and the other usual names)
   -h, --help      Show this help
   -v, --version   Show the version
 
-The instance module is src/index.ts (or .js/.mjs, server.*, index.*) and exports the app
-(\`export default createShelfApp({ ... })\`). Project commands (upload, build, ...) are in \`storyshelf\`.
+The instance module's default export is \`defineShelfInstance(async (env) => options)\` from
+@storyshelf/app: configuration, never a constructed app. Project commands are in \`storyshelf\`.
 `;

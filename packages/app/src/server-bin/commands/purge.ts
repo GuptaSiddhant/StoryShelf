@@ -1,7 +1,5 @@
-import { adminCall } from "../admin-call.ts";
-import type { ServerFlags } from "../args.ts";
-import { loadInstance } from "../instance.ts";
-import type { Io } from "../io.ts";
+import { adminCall, adminTokenOf } from "../admin-call.ts";
+import { withInstance, type CommandContext } from "./context.ts";
 
 interface PurgeResult {
   removedBuilds: number;
@@ -9,21 +7,22 @@ interface PurgeResult {
   removedBaselines?: number;
 }
 
-/** `purge`: remove expired builds through the instance's own retention (fenced, ADR 0039). */
-export async function purge(flags: ServerFlags, io: Io): Promise<number> {
-  const { app } = await loadInstance(flags.dir ?? process.cwd());
-  try {
-    await app.lifecycle.setup();
+/**
+ * `purge`: remove expired builds through the instance's own retention (fenced, ADR 0039). Runs as a
+ * `tool`: it never migrates, so the database must already be at this release's level.
+ */
+export async function purge(ctx: CommandContext): Promise<number> {
+  return await withInstance(ctx, "tool", async ({ app, options }) => {
+    const { ttlDays } = ctx.flags;
     const result = await adminCall<PurgeResult>(
       app,
+      adminTokenOf(options, ctx.env),
       "/api/v1/admin/purge",
-      flags.ttlDays === undefined ? {} : { ttlDays: flags.ttlDays },
+      ttlDays === undefined ? {} : { ttlDays },
     );
-    io.out(
+    ctx.io.out(
       `Removed ${result.removedBuilds} build(s), ${result.removedBranches ?? 0} branch(es) and ${result.removedBaselines ?? 0} baseline(s)`,
     );
     return 0;
-  } finally {
-    await app.lifecycle.teardown();
-  }
+  });
 }

@@ -1,20 +1,16 @@
-/** A real instance module for the bin's tests: SQLite and local storage in a scratch directory, admin token `test-admin`. */
+import type { ShelfOptions } from "@storyshelf/core/config";
+/** Real options for the bin's tests: SQLite and local storage in a data directory, admin token `test-admin`. */
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pino from "pino";
-import type { ShelfApp } from "../../app-types.ts";
-import { createShelfApp } from "../../index.tsx";
 
-/** A fresh app (own scratch directory): a torn-down app is closed for good, so each test makes its own. */
-export function createFixtureApp(): ShelfApp {
-  const dir = mkdtempSync(join(tmpdir(), "storyshelf-bin-"));
-  return createShelfApp({
-    database: createSqliteDatabase(join(dir, "shelf.db")),
-    storage: createLocalStorage(dir),
+/** Fresh adapters over `dataDir`: the database file is `shelf.db` there. */
+export function fixtureOptions(dataDir: string): ShelfOptions {
+  return {
+    database: createSqliteDatabase(join(dataDir, "shelf.db")),
+    storage: createLocalStorage(dataDir),
     logger: pino({ level: "silent" }),
-    config: { scratchDir: dir, adminToken: "test-admin" },
-  });
+    config: { scratchDir: dataDir, adminToken: "test-admin" },
+  };
 }

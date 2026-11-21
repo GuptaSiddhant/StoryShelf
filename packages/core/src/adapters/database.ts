@@ -28,6 +28,8 @@ export {
   type SchemaLevelStore,
 } from "./schema-level.ts";
 
+export { readSchemaRelease } from "./schema-release.ts";
+
 export {
   duplicateGroupsSql,
   logSkippedIndex,

@@ -1,17 +1,30 @@
-import { readSetting } from "@storyshelf/core/config";
+import type { ShelfOptions } from "@storyshelf/core/config";
 import type { ShelfApp } from "../app-types.ts";
+
+/** The instance's admin token: its configured one, else `SHELF_ADMIN_TOKEN`. Throws when there is none. */
+export function adminTokenOf(
+  options: ShelfOptions,
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const token = options.config?.adminToken ?? env["SHELF_ADMIN_TOKEN"];
+  if (!token) {
+    throw new Error(
+      "The instance has no admin token (config.adminToken / SHELF_ADMIN_TOKEN): this command runs with it.",
+    );
+  }
+  return token;
+}
 
 /**
  * Call a site-admin endpoint of the loaded app in-process (no network, no URL): the operation is the
- * route's own, so it has one implementation. The instance's own `SHELF_ADMIN_TOKEN` authorises it.
+ * route's own, so it has one implementation.
  */
-export async function adminCall<T>(app: ShelfApp, path: string, body: object): Promise<T> {
-  const token = readSetting(process.env, "SHELF_ADMIN_TOKEN");
-  if (!token) {
-    throw new Error(
-      "SHELF_ADMIN_TOKEN is not set: this command runs with the instance's admin token.",
-    );
-  }
+export async function adminCall<T>(
+  app: ShelfApp,
+  token: string,
+  path: string,
+  body: object,
+): Promise<T> {
   const response = await app.fetch(
     new Request(`http://storyshelf.invalid${path}`, {
       method: "POST",

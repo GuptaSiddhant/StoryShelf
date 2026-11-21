@@ -19,7 +19,7 @@ function mergeImports(lines: string[]): string[] {
 
 function buildImports(answers: Answers): string[] {
   return mergeImports([
-    `import { createShelfApp } from "@storyshelf/app";`,
+    `import { defineShelfInstance } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
     `import { createCaptureRunner } from "@storyshelf/runner";`,
@@ -89,7 +89,7 @@ const EMAIL_NOTIFIERS_LINES = [
 function buildRouterLines(answers: Answers): string[] {
   return [
     ...(wantsObservability(answers) ? OBSERVABILITY_SETUP_LINES : []),
-    `const app = createShelfApp({`,
+    `return {`,
     `  database,`,
     `  storage,`,
     `  testing: { runner: captureRunner },`,
@@ -97,7 +97,6 @@ function buildRouterLines(answers: Answers): string[] {
     ...authLines(answers),
     ...(wantsObservability(answers) ? [`  logger: shelfLogger,`, `  observability,`] : []),
     ...CONFIG_AND_SETUP_LINES,
-    ...(answers.auth === "password" ? PASSWORD_ADMIN_LINES : []),
   ];
 }
 
@@ -118,18 +117,20 @@ const CONFIG_AND_SETUP_LINES = [
   `    migrateCredentialsOnBoot: process.env.SHELF_SECRET_MIGRATE === "true",`,
   `    scratchDir: dataDir,`,
   `  },`,
-  `});`,
-  ``,
-  `await app.lifecycle.setup();`,
+  `};`,
 ];
 
-const PASSWORD_ADMIN_LINES = [
-  ``,
-  `// Provision the env-driven local admin (SHELF_ADMIN_PASSWORD, at least 12 chars).`,
-  `await ensurePasswordAdmin(database, {`,
-  `  email: process.env.SHELF_ADMIN_EMAIL ?? "admin@example.com",`,
-  `  password: process.env.SHELF_ADMIN_PASSWORD!,`,
-  `});`,
+/** Runs after setup, only under \`storyshelf-server serve\`: the admin needs the migrated database. */
+const PASSWORD_ADMIN_HOOK_LINES = [
+  `{`,
+  `  afterSetup: async ({ options }) => {`,
+  `    // Provision the env-driven local admin (SHELF_ADMIN_PASSWORD, at least 12 chars).`,
+  `    await ensurePasswordAdmin(options.database, {`,
+  `      email: process.env.SHELF_ADMIN_EMAIL ?? "admin@example.com",`,
+  `      password: process.env.SHELF_ADMIN_PASSWORD!,`,
+  `    });`,
+  `  },`,
+  `},`,
 ];
 
 const KEYCLOAK_OAUTH_LINES = [
@@ -176,18 +177,7 @@ export function requiredEnv(answers: Answers): string[] {
   return names;
 }
 
-/** Read `.env` when there is one (the scaffold ships `.env.example`); the shell's variables win. */
-const LOAD_ENV_LINES = [
-  `// Read .env when there is one (see .env.example); variables already set in the shell win.`,
-  `try {`,
-  `  process.loadEnvFile();`,
-  `} catch {`,
-  `  // no .env: the shell's variables are used`,
-  `}`,
-  ``,
-];
-
-/** One clear line and exit 1 when a required variable is unset, instead of a stack trace deep in a library. */
+/** One clear line when a required variable is unset (the bin prints it and exits 1), instead of a stack trace deep in a library. */
 function envCheckLines(answers: Answers): string[] {
   const names = requiredEnv(answers);
   if (names.length === 0) {
@@ -196,27 +186,40 @@ function envCheckLines(answers: Answers): string[] {
   return [
     `const missing = [${names.map((name) => `"${name}"`).join(", ")}].filter((name) => !process.env[name]);`,
     `if (missing.length > 0) {`,
-    `  console.error(\`Set \${missing.join(", ")} before starting (see .env.example and README.md).\`);`,
-    `  process.exit(1);`,
+    `  throw new Error(\`Set \${missing.join(", ")} before starting (see .env.example and README.md).\`);`,
     `}`,
     ``,
   ];
 }
 
-export function generateServer(answers: Answers): string {
+/** The module body: the factory's statements, then the options it returns. */
+function factoryBody(answers: Answers): string[] {
   return [
-    ...buildImports(answers),
-    ``,
     `const dataDir = process.env.SHELF_DATA_DIR || "./data";`,
     ``,
-    ...LOAD_ENV_LINES,
     ...envCheckLines(answers),
     ...buildAdapterLines(answers),
     ``,
     ...buildRouterLines(answers),
+  ];
+}
+
+/**
+ * \`src/index.ts\` of a scaffolded instance: the default export is a definition, never a constructed
+ * app. \`storyshelf-server\` loads \`.env\`, calls the factory and creates the app for its command.
+ */
+export function generateServer(answers: Answers): string {
+  const body = factoryBody(answers).map((line) => (line === "" ? line : `  ${line}`));
+  const hooks = answers.auth === "password" ? PASSWORD_ADMIN_HOOK_LINES : [];
+  return [
+    ...buildImports(answers),
     ``,
-    `// Exported, not started: \`storyshelf-server serve\` (npm start) listens, \`migrate\` and \`purge\` reuse it.`,
-    `export default app;`,
+    `export default defineShelfInstance(`,
+    `  async () => {`,
+    ...body.map((line) => (line === "" ? line : `  ${line}`)),
+    `  },`,
+    ...hooks.map((line) => `  ${line}`),
+    `);`,
     ``,
   ].join("\n");
 }

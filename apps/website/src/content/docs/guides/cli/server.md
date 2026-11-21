@@ -58,16 +58,31 @@ Then run `terraform init`, `terraform plan -out=tfplan` and `terraform apply tfp
 
 ## `storyshelf-server`
 
-The instance commands are the `storyshelf-server` bin of `@storyshelf/app`. Run it in the server project (`npm start` does for `serve`). The project's `src/index.ts` exports the app (`export default createShelfApp({ ... })`); `storyshelf-server` imports it and never reads `.storybook/storyshelf.json`.
+The instance commands are the `storyshelf-server` bin of `@storyshelf/app`. Run it in the server project (`npm start` does for `serve`, `npm run dev` for `serve --watch`).
 
 ```bash
-storyshelf-server serve [--dir <dir>] [--port 3000]   # start the instance; SIGTERM drains it
-storyshelf-server migrate                              # run migrations and adapter setup, then exit
-storyshelf-server purge [--ttl-days 30]                # purge expired builds
-storyshelf-server check-storage [--sample 50]          # read-only consistency check
-storyshelf-server doctor                               # module, adapters and settings
+storyshelf-server serve [--port 3000] [--watch]   # start the instance; SIGTERM drains it
+storyshelf-server migrate                         # run the database migrations, then exit
+storyshelf-server purge [--ttl-days 30]           # purge expired builds
+storyshelf-server check-storage [--sample 50]     # read-only consistency check
+storyshelf-server doctor                          # module, settings and the schema level
 ```
 
-`purge` and `check-storage` run in-process with the instance's own `SHELF_ADMIN_TOKEN`; no URL or network is involved. `storyshelf server serve`, `storyshelf server check-storage` and `storyshelf purge` were removed without a replacement alias.
+The project's `src/index.ts` default-exports an instance definition: configuration, never a constructed app.
+
+```ts
+import { defineShelfInstance } from "@storyshelf/app";
+
+export default defineShelfInstance(
+  async (env) => ({ database, storage, config: { adminToken: env.SHELF_ADMIN_TOKEN } }),
+  {
+    afterSetup: async ({ options }) => {
+      /* needs the migrated database; only `serve` runs it */
+    },
+  },
+);
+```
+
+`storyshelf-server` loads `.env` (the shell's variables win), refuses renamed settings, calls the factory and creates the app for the command. `serve` runs everything; `migrate` sets only the database up; `purge`, `check-storage` and `doctor` run as tools: they never migrate and start no job consumer, timers or replay, so the database must already be at this release's level (`doctor` reports it). A module that exports a constructed app is refused. `--entry <file>` or `"storyshelf": { "server": "<file>" }` in `package.json` names the module; without either the usual names are searched. `purge` and `check-storage` run in-process with the instance's admin token (`config.adminToken`, `SHELF_ADMIN_TOKEN`). `storyshelf server serve`, `storyshelf server check-storage` and `storyshelf purge` were removed without a replacement alias.
 
 See [Getting started](/guides/getting-started/) for the full init flow and [Configuration](/guides/config/) for env vars.

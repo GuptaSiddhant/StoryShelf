@@ -32,3 +32,20 @@ describe("parseServerArgs", () => {
     expect(parseServerArgs(["serve", "--port", "0"])).toMatchObject({ kind: "error" });
   });
 });
+
+describe("parseServerArgs: entry and watch", () => {
+  it("takes --entry and --watch", () => {
+    expect(parseServerArgs(["serve", "--entry", "app/server.ts", "--watch"])).toEqual({
+      kind: "run",
+      command: "serve",
+      flags: { entry: "app/server.ts", watch: true },
+    });
+    expect(parseServerArgs(["doctor", "--entry", "x.ts"])).toMatchObject({
+      flags: { entry: "x.ts" },
+    });
+  });
+
+  it("refuses --watch on any command but serve", () => {
+    expect(parseServerArgs(["migrate", "--watch"])).toMatchObject({ kind: "error" });
+  });
+});
