@@ -8,7 +8,9 @@
 // `capture` + `publish` on the main queue, `notify` + `review-request` on the notify queue. The
 // `notify` handler is the release's own declaration (its payload version and `accepts`); only `run`
 // is replaced, by a recorder, so nothing is delivered. The other kinds declare nothing in that
-// release, which is what the stubs declare.
+// release, which is what the stubs declare. At start it logs one `declared` line per kind: the
+// highest payload version its handler reads (default 1). The current side compares against that,
+// never against a version typed into the test.
 //
 // Usage (from the scratch directory): node mixed-queue-previous.mjs <sqlite|postgres> <seconds> <log>
 // Env: DATABASE_URL (postgres) or DATA_DIR (sqlite).
@@ -62,16 +64,29 @@ const database = await openDatabase();
 // Skips its migrations: the schema is a newer release's (ADR 0053, decision 2).
 await database.lifecycle?.setup?.({ config: {}, logger });
 const notify = { ...createNotifyHandler({ deps: {} }), run: ran };
+const handlers = {
+  capture: { run: ran },
+  publish: { run: ran },
+  notify,
+  "review-request": { run: ran },
+};
+for (const [kind, handler] of Object.entries(handlers)) {
+  const declared = handler.payloadVersion ?? 1;
+  appendFileSync(
+    log,
+    `${JSON.stringify({ release: RELEASE, event: "declared", kind, declared })}\n`,
+  );
+}
 const consumers = [
   createCaptureConsumer({
     queue: recordingQueue(database, ["capture", "publish"], 2),
-    handlers: { capture: ran, publish: ran },
+    handlers: { capture: handlers.capture, publish: handlers.publish },
     config: { concurrency: 2 },
     logger,
   }),
   createCaptureConsumer({
     queue: recordingQueue(database, ["notify", "review-request"], 4),
-    handlers: { notify, "review-request": ran },
+    handlers: { notify: handlers.notify, "review-request": handlers["review-request"] },
     config: { concurrency: 2 },
     logger,
   }),
