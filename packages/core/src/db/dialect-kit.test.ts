@@ -1,13 +1,15 @@
 import { integer, sqliteTable, text as sqliteText } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
-import { id, int, text } from "./columns.ts";
+import { id, int, json, text } from "./columns.ts";
 import { defineTable } from "./define-table.ts";
 import {
   applyFlags,
   buildAll,
   foreignKeysOf,
+  jsonCodec,
   referencedColumn,
   resolverOf,
+  withJsonInsertDefault,
   type ModifiableBuilder,
 } from "./dialect-kit.ts";
 
@@ -28,6 +30,35 @@ function recorder(): ModifiableBuilder & { calls: string[] } {
 }
 
 describe("dialect kit", () => {
+  it("writes json<T> as JSON text and parses it on read", () => {
+    expect(jsonCodec.toDriver({ a: [1, "b"] })).toBe('{"a":[1,"b"]}');
+    expect(jsonCodec.fromDriver('{"a":[1,"b"]}')).toEqual({ a: [1, "b"] });
+    expect(jsonCodec.fromDriver('"x"')).toBe("x");
+    // A driver that already parsed the value (a JSON-typed column) passes it through.
+    expect(jsonCodec.fromDriver({ a: 1 })).toEqual({ a: 1 });
+    // A value with no JSON form is refused rather than written as `undefined`.
+    expect(() => jsonCodec.toDriver(Symbol("x"))).toThrow("must have a JSON form");
+    expect(() => jsonCodec.toDriver(() => 1)).toThrow("must have a JSON form");
+  });
+
+  it("gives a json<T> default an insert default holding a fresh parsed copy", () => {
+    const fns: (() => unknown)[] = [];
+    const builder = {
+      notNull: () => null,
+      primaryKey: () => null,
+      unique: () => null,
+      default: () => null,
+      $defaultFn: (fn: () => unknown) => fns.push(fn),
+    };
+    withJsonInsertDefault(builder, json<{ a: number[] }>("meta").defaultJson({ a: [] }).spec);
+    withJsonInsertDefault(builder, json<string[]>("plain").spec);
+    withJsonInsertDefault(builder, text("name").default("x").spec);
+    expect(fns).toHaveLength(1);
+    const [first, second] = [fns[0]?.(), fns[0]?.()];
+    expect(first).toEqual({ a: [] });
+    expect(first).not.toBe(second);
+  });
+
   it("applies only the flags a column sets", () => {
     const plain = recorder();
     applyFlags(plain, text("a").spec, "u");

@@ -1,11 +1,13 @@
 /**
  * SQLite table factory (ADR 0041 decision 2; spike #800): builds a Drizzle `sqliteTable` from a
- * neutral table. Not used by the adapter yet; `schema/` and `ddl.ts` stay authoritative.
+ * neutral table. Tables not yet
+ * defined in core stay hand-written in `schema/` and `ddl.ts`.
  */
-import { neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import * as ns from "@storyshelf/core/db";
 import type { BuildColumns } from "drizzle-orm";
 import {
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -34,11 +36,14 @@ export type SqliteTableOf<T extends ns.NeutralTable> = SQLiteTableWithColumns<{
   >;
 }>;
 
-/** SQLite has no column types to choose: integers for numbers and booleans, text otherwise. */
-const refuseJson = (spec: ns.ColumnSpec): never => {
-  throw new Error(`json<T> column ${spec.name}: not mapped until a table needs it`);
-};
+/** A `json<T>` column: `TEXT` holding the JSON, encoded and parsed by `ns.jsonCodec`. */
+const jsonText = customType<{ data: unknown; driverData: string }>({
+  dataType: () => "text",
+  toDriver: (value) => ns.jsonCodec.toDriver(value),
+  fromDriver: (value) => ns.jsonCodec.fromDriver(value),
+});
 const plainText = (spec: ns.ColumnSpec): ns.ModifiableBuilder => text(spec.name);
+/** SQLite has no column types to choose: integers for numbers and booleans, text otherwise. */
 const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuilder> = {
   id: plainText,
   text: plainText,
@@ -48,7 +53,7 @@ const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuild
   int: (spec) => integer(spec.name),
   bigint: (spec) => integer(spec.name),
   bool: (spec) => integer(spec.name, { mode: "boolean" }),
-  json: refuseJson,
+  json: (spec) => jsonText(spec.name),
 };
 
 type KeyColumns = [AnySQLiteColumn, ...AnySQLiteColumn[]];
@@ -72,10 +77,13 @@ export function sqliteTableOf<T extends ns.NeutralTable>(
   const columns = Object.fromEntries(
     Object.entries(table.columns).map(([key, column]) => [
       key,
-      ns.applyFlags(
-        COLUMNS[column.spec.kind](column.spec),
+      ns.withJsonInsertDefault(
+        ns.applyFlags(
+          COLUMNS[column.spec.kind](column.spec) as ns.InsertDefaultBuilder,
+          column.spec,
+          `${table.name}_${column.spec.name}_unique`,
+        ),
         column.spec,
-        `${table.name}_${column.spec.name}_unique`,
       ),
     ]),
   );

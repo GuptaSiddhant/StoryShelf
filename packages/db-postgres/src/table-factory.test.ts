@@ -1,10 +1,11 @@
+import * as ns from "@storyshelf/core/db";
 /**
  * Spike #800 (ADR 0041 decisions 2 and 3): the neutral tables built by `pgTableOf` generate,
  * through drizzle-kit, the same DDL as `ddl.ts` apart from the differences listed and classified
  * below, and infer exactly the hand-written Drizzle row types.
  */
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
-import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import { compareDdlShapes, ddlShape } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/postgres";
 import { readFileSync } from "node:fs";
@@ -19,7 +20,7 @@ const external = { projects: schema.projects };
 const resolve = ns.resolverOf(external);
 const resolverOf = (tables: Record<string, unknown>) =>
   ns.resolverOf({ ...external, ...tables } as never);
-const TABLES = ns.SPIKE_TABLES.map((table) => table.name);
+const TABLES = ns.NEUTRAL_TABLES.map((table) => table.name);
 
 /**
  * Columns of a composite primary key. ddl.ts writes NOT NULL on each; drizzle-kit 1.0 leaves it to
@@ -55,8 +56,11 @@ const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory"
   })),
 ];
 
+/** A json<T> column is TEXT, its default the JSON text. */
+const JSON_DDL = /"body" text DEFAULT '\{\}' NOT NULL,\n\t"extra" text\n/u;
+
 async function generatedDdl(): Promise<string> {
-  const built = ns.buildAll(ns.SPIKE_TABLES, pgTableOf, external);
+  const built = ns.buildAll(ns.NEUTRAL_TABLES, pgTableOf, external);
   const before = await generateDrizzleJson({});
   const after = await generateDrizzleJson(built);
   return (await generateMigration(before, after)).join(";\n");
@@ -101,9 +105,25 @@ describe("Postgres table factory (spike #800)", () => {
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
-  it("refuses a json<T> column until a table needs one", () => {
-    const doc = ns.defineTable("docs", { body: ns.json<{ a: number }>("body") });
-    expect(() => pgTableOf(doc, resolve)).toThrow("json<T> column body");
+  it("maps json<T> to TEXT that parses on read", async () => {
+    type Doc = { a?: number };
+    const docs = ns.defineTable("docs", {
+      id: ns.id("id").primaryKey(),
+      body: ns.json<Doc>("body").notNull().defaultJson({}),
+      extra: ns.json<string[]>("extra"),
+    });
+    const built = pgTableOf(docs, resolve);
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<{
+      id: string;
+      body: Doc;
+      extra: string[] | null;
+    }>();
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<ns.InferRow<typeof docs>>();
+    expect(built.body.mapToDriverValue({ a: 1 })).toBe('{"a":1}');
+    expect(built.body.mapFromDriverValue('{"a":1}')).toEqual({ a: 1 });
+    const after = await generateDrizzleJson({ docs: built });
+    const statements = await generateMigration(await generateDrizzleJson({}), after);
+    expect(statements.join("\n")).toMatch(JSON_DDL);
   });
 
   it("expresses a partial index", async () => {

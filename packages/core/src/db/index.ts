@@ -1,7 +1,6 @@
 /**
- * The neutral schema layer (ADR 0041 decision 2), spike #800. Not wired into any adapter yet; it
- * reaches the adapters' table factories through `@storyshelf/core/test-helpers` until task 3
- * gives it a subpath of its own.
+ * `@storyshelf/core/db`: the neutral schema layer (ADR 0041 decision 2). Each table is defined once
+ * here with `defineTable`; each database adapter's table factory builds it as a Drizzle table.
  */
 export {
   bigint,
@@ -14,6 +13,7 @@ export {
   NeutralColumn,
   text,
   timestamp,
+  toJsonText,
   type AnyNeutralColumn,
   type ColumnKind,
   type ColumnReference,
@@ -37,9 +37,12 @@ export {
   applyFlags,
   buildAll,
   foreignKeysOf,
+  jsonCodec,
   referencedColumn,
   resolverOf,
+  withJsonInsertDefault,
   type FlaggedBuilder,
+  type InsertDefaultBuilder,
   type ForeignKeyPlan,
   type ModifiableBuilder,
   type TableResolver,
@@ -58,6 +61,6 @@ export {
   buildReferences,
   builds,
   labelTypes,
-  SPIKE_TABLES,
+  NEUTRAL_TABLES,
   users,
 } from "./tables/index.ts";

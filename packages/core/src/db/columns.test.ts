@@ -46,6 +46,15 @@ describe("neutral columns", () => {
     expect(base.$type<"a">()).toBeInstanceOf(NeutralColumn);
   });
 
+  it("stores a json<T> default as its JSON text, and only on a json<T> column", () => {
+    const column = json<{ tags: string[] }>("meta").notNull().defaultJson({ tags: [] });
+    expect(column.spec.defaultValue).toBe('{"tags":[]}');
+    expectTypeOf(column).toEqualTypeOf<NeutralColumn<{ tags: string[] }, true, true>>();
+    expect(() => text("name").defaultJson("x")).toThrow("defaultJson on text column name");
+    // `JSON.stringify` returns `undefined` for a value with no JSON form; that is refused.
+    expect(() => json<symbol>("meta").defaultJson(Symbol("x"))).toThrow("must have a JSON form");
+  });
+
   it("tracks the row type, nullability and default in the type", () => {
     expectTypeOf(text("a")).toEqualTypeOf<NeutralColumn<string>>();
     expectTypeOf(bool("a").notNull().default(true)).toEqualTypeOf<

@@ -1,10 +1,11 @@
+import * as ns from "@storyshelf/core/db";
 /**
  * Spike #800 (ADR 0041 decisions 2 and 3): the neutral tables built by `mysqlTableOf` generate,
  * through drizzle-kit, the same DDL as `ddl.ts` apart from the differences listed and classified
  * below, and infer exactly the hand-written Drizzle row types.
  */
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
-import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import { compareDdlShapes, ddlShape } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/mysql";
 import { readFileSync } from "node:fs";
@@ -19,15 +20,18 @@ const external = { projects: schema.projects };
 const resolve = ns.resolverOf(external);
 const resolverOf = (tables: Record<string, unknown>) =>
   ns.resolverOf({ ...external, ...tables } as never);
-const TABLES = ns.SPIKE_TABLES.map((table) => table.name);
+const TABLES = ns.NEUTRAL_TABLES.map((table) => table.name);
 
 /** Every remaining difference, `today → generated`, with its classification. */
 /** None: MySQL's generated DDL matches `ddl.ts` plus `migrate.ts`'s indexes exactly. */
 const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] =
   [];
 
+/** No DEFAULT on a MySQL TEXT column: the json<T> default is applied on insert. */
+const JSON_DDL = /`body` text NOT NULL,\n\t`extra` text\n/u;
+
 async function generatedDdl(): Promise<string> {
-  const built = ns.buildAll(ns.SPIKE_TABLES, mysqlTableOf, external);
+  const built = ns.buildAll(ns.NEUTRAL_TABLES, mysqlTableOf, external);
   const before = await generateDrizzleJson({});
   const after = await generateDrizzleJson(built);
   return (await generateMigration(before, after)).join(";\n");
@@ -72,9 +76,29 @@ describe("MySQL table factory (spike #800)", () => {
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
-  it("refuses a json<T> column until a table needs one", () => {
-    const doc = ns.defineTable("docs", { body: ns.json<{ a: number }>("body") });
-    expect(() => mysqlTableOf(doc, resolve)).toThrow("json<T> column body");
+  it("maps json<T> to TEXT that parses on read", async () => {
+    type Doc = { a?: number };
+    const docs = ns.defineTable("docs", {
+      id: ns.id("id").primaryKey(),
+      body: ns.json<Doc>("body").notNull().defaultJson({}),
+      extra: ns.json<string[]>("extra"),
+    });
+    const built = mysqlTableOf(docs, resolve);
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<{
+      id: string;
+      body: Doc;
+      extra: string[] | null;
+    }>();
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<ns.InferRow<typeof docs>>();
+    expect(built.body.mapToDriverValue({ a: 1 })).toBe('{"a":1}');
+    expect(built.body.mapFromDriverValue('{"a":1}')).toEqual({ a: 1 });
+    expect(built.body.defaultFn?.()).toEqual({});
+    // The insert default is the parsed value, so the driver encodes it once.
+    expect(built.body.mapToDriverValue(built.body.defaultFn?.())).toBe("{}");
+    expect(built.body.hasDefault).toBe(true);
+    const after = await generateDrizzleJson({ docs: built });
+    const statements = await generateMigration(await generateDrizzleJson({}), after);
+    expect(statements.join("\n")).toMatch(JSON_DDL);
   });
 
   it("cannot express a partial index", () => {
