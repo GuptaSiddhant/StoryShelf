@@ -52,6 +52,19 @@ export interface WaitOutcome {
   lines: string[];
 }
 
+/** The verdict name of an exit code, as `upload --json` reports it. */
+export function verdictName(code: number): string {
+  const names: Record<number, string> = {
+    [WAIT_EXIT.approved]: "approved",
+    [WAIT_EXIT.needsReview]: "needs-review",
+    [WAIT_EXIT.rejected]: "rejected",
+    [WAIT_EXIT.failed]: "failed",
+    [WAIT_EXIT.cancelled]: "cancelled",
+    [WAIT_EXIT.timedOut]: "timeout",
+  };
+  return names[code] ?? "interrupted";
+}
+
 /** Thrown inside a phase when waiting stops without a verdict, so the phase line says it failed. */
 class WaitStoppedError extends Error {
   readonly reason: "timeout" | "interrupted";

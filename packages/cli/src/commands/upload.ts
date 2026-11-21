@@ -27,6 +27,7 @@ import {
   type PhaseHandle,
   printLine,
   type Reporter,
+  setHumanOutputToStderr,
 } from "../output.ts";
 import {
   HashRoutesMissingError,
@@ -39,8 +40,15 @@ import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 import { findSupersedes } from "./supersede.ts";
-import { trySkipUnchanged } from "./upload-skip.ts";
-import { parseTimeout, reportOutcome, waitForBuild, DEFAULT_WAIT_TIMEOUT_MS } from "./wait.ts";
+import { printJsonResult, writeGithubOutputs, type UploadResult } from "./upload-result.ts";
+import { trySkipUnchanged, type SkipContext } from "./upload-skip.ts";
+import {
+  parseTimeout,
+  reportOutcome,
+  verdictName,
+  waitForBuild,
+  DEFAULT_WAIT_TIMEOUT_MS,
+} from "./wait.ts";
 import type { WaitOptions } from "./wait.ts";
 
 /**
@@ -49,6 +57,26 @@ import type { WaitOptions } from "./wait.ts";
  * @param options - Upload command options.
  */
 export async function runUpload(options: UploadOptions): Promise<void> {
+  let result: UploadResult | undefined;
+  const previous = setHumanOutputToStderr(options.json === true);
+  try {
+    await uploadFlow({
+      ...options,
+      onResult: (next) => {
+        result = next;
+        options.onResult?.(next);
+      },
+    });
+  } finally {
+    setHumanOutputToStderr(previous);
+  }
+  if (result === undefined) return;
+  writeGithubOutputs(result);
+  if (options.json === true) printJsonResult(result);
+}
+
+/** The upload itself; reports its {@link UploadResult} through `onResult`. */
+async function uploadFlow(options: UploadOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
   const reporter = options.reporter ?? createReporter();
   const collected = await reporter.phase("Checking config", "Checked config", async () => {
@@ -61,6 +89,7 @@ export async function runUpload(options: UploadOptions): Promise<void> {
     }
     if (shouldSkipUpload(found.skip, found.branch)) {
       printLine(`Skipped per config skip="${found.skip}" for branch "${found.branch}"`);
+      options.onResult?.({ buildId: null, url: null, status: "skipped", skipped: true });
       return null;
     }
     assertUploadOptions(found);
@@ -133,6 +162,10 @@ export interface UploadOptions {
   cwd?: string;
   /** After the upload, follow the build until it stops needing the server and exit by how it ended. */
   wait?: boolean;
+  /** Print one JSON result object on stdout; all human output goes to stderr. */
+  json?: boolean;
+  /** Test seam: receives the result as it becomes known (the last call is the final one). */
+  onResult?: (result: UploadResult) => void;
   /** How long `wait` follows the build: `90`, `90s`, `30m` or `2h` (default 30m). Never cancels the build. */
   timeout?: string;
   /** Test seam: the clock, sleep and abort signal of the wait. */
@@ -335,7 +368,7 @@ async function buildAndPost(
   collected: ResolvedUploadOptions,
   force?: boolean,
   dryRun?: boolean,
-  waitOptions?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps">,
+  waitOptions?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps" | "onResult">,
 ): Promise<void> {
   await reporter.phase("Building Storybook", "Built Storybook", async () => {
     await ensureBuildDir({
@@ -354,10 +387,12 @@ async function buildAndPost(
     printLine(
       `Dry run: would upload ${collected.buildDir} as ${collected.sha} on ${collected.branch}`,
     );
+    waitOptions?.onResult?.({ buildId: null, url: null, status: "dry-run", skipped: false });
     return;
   }
   const client = createClient(collected.url, collected.token);
-  if (collected.skipUnchanged && (await skipPhase(reporter, client, cwd, collected))) {
+  const skipCtx = withSkipResult(collected, waitOptions?.onResult);
+  if (collected.skipUnchanged && (await skipPhase(reporter, client, cwd, skipCtx))) {
     return;
   }
   const created = await reporter.phase("Creating build", "Created build", async () => {
@@ -372,13 +407,31 @@ async function buildAndPost(
   await finishUpload(reporter, { client, created, cwd, collected, wait: waitOptions });
 }
 
+/** The resolved options plus the hook that reports a skipped build as the result. */
+function withSkipResult(
+  collected: ResolvedUploadOptions,
+  onResult: UploadOptions["onResult"],
+): ResolvedUploadOptions & Pick<SkipContext, "onSkipped"> {
+  return {
+    ...collected,
+    onSkipped: (skipped) => {
+      onResult?.({
+        buildId: skipped.build.id,
+        url: buildPageUrl(collected.url, skipped.buildUrl),
+        status: "skipped",
+        skipped: true,
+      });
+    },
+  };
+}
+
 /** Everything a phase after the build exists needs. */
 interface UploadContext {
   client: ReturnType<typeof createClient>;
   created: BuildCreated;
   cwd: string;
   collected: ResolvedUploadOptions;
-  wait?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps"> | undefined;
+  wait?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps" | "onResult"> | undefined;
 }
 
 /** The affected, package-usage and upload phases, then the summary. */
@@ -393,6 +446,7 @@ async function finishUpload(reporter: Reporter, ctx: UploadContext): Promise<voi
   await reporter.phase("Recording package usage", "Recorded package usage", async () => {
     await reportPackageUsage(client, created, cwd, collected);
   });
+  ctx.wait?.onResult?.(createdResult(collected.url, created));
   const sent = await reporter.phase("Uploading Storybook", "Uploaded Storybook", async (handle) => {
     return await uploadBuild(client, created, cwd, collected, handle);
   });
@@ -435,9 +489,24 @@ async function followBuild(
     });
     const code = reportOutcome(result);
     if (code !== 0) process.exitCode = code;
+    wait?.onResult?.({
+      ...createdResult(collected.url, created),
+      verdict: verdictName(code),
+      exitCode: code,
+    });
   } finally {
     process.off("SIGINT", stop);
   }
+}
+
+/** The result of a build the server created: ids and links exactly as the server returned them. */
+function createdResult(serverUrl: string | undefined, created: BuildCreated): UploadResult {
+  return {
+    buildId: created.build.id,
+    url: buildPageUrl(serverUrl, created.buildUrl),
+    status: "created",
+    skipped: false,
+  };
 }
 
 /** The skip check as a phase; true when the commit was recorded as skipped. */
@@ -445,7 +514,7 @@ async function skipPhase(
   reporter: Reporter,
   client: ReturnType<typeof createClient>,
   cwd: string,
-  collected: ResolvedUploadOptions,
+  collected: ResolvedUploadOptions & Pick<SkipContext, "onSkipped">,
 ): Promise<boolean> {
   return await reporter.phase("Checking for unchanged stories", "Checked for changes", async () => {
     return await trySkipUnchanged(client, { ...collected, cwd });
