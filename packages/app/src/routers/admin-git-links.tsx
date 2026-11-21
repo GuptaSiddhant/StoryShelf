@@ -112,9 +112,7 @@ const APPROVE_FLASH = {
 /** Approve after checking coverage again; open builds are asked for their state through the link. */
 async function handleApprove(c: Context): Promise<Response> {
   const { row, view } = await openLink(c);
-  const seen = (await c.req.parseBody())["updatedAt"];
-  // Approve what the dialog showed: a link edited since is still pending, with the same id.
-  const outcome = seen === row.updatedAt ? await approve(row) : "moved";
+  const outcome = await approveShown(c, row);
   if (outcome !== "refused") {
     const done = { message: `${view.repository} approved`, tone: "success" } as const;
     const { message, tone } = outcome === "moved" ? APPROVE_FLASH.moved : done;
@@ -124,6 +122,15 @@ async function handleApprove(c: Context): Promise<Response> {
   const coverage = await coverageOf(row);
   const body = <ApproveLinkBody link={view} coverage={coverage} target={targetOf(c)} />;
   return await answer(c, approveTitle(view), body, 409);
+}
+
+/**
+ * Approve what the dialog showed: a link edited since is still pending with the same id, so the
+ * post carries the row's `updatedAt` and a different one means it moved.
+ */
+async function approveShown(c: Context, row: GitRepositoryLinkRow) {
+  const seen = (await c.req.parseBody())["updatedAt"];
+  return seen === row.updatedAt ? await approve(row) : "moved";
 }
 
 /** Approve the link: approved, moved by someone else, or refused (not covered, or no answer). */
