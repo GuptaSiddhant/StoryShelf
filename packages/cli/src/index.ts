@@ -207,6 +207,10 @@ function buildUploadCommand(): Command {
 /** `--wait`, `--timeout` and the exit-code help of `upload`. */
 function addWaitOptions(command: Command): Command {
   return command
+    .option(
+      "--json",
+      "print one JSON object on stdout (buildId, url, status, skipped; with --wait also verdict, exitCode); all other output goes to stderr",
+    )
     .option("--wait", "follow the build after the upload and exit by how it ended (see below)")
     .option(
       "--timeout <duration>",

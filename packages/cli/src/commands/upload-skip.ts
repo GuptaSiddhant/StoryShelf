@@ -25,6 +25,8 @@ export interface SkipContext {
   authorEmail?: string;
   authorName?: string;
   label?: string[];
+  /** Called with the skipped build the server recorded. */
+  onSkipped?: (created: SkippedBuildCreated) => void;
 }
 
 /** Attempts at the POST: one, plus retries after a network failure with the same key. */
@@ -100,6 +102,7 @@ async function recordSkip(
   printLine(
     `Skipped: no story changed since ${source.sha.slice(0, 7)} (build ${created.build.id})`,
   );
+  ctx.onSkipped?.(created);
   const link = buildPageUrl(ctx.url, created.buildUrl);
   if (link !== null) printLine(`View the build: ${link}`);
   return true;

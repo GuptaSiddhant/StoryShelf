@@ -23,6 +23,7 @@ jobs:
         # (`storyshelf upload` adds it itself when it runs the build script; a step like this one owns the flag)
         run: npx storybook build -o storybook-static --stats-json
       - name: Upload to StoryShelf
+        id: upload
         env:
           # On pull_request, GITHUB_SHA is a merge commit and GITHUB_REF_NAME is "<n>/merge": pass
           # the PR head and its branch instead. Through env, because a branch name is user input.
@@ -35,7 +36,13 @@ jobs:
             --token ${{ secrets.STORYSHELF_TOKEN }} \
             --sha "$UPLOAD_SHA" \
             --branch "$UPLOAD_BRANCH"
+      - name: Link the build
+        env:
+          BUILD_URL: ${{ steps.upload.outputs.build-url }}
+        run: echo "Storybook build: $BUILD_URL" >> "$GITHUB_STEP_SUMMARY"
 ```
+
+On GitHub Actions the upload step sets the outputs `build-id` and `build-url` (read them through `env`, as above). Elsewhere, `storyshelf upload --json` prints `{ "buildId", "url", "status", "skipped" }` on stdout, with every other message on stderr: `npx storyshelf upload … --json | jq -r .url`. See [Machine-readable output](/guides/cli/client/#machine-readable-output).
 
 Run `npx storyshelf doctor` after the build to check the setup before uploading. It reports a shallow clone or a missing `preview-stats.json` as a **warning** (the upload still works, rendering every story); fail the step on a warning if you want affected capture to be a requirement.
 
