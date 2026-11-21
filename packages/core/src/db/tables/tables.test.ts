@@ -1,19 +1,50 @@
 /**
- * The spike tables against the core row types (ADR 0041 decision 2): `LabelType` and
+ * The neutral tables against the core row types (ADR 0041 decision 2): `LabelType` and
  * `BuildLabel` match exactly; `User` and `Build` differ only as listed, which task 3 resolves by
  * deriving the core types from these tables.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Build } from "../../schema/build.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
+import type { ProjectMember } from "../../schema/member.ts";
+import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts";
+import type { Project } from "../../schema/project.ts";
+import type { ProjectLink } from "../../schema/usage.ts";
 import type { User } from "../../schema/user.ts";
 import type { InferRow } from "../define-table.ts";
-import { builds, buildLabels, labelTypes, NEUTRAL_TABLES, users } from "./index.ts";
+import {
+  builds,
+  buildLabels,
+  labelTypes,
+  NEUTRAL_TABLES,
+  projectGroupMappings,
+  projectLinks,
+  projectMembers,
+  projects,
+  users,
+} from "./index.ts";
 
 describe("spike tables", () => {
   it("match the core label rows exactly", () => {
     expectTypeOf<InferRow<typeof labelTypes>>().toEqualTypeOf<LabelType>();
     expectTypeOf<InferRow<typeof buildLabels>>().toEqualTypeOf<BuildLabel>();
+  });
+
+  it("match the core project-membership rows exactly", () => {
+    expectTypeOf<InferRow<typeof projectMembers>>().toEqualTypeOf<ProjectMember>();
+    expectTypeOf<InferRow<typeof projectGroupMappings>>().toEqualTypeOf<ProjectGroupMapping>();
+    expectTypeOf<InferRow<typeof projectLinks>>().toEqualTypeOf<ProjectLink>();
+  });
+
+  it("match the core project row apart from storybook_meta", () => {
+    // `Project` marks fourteen columns optional that every dialect always returns, and reads
+    // `storybookMeta` as `string | null | undefined` (the Drizzle schemas' `$type`); the column is
+    // plain nullable text.
+    type Row = InferRow<typeof projects>;
+    expectTypeOf<Omit<Row, "storybookMeta">>().toEqualTypeOf<
+      Required<Omit<Project, "storybookMeta">>
+    >();
+    expectTypeOf<Row["storybookMeta"]>().toEqualTypeOf<string | null>();
   });
 
   it("match the core user row once its optional fields are required", () => {
@@ -35,6 +66,8 @@ describe("spike tables", () => {
     const names = NEUTRAL_TABLES.map((table) => table.name);
     expect(names.indexOf("builds")).toBeLessThan(names.indexOf("build_labels"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("builds"));
-    expect(new Set(names).size).toBe(8);
+    expect(names.indexOf("projects")).toBe(0);
+    expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
+    expect(new Set(names).size).toBe(12);
   });
 });

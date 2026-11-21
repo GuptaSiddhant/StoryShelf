@@ -16,10 +16,12 @@ import * as schema from "./schema/index.ts";
 import { pgTableOf } from "./table-factory.ts";
 
 const MIGRATE_SOURCE = readFileSync(fileURLToPath(new URL("migrate.ts", import.meta.url)), "utf8");
-const external = { projects: schema.projects };
-const resolve = ns.resolverOf(external);
+/** No neutral table references a hand-written one now that `projects` is neutral. */
+const external = {};
+const BUILT = ns.buildAll(ns.NEUTRAL_TABLES, pgTableOf, external);
+const resolve = ns.resolverOf(BUILT);
 const resolverOf = (tables: Record<string, unknown>) =>
-  ns.resolverOf({ ...external, ...tables } as never);
+  ns.resolverOf({ ...BUILT, ...tables } as never);
 const TABLES = ns.NEUTRAL_TABLES.map((table) => table.name);
 
 /**
@@ -102,6 +104,22 @@ describe("Postgres table factory (spike #800)", () => {
       ns.InferRow<typeof ns.buildContentReleases>
     >();
     expectTypeOf(users.$inferSelect).toExtend<User>();
+    const projects = pgTableOf(ns.projects, resolve);
+    // The hand-written `storybookMeta` is `$type<string | null | undefined>().default(null)`.
+    type Unmeta<T> = Omit<T, "storybookMeta">;
+    expectTypeOf<Unmeta<typeof projects.$inferSelect>>().toEqualTypeOf<
+      Unmeta<typeof schema.projects.$inferSelect>
+    >();
+    expectTypeOf<(typeof projects.$inferSelect)["storybookMeta"]>().toEqualTypeOf<string | null>();
+    expectTypeOf(pgTableOf(ns.projectMembers, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectMembers.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.projectGroupMappings, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectGroupMappings.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.projectLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectLinks.$inferSelect
+    >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
