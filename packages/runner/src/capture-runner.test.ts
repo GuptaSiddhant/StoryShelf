@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { activeRuns } from "./browser.ts";
 import {
-  createPlaywrightCaptureRunner,
+  createCaptureRunner,
   createRuntimeParamsState,
   runtimeParametersForStory,
 } from "./capture-runner.ts";
@@ -190,9 +190,9 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-describe("createPlaywrightCaptureRunner.render", () => {
+describe("createCaptureRunner.render", () => {
   it("reports a story as failed when the in-flight browser is cancelled", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(true);
     const renderPromise = runner.render({
       buildId: "build-1",
@@ -216,7 +216,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   }, 30_000);
 
   it("lets a render in flight finish across a teardown, then closes its browser", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const release = playwright.holdGotos();
     const rendering = runner.render({
@@ -243,7 +243,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const before = playwright.launchCount();
     const info = vi.fn();
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({ recycleBrowserEvery: 4 }).render({
+    const result = await createCaptureRunner({ recycleBrowserEvery: 4 }).render({
       buildId: "build-1",
       storybookDir,
       stories,
@@ -264,7 +264,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const stories = Array.from({ length: 6 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     const before = playwright.launchCount();
     playwright.configureHang(false);
-    await createPlaywrightCaptureRunner({ recycleBrowserEvery: 0 }).render({
+    await createCaptureRunner({ recycleBrowserEvery: 0 }).render({
       buildId: "build-1",
       storybookDir,
       stories,
@@ -278,14 +278,12 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const stories = Array.from({ length: 8 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     const before = { ...playwright.stats };
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({ concurrency: 2, reusePages: true }).render(
-      {
-        buildId: "build-1",
-        storybookDir,
-        stories,
-        viewports: VIEWPORTS,
-      },
-    );
+    const result = await createCaptureRunner({ concurrency: 2, reusePages: true }).render({
+      buildId: "build-1",
+      storybookDir,
+      stories,
+      viewports: VIEWPORTS,
+    });
 
     expect(result.captures).toHaveLength(8);
     // 8 captures through 2 slots: two pages are opened once and reused, then closed.
@@ -298,7 +296,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   it("streams captures to onCapture instead of collecting them", async () => {
     const seen: string[] = [];
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner().render({
+    const result = await createCaptureRunner().render({
       buildId: "build-1",
       storybookDir,
       stories: STORIES,
@@ -315,7 +313,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
 
   it("reports a failed onCapture as a render failure for that story", async () => {
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner().render({
+    const result = await createCaptureRunner().render({
       buildId: "build-1",
       storybookDir,
       stories: STORIES,
@@ -330,7 +328,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   }, 30_000);
 
   it("cancels one render of a build by its run id, leaving a concurrent sibling running", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(true);
     const render = (runId: string) =>
       runner.render({
@@ -360,7 +358,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
   }, 30_000);
 
   it("resolves cancel for builds that are not rendering", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     await expect(runner.cancel("does-not-exist")).resolves.toBeUndefined();
   });
 
@@ -374,7 +372,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
       buildUrl: (): string => "/",
       waitForReady,
     };
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
@@ -405,7 +403,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
     };
     const stories = Array.from({ length: 12 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     playwright.configureHang(false);
-    const rendering = createPlaywrightCaptureRunner({ concurrency: 3 }).render({
+    const rendering = createCaptureRunner({ concurrency: 3 }).render({
       buildId: "build-1",
       storybookDir,
       stories,
@@ -437,7 +435,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
     };
     const stories = Array.from({ length: 60 }, (_, i) => ({ ...STORIES[0]!, id: `s-${i}` }));
     playwright.configureHang(false);
-    const rendering = createPlaywrightCaptureRunner({}).render({
+    const rendering = createCaptureRunner({}).render({
       buildId: "build-1",
       storybookDir,
       stories,
@@ -455,7 +453,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
 
   it("reports the browser build and host platform as the capture environment", async () => {
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({}).render({
+    const result = await createCaptureRunner({}).render({
       buildId: "build-1",
       storybookDir,
       stories: STORIES,
@@ -472,7 +470,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
     const info = vi.fn();
     playwright.configureHang(false);
     const logger = { info, debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as never;
-    await createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] }).render({
+    await createCaptureRunner({ browsers: ["chromium", "firefox"] }).render({
       buildId: "build-1",
       storybookDir,
       stories: STORIES,
@@ -488,7 +486,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
 
   it("echoes the target on every row it produces", async () => {
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({
+    const result = await createCaptureRunner({
       browsers: ["chromium", "firefox"],
     }).render({
       buildId: "build-1",
@@ -531,7 +529,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
       discover: async (): Promise<StoryEntry[]> => [],
       buildUrl: (): string => "/",
     };
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
@@ -553,7 +551,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
       type: "story",
       parameters: { viewport: { defaultViewport: "tablet" } },
     };
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
@@ -575,7 +573,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
       type: "story",
       parameters: { viewport: { defaultViewport: "desktop" } },
     };
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
@@ -604,7 +602,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
         return "/";
       },
     };
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     playwright.configureHang(false);
     const result = await runner.render({
       buildId: "build-1",
@@ -634,7 +632,7 @@ describe("createPlaywrightCaptureRunner.render", () => {
       },
     });
     playwright.configureHang(false);
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const params = await runner.extractParameters?.({
       buildId: "build-1",
       storybookDir,
@@ -660,15 +658,15 @@ const input = () => ({
   viewports: VIEWPORTS,
 });
 
-describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
+describe("createCaptureRunner targets (ADR 0007)", () => {
   it("offers chromium only by default, ready, reaching the loopback server", () => {
-    expect(createPlaywrightCaptureRunner().metadata.targets).toEqual([
+    expect(createCaptureRunner().metadata.targets).toEqual([
       { target: "chromium", reach: "loopback", status: "ready" },
     ]);
   });
 
   it("lists every declared target, default first, and rejects bad lists when created", () => {
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: ["webkit", local("chrome"), "firefox"],
     });
     expect(runner.metadata.targets?.map((entry) => entry.target)).toEqual([
@@ -676,15 +674,15 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
       "chrome",
       "firefox",
     ]);
-    expect(() => createPlaywrightCaptureRunner({ browsers: [] })).toThrow(/at least one/u);
-    expect(() => createPlaywrightCaptureRunner({ browsers: ["firefox", "firefox"] })).toThrow(
+    expect(() => createCaptureRunner({ browsers: [] })).toThrow(/at least one/u);
+    expect(() => createCaptureRunner({ browsers: ["firefox", "firefox"] })).toThrow(
       /entries 1 and 2 both produce the target "firefox"/u,
     );
   });
 
   it("renders on the first target when the request names none", async () => {
     playwright.configureHang(false);
-    const result = await createPlaywrightCaptureRunner({
+    const result = await createCaptureRunner({
       browsers: ["firefox", "chromium"],
     }).render(input());
     expect(result.captures.map((capture) => capture.browser)).toEqual(["firefox"]);
@@ -692,7 +690,7 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
 
   it("launches bare chrome with the chrome channel, bundled chromium with none", async () => {
     playwright.configureHang(false);
-    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "chrome"] });
+    const runner = createCaptureRunner({ browsers: ["chromium", "chrome"] });
     const before = playwright.launchOptions.length;
     await runner.render({ ...input(), target: "chrome" });
     await runner.render({ ...input(), target: "chromium" });
@@ -713,7 +711,7 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
 
   it("passes a local() channel through", async () => {
     playwright.configureHang(false);
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [local("chrome", { channel: "chrome-beta" })],
     });
     const before = playwright.launchOptions.length;
@@ -722,7 +720,7 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
   }, 30_000);
 
   it("fails a render for a target it does not offer", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     await expect(runner.render({ ...input(), target: "firefox" })).rejects.toThrow(
       /Cannot launch firefox: not offered by this runner/u,
     );
@@ -732,7 +730,7 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
   });
 
   it("fails at once when the browser will not launch, and marks the target unavailable", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
+    const runner = createCaptureRunner({ browsers: ["chromium", "firefox"] });
     playwright.failLaunches(
       new Error("Executable doesn't exist at /x/firefox\nrun playwright install"),
     );
@@ -754,7 +752,7 @@ describe("createPlaywrightCaptureRunner targets (ADR 0007)", () => {
   });
 
   it("verifies installed engines in setup and reports them in health", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
+    const runner = createCaptureRunner({ browsers: ["chromium", "firefox"] });
     await runner.lifecycle?.setup({} as never);
     const statuses = runner.metadata.targets?.map((entry) => entry.status);
     expect(statuses).toEqual([

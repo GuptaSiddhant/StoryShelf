@@ -38,7 +38,7 @@ deployment's public origin. Many platforms generate that URL, so an operator can
 
 ### 1. A runner declares everything it can render in one `browsers` list
 
-`createPlaywrightCaptureRunner` takes `browsers`: every target the
+`createCaptureRunner` takes `browsers`: every target the
 runner offers, local and remote. An entry is:
 
 - a bare engine, `"chromium"`: a local engine with the runner's defaults;
@@ -228,7 +228,7 @@ Legacy snapshot and baseline rows with no `browser` mean local `chromium`.
 A runner declares targets once; presets are sugar over one generic constructor:
 
 ```ts
-const runner = createPlaywrightCaptureRunner({
+const runner = createCaptureRunner({
   browsers: [
     "chromium",
     local("chrome", { channel: "chrome" }),

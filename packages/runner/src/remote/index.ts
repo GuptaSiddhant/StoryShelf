@@ -1,4 +1,4 @@
-/** Remote browsers for `browsers` (`@storyshelf/runner-playwright/remote`, ADR 0007). */
+/** Remote browsers for `browsers` (`@storyshelf/runner/remote`, ADR 0007). */
 export { remote } from "./remote.ts";
 export type { BrowserName, RemoteBrowser, RemoteConnection, RemoteOptions } from "./remote.ts";
 export { RemoteConnectError, refCounted } from "@storyshelf/core/adapter/capture-runner";

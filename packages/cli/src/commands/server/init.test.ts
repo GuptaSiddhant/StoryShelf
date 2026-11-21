@@ -137,7 +137,7 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
     expect(code).toContain("createShelfApp");
-    expect(code).toContain("createPlaywrightCaptureRunner");
+    expect(code).toContain("createCaptureRunner");
     expect(code).toContain("testing: { runner: captureRunner },");
     expect(code).toContain("scratchDir: dataDir,");
     expect(code).not.toMatch(/queue/iu);
@@ -145,7 +145,7 @@ describe("runServerInit", () => {
       dependencies: Record<string, string>;
       scripts: Record<string, string>;
     };
-    expect(pkg.dependencies["@storyshelf/runner-playwright"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/runner"]).toBeDefined();
     expect(Object.keys(pkg.dependencies).filter((name) => /queue|worker/u.test(name))).toEqual([]);
     expect(pkg.scripts["worker"]).toBeUndefined();
   });

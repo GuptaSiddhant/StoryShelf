@@ -48,9 +48,7 @@ async function snapshotCount(system, buildId) {
 
 /** 3. Load the published Storybook home page and one story in a browser; count storage calls. */
 export async function servingReport(system, buildId, storyId) {
-  const { chromium } = createRequire(join(root, "packages/runner-playwright/package.json"))(
-    "playwright-core",
-  );
+  const { chromium } = createRequire(join(root, "packages/runner/package.json"))("playwright-core");
   const browser = await chromium.launch();
   try {
     const out = {};
