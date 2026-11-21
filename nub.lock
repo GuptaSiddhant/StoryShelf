@@ -171,9 +171,6 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../../packages/runner-playwright
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       nodemailer:
         specifier: ^10.2.1
         version: 10.2.1
@@ -229,9 +226,6 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../../packages/runner-playwright
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       '@storyshelf/storage-s3':
         specifier: workspace:*
         version: link:../../packages/storage-s3
@@ -287,9 +281,6 @@ importers:
       '@storyshelf/runner-playwright':
         specifier: workspace:*
         version: link:../../packages/runner-playwright
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../../packages/storage-local
       '@storyshelf/storage-s3':
         specifier: workspace:*
         version: link:../../packages/storage-s3
@@ -1014,9 +1005,6 @@ importers:
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
-      '@storyshelf/storage-local':
-        specifier: workspace:*
-        version: link:../storage-local
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
