@@ -30,12 +30,12 @@ type Subpath = keyof typeof PEERS;
  * isolation (nothing else resolves) but loads none of its own. `sqlite/bun-sqlite` is left out: it
  * imports `bun:sqlite`, which only Bun resolves.
  */
-const LAZY: readonly Subpath[] = [
+const LAZY = new Set<Subpath>([
   "sqlite/turso",
   "postgres/rds-iam",
   "mysql/planetscale",
   "mysql/tidb",
-];
+]);
 
 const hooks = pathToFileURL(join(import.meta.dirname, "peer-isolation.hooks.ts")).href;
 const packageDir = join(import.meta.dirname, "..");
@@ -86,7 +86,7 @@ describe("optional peers load only from their own subpath", () => {
       // The block list made every other peer unresolvable, so reaching one would have thrown above;
       // here, check the subpath did load its own (peers' own transitive packages are not listed).
       const loaded = log.split("\n").filter(Boolean);
-      for (const peer of LAZY.includes(subpath) ? [] : PEERS[subpath]) {
+      for (const peer of LAZY.has(subpath) ? [] : PEERS[subpath]) {
         expect(loaded.some((name) => name === peer || name.startsWith(`${peer}/`))).toBe(true);
       }
     }, 60_000);
