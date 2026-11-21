@@ -10,8 +10,8 @@ const badgeBase = css`
   /* badge */
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.1rem 0.55rem;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
@@ -76,10 +76,10 @@ const toneIcons: Record<BadgeTone, IconName> = {
 const alertBase = css`
   /* alert */
   display: flex;
-  gap: 0.6rem;
+  gap: var(--space-2);
   align-items: flex-start;
   border-radius: var(--radius);
-  padding: 0.75rem 0.9rem;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   background: var(--surface-card);
   font-size: var(--text-base);
@@ -119,27 +119,27 @@ const alertTones: Record<AlertTone, Promise<string>> = {
 const alertIconTones: Record<AlertTone, Promise<string>> = {
   neutral: css`
     /* alert-icon-neutral */
-    margin-top: 0.1rem;
+    margin-top: 0;
     color: var(--text-secondary);
   `,
   info: css`
     /* alert-icon-info */
-    margin-top: 0.1rem;
+    margin-top: 0;
     color: var(--accent-fg);
   `,
   success: css`
     /* alert-icon-success */
-    margin-top: 0.1rem;
+    margin-top: 0;
     color: var(--status-approved-fg);
   `,
   warning: css`
     /* alert-icon-warning */
-    margin-top: 0.1rem;
+    margin-top: 0;
     color: var(--status-new-fg);
   `,
   danger: css`
     /* alert-icon-danger */
-    margin-top: 0.1rem;
+    margin-top: 0;
     color: var(--status-rejected-fg);
   `,
 };
@@ -147,7 +147,7 @@ const alertIconTones: Record<AlertTone, Promise<string>> = {
 const emptyWrap = css`
   /* empty */
   text-align: center;
-  padding: 2rem 1rem;
+  padding: var(--space-8) var(--space-4);
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   background: var(--surface-card);
@@ -155,7 +155,7 @@ const emptyWrap = css`
 
 const emptyTitle = css`
   /* empty-title */
-  margin: 0 0 0.3rem;
+  margin: 0 0 var(--space-1);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
@@ -171,13 +171,13 @@ const emptyDesc = css`
 
 const emptyAction = css`
   /* empty-action */
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 `;
 
 const statWrap = css`
   /* stat */
   text-align: center;
-  padding: 0.5rem;
+  padding: var(--space-2);
 `;
 
 const statValueBase = css`
@@ -238,8 +238,9 @@ const metaPre = css`
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 0.75rem;
+  padding: var(--space-3);
   font-size: var(--text-sm);
+  position: relative;
   overflow: auto;
 `;
 
@@ -346,7 +347,7 @@ export const Alert: FC<{
 const alertTitle = css`
   /* alert-title */
   display: block;
-  margin-bottom: 0.2rem;
+  margin-bottom: var(--space-1);
   font-weight: var(--weight-semibold);
 `;
 
@@ -372,6 +373,19 @@ export const EmptyState: FC<{
     </div>
   );
 };
+
+const statGroup = css`
+  /* stat-group */
+  display: grid;
+  gap: var(--space-4);
+  /* Stays a row down to phone width; the grid breakpoint would stack three short stats. */
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+`;
+
+/** A row of `Stat`s: auto-fits columns, one gap, no grid utility. */
+export const StatGroup: FC<{ children?: unknown }> = ({ children }) => (
+  <div class={statGroup}>{children}</div>
+);
 
 /** Centered statistic value with a label and an optional value tone. */
 export const Stat: FC<{ label: string; value: string | number; tone?: StatTone }> = ({

@@ -674,8 +674,11 @@ describe("the review settings and the switch-off pass", () => {
   it("shows the review card to admins and saves the switch and the approvals", async () => {
     const booted = await boot();
     const html = await (await booted.page("admin", "/settings/review")).text();
-    expect(html).toContain("Review builds before they are accepted");
-    expect(html).toContain("Approvals required");
+    expect(html).toContain("approval");
+    expect(html).toContain("/settings/review/edit");
+    const formHtml = await (await booted.page("admin", "/settings/review/edit")).text();
+    expect(formHtml).toContain("Review builds before they are accepted");
+    expect(formHtml).toContain("Approvals required");
 
     const saved = await booted.page(
       "admin",

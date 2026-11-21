@@ -123,12 +123,12 @@ jobs:
           # graph cannot match a changed packages/*/src file to a story. When one of them changed,
           # render everything, also when the diff cannot be computed; a change confined to packages/app is traced.
           mode=""
-          if [ -z "$DIFF_BASE" ] || ! changed=$(git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/image' ':(top)packages/affected') || [ -n "$changed" ]; then
+          if [ -z "$DIFF_BASE" ] || ! changed=$(git diff --name-only "$DIFF_BASE" "$UPLOAD_SHA" -- ':(top)packages/core' ':(top)packages/affected') || [ -n "$changed" ]; then
             mode="--full"
           fi
           # shellcheck disable=SC2086
           npx --yes storyshelf@latest upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH" $mode | tee upload.log
-          build=$(grep -oE 'Build created: [0-9A-Z]+|\(build [0-9A-Z]+\)' upload.log | grep -oE '[0-9A-Z]{26}' | head -n1)
+          build=$(grep -oE '^ *Build: +[0-9A-Z]{26}|Build created: [0-9A-Z]+|\(build [0-9A-Z]+\)' upload.log | grep -oE '[0-9A-Z]{26}' | head -n1)
           base=$(jq -r .url .storybook/storyshelf.json)
           slug=$(jq -r .slug .storybook/storyshelf.json)
           {

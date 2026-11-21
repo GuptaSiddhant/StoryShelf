@@ -35,6 +35,8 @@ export interface UrlBuilder {
   project(slug: string): string;
   projectsNew(): string;
   buildsList(slug: string): string;
+  /** The builds page form that cancels older unfinished builds (`POST`, a page route). */
+  buildsCancel(slug: string): string;
   /** The one build page (overview and review). `GET /projects/:slug/builds/:id` still redirects to it for old links. */
   build(slug: string, buildId: string): string;
   buildDiff(slug: string, buildId: string): string;
@@ -111,6 +113,7 @@ export function createUrlBuilder(baseUrl: string, contentHosts?: string): UrlBui
     project: (slug) => `${root}/projects/${slug}`,
     projectsNew: () => `${root}/projects/new`,
     buildsList: (slug) => `${root}/projects/${slug}/builds`,
+    buildsCancel: (slug) => `${root}/projects/${slug}/builds/cancel`,
     build: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     buildDiff: (slug, buildId) => `${root}/projects/${slug}/builds/${buildId}/diff`,
     snapshot: (slug, buildId, snapshotId) =>

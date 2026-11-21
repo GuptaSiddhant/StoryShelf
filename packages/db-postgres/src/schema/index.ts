@@ -27,6 +27,10 @@ import {
   designNodes as designNodesTable,
 } from "./design.ts";
 import {
+  gitConnections as gitConnectionsTable,
+  gitRepositoryLinks as gitRepositoryLinksTable,
+} from "./git-connection.ts";
+import {
   aiBudgetAlerts as aiBudgetAlertsTable,
   aiUsage as aiUsageTable,
   insights as insightsTable,
@@ -76,6 +80,7 @@ export { webhooks } from "./webhook.ts";
 export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
 export { notificationChannels, notificationSubscriptions } from "./notification.ts";
 export { contentUses } from "./content-uses.ts";
+export { gitConnections, gitRepositoryLinks } from "./git-connection.ts";
 
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
@@ -116,6 +121,8 @@ export type { NotificationChannel, NotificationSubscription } from "./notificati
 export type { Baseline } from "./baseline.ts";
 /** Content ref row for deduplicated assets. */
 export type { ContentUse } from "./content-uses.ts";
+/** Git connection and repository link rows. */
+export type { GitConnection, GitRepositoryLink } from "./git-connection.ts";
 
 /** Full Drizzle schema object passed to the database client. */
 export const schema: {
@@ -152,6 +159,8 @@ export const schema: {
   projectMembers: AnyPgTable;
   projectGroupMappings: AnyPgTable;
   contentUses: AnyPgTable;
+  gitConnections: AnyPgTable;
+  gitRepositoryLinks: AnyPgTable;
 } = {
   projects: projectsTable,
   builds: buildsTable,
@@ -186,6 +195,8 @@ export const schema: {
   projectMembers: projectMembersTable,
   projectGroupMappings: projectGroupMappingsTable,
   contentUses: contentUsesTable,
+  gitConnections: gitConnectionsTable,
+  gitRepositoryLinks: gitRepositoryLinksTable,
 };
 
 /** The full database schema type. */

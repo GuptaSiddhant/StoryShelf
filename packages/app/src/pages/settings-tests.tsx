@@ -18,7 +18,7 @@ export function renderSettingsTests(
   formState?: { globalError?: string },
 ): unknown {
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Interaction and accessibility tests</SectionTitle>

@@ -38,7 +38,8 @@ export const comparisonCard = css`
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  @media (max-width: 720px) {
+  box-shadow: var(--shadow);
+  @media (max-width: 880px) {
     & {
       padding: var(--space-3) var(--space-3) 0;
     }
@@ -73,9 +74,50 @@ export const filmstrip = css`
   box-shadow: var(--shadow);
   @media (max-width: 1024px) {
     & {
-      position: static;
+      position: relative;
+      top: auto;
       max-height: none;
     }
+  }
+  /* Phones: the list sits behind the toggle, closed until it is checked. */
+  @media (max-width: 880px) {
+    & > input:not(:checked) ~ :is([data-film-head], [data-diff-nav]) {
+      display: none;
+    }
+  }
+`;
+
+/** The phone toggle: a visually hidden checkbox plus its label, shown only at 880px and below. */
+export const filmToggleInput = css`
+  /* film-toggle-input */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+`;
+
+export const filmToggleLabel = css`
+  /* film-toggle-label */
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  @media (max-width: 880px) {
+    & {
+      display: flex;
+    }
+  }
+  input:focus-visible + & {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  input:checked + & {
+    border-bottom: 1px solid var(--border);
   }
 `;
 
@@ -89,9 +131,16 @@ export const filmstripHead = css`
 
 export const filmstripList = css`
   /* filmstrip-list */
+  /* Positioned so a .visually-hidden (absolute) label inside a scroller is clipped with it. */
+  position: relative;
   overflow: auto;
   overscroll-behavior: contain;
-  @media (max-width: 1024px) {
+  @media (max-width: 880px) {
+    & {
+      max-height: 50vh;
+    }
+  }
+  @media (min-width: 881px) and (max-width: 1024px) {
     & {
       display: flex;
       overflow-x: auto;
@@ -103,7 +152,7 @@ export const filmstripList = css`
 export const filmGroup = css`
   /* film-group */
   display: block;
-  @media (max-width: 1024px) {
+  @media (min-width: 881px) and (max-width: 1024px) {
     & {
       display: contents;
     }
@@ -124,7 +173,7 @@ export const filmGroupHead = css`
   font-weight: var(--weight-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  @media (max-width: 1024px) {
+  @media (min-width: 881px) and (max-width: 1024px) {
     & {
       flex: none;
       align-items: center;
@@ -146,7 +195,7 @@ export const filmItem = css`
   grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: center;
-  min-height: 44px;
+  min-height: var(--control-md);
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   border-left: 3px solid transparent;
@@ -161,7 +210,7 @@ export const filmItem = css`
   &[data-status="rejected"] {
     color: var(--text-secondary);
   }
-  @media (max-width: 1024px) {
+  @media (min-width: 881px) and (max-width: 1024px) {
     & {
       flex: none;
       width: 240px;
@@ -181,7 +230,7 @@ export const filmItemActive = css`
   &:hover {
     background: var(--accent-wash);
   }
-  @media (max-width: 1024px) {
+  @media (min-width: 881px) and (max-width: 1024px) {
     & {
       border-left-color: transparent;
       border-top-color: var(--accent);
@@ -293,7 +342,7 @@ export const actionBar = css`
   background: var(--surface-card);
   border-top: 1px solid var(--border-subtle);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  @media (max-width: 720px) {
+  @media (max-width: 880px) {
     & {
       margin: 0 calc(var(--space-3) * -1);
       padding: var(--space-2) var(--space-3);
@@ -338,7 +387,7 @@ export const actionHints = css`
 export const actionKey = css`
   /* review-action-key */
   display: inline-flex;
-  @media (max-width: 720px) {
+  @media (max-width: 880px) {
     & {
       display: none;
     }

@@ -32,8 +32,8 @@ const shellSidebar = css`
   .sidebar__brand {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    min-height: 40px;
+    gap: var(--space-3);
+    min-height: var(--control-md);
     padding: 0 var(--space-2);
     color: var(--text-primary);
     font-weight: var(--weight-semibold);
@@ -62,7 +62,7 @@ const shellSidebar = css`
   .sidebar__nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
     flex: 1;
     min-height: 0;
     overflow-x: hidden;
@@ -81,9 +81,9 @@ const shellSidebar = css`
   .sidebar__link {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    min-height: 38px;
-    padding: 0.4rem var(--space-3);
+    gap: var(--space-3);
+    min-height: var(--control-sm);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius);
     color: var(--text-secondary);
     font-size: var(--text-base);
@@ -114,7 +114,7 @@ const shellSidebar = css`
   .sidebar__group {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
   }
   .sidebar__group[data-folded] {
     display: none;
@@ -173,9 +173,9 @@ const shellSidebar = css`
     appearance: none;
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    min-height: 36px;
-    padding: 0.4rem var(--space-3);
+    gap: var(--space-3);
+    min-height: var(--control-sm);
+    padding: var(--space-2) var(--space-3);
     border: 0;
     border-radius: var(--radius);
     background: transparent;
@@ -204,7 +204,7 @@ const shellSidebar = css`
       top: 50%;
       z-index: 70;
       transform: translateY(-50%);
-      padding: 0.25rem 0.5rem;
+      padding: var(--space-1) var(--space-2);
       border-radius: var(--radius-sm);
       background: var(--text-primary);
       color: var(--surface-base);

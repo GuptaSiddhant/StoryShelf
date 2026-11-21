@@ -182,7 +182,7 @@ export function renderSettingsCapture(
   const allowlist = parseModesAllowlist(project.modesAllowlist) ?? [];
   const action = `/projects/${project.slug}/settings/capture`;
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Browsers</SectionTitle>

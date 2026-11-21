@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { ShelfOptions } from "./config.ts";
+import { githubApp } from "./integrations/git/connections/define.ts";
+import { TEST_PRIVATE_KEY } from "./integrations/git/test-key.ts";
 import {
   DEFAULT_SCRATCH_DIR,
   resolveShelfOptions,
@@ -46,6 +48,18 @@ describe("resolveShelfOptions", () => {
     const design = makeFakeDesign("figma").provider;
     expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
       /design\[1\] \(".*"\): kind "figma" is already used/u,
+    );
+  });
+
+  it("checks the configured git connections and keeps them (ADR 0054)", () => {
+    const app = githubApp({ id: "gh", appId: 1, privateKey: TEST_PRIVATE_KEY });
+    const git = {
+      connections: [app],
+      links: [{ connection: "gh", project: "web", repository: "a/b" }],
+    };
+    expect(resolveShelfOptions({ ...base, git }).git).toBe(git);
+    expect(() => resolveShelfOptions({ ...base, git: { connections: [app, app] } })).toThrow(
+      /configured twice/u,
     );
   });
 

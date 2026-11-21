@@ -5,7 +5,6 @@ import {
   createClient,
   normalizeBaseUrl,
   postForm,
-  postFormWithProgress,
   postJson,
   RequestError,
 } from "./client.ts";
@@ -20,37 +19,6 @@ describe("normalizeBaseUrl", () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-});
-
-describe("postFormWithProgress", () => {
-  it("posts the form and returns the parsed JSON response", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: "01JABC" }, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const form = new FormData();
-    form.set("gitSha", "abc123");
-    form.set("gitBranch", "main");
-
-    const result = await postFormWithProgress<{ id: string }>(
-      "https://shelf.test/api/v1/projects/demo/builds",
-      form,
-      { authorization: "Bearer token" },
-    );
-
-    expect(result.id).toBe("01JABC");
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://shelf.test/api/v1/projects/demo/builds",
-      expect.objectContaining({ method: "POST", body: form }),
-    );
-  });
-
-  it("throws when the server responds with an error", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 400 })));
-    const form = new FormData();
-
-    await expect(
-      postFormWithProgress("https://shelf.test/projects/demo/builds", form),
-    ).rejects.toThrow(/Request failed \(400\): boom/u);
-  });
 });
 
 describe("skip calls", () => {
@@ -207,7 +175,7 @@ describe("server url forms", () => {
       "fetch",
       vi.fn().mockImplementation(async () => Response.json(body, { status: 413 })),
     );
-    await expect(postFormWithProgress("https://shelf.test/x", new FormData())).rejects.toThrow(
+    await expect(postForm("https://shelf.test/x", new FormData())).rejects.toThrow(
       "Request failed (413): Upload too large",
     );
   });
@@ -257,10 +225,6 @@ describe("failed posts show the server's message", () => {
   const posts: [string, () => Promise<unknown>][] = [
     ["postJson", async () => await postJson("https://shelf.test/x", { a: 1 })],
     ["postForm", async () => await postForm("https://shelf.test/x", new FormData())],
-    [
-      "postFormWithProgress",
-      async () => await postFormWithProgress("https://shelf.test/x", new FormData()),
-    ],
   ];
 
   for (const [name, post] of posts) {
@@ -303,4 +267,44 @@ describe("apiErrorText", () => {
       expect(apiErrorText(body)).toBe(body);
     }
   });
+});
+
+describe("builds.get", () => {
+  it("reads one build with the bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: "b1", status: "capturing" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const state = await createClient("https://shelf.test", "tok").projects.builds.get("demo", "b1");
+    expect(state.status).toBe("capturing");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://shelf.test/api/v1/projects/demo/builds/b1");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer tok" });
+  });
+
+  it("keeps Retry-After seconds on a throttled answer", async () => {
+    const throttled = new Response("{}", { status: 429, headers: { "retry-after": "7" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(throttled));
+    const error = await createClient("https://shelf.test")
+      .projects.builds.get("demo", "b1")
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RequestError);
+    expect((error as RequestError).retryAfterMs).toBe(7000);
+  });
+
+  it.each([{}, { "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" }])(
+    "has no retryAfterMs without a usable header (%j)",
+    async (headers) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response("{}", { status: 503, headers: headers as Record<string, string> }),
+          ),
+      );
+      const error = await createClient("https://shelf.test")
+        .projects.builds.get("demo", "b1")
+        .catch((caught: unknown) => caught);
+      expect((error as RequestError).retryAfterMs).toBeUndefined();
+    },
+  );
 });

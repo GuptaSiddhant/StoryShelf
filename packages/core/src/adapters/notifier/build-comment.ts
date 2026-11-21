@@ -6,7 +6,7 @@ import {
   removedSection,
 } from "./build-comment-changes.ts";
 import { actionLinks, approvalsText, headlineOf } from "./build-comment-headline.ts";
-import { utcTime } from "./build-comment-text.ts";
+import { commitCode, utcTime } from "./build-comment-text.ts";
 import type { BuildCommentInput } from "./build-comment-types.ts";
 
 export type {
@@ -62,7 +62,7 @@ function closingDetails(input: BuildCommentInput, history: number): string[] {
   }
   const lines = (input.earlier ?? [])
     .slice(0, history)
-    .map((build) => `- ${build.state} · [\`${build.sha}\`](${build.url})`);
+    .map((build) => `- ${build.state} · [${commitCode(build.sha)}](${build.url})`);
   const more = (input.earlier?.length ?? 0) - lines.length;
   const body = [...lines, ...(more > 0 ? [`- …and ${String(more)} more`] : [])];
   if (body.length === 0) {
@@ -82,7 +82,7 @@ function footer(input: BuildCommentInput): string {
         : "full capture";
   const time = utcTime(input.updatedAt);
   const parts = [
-    `Commit \`${input.sha}\``,
+    `Commit ${commitCode(input.sha)}`,
     ...(partial === undefined ? [] : [partial]),
     ...(time === undefined ? [] : [`updated ${time}`]),
   ];
@@ -98,6 +98,6 @@ export function skippedCommentMarkdown(input: {
   const compared =
     input.source === undefined
       ? "a build that no longer exists"
-      : `[\`${input.source.sha}\`](${input.source.url})`;
+      : `[${commitCode(input.source.sha)}](${input.source.url})`;
   return `### ⏭️ StoryShelf: Skipped: no story changed since ${compared} · [Build](${input.buildUrl})`;
 }

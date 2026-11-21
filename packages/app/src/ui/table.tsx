@@ -2,6 +2,7 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 const tableWrap = css`
   /* table */
+  position: relative;
   overflow: auto;
   background: var(--surface-card);
   border: 1px solid var(--border);
@@ -16,7 +17,7 @@ const tableWrap = css`
   & th,
   & td {
     text-align: left;
-    padding: 0.7rem 0.9rem;
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
   }
@@ -51,7 +52,7 @@ const tableDense = css`
   ${tableWrap}
   & th,
   & td {
-    padding: 0.4rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
   }
 `;
 

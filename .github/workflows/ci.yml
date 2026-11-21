@@ -3,7 +3,7 @@ name: CI
 # `verify` runs build/lint/test and smoke checks; `storybook-dev` opens every story of the app's
 # Storybook in the dev server (the production build tree-shakes what the dev server still runs);
 # `postgres-lifecycle` runs the build-reference contract against a real Postgres server (PGlite cannot
-# prove row locking); `website` builds the docs site and runs its link and accessibility checks; `capture` (capture.yml) runs the
+# prove row locking); `mysql-lifecycle` does the same against a real MySQL 8 server; `website` builds the docs site and runs its link and accessibility checks; `capture` (capture.yml) runs the
 # real-browser capture tests on storybook-9; `fly` (fly-dry-run.yml) is the deploy dry run.
 # Every Storybook fixture and the Fly dry run also run nightly (nightly.yml).
 #
@@ -48,6 +48,7 @@ jobs:
       full: ${{ steps.detect.outputs.full }}
       app: ${{ steps.detect.outputs.app }}
       postgres: ${{ steps.detect.outputs.postgres }}
+      mysql: ${{ steps.detect.outputs.mysql }}
       schema: ${{ steps.detect.outputs.schema }}
       force: ${{ steps.detect.outputs.force }}
     timeout-minutes: 5
@@ -78,6 +79,7 @@ jobs:
           full=true
           app=true
           postgres=true
+          mysql=true
           schema=true
           # `--force` (no turbo cache) for a manual run, a diff that failed, or a change to the
           # files that decide every task's hash. Otherwise a full run replays cached tasks; the
@@ -105,9 +107,12 @@ jobs:
             # The Postgres retention lifecycle: its package, the shared contract it must pass, and
             # the interface that contract exercises (a locking regression must not merge).
             if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
+            # The MySQL retention lifecycle, on the same terms.
+            if grep -qE '^(packages/db-mysql/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then mysql=true; else mysql=false; fi
             # A schema or migration file (any dialect's DDL, migrations, Drizzle schema, the boot
-            # comparison) or the previous-release job itself: ADR 0053, decision 8.
-            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
+            # comparison), the job queue, its consumer or an enqueue path (the mixed-queue test), or
+            # the previous-release job itself: ADR 0053, decision 8.
+            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|packages/core/src/capture/(db-queue|consumer|build-state)/|packages/core/src/(models|schema)/capture-job|packages/app/src/(jobs-setup|job-queue|review-request-data)\.ts|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
             if grep -qE "$FULL" changed.txt; then force=true; else force=false; fi
             # A release PR often changes only versions and the changelog (all ignorable above), but it
             # is the deploy gate: the Fly dry run and its browser test must run for it.
@@ -130,9 +135,10 @@ jobs:
           echo "full=$full" >> "$GITHUB_OUTPUT"
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "postgres=$postgres" >> "$GITHUB_OUTPUT"
+          echo "mysql=$mysql" >> "$GITHUB_OUTPUT"
           echo "schema=$schema" >> "$GITHUB_OUTPUT"
           echo "force=$force" >> "$GITHUB_OUTPUT"
-          echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres force=$force"
+          echo "website=$website heavy=$heavy full=$full app=$app postgres=$postgres mysql=$mysql force=$force"
 
   verify:
     name: verify
@@ -158,7 +164,7 @@ jobs:
       - name: Lint and format-check every tracked file (what the commit hook checks)
         # `verify` lints each package's own globs; this also covers `scripts/` and any file outside them.
         run: |
-          node --test scripts/check-files.test.mjs
+          node --test scripts/check-files.test.mjs scripts/audit-check.test.mjs
           nub run lint:files
 
       - name: Verify (build + Storybook + lint + test)
@@ -322,6 +328,53 @@ jobs:
             "SELECT pid, state, wait_event_type, wait_event, now() - query_start AS running, left(query, 80) AS query FROM pg_stat_activity WHERE datname = 'storyshelf_test'" || true
           echo "::endgroup::"
 
+  # The MySQL retention lifecycle (ADR 0039) against a real MySQL 8 server, every party on its own
+  # pool: nothing in-process can stand in for InnoDB's row locks or the named content locks.
+  mysql-lifecycle:
+    name: mysql-lifecycle
+    needs: changes
+    if: ${{ needs.changes.outputs.mysql == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: storyshelf_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Build the packages the adapter imports
+        run: nubx turbo run build --filter='@storyshelf/db-mysql^...'
+
+      - name: Run the build-reference contract against real MySQL
+        working-directory: packages/db-mysql
+        env:
+          LIVE_CLOUD: "1"
+          # The suite creates and drops scratch databases: this service container is disposable.
+          MYSQL_SCHEMA_MUTATION_TEST: "1"
+          MYSQL_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_test
+        run: nubx vitest run src/build-reference-lifecycle.live.test.ts
+
+      - name: Show the server's lock state after a failure
+        if: ${{ failure() }}
+        run: |
+          mysql -h 127.0.0.1 -uroot -ptest-password -e "SHOW ENGINE INNODB STATUS\G; SELECT * FROM performance_schema.data_lock_waits; SHOW FULL PROCESSLIST;" || true
+
   # ADR 0053, decision 8: the last published release must keep working on the schema this change
   # leaves. Installs that release from npm, migrates an empty database with it, migrates again with
   # this checkout (as the next minor), starts the release on the result and smokes it; Postgres also
@@ -360,7 +413,8 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Run the previous release against this schema
+      # Also the mixed-queue test (step 5): the previous release's consumers beside this code's.
+      - name: Run the previous release against this schema and queue
         env:
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
         run: bash scripts/previous-release.sh "${{ matrix.dialect }}"
@@ -628,6 +682,7 @@ jobs:
         verify,
         storybook-dev,
         postgres-lifecycle,
+        mysql-lifecycle,
         previous-release-db,
         website,
         capture,

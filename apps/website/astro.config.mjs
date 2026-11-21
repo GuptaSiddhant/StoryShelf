@@ -124,6 +124,8 @@ export default defineConfig({
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "When the browser changes", slug: "guides/browser-changes" },
+            { label: "Upgrading guide", slug: "guides/upgrading" },
             { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
@@ -254,16 +256,7 @@ export default defineConfig({
           label: "Packages",
           items: [
             { label: "Overview", slug: "packages" },
-            packageGroup("Core", [
-              "core",
-              "app",
-              "affected",
-              "image",
-              "observability",
-              "auth",
-              "ai",
-              "mcp",
-            ]),
+            packageGroup("Core", ["core", "app", "affected", "observability", "auth", "ai", "mcp"]),
             packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
             packageGroup("Storage", [
               "storage-local",
@@ -271,9 +264,7 @@ export default defineConfig({
               "storage-azure",
               "storage-gcs",
             ]),
-            packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
-            packageGroup("Design", ["design-figma"]),
-            packageGroup("Notifications", ["notify-chat", "notify-email", "notify-git"]),
+            packageGroup("Capture runners", ["runner-playwright"]),
           ],
         },
       ],

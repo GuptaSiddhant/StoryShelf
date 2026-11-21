@@ -18,6 +18,7 @@ import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { ProjectModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import type { JobQueue } from "./job-queue.ts";
 import { notifySystemWith } from "./notify.ts";
 import type { ServerRuntime } from "./runtime.ts";
@@ -45,6 +46,7 @@ export function setupBuildState(
     publicOrigin: async () => await runtime.publicOrigin.url(),
     flags: (project) => buildStateFlags(options.testing !== undefined, project),
     logger: runtime.logger.child({ component: "build-state" }),
+    gitConnections: gitConnectionsOf(options, runtime.config),
   };
   if (jobs === null) {
     return { publisher: createBuildStatePublisher({ deps }), handler: null };
@@ -100,7 +102,7 @@ async function alertAdmins(
       buildId: failure.buildId,
       error: failure.error,
       // The formatter prints `message` in an admin alert.
-      message: `${failure.provider} channel of ${project?.slug ?? "a project"} could not show build ${failure.buildId}: ${failure.error}`,
+      message: `${failure.provider} ${failure.linkId === undefined ? "channel" : "repository link"} of ${project?.slug ?? "a project"} could not show build ${failure.buildId}: ${failure.error}`,
     },
   );
 }

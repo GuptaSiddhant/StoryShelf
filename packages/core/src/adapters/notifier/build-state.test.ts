@@ -10,6 +10,7 @@ import {
   type BuildStateSource,
   type PublishingState,
 } from "./build-state.ts";
+import { ALL_OUTPUTS, type StateOutputs } from "./outputs.ts";
 
 const build = (overrides: Partial<BuildStateBuild> = {}): BuildStateBuild => ({
   id: "b1",
@@ -33,6 +34,7 @@ function run(
     prefix?: string;
     base?: string;
     supersededBy?: { id: string; sha: string };
+    outputs?: StateOutputs;
     extras?: BuildStateExtras;
   } = {},
 ) {
@@ -48,6 +50,7 @@ function run(
     supersededBy: overrides.supersededBy,
     extras: overrides.extras,
     source: overrides.source,
+    outputs: overrides.outputs,
   });
 }
 
@@ -546,6 +549,50 @@ describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
       statuses: [],
       comment: null,
     });
+  });
+});
+
+const names = (set: ReturnType<typeof run>) => set.statuses.map((status) => status.name);
+const commentOutputs = (comment: StateOutputs["comment"]): StateOutputs => ({
+  ...ALL_OUTPUTS,
+  comment,
+});
+
+describe("statusesForBuild: a repository link's outputs (ADR 0054, decision 10)", () => {
+  const reviewing: { build: Partial<BuildStateBuild>; changes: BuildStateChange[] } = {
+    build: { status: "reviewing" },
+    changes: [change(1)],
+  };
+
+  it("posts everything with every output on, as a per-project channel does", () => {
+    expect(run({ ...reviewing, outputs: ALL_OUTPUTS })).toEqual(run(reviewing));
+  });
+
+  it("always keeps the gate; the Storybook status and annotations can be off", () => {
+    const set = run({
+      ...reviewing,
+      outputs: { storybook: false, comment: "always", annotations: false },
+    });
+    expect(names(set)).toEqual(["testing"]);
+    expect(gate(set)?.annotations).toBeUndefined();
+    expect(set.comment).not.toBeNull();
+  });
+
+  it("keeps the comment always, only for a build with changes, or never", () => {
+    expect(run({ ...reviewing, outputs: commentOutputs("off") }).comment).toBeNull();
+    expect(run({ ...reviewing, outputs: commentOutputs("on-changes") }).comment).not.toBeNull();
+    expect(
+      run({ build: { status: "approved", changedCount: 0 }, outputs: commentOutputs("on-changes") })
+        .comment,
+    ).toBeNull();
+  });
+
+  it("keeps the review gate of a hosting-only project", () => {
+    const set = run({
+      flags: { testing: false, review: true },
+      outputs: { storybook: false, comment: "off", annotations: false },
+    });
+    expect(names(set)).toEqual(["review"]);
   });
 });
 

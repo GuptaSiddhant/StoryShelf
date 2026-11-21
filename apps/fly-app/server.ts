@@ -8,6 +8,7 @@ import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
 import { parseTrustProxy } from "@storyshelf/core/config";
 import {
   createEmailNotifier,
+  gitFromEnv,
   integrationsFromEnv,
   smtpPresetFromEnv,
 } from "@storyshelf/core/integrations";
@@ -67,11 +68,18 @@ function buildAuthUi(): AuthUiConfig | undefined {
     ["helpText", env["SHELF_AUTH_HELP_TEXT"]],
     ["footerText", env["SHELF_AUTH_FOOTER_TEXT"]],
   ];
-  const out: Record<string, string> = {};
+  const out: AuthUiConfig = {};
   for (const [key, value] of pairs) {
     if (value) {
-      out[key] = value;
+      Object.assign(out, { [key]: value });
     }
+  }
+  const href = env["SHELF_AUTH_PUBLIC_LINK_URL"];
+  if (href) {
+    out.publicLink = {
+      href,
+      label: env["SHELF_AUTH_PUBLIC_LINK_LABEL"] ?? "Browse without an account",
+    };
   }
   return Object.keys(out).length === 0 ? undefined : out;
 }
@@ -138,10 +146,20 @@ const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 // SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
 const integrations = integrationsFromEnv(env);
 
+// Git connections from the environment (ADR 0054, decision 9), so the demo's App can move to a
+// configured connection: SHELF_GITHUB_APP_ID + SHELF_GITHUB_APP_PRIVATE_KEY[_FILE], and so on. Unset,
+// there are none and the demo's deployed secrets are untouched.
+const git = gitFromEnv(env);
+shelfLogger.info(
+  { gitConnections: (git.connections ?? []).map((connection) => connection.id) },
+  "git connections",
+);
+
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
+  git,
   ai,
   design: integrations.design,
   notifications: {

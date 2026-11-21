@@ -101,7 +101,7 @@ describe("design settings", () => {
     const { app, design, credentials } = await seed();
     const page = await (await app.request("/projects/app/settings/capture")).text();
     expect(page).toContain("Design files");
-    expect(page).toContain("No design files linked.");
+    expect(page).toContain("No design files linked");
     expect(page).toContain("Component mapping");
 
     const file = await app.request(

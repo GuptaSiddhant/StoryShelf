@@ -34,6 +34,7 @@ import {
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
 import type { SettingsDesignData, SettingsDesignProvider } from "../pages/settings-design.tsx";
+import type { SettingsGitData } from "../pages/settings-git.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
@@ -52,6 +53,7 @@ import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
 import { isSiteAdmin } from "./insights.handlers.ts";
+import { loadGitSection } from "./settings-git-data.ts";
 import { loadSettingsInsights } from "./settings-insights.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
@@ -68,6 +70,7 @@ export interface SettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  git: SettingsGitData | null;
 }
 
 /** Tokens without hashes for the settings UI. */
@@ -326,7 +329,15 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
   const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
-  return { project, ...inventory, ...notifications, ...linksSection, design, isAdmin };
+  return {
+    project,
+    ...inventory,
+    ...notifications,
+    ...linksSection,
+    design,
+    isAdmin,
+    git: await loadGitSection(project),
+  };
 }
 
 /**
@@ -366,6 +377,8 @@ export async function renderSettingsPage(
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
+      canDeleteProject: data.isAdmin && isSiteAdmin(c),
+      git: data.git ?? undefined,
       notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
       targets: await runnerTargets(),
@@ -383,6 +396,7 @@ function unofferedFor(c: Context): SettingsUnoffered | undefined {
   return {
     notifications: unofferedIntegrations("notifiers"),
     design: unofferedIntegrations("design"),
+    git: true,
   };
 }
 
@@ -395,15 +409,6 @@ function aiSettingsData(c: Context): SettingsAiData {
     defaultProfile: ai?.defaultProfile() ?? "",
     isSiteAdmin: isSiteAdmin(c),
   };
-}
-
-/** Find a project by slug or throw 404. */
-export async function findProject(slug: string): Promise<Project> {
-  const project = await new ProjectModel(getStore().db).getBySlug(slug);
-  if (!project) {
-    notFound("Project not found");
-  }
-  return project;
 }
 
 /** Trim a form value to a string, dropping files and blanks. */

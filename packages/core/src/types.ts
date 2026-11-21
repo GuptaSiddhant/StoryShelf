@@ -6,6 +6,7 @@ export {
   TERMINAL_BUILD_STATUSES,
   type BuildStatus,
 } from "./lifecycle/build-lifecycle.ts";
+export { selectOlderUnfinished, type UnfinishedCandidate } from "./lifecycle/older-unfinished.ts";
 
 /** All review statuses a snapshot can carry. */
 export const SNAPSHOT_STATUSES = [

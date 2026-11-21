@@ -138,7 +138,7 @@ Amended by the owner on 2026-11-10.
   - Azure Database for PostgreSQL, Flexible Server.
 
   Postgres has the fenced retention lifecycle (ADR 0039) and runs in the nightly cloud jobs. MySQL
-  is not offered by the modules; an operator can still wire it up by hand. Each module also accepts
+  (which has it on MySQL 8, #376) is not offered by the modules; an operator can still wire it up by hand. Each module also accepts
   an existing database URL instead of creating one.
 
 - **Capture runs in the app's container.** The image includes Playwright's Chromium, and the default

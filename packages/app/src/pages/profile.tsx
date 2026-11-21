@@ -14,9 +14,11 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  RelativeTime,
   Table,
   VStack,
   statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -104,8 +106,10 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                   <div>{key.name ?? "Unnamed key"}</div>
                   <div class={profileMeta}>{key.deviceType}</div>
                 </td>
-                <td>{new Date(key.createdAt).toLocaleDateString()}</td>
                 <td>
+                  <Time value={key.createdAt} format="date" />
+                </td>
+                <td class="nowrap">
                   <HStack>
                     {key.backedUp ? <Badge>Synced</Badge> : null}
                     <form
@@ -140,8 +144,10 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
           <span class="mono">{session.ipAddress ?? "—"}</span>
         </div>
       </td>
-      <td>{new Date(session.createdAt).toLocaleString()}</td>
-      <td>
+      <td class="nowrap">
+        <RelativeTime value={session.createdAt} />
+      </td>
+      <td class="nowrap">
         {session.current ? (
           <Badge>This device</Badge>
         ) : (
@@ -258,8 +264,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             </VStack>
           </HStack>
           <div class={profileMeta}>
-            Member since {dbUser?.createdAt ? new Date(dbUser.createdAt).toLocaleDateString() : "—"}{" "}
-            · Last login {dbUser?.lastLoginAt ? new Date(dbUser.lastLoginAt).toLocaleString() : "—"}
+            Member since {dbUser?.createdAt ? <Time value={dbUser.createdAt} format="date" /> : "—"}{" "}
+            · Last login {dbUser?.lastLoginAt ? <Time value={dbUser.lastLoginAt} /> : "—"}
           </div>
         </VStack>
       </Card>

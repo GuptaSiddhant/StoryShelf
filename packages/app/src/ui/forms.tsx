@@ -34,8 +34,8 @@ const fieldLabel = css`
 const fieldInput = css`
   /* field-input */
   width: 100%;
-  min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-md);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface-card);
@@ -193,6 +193,8 @@ const FieldAssistant: FC<{ name: string; error: string | undefined; hint: string
 export const Field: FC<{
   label: string;
   name: string;
+  /** The element id when it must differ from the name (the same name in several option groups). */
+  id?: string;
   type?: string;
   value?: string;
   placeholder?: string;
@@ -210,6 +212,7 @@ export const Field: FC<{
 }> = ({
   label,
   name,
+  id,
   type = "text",
   value,
   placeholder,
@@ -225,15 +228,16 @@ export const Field: FC<{
   hint,
   autocomplete,
 }) => {
+  const domId = id ?? name;
   return (
     <div class={layout === "inline" ? fieldWrapInline : fieldWrap}>
-      <label class={fieldLabel} for={name}>
+      <label class={fieldLabel} for={domId}>
         {label}
         {required ? <span aria-hidden="true"> *</span> : null}
       </label>
       <input
         class={error ? fieldInputError : fieldInput}
-        id={name}
+        id={domId}
         name={name}
         type={type}
         value={value}
@@ -246,10 +250,10 @@ export const Field: FC<{
         max={max}
         step={step}
         aria-invalid={error ? "true" : undefined}
-        aria-describedby={fieldDescribedBy(name, error, hint)}
+        aria-describedby={fieldDescribedBy(domId, error, hint)}
         autocomplete={autocomplete}
       />
-      <FieldAssistant name={name} error={error} hint={hint} />
+      <FieldAssistant name={domId} error={error} hint={hint} />
     </div>
   );
 };

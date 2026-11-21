@@ -98,7 +98,7 @@ jobs:
 
       - name: Run git suites (hermetic + live)
         if: matrix.suite == 'git'
-        # The git integrations live in core (ADR 0049); @storyshelf/notify-git is only a shim.
+        # The git integrations live in core (ADR 0049).
         # Runs the git folder directly (no turbo, so never a cached result).
         working-directory: packages/core
         run: nubx vitest run src/integrations/git/

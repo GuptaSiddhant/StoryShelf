@@ -1,5 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
+import { onAPhone } from "../../.storybook/page.tsx";
 import { jsxStory } from "../../.storybook/render.tsx";
 import { Segmented, VStack } from "./components.tsx";
 
@@ -29,3 +30,20 @@ export const AsLinks = jsxStory(() => (
     />
   </VStack>
 ));
+
+/** More items than a 375px phone holds: the row scrolls and its right edge fades (#1133). */
+export const OverflowingOnAPhone = onAPhone(
+  jsxStory(() => (
+    <Segmented
+      label="Build status"
+      items={[
+        { label: "All 12", value: "all", href: "#all", active: true },
+        { label: "Reviewing 3", value: "reviewing", href: "#reviewing" },
+        { label: "Approved 4", value: "approved", href: "#approved" },
+        { label: "Failed 1", value: "failed", href: "#failed" },
+        { label: "Cancelled 2", value: "cancelled", href: "#cancelled" },
+        { label: "Skipped 2", value: "skipped", href: "#skipped" },
+      ]}
+    />
+  )),
+);

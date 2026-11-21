@@ -19,6 +19,16 @@ vi.mock("../../config.ts", async (importOriginal) => ({
   detectPackageRunner: async (): Promise<"npm"> => await Promise.resolve("npm"),
 }));
 
+vi.mock("../../output.ts", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../output.ts")>();
+  // A fixed clock and a non-terminal reporter, whatever the terminal, `CI` and `NO_COLOR` are.
+  return {
+    ...original,
+    createReporter: (): ReturnType<typeof original.createReporter> =>
+      original.createReporter({ interactive: false, color: false, now: () => 0 }),
+  };
+});
+
 import prompts from "prompts";
 import { runServerInit } from "./init.ts";
 

@@ -18,10 +18,12 @@ export type { NavConfig };
 export type RenderedContent = string | Promise<string>;
 
 /**
- * Page frame: `default` is a readable column, `wide` uses the full viewport,
- * `bare` drops the app chrome (sign-in, invites).
+ * Page frame, which owns the content width so the header, tab rule and body share one edge:
+ * `form` is a narrow column (880px: settings and other forms), `default` a list column (1200px),
+ * `wide` the full viewport (workspaces such as the review page), `bare` drops the app chrome
+ * (sign-in, invites).
  */
-type PageLayout = "default" | "wide" | "bare";
+type PageLayout = "form" | "default" | "wide" | "bare";
 
 const shellRoot = css`
   /* shell */
@@ -42,6 +44,11 @@ const shellContent = css`
   margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-8);
   min-width: 0;
+  /* The page column: header and blocks sit one gap apart, no per-block margins. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-4);
   @media (max-width: 880px) {
     & {
       padding: var(--space-4);
@@ -54,6 +61,18 @@ const shellContentWide = css`
   ${shellContent}
   max-width: none;
 `;
+
+const shellContentForm = css`
+  /* shell-content-form */
+  ${shellContent}
+  max-width: 880px;
+`;
+
+const CONTENT_CLASS = {
+  form: shellContentForm,
+  default: shellContent,
+  wide: shellContentWide,
+};
 
 const shellBackdrop = css`
   /* shell-backdrop */
@@ -96,7 +115,7 @@ const AppChrome: FC<{
   nav?: NavConfig;
   name: string;
   logo: string;
-  layout: PageLayout;
+  layout: Exclude<PageLayout, "bare">;
   children?: unknown;
 }> = ({ nav, name, logo, layout, children }) => (
   <>
@@ -104,11 +123,7 @@ const AppChrome: FC<{
       <Sidebar nav={nav} name={name} logo={logo} />
       <div data-shell-main>
         <TopBar nav={nav} />
-        <main
-          id="main-content"
-          class={layout === "wide" ? shellContentWide : shellContent}
-          tabindex={-1}
-        >
+        <main id="main-content" class={CONTENT_CLASS[layout]} tabindex={-1}>
           {children}
         </main>
       </div>
