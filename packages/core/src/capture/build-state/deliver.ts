@@ -19,6 +19,7 @@ import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
 import { publishingOfBuild } from "../publish/published.ts";
+import { extrasOf } from "./comment-extras.ts";
 import { deliverToLink, linkTargets } from "./link-target.ts";
 import type { BuildStateDeps, SkipReason, StateTarget, TargetRef } from "./types.ts";
 
@@ -74,27 +75,40 @@ export async function loadBuild(
   return build && project ? { build, project } : null;
 }
 
+/** What `target` shows of the build: the statuses, the annotations and the comment. */
+async function statesOf(
+  deps: BuildStateDeps,
+  loaded: { build: Build; project: Project },
+  where: { target: StateTarget; origin: string },
+): Promise<ReturnType<typeof statusesForBuild>> {
+  const { build, project } = loaded;
+  const flags = deps.flags(project);
+  const snapshots = await snapshotsOf(deps, build, flags.testing);
+  return statusesForBuild({
+    build,
+    projectSlug: project.slug,
+    prefix: channelPrefix(where.target.channel),
+    urls: createUrlBuilder(where.origin, contentHostSuffix(deps.config)),
+    flags,
+    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
+    source: (await skipSourceOf(deps, build)) ?? undefined,
+    approvals: await approvalsOf(deps, build, project),
+    changes: snapshots.changes,
+    extras: await extrasOf(deps, { build, testing: flags.testing, snapshots: snapshots.all }),
+    supersededBy: await supersededByOf(deps, build),
+    outputs: where.target.link?.outputs,
+  });
+}
+
 /** Write `target`'s view of the build, linking to `origin`; throws on a refused status. */
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
   where: { target: StateTarget; origin: string; signal?: AbortSignal | undefined },
 ): Promise<void> {
-  const { build, project } = loaded;
-  const { target, origin } = where;
-  const states = statusesForBuild({
-    build,
-    projectSlug: project.slug,
-    prefix: channelPrefix(target.channel),
-    urls: createUrlBuilder(origin, contentHostSuffix(deps.config)),
-    flags: deps.flags(project),
-    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
-    source: (await skipSourceOf(deps, build)) ?? undefined,
-    approvals: await approvalsOf(deps, build, project),
-    changes: await changesOf(deps, build, project),
-    supersededBy: await supersededByOf(deps, build),
-    outputs: target.link?.outputs,
-  });
+  const { build } = loaded;
+  const { target } = where;
+  const states = await statesOf(deps, loaded, where);
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
     return;
@@ -226,14 +240,17 @@ async function approvalsOf(
   };
 }
 
-/** The build's snapshots for the annotations; read only when `testing` is on and something changed. */
-async function changesOf(
+/** The build's snapshots (with testing on): `changes` for the annotations only when something changed. */
+async function snapshotsOf(
   deps: BuildStateDeps,
   build: Build,
-  project: Project,
-): Promise<Snapshot[] | undefined> {
-  const wanted = deps.flags(project).testing && build.changedCount > 0;
-  return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
+  testing: boolean,
+): Promise<{ all: Snapshot[] | undefined; changes: Snapshot[] | undefined }> {
+  const all =
+    testing && build.snapshotCount > 0
+      ? await new SnapshotModel(deps.db).listByBuild(build.id)
+      : undefined;
+  return { all, changes: build.changedCount > 0 ? all : undefined };
 }
 
 /** The newer build that cancelled this one (ADR 0045), or undefined for any other build. */

@@ -42,9 +42,10 @@ const SKIPPED = new Set([
 /** The source file of an export: its `source` condition, else `./dist/x.js` -> `./src/x.ts` when that exists. */
 function sourceOf(dir, target) {
   if (typeof target === "object" && typeof target.source === "string") return target.source;
+  const built = typeof target === "object" ? target.default : target;
   const file =
-    typeof target === "string"
-      ? target.replace(/^\.\/dist\/(?<name>.+)\.js$/u, "./src/$<name>.ts")
+    typeof built === "string"
+      ? built.replace(/^\.\/dist\/(?<name>.+)\.js$/u, "./src/$<name>.ts")
       : "";
   return file.startsWith("./src/") && existsSync(join(root, dir, file)) ? file : undefined;
 }

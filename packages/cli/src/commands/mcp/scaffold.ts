@@ -15,12 +15,13 @@ export interface McpScaffoldAnswers {
   docker: boolean;
 }
 
-/** `src/index.ts`: stdio runs the package bin on import; http mounts the handler on `/mcp`. */
+/** `src/index.ts`: stdio is a note (`npm start` runs the package bin); http mounts the handler on `/mcp`. */
 export function generateMcpEntry(transport: McpTransport): string {
   if (transport === "stdio") {
     return [
-      `// Serves MCP over stdio. Configuration comes from STORYSHELF_URL / STORYSHELF_TOKEN / STORYSHELF_SLUG.`,
-      `import "@storyshelf/mcp";`,
+      `// Serves MCP over stdio: \`npm start\` runs the \`storyshelf-mcp\` bin of @storyshelf/mcp.`,
+      `// Configuration comes from STORYSHELF_URL / STORYSHELF_TOKEN / STORYSHELF_SLUG.`,
+      `// The package root is not importable: importing it would only start the CLI.`,
       ``,
     ].join("\n");
   }
@@ -52,7 +53,10 @@ export function generateMcpPackageJson(
       private: true,
       description: "StoryShelf MCP server.",
       engines: { node: ">=24" },
-      scripts: { start: `node ${MCP_ENTRY}`, typecheck: "tsc" },
+      scripts: {
+        start: answers.transport === "stdio" ? "storyshelf-mcp" : `node ${MCP_ENTRY}`,
+        typecheck: "tsc",
+      },
       dependencies: { "@storyshelf/mcp": __PKG_VERSION__ ?? "0.0.0" },
       devDependencies,
     },
