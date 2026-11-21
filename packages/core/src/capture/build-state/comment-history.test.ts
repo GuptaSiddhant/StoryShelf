@@ -112,6 +112,23 @@ describe("removed stories", () => {
     expect(body).toContain("…and 140 more");
   });
 
+  it("leaves the list out, and still delivers, when a catalog holds a malformed entry", async () => {
+    const w = await world();
+    const baseline = await approvedBefore(w, "base111");
+    const current = { id: await buildAt(w, "new222", "feature/x") };
+    await writeCatalog(w, baseline, [entry("a--one", "Old", "One")]);
+    await writeCatalog(w, current.id, [null as unknown as object, "text" as unknown as object]);
+    await review(w, current.id);
+    await expect(
+      deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId }),
+    ).resolves.toBe("delivered");
+    const body = w.git.calls.flatMap((c) =>
+      c.target.kind === "comment" ? [c.target.markdown] : [],
+    )[0];
+    expect(body).toBeDefined();
+    expect(body).not.toContain("removed");
+  });
+
   it("names nothing while an index cannot be read", async () => {
     const w = await world();
     const baseline = await approvedBefore(w, "base111");

@@ -70,7 +70,16 @@ function storiesOf(entries: readonly CatalogEntry[]): Map<string, string> {
   );
 }
 
-/** The baseline's and this build's catalog entries; null while either cannot be read. */
+/** A stored entry is a story or docs entry with the fields the comparison reads; the file is not trusted. */
+function isEntry(entry: unknown): entry is CatalogEntry {
+  if (typeof entry !== "object" || entry === null) {
+    return false;
+  }
+  const { id, title, name } = entry as Record<string, unknown>;
+  return typeof id === "string" && typeof title === "string" && typeof name === "string";
+}
+
+/** The baseline's and this build's catalog entries; null while either cannot be read or is malformed. */
 async function entriesOf(
   deps: BuildStateDeps,
   where: Where,
@@ -85,7 +94,10 @@ async function entriesOf(
     readCatalog(storage, project.id, baseline.id),
     readCatalog(storage, project.id, build.id),
   ]);
-  return was === null || now === null ? null : { was: was.entries, now: now.entries };
+  if (was === null || now === null || !was.entries.every(isEntry) || !now.entries.every(isEntry)) {
+    return null;
+  }
+  return { was: was.entries, now: now.entries };
 }
 
 /**
