@@ -33,15 +33,13 @@ describe("generateServer", () => {
 
   it("always declares dataDir: it is the capture scratch directory", () => {
     const code = server({ database: "postgres", storage: "s3" });
-    expect(code).toContain('const dataDir = process.env.DATA_DIR || "./data";');
+    expect(code).toContain('const dataDir = process.env.SHELF_DATA_DIR || "./data";');
     expect(code).toContain("scratchDir: dataDir,");
   });
 
-  it("wires the bootstrap admin token from STORYSHELF_ADMIN_TOKEN, with or without auth", () => {
+  it("wires the bootstrap admin token from SHELF_ADMIN_TOKEN, with or without auth", () => {
     for (const auth of ["none", "password"] as const) {
-      expect(server({ auth })).toContain(
-        "adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined,",
-      );
+      expect(server({ auth })).toContain("adminToken: process.env.SHELF_ADMIN_TOKEN || undefined,");
     }
   });
 
@@ -109,15 +107,8 @@ describe("generateServer", () => {
     const code = server({ auth: "oauth", deployTarget: "local" });
     expect(code).toContain("createShelfAuth");
     expect(code).toContain("keycloakPreset");
-    expect(code).toContain("OIDC_ISSUER");
+    expect(code).toContain("SHELF_OIDC_ISSUER");
     expect(code).not.toContain("cognitoPreset");
-  });
-
-  it("emits the Cognito preset for oauth on AWS", () => {
-    const code = server({ auth: "oauth", deployTarget: "aws" });
-    expect(code).toContain("cognitoPreset");
-    expect(code).toContain("COGNITO_USER_POOL_ID");
-    expect(code).not.toContain("keycloakPreset");
   });
 
   it("puts the D1 binding stub before the database", () => {
@@ -128,15 +119,15 @@ describe("generateServer", () => {
 
   it("stops with one line when a required variable is unset (local accounts)", () => {
     const code = server({ auth: "password" });
-    expect(code).toContain('["SECRET", "PUBLIC_BASE_URL", "AUTH_PASSWORD"]');
+    expect(code).toContain('["SHELF_SECRET", "SHELF_PUBLIC_BASE_URL", "SHELF_ADMIN_PASSWORD"]');
     expect(code).toContain("process.exit(1)");
     expect(code.indexOf("process.exit(1)")).toBeLessThan(code.indexOf("createShelfApp({"));
   });
 
-  it("passes PUBLIC_BASE_URL and the admin token into config", () => {
+  it("passes SHELF_PUBLIC_BASE_URL and the admin token into config", () => {
     const code = server({ auth: "none" });
-    expect(code).toContain("publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined");
-    expect(code).toContain("adminToken: process.env.STORYSHELF_ADMIN_TOKEN || undefined");
+    expect(code).toContain("publicBaseUrl: process.env.SHELF_PUBLIC_BASE_URL || undefined");
+    expect(code).toContain("adminToken: process.env.SHELF_ADMIN_TOKEN || undefined");
     expect(code).not.toContain("process.exit(1)");
   });
 });

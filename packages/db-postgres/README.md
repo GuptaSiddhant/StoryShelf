@@ -55,6 +55,27 @@ All providers speak the standard Postgres wire protocol. Pick the connection str
 | Neon                          | `postgres://user:pass@<neon-host>/db?sslmode=require`                                                               | `ssl: true`                                                                          | Serverless pooler — keep `max` low (e.g. `max: 5`); pooled endpoints via PgBouncer need `prepare: false`                        |
 | Azure Database for PostgreSQL | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require`                                 | `ssl: true`                                                                          | Microsoft Entra ID (IAM) via injected `client` with an access token; otherwise password auth works with default pooling         |
 
+## RDS and Aurora with IAM authentication
+
+`@storyshelf/db-postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token instead of a password, so there is nothing to rotate. Install the optional peers (`pg` and `@aws-sdk/rds-signer`); the standard AWS credential chain applies (ECS task role, instance role, web identity).
+
+```ts
+import { createRdsIamDatabase } from "@storyshelf/db-postgres/rds-iam";
+
+const database = createRdsIamDatabase({
+  host: "mydb.cluster-abc.eu-west-1.rds.amazonaws.com",
+  database: "storyshelf",
+  user: "storyshelf_app", // GRANT rds_iam TO storyshelf_app;
+  region: "eu-west-1",
+});
+```
+
+- **A fresh token for every new connection.** Tokens live 15 minutes; the pool asks for one each time it opens a connection, so it never reuses a stale one. An open connection stays valid after its token expires.
+- **The server certificate is verified by default.** The IAM token is a credential, so the preset checks the database's certificate against the Amazon RDS root certificates it bundles (AWS's global bundle, every region, and the GovCloud bundle for `us-gov-*`). Pass `ca` (PEM, or an array) to trust your own instead, for a proxy or a custom domain. There is no option to encrypt without verifying, because anyone who can intercept the connection could then take the token; a blank `ca` is refused. The server image reads `SHELF_DATABASE_CA` / `SHELF_DATABASE_CA_FILE` for this, the same variables it uses for `DATABASE_URL`.
+- **Tokens stay out of logs and errors.** A signer failure is reported without the token, and `redactSecrets` removes presigned `X-Amz-*` values.
+- **A missing `@aws-sdk/rds-signer` fails at startup** with an install hint.
+- The database user needs the `rds_iam` role and the task role needs `rds-db:connect` on the database user.
+
 ## Client injection (IAM and advanced TLS)
 
 When `client` is supplied, all other connection options are ignored and the caller owns the client lifecycle. Use this for IAM token refresh or pre-configured TLS:

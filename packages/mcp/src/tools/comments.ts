@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buildPath, type ToolDef } from "./types.ts";
 
-const project = z.string().optional().describe("Project slug (defaults to STORYSHELF_SLUG)");
+const project = z.string().optional().describe("Project slug (defaults to SHELF_SLUG)");
 const buildId = z.string().describe("Build id (ULID)");
 
 export const listComments: ToolDef = {

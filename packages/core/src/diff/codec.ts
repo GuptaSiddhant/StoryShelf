@@ -1,13 +1,13 @@
 /** Image codecs: how PNGs become raw RGBA pixels and back. The comparison itself is always pixelmatch. */
 
-/** Engine names accepted by `images.engine` and `STORYSHELF_IMAGE_ENGINE`. */
+/** Engine names accepted by `images.engine` and `SHELF_IMAGE_ENGINE`. */
 export const IMAGE_ENGINES = ["pngjs", "sharp"] as const;
 
 /** A codec that can decode, encode and downscale PNGs. */
 export type ImageEngine = (typeof IMAGE_ENGINES)[number];
 
 /** Environment variable that selects the engine when `images.engine` is not set. */
-export const IMAGE_ENGINE_ENV = "STORYSHELF_IMAGE_ENGINE";
+export const IMAGE_ENGINE_ENV = "SHELF_IMAGE_ENGINE";
 
 /** The engine used when nothing is configured: pure JavaScript, runs anywhere. */
 export const DEFAULT_IMAGE_ENGINE: ImageEngine = "pngjs";
@@ -36,7 +36,7 @@ export function isImageEngine(value: unknown): value is ImageEngine {
 }
 
 /**
- * The engine named by a raw setting (an option or the `STORYSHELF_IMAGE_ENGINE` value); blank or
+ * The engine named by a raw setting (an option or the `SHELF_IMAGE_ENGINE` value); blank or
  * missing means the default. An unknown name throws so a typo cannot silently fall back.
  */
 export function resolveImageEngine(raw: string | undefined): ImageEngine {

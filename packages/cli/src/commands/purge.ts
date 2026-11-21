@@ -1,5 +1,6 @@
 import { createClient } from "../client.ts";
 import { printLine } from "../output.ts";
+import { readSetting } from "../settings.ts";
 
 interface PurgeResponse {
   removedBuilds: number;
@@ -20,8 +21,7 @@ export interface PurgeOptions {
  * @param options - Purge command options.
  */
 export async function runPurge(options: PurgeOptions): Promise<void> {
-  const token =
-    options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"];
+  const token = options.token ?? readSetting(process.env, "SHELF_ADMIN_TOKEN");
   const client = createClient(options.url, token);
   const result = await client.projects.admin.purge({});
   const resultData = result as PurgeResponse;

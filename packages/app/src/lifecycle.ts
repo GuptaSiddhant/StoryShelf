@@ -92,16 +92,35 @@ async function stopConsumer(cell: LifecycleCell, graceMs: number | undefined): P
   await cell.consumerRun;
 }
 
-/** Wait for tracked boot tasks, bounded so a hung task can never block shutdown. */
-async function drainBackground(cell: LifecycleCell): Promise<void> {
+/**
+ * Wait for tracked boot tasks, bounded so a hung task can never block shutdown: by the cell's drain
+ * limit, and by `remainingMs` (what is left of the shutdown grace) when teardown has one.
+ */
+async function drainBackground(cell: LifecycleCell, remainingMs = Infinity): Promise<void> {
   const pending = Promise.allSettled(cell.background ?? []);
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, cell.drainMs ?? BACKGROUND_DRAIN_MS);
+    timer = setTimeout(
+      resolve,
+      Math.max(0, Math.min(cell.drainMs ?? BACKGROUND_DRAIN_MS, remainingMs)),
+    );
     timer.unref();
   });
   await Promise.race([pending, timeout]);
   clearTimeout(timer);
+}
+
+/**
+ * The consumer drain, then the boot-task wait, under one `graceMs` budget: the wait only gets what
+ * the job drain left of it, so a stopping host stays inside the platform's stop timeout.
+ */
+async function drainWithinGrace(cell: LifecycleCell, graceMs?: number): Promise<void> {
+  const startedAt = Date.now();
+  await stopConsumer(cell, graceMs);
+  await drainBackground(
+    cell,
+    graceMs === undefined ? undefined : graceMs - (Date.now() - startedAt),
+  );
 }
 
 function trackSettlement(cell: LifecycleCell, promise: Promise<AdapterSetupResult>): void {
@@ -442,8 +461,7 @@ function createLifecycle(
     },
     teardown: async (teardownOptions) => {
       timer?.stop();
-      await stopConsumer(cell, teardownOptions?.graceMs);
-      await drainBackground(cell);
+      await drainWithinGrace(cell, teardownOptions?.graceMs);
       await settleInsightJobs();
       await options.ai?.teardown();
       await shutdownDiffPool();

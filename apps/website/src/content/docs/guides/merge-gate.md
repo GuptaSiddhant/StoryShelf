@@ -29,7 +29,7 @@ With `testing` on, `<prefix>/testing` stays the only gate and review never adds 
 
 The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git channel's prefix (default `storyshelf`, so `storyshelf/testing`), and links to the build review page. Its description says whether review is still open. StoryShelf also posts `<prefix>/storybook` (the published Storybook, informational), which you should not require. Statuses follow the build's current state and are delivered durably with retries; see [Delivery](/guides/notifications/#git-channels-commit-statuses-and-check-runs). The name has no project slug: a repository that holds several projects gives each channel its own prefix (see [Several projects in one repo](#several-projects-in-one-repo)). Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
 
-> **A public URL is required.** Every status links to the build page, so nothing is posted, and the required check never appears, while the server has no [public origin](/guides/config/#public-origin). Set `PUBLIC_BASE_URL` (or confirm the detected origin on **System**: a detected address is not used until it is confirmed); until then **System** and the project's notification settings show "Notifications are paused until a public URL is set" and no channel is marked as failing.
+> **A public URL is required.** Every status links to the build page, so nothing is posted, and the required check never appears, while the server has no [public origin](/guides/config/#public-origin). Set `SHELF_PUBLIC_BASE_URL` (or confirm the detected origin on **System**: a detected address is not used until it is confirmed); until then **System** and the project's notification settings show "Notifications are paused until a public URL is set" and no channel is marked as failing.
 
 ## 1. Connect the git provider
 
@@ -40,7 +40,7 @@ Do this once per project. See the [CI guide](/guides/ci/#merge-gate) for the sho
    - GitHub: a token with `repo:status` scope.
    - GitLab: a token with `api` scope.
 
-The token is stored encrypted with the server `SECRET`, in the channel's secret like a chat webhook URL. It is separate from the CLI project token: the CLI token identifies a build, the status token writes to your repo.
+The token is stored encrypted with the server `SHELF_SECRET`, in the channel's secret like a chat webhook URL. It is separate from the CLI project token: the CLI token identifies a build, the status token writes to your repo.
 
 ### GitHub App checks
 
@@ -57,7 +57,7 @@ Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHu
 4. Open **Install App**, install it on the repository (or organization) and copy the **installation ID** from the URL of the installation's settings page (`…/settings/installations/<installation id>`).
 5. In **Project → Settings → Notifications → Add a git channel** choose GitHub, set **GitHub mode** to _Check runs (GitHub App)_, enter owner, repository, prefix, **App ID**, **Installation ID** and paste the whole PEM into **App private key**. Leave the token empty. Through the API: `"config": { "owner": "acme", "repo": "widgets", "mode": "checks", "appId": "123456", "installationId": "7654321" }` and the PEM as `"secret"`.
 
-The private key is stored encrypted with the server `SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
+The private key is stored encrypted with the server `SHELF_SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
 
 ### Server-wide connection from configuration
 
@@ -75,7 +75,7 @@ Setting only half of a connection, or both a secret and its `_FILE`, stops the s
 
 What StoryShelf reads is fixed and small: which pull request contains a commit, the pull request's own comments (to find its own), which installation covers a repository, the repository's numeric ID, and whether a commit is on the default branch. **It never reads your code, diffs or files**: captures come from the Storybook you upload, not from the git host. GitHub has no narrower permission for the branch check than **Contents: Read-only**, so the App requests it and only the comparison's status is read. Posting is limited by the permissions you give the connection: **Checks: Read and write** is required for the gate; **Pull requests** and **Commit statuses** write are optional.
 
-The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a Key Vault secret name on Azure. The key never appears in Terraform variables or state.
+The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a versionless Key Vault secret id on Azure (the app's identity reads that stack's vault). The key never appears in Terraform variables or state.
 
 ## 2. Upload the PR head commit
 
@@ -87,9 +87,9 @@ On GitHub, `$GITHUB_SHA` in a `pull_request` workflow is a temporary _merge comm
 - name: Upload to StoryShelf
   run: |
     npx storyshelf upload \
-      --url ${{ secrets.STORYSHELF_URL }} \
-      --slug ${{ vars.STORYSHELF_SLUG }} \
-      --token ${{ secrets.STORYSHELF_TOKEN }} \
+      --url ${{ secrets.SHELF_URL }} \
+      --slug ${{ vars.SHELF_SLUG }} \
+      --token ${{ secrets.SHELF_TOKEN }} \
       --sha "${{ github.event.pull_request.head.sha || github.sha }}" \
       --branch "${{ github.head_ref || github.ref_name }}"
 ```
@@ -162,7 +162,7 @@ Status names changed once, when git hosts became notification channels (`@storys
 
 ## Troubleshooting
 
-- **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.
+- **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SHELF_SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.
 - **Status is late.** Statuses are delivered by `notify` jobs, so one can lag the build by a queue polling interval, and a refused write is retried with backoff (five attempts in total). A hosting-only instance on a serverless platform delivers inline instead, without retries: the next transition writes the current state again.
 - **Check run stays queued or is missing (GitHub App).** The App must be installed on this repository and have **Checks: Read and write**; a refused write shows on the channel as failing with the GitHub error. Check the App ID, the installation ID and that the whole PEM (including the `BEGIN`/`END` lines) was pasted.
 - **Status stays pending after a failure.** After the last attempt the channel shows the error and a `sys:notify-failed` alert goes to the site-wide channels; fix the token or repository, then run the build or review action again to deliver the current state.

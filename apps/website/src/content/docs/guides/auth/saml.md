@@ -10,14 +10,14 @@ import { createShelfAuth, samlPreset } from "@storyshelf/auth";
 
 const shelf = createShelfAuth({
   db: database,
-  secret: process.env.SECRET!,
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: process.env.SHELF_SECRET!,
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
   sso: {
     providers: [
       samlPreset({
         id: "acme-saml",
         domain: "example.com",
-        issuer: process.env.PUBLIC_BASE_URL!,
+        issuer: process.env.SHELF_PUBLIC_BASE_URL!,
         entryPoint: "https://idp.example.com/sso",
         metadataXml: "{env:SAML_METADATA}",
       }),

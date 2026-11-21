@@ -31,7 +31,7 @@ Take the database backup first, then the storage backup. Storage then holds ever
 ## Check consistency
 
 ```sh
-storyshelf server check-storage --url https://shelf.example.com --token "$STORYSHELF_ADMIN_TOKEN"
+storyshelf server check-storage --url https://shelf.example.com --token "$SHELF_ADMIN_TOKEN"
 ```
 
 The check is read-only. It walks published manifests and baselines, reports builds with blobs that storage lacks and baselines whose image is gone, and counts blobs nothing references. Output names build ids and counts only. It exits non-zero when something is missing. Add `--sample 50` to check only the newest 50 builds on a large instance (the unreferenced count is skipped then).

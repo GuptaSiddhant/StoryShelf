@@ -19,7 +19,7 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
-- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
+- **One `docker run` to self-host**, or versioned Terraform modules for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
 - **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
@@ -29,32 +29,33 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 Start a server (Docker; sign-in is on, and these three values are required):
 
 ```sh
-# Generate SECRET once and keep it: the data volume needs the same value on every run.
-export SECRET="$(openssl rand -hex 32)"
-export PUBLIC_BASE_URL=http://localhost:3000
+# Generate SHELF_SECRET once and keep it: the data volume needs the same value on every run.
+export SHELF_SECRET="$(openssl rand -hex 32)"
+export SHELF_PUBLIC_BASE_URL=http://localhost:3000
 # Choose a private admin password (at least 12 characters); it is not echoed.
-printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
-export AUTH_PASSWORD
+printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
+export SHELF_ADMIN_PASSWORD
 docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data \
-  -e SECRET -e PUBLIC_BASE_URL -e AUTH_PASSWORD \
+  -e SHELF_SECRET -e SHELF_PUBLIC_BASE_URL -e SHELF_ADMIN_PASSWORD \
   ghcr.io/guptasiddhant/storyshelf
 ```
 
 Then get a first build:
 
-1. Open <http://localhost:3000> and sign in as `admin@example.com` with your `AUTH_PASSWORD`.
+1. Open <http://localhost:3000> and sign in as `admin@example.com` with your `SHELF_ADMIN_PASSWORD`.
 2. Choose **New project**. The project's **Get your first build** card creates a token and shows the upload command.
 3. From your Storybook project, run it (it builds Storybook first if `storybook-static` is missing):
 
    ```sh
-   STORYSHELF_TOKEN=shelf_… npx storyshelf upload --url http://localhost:3000 --slug my-design-system
+   SHELF_TOKEN=shelf_… npx storyshelf upload --url http://localhost:3000 --slug my-design-system
    ```
 
 4. Open the build, approve it as the baseline, and upload again: the second build is compared with it.
 
 Prefer Node.js over Docker? `npx storyshelf server init` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
 
-SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `AUTH_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
+SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `SHELF_ADMIN_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
+For AWS, GCP and Azure, and the list of supported targets, see the [deployment guide](https://storyshelf.js.org/guides/deployment/#supported-targets).
 
 ## StoryShelf vs Chromatic
 

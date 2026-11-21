@@ -27,6 +27,7 @@ export const BUNDLES = [
       "/concepts/hosting-only/",
       "/concepts/labels/",
       "/guides/support/",
+      "/guides/demo/",
       "/guides/upgrading/",
       "/guides/troubleshooting/",
       "/guides/browser-changes/",
@@ -39,8 +40,15 @@ export const BUNDLES = [
     about:
       "Running a StoryShelf server: deployment, sizing, configuration, secrets, observability.",
     groups: ["Deploy & operate"],
-    // A long page for adapter authors, still one link away in llms.txt: the budget leaves no room.
-    exclude: ["/guides/custom-adapters/"],
+    // A one-off migration guide, the three per-cloud pages (module inputs, permissions, costs) and a
+    // long page for adapter authors, each one link away in llms.txt: the budget leaves no room.
+    exclude: [
+      "/guides/deployment/migrate-terraform/",
+      "/guides/deployment/aws/",
+      "/guides/deployment/gcp/",
+      "/guides/deployment/azure/",
+      "/guides/custom-adapters/",
+    ],
     budget: 25_000,
   },
   {

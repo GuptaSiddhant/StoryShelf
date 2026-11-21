@@ -18,7 +18,7 @@ export type DatabaseChoice =
 export type StorageChoice = "local" | "s3" | "azure" | "gcs";
 export type AuthChoice = "none" | "password" | "oauth";
 export type GitChoice = "none" | "git";
-export type DeployTarget = "local" | "docker" | "aws" | "azure" | "gcp";
+export type DeployTarget = "local" | "docker";
 
 export interface Answers {
   name: string;
@@ -39,17 +39,6 @@ export interface Answers {
   deployTarget?: DeployTarget;
   /** Curated-path opt-in: show the full adapter matrix on local/docker. */
   advancedAdapters?: boolean;
-  /** AWS-only follow-ups (asked when deployTarget is `aws`). */
-  awsRegion?: string;
-  domainName?: string;
-  samlMetadataUrl?: string;
-  /** Azure-only follow-ups (asked when deployTarget is `azure`). */
-  azureLocation?: string;
-  entraTenantId?: string;
-  /** GCP-only follow-ups (asked when deployTarget is `gcp`). */
-  gcpProjectId?: string;
-  gcpLocation?: string;
-  identityTenant?: string;
 }
 
 /** Normalize the deploy target, preserving pre-target answers. */

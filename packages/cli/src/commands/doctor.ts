@@ -65,7 +65,7 @@ function serverErrorMessage(error: unknown): string {
   }
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("(401)")) {
-    return "authentication failed (401) — check STORYSHELF_TOKEN";
+    return "authentication failed (401) — check SHELF_TOKEN";
   }
   if (message.includes("(403)")) {
     return `forbidden (403) — ${message.replace(/^Request failed \(403\): /u, "")}`;

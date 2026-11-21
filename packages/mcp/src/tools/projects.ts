@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { projectSlug, type ToolDef } from "./types.ts";
 
-const project = z.string().optional().describe("Project slug (defaults to STORYSHELF_SLUG)");
+const project = z.string().optional().describe("Project slug (defaults to SHELF_SLUG)");
 
 export const listProjects: ToolDef = {
   name: "list_projects",

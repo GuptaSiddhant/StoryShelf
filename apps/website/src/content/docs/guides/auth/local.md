@@ -10,8 +10,8 @@ import { createShelfAuth } from "@storyshelf/auth";
 
 const shelf = createShelfAuth({
   db: database,
-  secret: process.env.SECRET!,
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: process.env.SHELF_SECRET!,
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
 });
 
 const app = createShelfApp({ database, storage, auth: shelf.adapter });
@@ -37,16 +37,16 @@ Local emails are **identifiers, not mailboxes**. Deliverability is never checked
 `apps/dev-server` and `apps/fly-app` provision a local admin from the environment on every boot:
 
 ```bash
-AUTH_PASSWORD=a-long-admin-password   # at least 12 characters
-AUTH_EMAIL=admin@example.com                # optional, defaults to admin@example.com
-SECRET=$(openssl rand -hex 32)        # ≥ 32 characters
+SHELF_ADMIN_PASSWORD=a-long-admin-password   # at least 12 characters
+SHELF_ADMIN_EMAIL=admin@example.com                # optional, defaults to admin@example.com
+SHELF_SECRET=$(openssl rand -hex 32)        # ≥ 32 characters
 ```
 
 ## Invite playbook
 
-1. Admin (server or `POST` via `STORYSHELF_ADMIN_TOKEN`) calls `shelf.adapter.issueInvite({ email, name, role })`.
+1. Admin (server or `POST` via `SHELF_ADMIN_TOKEN`) calls `shelf.adapter.issueInvite({ email, name, role })`.
 2. Copy the one-time URL `/auth/invites/<inviteId>?token=<token>` and relay it out-of-band (Slack, email, 1:1 — no SMTP in StoryShelf).
 3. User opens the link, sets a password (≥ 12), and is auto-signed-in to `/profile`.
 4. Expired or superseded links show “Invalid or expired invite”; generic “Invalid credentials” on login avoids enumeration. Re-invite to recover.
 
-See [Configuration](/guides/auth/configuration/) for `resolveAuthOptions` and `SECRET` handling, and [Auth concepts](/concepts/auth/) for the engine vs shelf table split.
+See [Configuration](/guides/auth/configuration/) for `resolveAuthOptions` and `SHELF_SECRET` handling, and [Auth concepts](/concepts/auth/) for the engine vs shelf table split.

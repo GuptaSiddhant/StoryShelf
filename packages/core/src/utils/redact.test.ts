@@ -23,8 +23,18 @@ describe("redactSecrets", () => {
 
   it("redacts provider key prefixes", () => {
     expect(redactSecrets("key AKIAIOSFODNN7EXAMPLE leaked")).toBe("key [redacted] leaked");
+
     expect(redactSecrets("pat ghp_abcDEF123 leaked")).toBe("pat [redacted] leaked");
     expect(redactSecrets("pat glpat-aB3_x-9Yz leaked")).toBe("pat [redacted] leaked");
+  });
+
+  it("redacts a presigned RDS IAM auth token", () => {
+    const token =
+      "db.example.rds.amazonaws.com:5432/?Action=connect&DBUser=app&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=abc%2F20261113%2Feu-west-1%2Frds-db%2Faws4_request&X-Amz-Signature=deadbeef01&X-Amz-Security-Token=tok123";
+    const out = redactSecrets(`connect failed: ${token}`);
+    expect(out).not.toContain("deadbeef01");
+    expect(out).not.toContain("tok123");
+    expect(out).not.toContain("abc%2F");
   });
 
   it("redacts an Anthropic API key embedded in an error", () => {

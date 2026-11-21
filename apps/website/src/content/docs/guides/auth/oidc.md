@@ -10,14 +10,14 @@ import { createShelfAuth, ssoKeycloakPreset } from "@storyshelf/auth";
 
 const shelf = createShelfAuth({
   db: database,
-  secret: process.env.SECRET!,
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: process.env.SHELF_SECRET!,
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
   sso: {
     providers: [
       ssoKeycloakPreset("https://idp.example.com/realms/shelf", {
         domain: "example.com",
         clientId: "storyshelf",
-        clientSecret: "{env:OIDC_CLIENT_SECRET}",
+        clientSecret: "{env:SHELF_OIDC_CLIENT_SECRET}",
       }),
     ],
   },
@@ -38,7 +38,7 @@ Recipes accept group options — synced on every sign-in (social and generic-OAu
 ssoKeycloakPreset("https://idp.example.com/realms/shelf", {
   domain: "example.com",
   clientId: "storyshelf",
-  clientSecret: "{env:OIDC_CLIENT_SECRET}",
+  clientSecret: "{env:SHELF_OIDC_CLIENT_SECRET}",
   groupsClaim: ["groups", "cognito:groups"], // OIDC claim names (default ["groups"])
   adminGroups: ["shelf-admins"], // exact match → site admin
 });
@@ -52,7 +52,7 @@ ssoKeycloakPreset("https://idp.example.com/realms/shelf", {
 
 StoryShelf is an OIDC **relying party**, not a provider:
 
-- `GET /.well-known/openid-configuration` — RP metadata (`issuer`, `code` flow, scopes, per-provider `redirect_uris`, provider list). Set `PUBLIC_BASE_URL` so the issuer is stable: without a confirmed [public origin](/guides/config/#public-origin) it names the address of the request it answers.
+- `GET /.well-known/openid-configuration` — RP metadata (`issuer`, `code` flow, scopes, per-provider `redirect_uris`, provider list). Set `SHELF_PUBLIC_BASE_URL` so the issuer is stable: without a confirmed [public origin](/guides/config/#public-origin) it names the address of the request it answers.
 - `GET /.well-known/change-password` — redirects to `/profile`.
 
 For SAML, see [SAML](/guides/auth/saml/); for generic config and secrets, see [Configuration](/guides/auth/configuration/).
