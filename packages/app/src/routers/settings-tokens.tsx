@@ -8,7 +8,7 @@ import { flash } from "./flash.ts";
 import { respondWithForm } from "./form-response.tsx";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect, retargetBody } from "./htmx.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** CI token settings (create with one-time display, delete). */
 export function registerTokenSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/tokens/new", async (c) => {
@@ -22,7 +22,7 @@ export function registerTokenSettings(app: ShelfRouter): void {
 }
 
 async function handleCreateToken(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   const tokenName = asString(form.get("tokenName")) ?? asString(form.get("name"));
   if (!tokenName) {
@@ -52,7 +52,7 @@ async function handleCreateToken(c: Context): Promise<Response> {
 }
 
 async function handleDeleteToken(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   await new TokenModel(getStore().db).remove(c.req.param("tokenId") ?? "");
   flash(c, "Token deleted");
   return hxRedirect(c, settingsHref(project.slug, "tokens"));
