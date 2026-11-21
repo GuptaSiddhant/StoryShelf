@@ -207,7 +207,7 @@ reviews:
         - Constraint errors map to typed errors; migrations are upgrade-safe and idempotent; teardown twice is safe.
         - Indexes match real predicates/order; flag unindexed scans, N+1 queries and unbounded results.
 
-    - path: "packages/storage-*/**"
+    - path: "packages/storage/**"
       instructions: |
         Storage adapters handle untrusted keys and large streams. Verify:
         - Path traversal (`../`), absolute paths, NUL bytes and empty segments are rejected before any filesystem/object call.

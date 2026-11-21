@@ -124,10 +124,10 @@ A deploy or a scale-down sends SIGTERM. The server stops accepting requests, let
 
 ### Object storage on Tigris (Fly.io)
 
-Tigris is an S3-compatible object store that Fly provisions with `fly storage create`, so it needs no new package or preset: it is `@storyshelf/storage-s3` pointed at its endpoint. Keep the database on the machine's volume (SQLite) and move the objects (published Storybooks, screenshots, baselines, diffs) off it, so the volume stops filling up and storage no longer depends on one machine.
+Tigris is an S3-compatible object store that Fly provisions with `fly storage create`, so it needs no new package or preset: it is `@storyshelf/storage/s3` pointed at its endpoint. Keep the database on the machine's volume (SQLite) and move the objects (published Storybooks, screenshots, baselines, diffs) off it, so the volume stops filling up and storage no longer depends on one machine.
 
 ```ts
-import { createS3Storage } from "@storyshelf/storage-s3";
+import { createS3Storage } from "@storyshelf/storage/s3";
 
 const storage = createS3Storage({
   bucket: process.env.SHELF_S3_BUCKET!,

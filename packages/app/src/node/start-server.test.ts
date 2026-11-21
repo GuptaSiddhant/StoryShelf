@@ -188,6 +188,16 @@ describe("startServer close", () => {
     expect(teardowns()).toBe(1);
   });
 
+  it("keeps its signal handlers while the shutdown runs, so a repeated signal joins it", async () => {
+    const { app } = track(realApp());
+    const before = process.listenerCount("SIGTERM");
+    const server = await startServer({ app, port: 0, handleSignals: true });
+    const closing = server.close();
+    expect(process.listenerCount("SIGTERM")).toBe(before + 1);
+    await closing;
+    expect(process.listenerCount("SIGTERM")).toBe(before);
+  });
+
   it("registers no signal handler unless asked, and removes only its own", async () => {
     const { app } = track(realApp());
     const before = {

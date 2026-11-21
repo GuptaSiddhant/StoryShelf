@@ -4,7 +4,7 @@
 # `shelf.db*` (SQLite stays on the volume) and the scratch directory is copied under the same
 # key; an object already in the bucket is skipped, so a run that is cut short can simply be run again.
 #
-# Run it on the machine, after the deploy that adds `storage-s3` and with the bucket secrets set:
+# Run it on the machine, after the deploy that adds `@storyshelf/storage` and with the bucket secrets set:
 #
 #   fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh --dry-run"   # counts only, writes nothing
 #   fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh"

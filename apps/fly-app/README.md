@@ -1,6 +1,6 @@
 # StoryShelf Fly App (apps/fly-app)
 
-Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `storage-s3` (or on the volume with core's local storage when no bucket is configured), `runner` for capture, and **workspace packages** (no publish).
+Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `@storyshelf/storage/s3` (or on the volume with core's local storage when no bucket is configured), `runner` for capture, and **workspace packages** (no publish).
 
 - `server.ts` mirrors `apps/dev-server/src/server.ts:1` but with `SHELF_DATA_DIR=/data`, `PORT=3000`, `SHELF_SECRET`/`SHELF_ADMIN_PASSWORD` via Fly secrets.
 - `Dockerfile` is multi-stage, cache-efficient, and uses `ghcr.io/nubjs/nub:0.8.1` for `nub install --frozen-lockfile` with BuildKit cache mount, then `mcr.microsoft.com/playwright:v1.62.1-noble` for runtime. Build context must be **repo root**.
@@ -36,11 +36,11 @@ fly status -a storyshelf
 
 ## Object storage on Tigris
 
-The 1 GB volume used to hold SQLite **and** every published Storybook, screenshot, baseline and diff. Objects now go to a Tigris bucket (S3-compatible, `@storyshelf/storage-s3`); SQLite stays on the volume.
+The 1 GB volume used to hold SQLite **and** every published Storybook, screenshot, baseline and diff. Objects now go to a Tigris bucket (S3-compatible, `@storyshelf/storage/s3`); SQLite stays on the volume.
 
 **Configuration** is Fly secrets only (`fly storage create` sets most of them). `server.ts` reads the bucket from `SHELF_S3_BUCKET`, else the `BUCKET_NAME` that `fly storage create` injects, the endpoint from `AWS_ENDPOINT_URL_S3` (`https://t3.storage.dev`) and the region from `AWS_REGION` (`auto` when unset); the SDK takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment by itself. With no bucket set the app uses the volume as before, so removing the secret (`fly secrets unset SHELF_S3_BUCKET -a storyshelf`) is the rollback. At boot the server logs one `object storage` line with the storage kind and the endpoint origin, never the bucket, a key or a credential.
 
-**Existing data.** Core's local storage and `storage-s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
+**Existing data.** Core's local storage and `@storyshelf/storage/s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
 
 ```sh
 fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh --dry-run"   # counts only, writes nothing
@@ -54,9 +54,9 @@ fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh"
 The adapter's own contract can be checked against a scratch Tigris bucket (never the demo's) with credentials you provide for that run:
 
 ```sh
-cd packages/storage-s3
+cd packages/storage
 LIVE_CLOUD=1 SHELF_S3_BUCKET=<scratch-bucket> AWS_ENDPOINT_URL_S3=https://t3.storage.dev AWS_REGION=auto \
-  AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… nubx vitest run src/s3.live.test.ts
+  AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… nubx vitest run src/s3/s3.live.test.ts
 ```
 
 ## Browser on a Fly Sprite (scale to zero)

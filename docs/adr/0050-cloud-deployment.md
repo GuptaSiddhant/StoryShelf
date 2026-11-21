@@ -15,7 +15,7 @@ StoryShelf runs on AWS, GCP and Azure today through three kinds of cloud-specifi
   - `db-mysql/planetscale` and `db-mysql/tidb`;
   - `db-sqlite/d1` and `db-sqlite/turso`.
 
-  Storage has one adapter per cloud, and `storage-s3` also covers R2 and MinIO.
+  Storage has one adapter per cloud, and `@storyshelf/storage/s3` also covers R2 and MinIO.
 
 - **Terraform generators in the developer CLI.** `storyshelf server terraform-{aws,gcp,azure}` is
   about 3,150 lines of TypeScript that print Terraform:

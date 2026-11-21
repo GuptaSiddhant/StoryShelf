@@ -114,9 +114,21 @@ To move, set every new name with the old value, unset the old names, then deploy
 | `STORYSHELF_REUSE_PAGES`, `STORYSHELF_BROWSER_RECYCLE_EVERY`, `STORYSHELF_NAVIGATION_TIMEOUT_MS` | `SHELF_REUSE_PAGES`, `SHELF_BROWSER_RECYCLE_EVERY`, `SHELF_NAVIGATION_TIMEOUT_MS`  |
 | `STORYSHELF_OTEL_ENABLED`, `STORYSHELF_OTEL_METRICS_INTERVAL_MS`                                 | `SHELF_OTEL_ENABLED`, `SHELF_OTEL_METRICS_INTERVAL_MS`                             |
 
+### `@storyshelf/storage-s3`, `-gcs` and `-azure` are now `@storyshelf/storage`
+
+**Who is affected:** a server that imports `@storyshelf/storage-s3`, `@storyshelf/storage-gcs` or `@storyshelf/storage-azure`, or scaffolded one with `server init` before 0.15.0.
+
+The three cloud adapters are one package with a subpath each. The factories and their options are unchanged, and so are the stored objects: no data moves.
+
+1. Replace the dependency: remove the old package and add `@storyshelf/storage`.
+2. Install the SDK of the backend you use, because the SDKs are now optional peers that only their own subpath loads: `@aws-sdk/client-s3` and `@aws-sdk/lib-storage` for S3, `@google-cloud/storage` for GCS, `@azure/storage-blob` and `@azure/identity` for Azure. (`server init` adds them for you.)
+3. Change the imports: `@storyshelf/storage-s3` becomes `@storyshelf/storage/s3`, `@storyshelf/storage-gcs` becomes `@storyshelf/storage/gcs`, and `@storyshelf/storage-azure` becomes `@storyshelf/storage/azure`.
+
+`@storyshelf/storage/local` re-exports core's `createLocalStorage`, so switching between local disk and a cloud backend is a one-word import change. There is no alias and no re-export under the old names: the three old packages are not published again, and the owner deprecates them on npm with a message naming the new one.
+
 ### Nothing else is pending
 
-Besides the runner, local storage and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
+Besides the runner, local storage, the storage packages and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
 
 ## 0.14.0 (2026-11-21)
 
