@@ -42,12 +42,12 @@ function UnreachableNote(props: {
 
 /** One offered target: its name, how it reaches Storybook and whether it can render now. */
 function TargetRow(props: {
-  entry: RunnerTarget;
+  entry: Partial<RunnerTarget> & Pick<RunnerTarget, "target">;
   isDefault: boolean;
   down: UnreachableView | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { entry } = props;
-  const reason = unavailableReason(entry.status);
+  const reason = entry.status === undefined ? null : unavailableReason(entry.status);
   return (
     <tr>
       <td>
@@ -58,7 +58,9 @@ function TargetRow(props: {
         {props.isDefault ? <Badge>default</Badge> : null}
       </td>
       <td>
-        <Meta as="span">{entry.reach === "url" ? "signed URL" : "local server"}</Meta>
+        <Meta as="span">
+          {entry.reach === undefined ? "—" : entry.reach === "url" ? "signed URL" : "local server"}
+        </Meta>
       </td>
       <td>
         <Badge tone={reason === null ? "success" : "danger"} icon>
@@ -73,11 +75,18 @@ function TargetRow(props: {
 
 /** The browsers the capture runner offers and whether each can render now (ADR 0007, decision 7). */
 export function CaptureTargetsCard(props: {
+  /** The runner's offered targets; empty when it publishes no list. */
   targets: readonly RunnerTarget[];
   /** Targets whose last launch failed, by target; absent or empty when all are reachable. */
   unreachable?: ReadonlyMap<string, UnreachableView> | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { targets } = props;
+  // A runner that publishes no list accepts any target, so an outage can name one it never offered.
+  const offered = new Set(targets.map((entry) => entry.target));
+  const extra = [...(props.unreachable?.keys() ?? [])]
+    .filter((target) => !offered.has(target as RunnerTarget["target"]))
+    .map((target) => ({ target: target as RunnerTarget["target"] }));
+  const rows = [...targets, ...extra];
   return (
     <Card>
       <SectionTitle>Capture browsers</SectionTitle>
@@ -95,11 +104,11 @@ export function CaptureTargetsCard(props: {
             </tr>
           </thead>
           <tbody>
-            {targets.map((entry, index) => (
+            {rows.map((entry, index) => (
               <TargetRow
                 key={entry.target}
                 entry={entry}
-                isDefault={index === 0}
+                isDefault={index === 0 && targets.length > 0}
                 down={props.unreachable?.get(entry.target)}
               />
             ))}

@@ -51,6 +51,8 @@ export function reportingReachability(
     ...inner,
     accepts: (job) => inner.accepts?.(job) !== false,
     run: async (job, context) => {
+      // The outages this run started with: one recorded meanwhile by an overlapping run is newer.
+      const started = new Map(reach.unreachable());
       try {
         await inner.run(job, context);
       } catch (error) {
@@ -66,7 +68,7 @@ export function reportingReachability(
         const targets = await renderedTargets(db, job.buildId);
         await Promise.all(
           targets.map(async (target) => {
-            await reach.succeeded(target);
+            await reach.succeeded(target, started);
           }),
         );
       });

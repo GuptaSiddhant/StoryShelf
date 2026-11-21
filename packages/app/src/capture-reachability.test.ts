@@ -93,6 +93,29 @@ describe("reportingReachability", () => {
     expect(await renderedTargets(db, buildId)).toEqual(["chromium@sprite"]);
   });
 
+  it("keeps an outage an overlapping run recorded while this one rendered", async () => {
+    const { db, buildId } = await renderedBuild(["chromium@sprite"]);
+    const reach = new TargetReachability();
+    const changes = vi.fn();
+    reach.onChange = changes;
+    const { promise: gate, resolve: release } = Promise.withResolvers<null>();
+    const slow = reportingReachability(
+      handlerOf(async () => {
+        await gate;
+      }),
+      reach,
+      db,
+      logger,
+    );
+    const running = slow.run(jobOf(buildId), {} as never);
+    // Another run fails to launch the target while the first is still rendering.
+    await reach.failed("chromium@sprite", "connection");
+    release(null);
+    await running;
+    expect(reach.unreachable().has("chromium@sprite")).toBe(true);
+    expect(changes.mock.calls.map(([change]) => change.kind)).toEqual(["unreachable"]);
+  });
+
   it("never lets a failing reporter change the run", async () => {
     const { db, buildId } = await renderedBuild(["chromium"]);
     const reach = new TargetReachability();

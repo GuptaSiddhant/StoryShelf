@@ -339,9 +339,9 @@ function CaptureCards(props: {
           <PublicOriginCard origin={publicOrigin} />
         </div>
       ) : null}
-      {targets && targets.length > 0 ? (
+      {(targets && targets.length > 0) || (unreachable && unreachable.size > 0) ? (
         <div>
-          <CaptureTargetsCard targets={targets} unreachable={unreachable} />
+          <CaptureTargetsCard targets={targets ?? []} unreachable={unreachable} />
         </div>
       ) : null}
     </>

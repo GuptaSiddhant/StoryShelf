@@ -39,6 +39,21 @@ describe("TargetReachability", () => {
     expect(reach.unreachable().size).toBe(0);
   });
 
+  it("does not clear an outage that began after the run did", async () => {
+    const reach = new TargetReachability(clock());
+    const onChange = vi.fn();
+    const started = new Map(reach.unreachable());
+    await reach.failed("chromium@sprite", "connection");
+    reach.onChange = onChange;
+    await reach.succeeded("chromium@sprite", started);
+    expect(reach.unreachable().has("chromium@sprite")).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    // A run that began during the same outage does clear it.
+    await reach.succeeded("chromium@sprite", new Map(reach.unreachable()));
+    expect(reach.unreachable().size).toBe(0);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it("works without a listener", async () => {
     const reach = new TargetReachability();
     await reach.failed("firefox", "launch");

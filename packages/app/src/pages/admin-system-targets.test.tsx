@@ -36,4 +36,28 @@ describe("CaptureTargetsCard reachability", () => {
     expect(text).toContain(`href="${REMOTE_BROWSERS_GUIDE}"`);
     expect(text).not.toMatch(/wss?:\/\//u);
   });
+
+  it("lists an outage on a target the runner never offered, after the offered ones", async () => {
+    const text = await html(
+      CaptureTargetsCard({
+        targets: [],
+        unreachable: new Map([
+          ["firefox", { reason: "launch", since: "2026-11-20T15:55:00.000Z" }],
+        ]),
+      }),
+    );
+    expect(text).toContain("firefox");
+    expect(text).toContain("unreachable");
+    expect(text).not.toContain(">default<");
+    const both = await html(
+      CaptureTargetsCard({
+        targets,
+        unreachable: new Map([
+          ["firefox", { reason: "launch", since: "2026-11-20T15:55:00.000Z" }],
+        ]),
+      }),
+    );
+    expect(both.indexOf("chromium@sprite")).toBeLessThan(both.indexOf("firefox"));
+    expect(both.match(/>default</gu)).toHaveLength(1);
+  });
 });

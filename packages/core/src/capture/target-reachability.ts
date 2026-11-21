@@ -80,10 +80,19 @@ export class TargetReachability {
     await this.onChange?.({ kind: "unreachable", target, reason, since });
   }
 
-  /** Record a launch that worked; reports only when the target was unreachable. */
-  async succeeded(target: CaptureTarget): Promise<void> {
+  /**
+   * Record a launch that worked; reports only when the target was unreachable. A run passes the
+   * outages it started with, so a failure another run recorded meanwhile is not cleared by it.
+   */
+  async succeeded(
+    target: CaptureTarget,
+    startedWith?: ReadonlyMap<CaptureTarget, UnreachableTarget>,
+  ): Promise<void> {
     const was = this.#down.get(target);
     if (was === undefined) {
+      return;
+    }
+    if (startedWith !== undefined && startedWith.get(target)?.since !== was.since) {
       return;
     }
     this.#down.delete(target);
