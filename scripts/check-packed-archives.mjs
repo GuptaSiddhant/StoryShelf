@@ -6,7 +6,8 @@
  *  - an `exports` or `bin` target is not in the tarball;
  *  - a `source` export condition ships (it points at `src/`, which is never packed);
  *  - a `types` target is missing;
- *  - a source map ships (the maps point at `src/`).
+ *  - a source map ships (the maps point at `src/`);
+ *  - a public subpath consumers rely on is not exported ({@link REQUIRED_EXPORTS}).
  *
  * Usage: node scripts/check-packed-archives.mjs <tarball.tgz>...
  */
@@ -14,6 +15,12 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, normalize } from "node:path";
+
+/**
+ * Subpaths a package must export, beyond what its own manifest lists: dropping one breaks every
+ * consumer that imports it (`@storyshelf/app/node` is the Node host, #394).
+ */
+export const REQUIRED_EXPORTS = { "@storyshelf/app": ["./node"] };
 
 /** A target is a file path inside the package; skip bare specifiers and `null` (a blocked subpath). */
 const isFileTarget = (value) => typeof value === "string" && value.startsWith("./");
@@ -79,6 +86,17 @@ export function checkArchive(manifest, files) {
   for (const field of ["main", "module", "types"]) {
     if (isFileTarget(manifest[field]) && !has(manifest[field])) {
       problems.push(`${field} -> ${manifest[field]} is not in the tarball`);
+    }
+  }
+  for (const subpath of REQUIRED_EXPORTS[manifest.name] ?? []) {
+    if (
+      !manifest.exports ||
+      typeof manifest.exports !== "object" ||
+      !(subpath in manifest.exports)
+    ) {
+      problems.push(
+        `exports ${subpath} is missing (consumers import ${manifest.name}${subpath.slice(1)})`,
+      );
     }
   }
   const maps = [...present].filter((file) => file.endsWith(".map")).toSorted();

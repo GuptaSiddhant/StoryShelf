@@ -31,6 +31,9 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 - `@storyshelf/app` root barrel is the HTTP app: `createShelfApp` plus
   `ShelfApp`/`ShelfRouter`/`ShelfContext`/`ShelfLifecycle` and the re-exported
   option types (`ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme` from core).
+- `@storyshelf/app/node` is the Node host: `startServer({ app, port, handleSignals })` owns the
+  listener, readiness, the bounded drain and the app's teardown (#394). `@hono/node-server` is a
+  runtime dependency of app only; hosts that call `app.fetch` themselves never load it.
 - `@storyshelf/core` root barrel is domain-only (config/logger/types surface).
   Importing it must never pull Hono into bundles that do not serve it
   (e.g. runners, the forked capture child) — enforced by keeping all HTTP modules in app.

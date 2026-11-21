@@ -1,5 +1,5 @@
-import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
+import { startServer } from "@storyshelf/app/node";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import {
   OLD_NAMES_ALLOWED_MESSAGE,
@@ -68,9 +68,9 @@ function purgeTtlDaysFromEnv(): number | undefined {
 }
 const purgeTtlDays = purgeTtlDaysFromEnv();
 
-// Bound of the SIGTERM drain (#912): `SHELF_SHUTDOWN_GRACE_SECONDS` hands the jobs still running near its
-// end back to the queue, without spending an attempt. Unset waits for every job. Mirrors
-// apps/fly-app/shutdown.ts (without its Fly default).
+// Bound of the SIGTERM shutdown (#912): `SHELF_SHUTDOWN_GRACE_SECONDS` hands the jobs still running near
+// its end back to the queue, without spending an attempt. Unset leaves startServer's default (30 s).
+// Mirrors apps/fly-app/shutdown.ts (without its Fly default).
 function shutdownGraceMsFromEnv(): number | undefined {
   const raw = readSetting(env, "SHELF_SHUTDOWN_GRACE_SECONDS");
   if (raw === undefined || raw === "") return undefined;
@@ -190,40 +190,28 @@ const app = createShelfApp({
   },
 });
 
-await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
-if (ignoredOldNames.length > 0) {
-  logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
-}
 
-if (authPassword) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
-}
+// Ready (a failed boot check stops the server before it listens), the admin, then the port. The
+// host owns SIGINT/SIGTERM, so `nub watch`'s restart (SIGTERM) drains and frees the port.
+const server = await startServer({
+  app,
+  port,
+  handleSignals: true,
+  ...(graceMs === undefined ? {} : { shutdownTimeoutMs: graceMs }),
+  beforeListen: async () => {
+    if (ignoredOldNames.length > 0) {
+      logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+    }
+    if (authPassword) {
+      await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+      logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
+    }
+  },
+});
+logger.info({ port: server.port, dataDir }, "StoryShelf dev server listening");
 
-const server = serve({ fetch: app.fetch, port }, () => {
-  logger.info({ port, dataDir }, "StoryShelf dev server listening");
-});
-
-const shutdown = async (): Promise<void> => {
-  // A bounded drain may leave a stuck handler to its lease: the process must end it, a second past
-  // the grace whatever the rest of the teardown does, so the exit is armed now (unref'd, so a
-  // process with nothing left running exits on its own first). Mirrors apps/fly-app `exitBy`.
-  if (graceMs !== undefined) {
-    setTimeout(() => {
-      // oxlint-disable-next-line unicorn/no-process-exit -- a stuck handler must not outlive the drain
-      process.exit(0);
-    }, graceMs + 1000).unref();
-  }
-  try {
-    await app.lifecycle.teardown(graceMs === undefined ? {} : { graceMs });
-  } finally {
-    server.close();
-  }
-};
-process.on("SIGTERM", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
-process.on("SIGINT", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
+// The process ends with the shutdown (bounded), so the watcher's restart never waits on a stuck job.
+await server.closed;
+// oxlint-disable-next-line unicorn/no-process-exit -- the executable owns the final exit
+process.exit(0);
