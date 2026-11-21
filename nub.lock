@@ -64,11 +64,11 @@ catalogs:
       specifier: 0.6.1
       version: 0.6.1
     drizzle-kit:
-      specifier: 1.0.0-rc.5
-      version: 1.0.0-rc.5
+      specifier: 1.0.0-rc.6
+      version: 1.0.0-rc.6
     drizzle-orm:
-      specifier: 1.0.0-rc.5
-      version: 1.0.0-rc.5
+      specifier: 1.0.0-rc.6
+      version: 1.0.0-rc.6
     hono:
       specifier: ^4.11.0
       version: 4.13.14
@@ -667,7 +667,7 @@ importers:
         version: 4.13.0
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@opentelemetry/api@1.10.0)(zod@4.6.7)
+        version: 1.0.0-rc.6(@opentelemetry/api@1.10.0)(zod@4.6.7)
       pino:
         specifier: 'catalog:'
         version: 10.4.0
@@ -749,7 +749,7 @@ importers:
         version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5))
+        version: 1.0.0-rc.6(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5))
       mysql2:
         specifier: ^3.9.0
         version: 3.24.6(@types/node@26.6.5)
@@ -768,7 +768,7 @@ importers:
         version: 4.1.12(vitest@5.0.5)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@planetscale/database@1.20.2)(drizzle-orm@1.0.0-rc.5(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)))(mysql2@3.24.6(@types/node@26.6.5))
+        version: 1.0.0-rc.6(@planetscale/database@1.20.2)(drizzle-orm@1.0.0-rc.6(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)))(mysql2@3.24.6(@types/node@26.6.5))
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -795,7 +795,7 @@ importers:
         version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)
+        version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)
       postgres:
         specifier: ^3.4.0
         version: 3.4.9
@@ -817,7 +817,7 @@ importers:
         version: 4.1.12(vitest@5.0.5)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9)
+        version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9)
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -847,7 +847,7 @@ importers:
         version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1)
+        version: 1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1)
     devDependencies:
       '@libsql/client':
         specifier: ^0.18.0
@@ -863,7 +863,7 @@ importers:
         version: 12.11.1
       drizzle-kit:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1)(drizzle-orm@1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1))
+        version: 1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1)(drizzle-orm@1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1))
       oxfmt:
         specifier: 'catalog:'
         version: 0.65.0
@@ -5086,8 +5086,9 @@ packages:
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
 
-  drizzle-kit@1.0.0-rc.5:
-    resolution: {integrity: sha512-8glQN7iFK3e1aOIoRit1NtslcsqE/rnlqNw/1jUC5Ph4RFVh/E5Jricxd6Nu2ugj2HlFZlZ6O4006AwqJ9e24g==}
+  drizzle-kit@1.0.0-rc.6:
+    resolution: {integrity: sha512-UNwJcuwG8Iw/5M/aKmmzaX61OQgX+gj87MIEZE4J/2pSDCnQJHjhFhmPq8YNHAHnY81bbGsqiWxlyiybDD1E/g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
       '@electric-sql/pglite': '*'
@@ -5098,6 +5099,7 @@ packages:
       better-sqlite3: '*'
       drizzle-orm: '>=1.0.0-rc.5'
       mysql2: '*'
+      oxc-parser: ^0.157.0
       pg: '*'
       postgres: '*'
       zod: '*'
@@ -5117,6 +5119,8 @@ packages:
       drizzle-orm:
         optional: true
       mysql2:
+        optional: true
+      oxc-parser:
         optional: true
       pg:
         optional: true
@@ -5229,14 +5233,14 @@ packages:
       sqlite3:
         optional: true
 
-  drizzle-orm@1.0.0-rc.5:
-    resolution: {integrity: sha512-7BMYTsAZbQ9DcQCtLG4G202Hq6nc/e8o1EBKN6nBweRI8EGPFe/VdyvWQCsU9fuZSiRjNpELolUSi//JFBq+lw==}
+  drizzle-orm@1.0.0-rc.6:
+    resolution: {integrity: sha512-z/2UDIuD/IbA862MbficiLc0BZodaWoXqSrv3Opdi1k0lx5oK4iX+rayJ1RwHbwFvvDGJpVP2mTYwxefar1xEg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@aws/aurora-dsql-node-postgres-connector': '>=0.1.9'
       '@aws/aurora-dsql-postgresjs-connector': '>=0.3.0'
       '@cloudflare/workers-types': '>=4'
-      '@drizzle-team/minipg': '>=0.4.2'
       '@effect/sql-d1': '>=4.0.0'
       '@effect/sql-libsql': '>=4.0.0'
       '@effect/sql-mysql2': '>=4.0.0'
@@ -5263,10 +5267,9 @@ packages:
       '@tursodatabase/serverless': '>=1.4.0'
       '@tursodatabase/sync': '>=0.7.1'
       '@types/better-sqlite3': '*'
-      '@types/mssql': ^9.1.4
+      '@types/mssql': '>=9.1.11'
       '@types/pg': '*'
       '@types/sql.js': '*'
-      '@upstash/redis': '>=1.34.7'
       '@vercel/postgres': '>=0.8.0'
       '@xata.io/client': '*'
       arktype: '>=2.0.0'
@@ -5275,7 +5278,7 @@ packages:
       bun-types: '*'
       effect: '>=4.0.0'
       expo-sqlite: '>=14.0.0'
-      mssql: ^11.0.1
+      mssql: '>=11.0.1'
       mysql2: '>=2'
       pg: '>=8'
       postgres: '>=3'
@@ -5293,8 +5296,6 @@ packages:
       '@aws/aurora-dsql-postgresjs-connector':
         optional: true
       '@cloudflare/workers-types':
-        optional: true
-      '@drizzle-team/minipg':
         optional: true
       '@effect/sql-d1':
         optional: true
@@ -5353,8 +5354,6 @@ packages:
       '@types/pg':
         optional: true
       '@types/sql.js':
-        optional: true
-      '@upstash/redis':
         optional: true
       '@vercel/postgres':
         optional: true
@@ -11952,25 +11951,25 @@ snapshots:
       domelementtype: 2.3.0
       domhandler: 5.0.3
 
-  drizzle-kit@1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9):
+  drizzle-kit@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(drizzle-orm@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9))(pg@8.23.1)(postgres@3.4.9):
     optionalDependencies:
       '@electric-sql/pglite': 0.5.12
       '@neondatabase/serverless': 1.2.0
       '@vercel/postgres': 0.10.0
-      drizzle-orm: 1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)
+      drizzle-orm: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)
       pg: 8.23.1
       postgres: 3.4.9
 
-  drizzle-kit@1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1)(drizzle-orm@1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1)):
+  drizzle-kit@1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1)(drizzle-orm@1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1)):
     optionalDependencies:
       '@libsql/client': 0.18.0
       better-sqlite3: 12.11.1
-      drizzle-orm: 1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1)
+      drizzle-orm: 1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1)
 
-  drizzle-kit@1.0.0-rc.5(@planetscale/database@1.20.2)(drizzle-orm@1.0.0-rc.5(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)))(mysql2@3.24.6(@types/node@26.6.5)):
+  drizzle-kit@1.0.0-rc.6(@planetscale/database@1.20.2)(drizzle-orm@1.0.0-rc.6(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)))(mysql2@3.24.6(@types/node@26.6.5)):
     optionalDependencies:
       '@planetscale/database': 1.20.2
-      drizzle-orm: 1.0.0-rc.5(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5))
+      drizzle-orm: 1.0.0-rc.6(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5))
       mysql2: 3.24.6(@types/node@26.6.5)
 
   drizzle-orm@0.45.4(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(kysely@0.29.7)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9):
@@ -11989,7 +11988,7 @@ snapshots:
     optionalDependencies:
       kysely: 0.29.7
 
-  drizzle-orm@1.0.0-rc.5(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9):
+  drizzle-orm@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9):
     optionalDependencies:
       '@electric-sql/pglite': 0.5.12
       '@neondatabase/serverless': 1.2.0
@@ -11997,17 +11996,17 @@ snapshots:
       pg: 8.23.1
       postgres: 3.4.9
 
-  drizzle-orm@1.0.0-rc.5(@libsql/client@0.18.0)(better-sqlite3@12.11.1):
+  drizzle-orm@1.0.0-rc.6(@libsql/client@0.18.0)(better-sqlite3@12.11.1):
     optionalDependencies:
       '@libsql/client': 0.18.0
       better-sqlite3: 12.11.1
 
-  drizzle-orm@1.0.0-rc.5(@opentelemetry/api@1.10.0)(zod@4.6.7):
+  drizzle-orm@1.0.0-rc.6(@opentelemetry/api@1.10.0)(zod@4.6.7):
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
       zod: 4.6.7
 
-  drizzle-orm@1.0.0-rc.5(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)):
+  drizzle-orm@1.0.0-rc.6(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(mysql2@3.24.6(@types/node@26.6.5)):
     optionalDependencies:
       '@planetscale/database': 1.20.2
       '@tidbcloud/serverless': 0.1.1
