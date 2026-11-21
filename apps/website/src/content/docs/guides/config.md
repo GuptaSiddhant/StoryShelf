@@ -148,6 +148,10 @@ So a first deploy needs no redeploy to learn its URL: open **System** once and c
 
 StoryShelf's own settings are `SHELF_*` variables (`SHELF_SECRET`, `SHELF_PUBLIC_BASE_URL`, `SHELF_TOKEN`, …). A name is unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning, such as `PORT`, `DATABASE_URL`, `AWS_REGION` or `OTEL_EXPORTER_OTLP_ENDPOINT`. The names from before 0.15 (`SECRET`, `ADMIN_TOKEN`, `STORYSHELF_URL`, …) still work: the server logs one warning per old name at boot, and an old and a new name of one setting set to different values stop it, naming both variables and never a value. The [upgrading guide](/guides/upgrading/#storyshelfs-environment-variables-use-the-shelf_-prefix) has the full table.
 
+### Your own adapters
+
+`database`, `storage`, `testing.runner`, `notifications.notifiers` and `design` take adapters, and none of them has to be a built-in. [Write your own adapter](/guides/custom-adapters/) shows the contract, two tested examples and how to package one.
+
 ## Validation
 
 File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys are ignored, and any present-but-invalid field (`url` shape, `buildCommand`+`buildScriptName` together, non-boolean `affectedOnly` or `buildStats`, malformed `untraced`) invalidates the whole file — `upload` then errors on the missing `slug`/`url` with a helpful message.

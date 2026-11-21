@@ -17,10 +17,10 @@ PORT = '3000'
 # Daily purge of builds older than 14 days (baselines and pinned builds are kept; ADR 0039).
 SHELF_PURGE_TTL_DAYS = '14'
 SHELF_PUBLIC_BASE_URL = 'https://storyshelf.fly.dev'
-# Sign-in page link to the demo's Storybook (the latest approved `main` build; public hosting only, no review).
-SHELF_AUTH_PUBLIC_LINK_URL = '/_/demo-design-system/'
-SHELF_AUTH_PUBLIC_LINK_LABEL = "Browse the demo's Storybook without an account"
-SHELF_AUTH_HELP_TEXT = 'Reviewing builds and diffs needs an account.'
+# The demo's one published read-only account (#1275, #1274). Its password is the Fly secret
+# SHELF_DEMO_VIEWER_PASSWORD (set by the owner; never put it here).
+SHELF_READ_ONLY_ACCOUNTS = 'demo@storyshelf.js.org'
+SHELF_AUTH_HELP_TEXT = "Demo: sign in as demo@storyshelf.js.org (read-only). The password is on the website's demo page."
 
 [[mounts]]
 source = 'storyshelf_data'
