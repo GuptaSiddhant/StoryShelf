@@ -99,8 +99,8 @@ variable "shutdown_grace_seconds" {
   default     = 8
 
   validation {
-    condition     = var.shutdown_grace_seconds >= 1 && var.shutdown_grace_seconds <= 9
-    error_message = "shutdown_grace_seconds must be 1-9: Cloud Run stops a container 10 seconds after SIGTERM."
+    condition     = var.shutdown_grace_seconds >= 1 && var.shutdown_grace_seconds <= 8
+    error_message = "shutdown_grace_seconds must be 1-8: Cloud Run stops a container 10 seconds after SIGTERM, and the process exits 1 second after the grace."
   }
 }
 

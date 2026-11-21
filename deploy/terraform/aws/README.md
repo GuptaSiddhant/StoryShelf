@@ -172,7 +172,8 @@ only (`execution_role_policy_json`).
 
 - **Capture runs in the container** (the image ships Chromium). For a remote browser, put its
   endpoint and token in Secrets Manager and pass the two ARNs; they become `REMOTE_BROWSER_ENDPOINT`
-  and `REMOTE_BROWSER_TOKEN`. The module builds no browser service.
+  and `REMOTE_BROWSER_TOKEN`, which the image does not read yet ("Image contract"), so capture stays
+  in the container for now. The module builds no browser service.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the

@@ -19,7 +19,7 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
-- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
+- **One `docker run` to self-host**, or versioned Terraform modules for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
 - **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).

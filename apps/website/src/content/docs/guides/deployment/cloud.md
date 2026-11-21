@@ -103,5 +103,5 @@ See the [`@storyshelf/db-postgres` package reference](/packages/db-postgres/) fo
 
 ## Related
 
-- [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) — reference Terraform stacks
+- [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) — versioned Terraform modules on the published image
 - [Docker Compose](/guides/deployment/docker-compose/) — single-host deploy
