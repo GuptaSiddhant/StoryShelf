@@ -4,7 +4,7 @@
  * handle, as its `tx` store.
  */
 import type { ListOptions, TxStore } from "@storyshelf/core/adapter/database";
-import { listSelection } from "@storyshelf/core/adapter/database";
+import { listPage, listSelection } from "@storyshelf/core/adapter/database";
 import type { SQL, Table } from "drizzle-orm";
 import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
@@ -94,11 +94,12 @@ function applyListOptions(
     next = next.where(opts.where);
   }
   next = next.orderBy(opts.orderBy ? sql`${opts.orderBy}, ${id}` : sql`${id}`);
-  if (opts.limit !== undefined) {
-    next = next.limit(opts.limit);
+  const page = listPage(opts);
+  if (page.limit !== undefined) {
+    next = next.limit(page.limit);
   }
-  if (opts.offset !== undefined) {
-    next = next.offset(opts.offset);
+  if (page.offset !== undefined) {
+    next = next.offset(page.offset);
   }
   return next;
 }

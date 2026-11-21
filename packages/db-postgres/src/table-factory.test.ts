@@ -6,7 +6,7 @@
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
-import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/postgres";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";

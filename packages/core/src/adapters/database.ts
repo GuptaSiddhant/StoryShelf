@@ -156,6 +156,29 @@ export function listSelection(
   return Object.fromEntries([...keys].map((key) => [key, all[key]]));
 }
 
+/** The `limit` and `offset` a list query applies; a missing key is not applied. */
+export interface ListPage {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * The page a list applies, by the rule every adapter has always used: a `limit` only when it is a
+ * number ≥ 0, an `offset` only when it is non-zero (`NaN` neither). Drizzle 1.0 emits whatever it is
+ * given (a negative `LIMIT` is an error on Postgres and MySQL), so each dialect pages through this
+ * and list results stay what they were.
+ */
+export function listPage(opts: Pick<ListOptions, "limit" | "offset">): ListPage {
+  const page: ListPage = {};
+  if (typeof opts.limit === "number" && opts.limit >= 0) {
+    page.limit = opts.limit;
+  }
+  if (opts.offset !== undefined && opts.offset !== 0 && !Number.isNaN(opts.offset)) {
+    page.offset = opts.offset;
+  }
+  return page;
+}
+
 /**
  * Transactional CRUD subset available inside {@link DatabaseAdapter.transact}.
  * Mirrors the adapter surface minus metadata, lifecycle, and raw `all`

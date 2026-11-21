@@ -5,7 +5,7 @@
  */
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
-import { generateSQLiteDrizzleJson, generateSQLiteMigration } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/sqlite";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { DDL, IDENTITY_STATEMENTS } from "./ddl.ts";
 import * as schema from "./schema/index.ts";
@@ -29,9 +29,9 @@ const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory"
 
 async function generatedDdl(): Promise<string> {
   const built = ns.buildAll(ns.SPIKE_TABLES, sqliteTableOf, external);
-  const before = await generateSQLiteDrizzleJson({});
-  const after = await generateSQLiteDrizzleJson(built);
-  return (await generateSQLiteMigration(before, after)).join(";\n");
+  const before = await generateDrizzleJson({});
+  const after = await generateDrizzleJson(built);
+  return (await generateMigration(before, after)).join(";\n");
 }
 
 describe("SQLite table factory (spike #800)", () => {
@@ -84,8 +84,8 @@ describe("SQLite table factory (spike #800)", () => {
       { id: ns.id("id").primaryKey(), key: ns.key("key", 64) },
       { indexes: [ns.uniqueIndex("partials_key_idx", ["key"], "key IS NOT NULL")] },
     );
-    const after = await generateSQLiteDrizzleJson({ partials: sqliteTableOf(partial, resolve) });
-    const statements = await generateSQLiteMigration(await generateSQLiteDrizzleJson({}), after);
+    const after = await generateDrizzleJson({ partials: sqliteTableOf(partial, resolve) });
+    const statements = await generateMigration(await generateDrizzleJson({}), after);
     expect(statements.join("\n")).toMatch(
       /UNIQUE INDEX .partials_key_idx. .* WHERE key IS NOT NULL/u,
     );

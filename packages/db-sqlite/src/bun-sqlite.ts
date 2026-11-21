@@ -63,7 +63,7 @@ export function createBunSqliteDatabase(options: BunSqliteDatabaseOptions): Data
       client.exec(sql);
     }, options);
   }
-  const db = drizzle(client, { schema });
+  const db = drizzle(client);
 
   const adapter = createDrizzleAdapter(db, {
     metadata: {

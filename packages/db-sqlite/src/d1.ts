@@ -65,7 +65,7 @@ export function createD1Database(options: D1DatabaseOptions): DatabaseAdapter {
   }
   const { client } = options;
   // oxlint-disable-next-line typescript/no-unsafe-argument -- structural D1 binding vs platform type
-  const db = drizzle(client as never, { schema });
+  const db = drizzle(client as never);
 
   return createDrizzleAdapter(db, {
     metadata: {
