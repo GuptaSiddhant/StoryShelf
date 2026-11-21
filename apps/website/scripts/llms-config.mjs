@@ -27,6 +27,7 @@ export const BUNDLES = [
       "/concepts/hosting-only/",
       "/concepts/labels/",
       "/guides/support/",
+      "/guides/upgrading/",
       "/guides/troubleshooting/",
       "/guides/browser-changes/",
     ],
