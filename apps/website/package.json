@@ -14,7 +14,8 @@
     "check:links": "node scripts/check-links.mjs",
     "check:llms": "node scripts/check-llms.mjs",
     "check:a11y": "node scripts/check-a11y.mjs",
-    "verify": "nub run check:links && nub run check:llms"
+    "verify": "nub run check:links && nub run check:llms",
+    "test": "tsc --noEmit -p examples/tsconfig.json && vitest run --root examples"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.0",
@@ -29,6 +30,9 @@
     "starlight-package-managers": "0.13.0"
   },
   "devDependencies": {
+    "@storyshelf/app": "workspace:*",
+    "@storyshelf/core": "workspace:*",
+    "@types/node": "catalog:",
     "axe-core": "^4.13.0",
     "hast-util-select": "6.0.4",
     "playwright-core": "1.63.0",
@@ -41,6 +45,8 @@
     "typedoc": "0.28.20",
     "typedoc-plugin-markdown": "4.14.1",
     "typescript": "5.9.3",
-    "unified": "11.0.5"
+    "unified": "11.0.5",
+    "vitest": "catalog:",
+    "zod": "catalog:"
   }
 }
