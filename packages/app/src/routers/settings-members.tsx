@@ -15,7 +15,7 @@ import { flash } from "./flash.ts";
 import { respondWithForm } from "./form-response.tsx";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
 export function registerMemberSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/members/new", async (c) => {
@@ -33,7 +33,7 @@ export function registerMemberSettings(app: ShelfRouter): void {
   });
 
   app.post("/projects/:slug/settings/members", async (c) => {
-    const project = await findProject(c.req.param("slug") ?? "");
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
     const form = await c.req.formData();
     const role = asString(form.get("role"));
     const userId = await resolveMemberUser(form);
@@ -55,7 +55,7 @@ export function registerMemberSettings(app: ShelfRouter): void {
   });
 
   app.post("/projects/:slug/settings/members/:userId/remove", async (c) => {
-    const project = await findProject(c.req.param("slug") ?? "");
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
     await new MemberModel(getStore().db).remove(project.id, c.req.param("userId") ?? "");
     flash(c, "Member removed");
     return hxRedirect(c, settingsHref(project.slug, "members"));
@@ -105,7 +105,7 @@ function registerOwnerSettings(app: ShelfRouter): void {
 /** Identity-provider group mapping settings (exact-match group to role). */
 function registerGroupMappingSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/members/groups", async (c) => {
-    const project = await findProject(c.req.param("slug") ?? "");
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
     const form = await c.req.formData();
     const groupName = asString(form.get("groupName"));
     const role = asString(form.get("role"));
@@ -132,7 +132,7 @@ function registerGroupMappingSettings(app: ShelfRouter): void {
   });
 
   app.post("/projects/:slug/settings/members/groups/:mappingId/remove", async (c) => {
-    const project = await findProject(c.req.param("slug") ?? "");
+    const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
     await new ProjectGroupMappingModel(getStore().db).remove(
       project.id,
       c.req.param("mappingId") ?? "",

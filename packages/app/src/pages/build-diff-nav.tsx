@@ -217,6 +217,7 @@ export function DiffNav(props: DiffNavProps): HtmlEscapedString | Promise<HtmlEs
         aria-label="Snapshots"
         hx-swap-oob={props.oob ? "true" : undefined}
       >
+        <h2 class="visually-hidden">Snapshots</h2>
         <input type="checkbox" id="film-toggle" class={filmToggleInput} />
         <label for="film-toggle" class={filmToggleLabel}>
           <Icon name="chevron-down" size="sm" />

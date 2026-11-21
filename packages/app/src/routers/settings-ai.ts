@@ -5,9 +5,9 @@ import type { ShelfRouter } from "../app-types.ts";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { requireSiteAdmin } from "./helpers.ts";
+import { requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Register the project AI settings tab (site admins set the profile gate). */
 export function registerAiSettings(app: ShelfRouter): void {
@@ -27,7 +27,7 @@ function profileError(ai: Ai | undefined, requested: string): string | null {
 async function handleAiUpdate(c: Context): Promise<Response> {
   requireSiteAdmin(c);
   const { ai, db } = getStore();
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const requested = asString((await c.req.formData()).get("aiProfile")) ?? "";
   const error = profileError(ai, requested);
   if (error) {

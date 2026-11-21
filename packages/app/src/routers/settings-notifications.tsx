@@ -14,6 +14,7 @@ import { LISTED_TOPICS, REVIEW_REQUESTED_EVENT } from "../pages/settings-notific
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { parseOptionFields } from "../ui/components.tsx";
+import { VIEW_ROLES } from "./builds.handlers.ts";
 import { retryChannelState } from "./channel-retry.ts";
 import { flash } from "./flash.ts";
 import { respondWithForm } from "./form-response.tsx";
@@ -21,7 +22,7 @@ import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect, isHxRequest } from "./htmx.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { createGitChannel } from "./settings-git-channel.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Notifications settings (message and git channels plus my preferences). */
 export function registerNotificationSettings(app: ShelfRouter): void {
@@ -57,7 +58,7 @@ function parseChecks(form: FormData, name: string): string[] {
 }
 
 async function handleCreateChannel(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   const gitProvider = asString(form.get("gitProvider"));
   return gitProvider
@@ -203,7 +204,7 @@ async function persistChannel(
 }
 
 async function handleDeleteChannel(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const model = notificationChannelModel();
   const channel = await model.get(c.req.param("channelId") ?? "");
   if (!channel || channel.projectId !== project.id) {
@@ -244,8 +245,9 @@ async function handleRetryChannel(c: Context): Promise<Response> {
   return isHxRequest(c) ? c.body(null, 200) : c.redirect(back, 303);
 }
 
+/** Any member may save their own preferences, as `PUT /api/v1/projects/:slug/notifications/me`. */
 async function handleSaveMine(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", ...VIEW_ROLES);
   const user = getStore().user;
   if (user) {
     await saveSubscription(project, user.id, await c.req.formData());
