@@ -22,6 +22,8 @@ locals {
     var.existing_database_url_secret_arn,
     var.remote_browser_endpoint_secret_arn,
     var.remote_browser_token_secret_arn,
+    var.github_app_private_key_secret_arn,
+    var.gitlab_token_secret_arn,
   ])
 }
 

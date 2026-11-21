@@ -86,6 +86,8 @@ locals {
       "playwright-endpoint" = var.playwright_workspace_endpoint_secret_id
       "playwright-token"    = var.playwright_workspace_token_secret_id
     } : {},
+    var.github_app_private_key_secret_id == "" ? {} : { "github-app-private-key" = var.github_app_private_key_secret_id },
+    var.gitlab_token_secret_id == "" ? {} : { "gitlab-token" = var.gitlab_token_secret_id },
   )
 
   # Environment variable -> Container App secret name.
@@ -100,5 +102,15 @@ locals {
       "PLAYWRIGHT_SERVICE_URL"          = "playwright-endpoint"
       "PLAYWRIGHT_SERVICE_ACCESS_TOKEN" = "playwright-token"
     } : {},
+    var.github_app_private_key_secret_id == "" ? {} : { "SHELF_GITHUB_APP_PRIVATE_KEY" = "github-app-private-key" },
+    var.gitlab_token_secret_id == "" ? {} : { "SHELF_GITLAB_TOKEN" = "gitlab-token" },
   )
+
+  # Git connections (ADR 0054): plain values only; the key and the token are in secret_env.
+  git_env = { for name, value in {
+    SHELF_GITHUB_APP_ID        = var.github_app_id
+    SHELF_GITHUB_API_URL       = var.github_api_url
+    SHELF_GITLAB_TOKEN_EXPIRES = var.gitlab_token_expires
+    SHELF_GITLAB_HOST          = var.gitlab_host
+  } : name => value if value != "" }
 }

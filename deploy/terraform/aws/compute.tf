@@ -67,6 +67,20 @@ locals {
     var.remote_browser_endpoint_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_ENDPOINT", valueFrom = var.remote_browser_endpoint_secret_arn }],
     var.remote_browser_token_secret_arn == "" ? [] : [{ name = "REMOTE_BROWSER_TOKEN", valueFrom = var.remote_browser_token_secret_arn }],
   )
+
+  # Git connections (ADR 0054): each is on only when its reference is set. The key and the token
+  # reach the task as secret references (the execution role reads them), never as plain values.
+  git_environment = concat(
+    var.github_app_id == "" ? [] : [{ name = "SHELF_GITHUB_APP_ID", value = var.github_app_id }],
+    var.github_api_url == "" ? [] : [{ name = "SHELF_GITHUB_API_URL", value = var.github_api_url }],
+    var.gitlab_token_expires == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN_EXPIRES", value = var.gitlab_token_expires }],
+    var.gitlab_host == "" ? [] : [{ name = "SHELF_GITLAB_HOST", value = var.gitlab_host }],
+  )
+
+  git_secrets = concat(
+    var.github_app_private_key_secret_arn == "" ? [] : [{ name = "SHELF_GITHUB_APP_PRIVATE_KEY", valueFrom = var.github_app_private_key_secret_arn }],
+    var.gitlab_token_secret_arn == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN", valueFrom = var.gitlab_token_secret_arn }],
+  )
 }
 
 resource "aws_lb" "main" {
@@ -184,12 +198,12 @@ resource "aws_ecs_task_definition" "app" {
       { name = "SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
       { name = "DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
       { name = "AUTH_EMAIL", value = var.auth_email },
-    ], local.database_environment)
+    ], local.database_environment, local.git_environment)
     secrets = concat([
       { name = "SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "AUTH_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
       { name = "ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
-    ], local.oidc_secrets, local.database_secrets, local.remote_browser_secrets)
+    ], local.oidc_secrets, local.database_secrets, local.remote_browser_secrets, local.git_secrets)
     logConfiguration = {
       logDriver = "awslogs"
       options = {

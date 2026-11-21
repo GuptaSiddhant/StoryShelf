@@ -39,26 +39,30 @@ The module enables the APIs it needs (`run`, `storage`, `secretmanager`, `artifa
 
 ## Inputs
 
-| Name                                | Default            | Meaning                                                                       |
-| ----------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
-| `name`                              | required           | Name prefix, 2-20 characters                                                  |
-| `project_id`                        | required           | GCP project                                                                   |
-| `image_version`                     | required           | Release version of the image (no `v`)                                         |
-| `region`                            | `us-central1`      | Must match the provider's region                                              |
-| `image_repository`                  | `""`               | A full registry path (your mirror). Empty creates the ghcr.io proxy           |
-| `public_base_url`                   | `""`               | `PUBLIC_BASE_URL`, e.g. for a domain you map yourself                         |
-| `network` / `subnetwork`            | `""`               | Existing VPC and subnet (self links). Empty creates them                      |
-| `cpu` / `memory`                    | `2` / `4Gi`        | Capture renders in the container: do not go much lower                        |
-| `min_instances` / `max_instances`   | `1` / `1`          | Identical copies; every copy serves and consumes the queue (ADR 0006)         |
-| `database_pool_size`                | `10`               | Connections per copy: `max_instances` x this must fit the database's limit    |
-| `shutdown_grace_seconds`            | `8`                | See "Shutdown"                                                                |
-| `existing_database_url_secret_id`   | `""`               | A Postgres URL in Secret Manager; no database is created                      |
-| `database_tier`                     | `db-custom-1-3840` | Created database only                                                         |
-| `database_disk_size_gb`             | `10`               | Created database only                                                         |
-| `deletion_protection`               | `true`             | Protects the database and service; `false` also empties the bucket on destroy |
-| `remote_browser_endpoint_secret_id` | `""`               | Optional remote browser (secret reference)                                    |
-| `remote_browser_token_secret_id`    | `""`               | Optional remote browser token (secret reference)                              |
-| `labels`                            | `{}`               | Added to every resource that supports them                                    |
+| Name                                                 | Default            | Meaning                                                                       |
+| ---------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `name`                                               | required           | Name prefix, 2-20 characters                                                  |
+| `project_id`                                         | required           | GCP project                                                                   |
+| `image_version`                                      | required           | Release version of the image (no `v`)                                         |
+| `region`                                             | `us-central1`      | Must match the provider's region                                              |
+| `image_repository`                                   | `""`               | A full registry path (your mirror). Empty creates the ghcr.io proxy           |
+| `public_base_url`                                    | `""`               | `PUBLIC_BASE_URL`, e.g. for a domain you map yourself                         |
+| `network` / `subnetwork`                             | `""`               | Existing VPC and subnet (self links). Empty creates them                      |
+| `cpu` / `memory`                                     | `2` / `4Gi`        | Capture renders in the container: do not go much lower                        |
+| `min_instances` / `max_instances`                    | `1` / `1`          | Identical copies; every copy serves and consumes the queue (ADR 0006)         |
+| `database_pool_size`                                 | `10`               | Connections per copy: `max_instances` x this must fit the database's limit    |
+| `shutdown_grace_seconds`                             | `8`                | See "Shutdown"                                                                |
+| `existing_database_url_secret_id`                    | `""`               | A Postgres URL in Secret Manager; no database is created                      |
+| `database_tier`                                      | `db-custom-1-3840` | Created database only                                                         |
+| `database_disk_size_gb`                              | `10`               | Created database only                                                         |
+| `deletion_protection`                                | `true`             | Protects the database and service; `false` also empties the bucket on destroy |
+| `remote_browser_endpoint_secret_id`                  | `""`               | Optional remote browser (secret reference)                                    |
+| `remote_browser_token_secret_id`                     | `""`               | Optional remote browser token (secret reference)                              |
+| `github_app_id` / `github_app_private_key_secret_id` | `""`               | Server-wide GitHub App connection (both or none; see "Git connections")       |
+| `github_api_url`                                     | `""`               | GitHub Enterprise Server API base; empty means github.com                     |
+| `gitlab_token_secret_id` / `gitlab_token_expires`    | `""`               | Server-wide GitLab connection (both or none)                                  |
+| `gitlab_host`                                        | `""`               | GitLab base URL; empty means gitlab.com                                       |
+| `labels`                                             | `{}`               | Added to every resource that supports them                                    |
 
 ## Outputs
 
@@ -122,16 +126,32 @@ destroying the stack; there is no firewall rule to loosen.
 The service has the `*.run.app` HTTPS origin. For your own domain, map it yourself (a load balancer or
 a Cloud Run domain mapping) and pass `public_base_url`.
 
+## Git connections
+
+Optional, for merge gates and pull-request comments without anyone pasting a key (ADR 0054). Create
+the GitHub App's private key, or a GitLab group or project access token (`api` scope), as a
+Secret Manager secret yourself, then pass its reference. Terraform holds only the reference, so the key
+and the token never enter configuration or state; the app reads them as
+`SHELF_GITHUB_APP_PRIVATE_KEY` and `SHELF_GITLAB_TOKEN`. The service account gets `roles/secretmanager.secretAccessor` on exactly these secrets. A half-set connection fails the plan,
+and the image refuses to boot on one too, naming the variable and never its value. Rotating a key is
+a new secret version and a new revision.
+
+```sh
+gcloud secrets create shelf-github-app-key --data-file=app.private-key.pem
+```
+
 ## Image contract
 
-| Variable                                          | Source                               | Status  |
-| ------------------------------------------------- | ------------------------------------ | ------- |
-| `PUBLIC_BASE_URL`, `TRUST_PROXY`                  | module                               | read    |
-| `DATABASE_URL`, `DATABASE_POOL_MAX`               | Secret Manager, `database_pool_size` | read    |
-| `SECRET`, `ADMIN_TOKEN`                           | Secret Manager                       | read    |
-| `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`              | the created bucket                   | read    |
-| `SHUTDOWN_GRACE_SECONDS`                          | `shutdown_grace_seconds`             | read    |
-| `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN` | secret references                    | pending |
+| Variable                                                                                         | Source                               | Status  |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------ | ------- |
+| `PUBLIC_BASE_URL`, `TRUST_PROXY`                                                                 | module                               | read    |
+| `DATABASE_URL`, `DATABASE_POOL_MAX`                                                              | Secret Manager, `database_pool_size` | read    |
+| `SECRET`, `ADMIN_TOKEN`                                                                          | Secret Manager                       | read    |
+| `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`                                                             | the created bucket                   | read    |
+| `SHUTDOWN_GRACE_SECONDS`                                                                         | `shutdown_grace_seconds`             | read    |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)                | read    |
+| `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secret Manager references (optional) | read    |
+| `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN`                                                | secret references                    | pending |
 
 The image selects Google Cloud Storage from `GCS_BUCKET` (credentials from the service account via
 Application Default Credentials) and refuses to boot when another storage backend is also set. _Pending_

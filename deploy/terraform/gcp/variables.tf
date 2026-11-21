@@ -145,3 +145,52 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+# Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+# GitLab token are Secret Manager secrets you create outside Terraform (same project), so their
+# values never enter configuration or state. Empty keeps a connection off.
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection, passed as SHELF_GITHUB_APP_ID. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret_id" {
+  description = "Secret Manager secret id holding the GitHub App private key (PEM), passed as SHELF_GITHUB_APP_PRIVATE_KEY. Set with github_app_id."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.github_app_id == "") == (var.github_app_private_key_secret_id == "")
+    error_message = "Set both github_app_id and github_app_private_key_secret_id, or neither."
+  }
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3), passed as SHELF_GITHUB_API_URL. Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret_id" {
+  description = "Secret Manager secret id holding a GitLab group or project access token (api scope), passed as SHELF_GITLAB_TOKEN. Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD), passed as SHELF_GITLAB_TOKEN_EXPIRES; the System page warns 30 days before. Set with gitlab_token_secret_id."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.gitlab_token_secret_id == "") == (var.gitlab_token_expires == "")
+    error_message = "Set both gitlab_token_secret_id and gitlab_token_expires, or neither."
+  }
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL, passed as SHELF_GITLAB_HOST. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
+}

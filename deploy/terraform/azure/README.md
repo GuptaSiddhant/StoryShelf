@@ -44,23 +44,27 @@ The database has no public endpoint: only the VNet reaches it.
 
 ## Inputs
 
-| Name                                                           | Default                            | Meaning                                                               |
-| -------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------- |
-| `name`                                                         | required                           | Name prefix, 2-20 characters                                          |
-| `image_version`                                                | required                           | Release version of the image (no `v`)                                 |
-| `allowed_cidr_blocks`                                          | required                           | Who may reach the app                                                 |
-| `location`                                                     | `eastus`                           | Region                                                                |
-| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                           |
-| `cpu` / `memory`                                               | `2` / `4Gi`                        | Capture renders in the container: do not go much lower                |
-| `min_instances` / `max_instances`                              | `1` / `1`                          | Identical copies; at least 1 (see "Capture, scaling and shutdown")    |
-| `database_pool_size`                                           | `10`                               | Connections per copy: `max_instances` x this must fit the database    |
-| `shutdown_grace_seconds`                                       | `30`                               | See "Capture, scaling and shutdown"                                   |
-| `existing_database_url_secret_id`                              | `""`                               | A Postgres URL in Key Vault; no database is created                   |
-| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`        | Created database only                                                 |
-| `deletion_protection`                                          | `true`                             | Delete lock on the database, purge protection on the vault            |
-| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none) |
-| `log_retention_days`                                           | `30`                               | Log Analytics retention                                               |
-| `tags`                                                         | `{}`                               | Added to every taggable resource                                      |
+| Name                                                           | Default                            | Meaning                                                                 |
+| -------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `name`                                                         | required                           | Name prefix, 2-20 characters                                            |
+| `image_version`                                                | required                           | Release version of the image (no `v`)                                   |
+| `allowed_cidr_blocks`                                          | required                           | Who may reach the app                                                   |
+| `location`                                                     | `eastus`                           | Region                                                                  |
+| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                             |
+| `cpu` / `memory`                                               | `2` / `4Gi`                        | Capture renders in the container: do not go much lower                  |
+| `min_instances` / `max_instances`                              | `1` / `1`                          | Identical copies; at least 1 (see "Capture, scaling and shutdown")      |
+| `database_pool_size`                                           | `10`                               | Connections per copy: `max_instances` x this must fit the database      |
+| `shutdown_grace_seconds`                                       | `30`                               | See "Capture, scaling and shutdown"                                     |
+| `existing_database_url_secret_id`                              | `""`                               | A Postgres URL in Key Vault; no database is created                     |
+| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`        | Created database only                                                   |
+| `deletion_protection`                                          | `true`                             | Delete lock on the database, purge protection on the vault              |
+| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none)   |
+| `github_app_id` / `github_app_private_key_secret_id`           | `""`                               | Server-wide GitHub App connection (both or none; see "Git connections") |
+| `github_api_url`                                               | `""`                               | GitHub Enterprise Server API base; empty means github.com               |
+| `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                               | Server-wide GitLab connection (both or none)                            |
+| `gitlab_host`                                                  | `""`                               | GitLab base URL; empty means gitlab.com                                 |
+| `log_retention_days`                                           | `30`                               | Log Analytics retention                                                 |
+| `tags`                                                         | `{}`                               | Added to every taggable resource                                        |
 
 ## Outputs
 
@@ -141,15 +145,31 @@ needs an account that allows shared keys, so it does not work against this modul
   `shutdown_grace_seconds` (`SHUTDOWN_GRACE_SECONDS`), then hands the rest back to the queue. The
   container's termination grace is the grace plus 10 seconds, so it is never killed mid-drain.
 
+## Git connections
+
+Optional, for merge gates and pull-request comments without anyone pasting a key (ADR 0054). Create
+the GitHub App's private key, or a GitLab group or project access token (`api` scope), as a
+Key Vault secret yourself, then pass its reference. Terraform holds only the reference, so the key
+and the token never enter configuration or state; the app reads them as
+`SHELF_GITHUB_APP_PRIVATE_KEY` and `SHELF_GITLAB_TOKEN`. The app's identity reads only this stack's vault (`Key Vault Secrets User`), so create them there, or grant the identity that role on your own vault. A half-set connection fails the plan,
+and the image refuses to boot on one too, naming the variable and never its value. Rotating a key is
+a new secret version and a new revision.
+
+```sh
+az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name GITHUB-APP-PRIVATE-KEY --file app.private-key.pem
+```
+
 ## Image contract
 
-| Variable                                                              | Source                          | Status |
-| --------------------------------------------------------------------- | ------------------------------- | ------ |
-| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`            | module                          | read   |
-| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                         | Key Vault                       | read   |
-| `DATABASE_URL`, `DATABASE_POOL_MAX`                                   | Key Vault, `database_pool_size` | read   |
-| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`           | Key Vault references (optional) | read   |
-| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID` | the module                      | read   |
+| Variable                                                                                         | Source                          | Status |
+| ------------------------------------------------------------------------------------------------ | ------------------------------- | ------ |
+| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`                                       | module                          | read   |
+| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                                    | Key Vault                       | read   |
+| `DATABASE_URL`, `DATABASE_POOL_MAX`                                                              | Key Vault, `database_pool_size` | read   |
+| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`                                      | Key Vault references (optional) | read   |
+| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID`                            | the module                      | read   |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)           | read   |
+| `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Key Vault references (optional) | read   |
 
 The image stores uploads in the Blob container when `AZURE_STORAGE_ACCOUNT` is set (managed identity),
 or `AZURE_STORAGE_CONNECTION` for a host without one. Setting more than one storage backend refuses to

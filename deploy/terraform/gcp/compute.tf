@@ -15,7 +15,17 @@ locals {
     },
     var.remote_browser_endpoint_secret_id == "" ? {} : { REMOTE_BROWSER_ENDPOINT = var.remote_browser_endpoint_secret_id },
     var.remote_browser_token_secret_id == "" ? {} : { REMOTE_BROWSER_TOKEN = var.remote_browser_token_secret_id },
+    var.github_app_private_key_secret_id == "" ? {} : { SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret_id },
+    var.gitlab_token_secret_id == "" ? {} : { SHELF_GITLAB_TOKEN = var.gitlab_token_secret_id },
   )
+
+  # Git connections (ADR 0054): plain values only; the key and the token are in secret_env.
+  git_env = { for name, value in {
+    SHELF_GITHUB_APP_ID        = var.github_app_id
+    SHELF_GITHUB_API_URL       = var.github_api_url
+    SHELF_GITLAB_TOKEN_EXPIRES = var.gitlab_token_expires
+    SHELF_GITLAB_HOST          = var.gitlab_host
+  } : name => value if value != "" }
 }
 
 # Cloud Run cannot pull from ghcr.io. A remote repository proxies the published image through
@@ -128,6 +138,15 @@ resource "google_cloud_run_v2_service" "app" {
 
         content {
           name  = "PUBLIC_BASE_URL"
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.git_env
+
+        content {
+          name  = env.key
           value = env.value
         }
       }

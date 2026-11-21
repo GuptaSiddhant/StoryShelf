@@ -91,6 +91,15 @@ resource "azurerm_container_app" "app" {
       }
 
       dynamic "env" {
+        for_each = local.git_env
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
         for_each = local.secret_env
 
         content {
