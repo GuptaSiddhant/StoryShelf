@@ -25,7 +25,7 @@ locals {
   labels = merge(var.labels, { app = "storyshelf" })
 
   # Cloud Run's deterministic URL, known before the service exists, so the app always gets an https
-  # PUBLIC_BASE_URL (secure session cookies, correct links) even without public_base_url.
+  # SHELF_PUBLIC_BASE_URL (secure session cookies, correct links) even without public_base_url.
   public_base_url = var.public_base_url != "" ? var.public_base_url : "https://${var.name}-app-${data.google_project.this.number}.${var.region}.run.app"
 }
 

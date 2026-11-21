@@ -22,7 +22,7 @@ describe("assertServerless", () => {
 
   it("refuses testing on AWS Lambda", () => {
     expect(() => assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn" })).toThrow(
-      /AWS Lambda.*STORYSHELF_ALLOW_SERVERLESS=1/u,
+      /AWS Lambda.*SHELF_ALLOW_SERVERLESS=1/u,
     );
   });
 
@@ -31,12 +31,18 @@ describe("assertServerless", () => {
     expect(assertServerless(true, { NETLIFY: "true" })).toMatch(/serverless host/u);
   });
 
-  it("is overridden by STORYSHELF_ALLOW_SERVERLESS=1 only", () => {
+  it("is overridden by SHELF_ALLOW_SERVERLESS=1 only", () => {
+    expect(
+      assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", SHELF_ALLOW_SERVERLESS: "1" }),
+    ).toBeUndefined();
+    expect(() =>
+      assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", SHELF_ALLOW_SERVERLESS: "0" }),
+    ).toThrow();
+  });
+
+  it("still takes the old STORYSHELF_ALLOW_SERVERLESS (#1308)", () => {
     expect(
       assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", STORYSHELF_ALLOW_SERVERLESS: "1" }),
     ).toBeUndefined();
-    expect(() =>
-      assertServerless(true, { AWS_LAMBDA_FUNCTION_NAME: "fn", STORYSHELF_ALLOW_SERVERLESS: "0" }),
-    ).toThrow();
   });
 });

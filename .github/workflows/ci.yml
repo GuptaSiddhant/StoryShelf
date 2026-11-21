@@ -517,7 +517,7 @@ jobs:
         run: |
           set -e
           for variant in storyshelf:ci storyshelf:ci-hosting; do
-            # No sign-in on purpose: the image refuses to start without AUTH_PASSWORD unless told.
+            # No sign-in on purpose: the image refuses to start without SHELF_ADMIN_PASSWORD unless told.
             docker run -d --name smoke -p 3000:3000 -e SHELF_AUTH=none "$variant"
             if ! SMOKE_BASE_URL=http://127.0.0.1:3000 bash scripts/smoke.sh; then
               docker logs smoke
@@ -535,11 +535,11 @@ jobs:
         run: |
           set -e
           # No sign-in on purpose, as in the smoke above: the image refuses to start without
-          # AUTH_PASSWORD unless told, and that check runs before the database connection.
+          # SHELF_ADMIN_PASSWORD unless told, and that check runs before the database connection.
           docker run -d --name iam -e SHELF_AUTH=none \
             -e AWS_ACCESS_KEY_ID=x -e AWS_SECRET_ACCESS_KEY=y \
-            -e DATABASE_IAM_HOST=127.0.0.1 -e DATABASE_IAM_PORT=1 \
-            -e DATABASE_IAM_USER=shelf -e DATABASE_IAM_NAME=shelf -e DATABASE_IAM_REGION=us-east-1 \
+            -e SHELF_DATABASE_IAM_HOST=127.0.0.1 -e SHELF_DATABASE_IAM_PORT=1 \
+            -e SHELF_DATABASE_IAM_USER=shelf -e SHELF_DATABASE_IAM_NAME=shelf -e SHELF_DATABASE_IAM_REGION=us-east-1 \
             storyshelf:ci
           for _ in $(seq 1 30); do
             docker logs iam > iam.log 2>&1 || true

@@ -24,7 +24,7 @@ export interface BuildStatePublisherOptions {
 
 /** Logged once when the first request finds no public origin, and again after one came back and went. */
 export const PAUSED_MESSAGE =
-  "notifications are paused until a public URL is set (PUBLIC_BASE_URL or a confirmed detected origin)";
+  "notifications are paused until a public URL is set (SHELF_PUBLIC_BASE_URL or a confirmed detected origin)";
 
 /** A publisher over `options.deps`. */
 export function createBuildStatePublisher(

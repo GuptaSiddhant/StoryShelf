@@ -36,13 +36,13 @@ export function createPlaywrightCaptureRunner(
      * does. A list with no local entry needs no installed browsers.
      */
     browsers?: readonly BrowserEntry[];
-    /** Pages rendered at once; falls back to `STORYSHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
+    /** Pages rendered at once; falls back to `SHELF_CAPTURE_CONCURRENCY`, then CPU/memory detection. */
     concurrency?: number;
-    /** Per-page timeout in ms; falls back to `STORYSHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
+    /** Per-page timeout in ms; falls back to `SHELF_NAVIGATION_TIMEOUT_MS`, then CPU detection. */
     navigationTimeoutMs?: number;
-    /** Captures between browser restarts (0 disables); falls back to `STORYSHELF_BROWSER_RECYCLE_EVERY`, then 150. */
+    /** Captures between browser restarts (0 disables); falls back to `SHELF_BROWSER_RECYCLE_EVERY`, then 150. */
     recycleBrowserEvery?: number;
-    /** Reuse pages between captures (default on); falls back to `STORYSHELF_REUSE_PAGES`, where `0` or `false` turns it off. */
+    /** Reuse pages between captures (default on); falls back to `SHELF_REUSE_PAGES`, where `0` or `false` turns it off. */
     reusePages?: boolean;
     /** Gzip small loopback Storybook assets when requested by the browser (default off). */
     staticCompression?: boolean;

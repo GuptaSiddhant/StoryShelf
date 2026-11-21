@@ -47,7 +47,8 @@ Do this once per project after an upgrade that changed the browser.
    npx storyshelf upload --full
    ```
 
-   `--full` renders every story (see [Affected capture](/concepts/affected-capture/)); `STORYSHELF_FULL=1` does the same for a pipeline. The build is accepted without diffs, and its notice says how many snapshots migrated.
+   `--full` renders every story (see [Affected capture](/concepts/affected-capture/)); `SHELF_FULL=1` does the same for a pipeline. The build is accepted without diffs, and its notice says how many snapshots migrated.
+
 3. **Refresh open feature branches.** Builds captured before the migration compare against the old baselines. When a build shows the stale-baseline banner, use **Re-diff against current baselines**: it compares the stored screenshots with the baseline that applies now, without rendering again. Otherwise push a new commit, or use **Retry capture** in the build's menu. Stories that only differed because of the browser come out `unchanged`. A branch that already **accepted** baselines in the old environment keeps comparing against them, because a branch baseline wins over the default branch; accept those snapshots once more on the branch, or merge the branch.
 4. **Review what is left.** A diff that remains after steps 2 and 3 is not explained by the browser. Treat it as a real change.
 

@@ -62,31 +62,31 @@ resource "azurerm_container_app" "app" {
       memory = var.memory
 
       env {
-        name  = "PUBLIC_BASE_URL"
+        name  = "SHELF_PUBLIC_BASE_URL"
         value = local.public_base_url
       }
       env {
-        name  = "TRUST_PROXY"
+        name  = "SHELF_TRUST_PROXY"
         value = "1"
       }
       env {
-        name  = "AUTH_EMAIL"
-        value = var.auth_email
+        name  = "SHELF_ADMIN_EMAIL"
+        value = var.admin_email
       }
       env {
-        name  = "SHUTDOWN_GRACE_SECONDS"
+        name  = "SHELF_SHUTDOWN_GRACE_SECONDS"
         value = tostring(var.shutdown_grace_seconds)
       }
       env {
-        name  = "DATABASE_POOL_MAX"
+        name  = "SHELF_DATABASE_POOL_MAX"
         value = tostring(var.database_pool_size)
       }
       env {
-        name  = "AZURE_STORAGE_ACCOUNT"
+        name  = "SHELF_AZURE_ACCOUNT"
         value = azurerm_storage_account.main.name
       }
       env {
-        name  = "AZURE_STORAGE_CONTAINER"
+        name  = "SHELF_AZURE_CONTAINER"
         value = azurerm_storage_container.storybook.name
       }
       env {

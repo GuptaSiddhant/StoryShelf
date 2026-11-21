@@ -3,7 +3,12 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import {
+  parseTrustProxy,
+  readSetting,
+  renamedSettingsIn,
+  warnRenamedSettings,
+} from "@storyshelf/core/config";
 import {
   createEmailNotifier,
   gitFromEnv,
@@ -17,18 +22,18 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
 /**
  * The StoryShelf product image's server (`docker run ghcr.io/guptasiddhant/storyshelf`).
  *
- * Everything comes from the environment: `DATABASE_URL`, or `DATABASE_IAM_HOST` + `DATABASE_IAM_USER` +
- * `DATABASE_IAM_NAME` + `DATABASE_IAM_REGION` for RDS IAM login (SQLite on `/data` when neither is set),
- * `DATABASE_POOL_MAX`, `DATABASE_CA` / `DATABASE_CA_FILE`, `AWS_BUCKET`, `GCS_BUCKET` or Azure Blob (`AZURE_STORAGE_CONTAINER` is required, with either
- * `AZURE_STORAGE_ACCOUNT` [+ `AZURE_CLIENT_ID`] or `AZURE_STORAGE_CONNECTION`) for one object store (local storage on `/data` when none is set),
- * `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it), `PUBLIC_BASE_URL`, `AUTH_PASSWORD`,
- * `AUTH_EMAIL`, `SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
+ * Everything comes from the environment: `DATABASE_URL`, or `SHELF_DATABASE_IAM_HOST` + `SHELF_DATABASE_IAM_USER` +
+ * `SHELF_DATABASE_IAM_NAME` + `SHELF_DATABASE_IAM_REGION` for RDS IAM login (SQLite on `/data` when neither is set),
+ * `SHELF_DATABASE_POOL_MAX`, `SHELF_DATABASE_CA` / `SHELF_DATABASE_CA_FILE`, `SHELF_S3_BUCKET`, `SHELF_GCS_BUCKET` or Azure Blob (`SHELF_AZURE_CONTAINER` is required, with either
+ * `SHELF_AZURE_ACCOUNT` [+ `AZURE_CLIENT_ID`] or `SHELF_AZURE_CONNECTION_STRING`) for one object store (local storage on `/data` when none is set),
+ * `SHELF_SECRET` (`SHELF_SECRET_PREVIOUS` and `SHELF_SECRET_MIGRATE` to rotate it), `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD`,
+ * `SHELF_ADMIN_EMAIL`, `SHELF_SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
  * `SHELF_GITHUB_APP_PRIVATE_KEY[_FILE]`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`,
  * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
- * `SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
+ * `SHELF_SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
- * `AUTH_PASSWORD` and `SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
+ * `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
  * missing or short secret stops the server. Bundled by rolldown (`rolldown.config.ts`).
  */
 import { mkdirSync } from "node:fs";
@@ -48,15 +53,6 @@ import { exitBy, shutdownGraceMs } from "./shutdown.ts";
 
 const env = process.env;
 
-const dataDir = env["DATA_DIR"] ?? "/data";
-const port = Number(env["PORT"] ?? 3000);
-const hostname = "0.0.0.0";
-const secret = nonEmpty(env["SECRET"]);
-const publicBaseUrl = nonEmpty(env["PUBLIC_BASE_URL"]);
-// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
-const graceMs = shutdownGraceMs(env);
-const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
-
 // Every refusal below throws before the server listens. Node would print the throwing source line
 // and a bundle stack, so a refusal prints only its reason (naming the variable, never its value);
 // any other error still prints its stack.
@@ -64,6 +60,19 @@ process.on("uncaughtException", (error) => {
   process.stderr.write(describeBootFailure(error));
   process.exit(1);
 });
+// Old variable names still work (#1308): two names of one setting set to different values stop
+// boot here, naming both variables; each old name in use is logged once the logger exists.
+renamedSettingsIn(env);
+
+const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
+const port = Number(env["PORT"] ?? 3000);
+const hostname = "0.0.0.0";
+const secret = nonEmpty(readSetting(env, "SHELF_SECRET"));
+const publicBaseUrl = nonEmpty(readSetting(env, "SHELF_PUBLIC_BASE_URL"));
+// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+const graceMs = shutdownGraceMs(env);
+const trustProxy = parseTrustProxy(readSetting(env, "SHELF_TRUST_PROXY"));
+
 const imageAuth = authFromEnv(env);
 const storybookHosting = storybookHostingFromEnv(env);
 
@@ -72,15 +81,16 @@ const { database, log: databaseLog } = databaseFromEnv(env, dataDir);
 const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
+warnRenamedSettings(env, shelfLogger);
 shelfLogger.info({ ...databaseLog, ...storageLog }, "adapters");
 if (unverifiedDatabaseTls(env)) {
   shelfLogger.warn(
     { sslmode: "unverified" },
-    "DATABASE_URL asks for TLS without checking the database certificate; set DATABASE_CA (or DATABASE_CA_FILE) and sslmode=verify-full",
+    "DATABASE_URL asks for TLS without checking the database certificate; set SHELF_DATABASE_CA (or SHELF_DATABASE_CA_FILE) and sslmode=verify-full",
   );
 }
 
-// Every built-in integration is registered (ADR 0049); with SMTP_* set the `email` notifier sends through it.
+// Every built-in integration is registered (ADR 0049); with SHELF_SMTP_* set the `email` notifier sends through it.
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 // SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
 const integrations = integrationsFromEnv(env);
@@ -98,7 +108,7 @@ const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
 
-// Sign-in first: a short SECRET throws here, before anything listens.
+// Sign-in first: a short SHELF_SECRET throws here, before anything listens.
 const auth =
   imageAuth.mode === "password"
     ? createShelfAuth({
@@ -107,7 +117,7 @@ const auth =
         baseURL: publicBaseUrl ?? `http://localhost:${port}`,
         passkeys: {},
         emailSender,
-        fromEmail: env["SMTP_FROM"],
+        fromEmail: readSetting(env, "SHELF_SMTP_FROM"),
         onAuthSystemEvent: createAuthSystemHook(),
         logger: shelfLogger,
       }).adapter
@@ -125,7 +135,7 @@ const app = createShelfApp({
         emailSender
           ? builtIn.map((provider) =>
               provider.metadata.kind === "email"
-                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                ? createEmailNotifier(emailSender, { from: readSetting(env, "SHELF_SMTP_FROM") })
                 : provider,
             )
           : builtIn,
@@ -137,9 +147,9 @@ const app = createShelfApp({
   config: {
     secret,
     // Rotation (guides/deployment/secret-rotation): the old key decrypts until credentials move.
-    previousSecret: nonEmpty(env["SECRET_PREVIOUS"]),
-    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
-    adminToken: env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"],
+    previousSecret: nonEmpty(readSetting(env, "SHELF_SECRET_PREVIOUS")),
+    migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
+    adminToken: readSetting(env, "SHELF_ADMIN_TOKEN"),
     publicBaseUrl,
     ...(storybookHosting === undefined ? {} : { storybookHosting }),
     ...(trustProxy === undefined ? {} : { trustProxy }),
@@ -153,7 +163,7 @@ const logger = app.lifecycle.logger;
 
 if (imageAuth.mode === "password") {
   await ensurePasswordAdmin(database, { email: imageAuth.email, password: imageAuth.password });
-  logger.info({ email: imageAuth.email }, "Local admin login enabled from AUTH_PASSWORD");
+  logger.info({ email: imageAuth.email }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
 } else if (!isLoopback(hostname)) {
   logger.warn({ hostname }, "SHELF_AUTH=none on a non-loopback address: every route is open");
 }

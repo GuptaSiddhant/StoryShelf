@@ -4,13 +4,13 @@
 # shows real pixel diffs. Run from the repo root after building packages/cli and
 # fixtures/storybook-9 (needs curl and jq).
 #
-#   STORYSHELF_URL=https://storyshelf.fly.dev STORYSHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
+#   SHELF_URL=https://storyshelf.fly.dev SHELF_ADMIN_TOKEN=... apps/fly-app/seed.sh
 #
 # Idempotent: build SHAs derive from the fixture's index.json, so an unchanged fixture is a
 # no-op and a changed one deletes the demo project and seeds it again.
 set -euo pipefail
 
-: "${STORYSHELF_URL:?}" "${STORYSHELF_ADMIN_TOKEN:?}"
+: "${SHELF_URL:?}" "${SHELF_ADMIN_TOKEN:?}"
 SLUG=demo-design-system
 FIXTURE=fixtures/storybook-9
 STATIC="$PWD/$FIXTURE/storybook-static"

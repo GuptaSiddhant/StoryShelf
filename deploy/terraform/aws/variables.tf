@@ -99,13 +99,13 @@ variable "max_instances" {
 }
 
 variable "database_pool_size" {
-  description = "Most database connections each copy opens (DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
+  description = "Most database connections each copy opens (SHELF_DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
   type        = number
   default     = 10
 }
 
 variable "shutdown_grace_seconds" {
-  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHUTDOWN_GRACE_SECONDS). The ECS stop timeout and the load balancer deregistration delay are set from it."
+  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHELF_SHUTDOWN_GRACE_SECONDS). The ECS stop timeout and the load balancer deregistration delay are set from it."
   type        = number
   default     = 30
 
@@ -157,13 +157,13 @@ variable "database_init_image" {
 }
 
 variable "enable_cognito" {
-  description = "Create the Cognito user pool, client and OIDC_CLIENT_SECRET. Off by default: the image does not read OIDC yet, so they would be unused."
+  description = "Create the Cognito user pool, client and SHELF_OIDC_CLIENT_SECRET. Off by default: the image does not read OIDC yet, so they would be unused."
   type        = bool
   default     = false
 }
 
-variable "auth_email" {
-  description = "Email of the local admin login created from AUTH_PASSWORD (AUTH_EMAIL)."
+variable "admin_email" {
+  description = "Email of the local admin login created from SHELF_ADMIN_PASSWORD (SHELF_ADMIN_EMAIL)."
   type        = string
   default     = "admin@example.com"
 }

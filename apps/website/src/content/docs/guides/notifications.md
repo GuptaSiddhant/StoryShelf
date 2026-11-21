@@ -19,15 +19,15 @@ In **Settings → Notifications** or via API:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "provider": "slack-webhook", "events": ["build:reviewing"], "config": { "style": "compact" }, "secret": "https://hooks.slack.com/..." }'
 ```
 
 - `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be registered (every built-in is, unless `ShelfOptions.notifications.notifiers` says otherwise), and unknown kinds are a 400.
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
-- Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
-- **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected. Events that happen while notifications are paused are not delivered later: chat, email and system messages for them are lost, and only the current state of open builds is sent again to git channels once a public URL resolves.
+- Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SHELF_SECRET` and decrypted only in memory at send time.
+- **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`SHELF_PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected. Events that happen while notifications are paused are not delivered later: chat, email and system messages for them are lost, and only the current state of open builds is sent again to git channels once a public URL resolves.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
 
 ## Git channels (commit statuses and check runs)
@@ -36,7 +36,7 @@ A git channel (the built-in `github` and `gitlab` providers) belongs to a projec
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "provider": "github", "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" }, "secret": "ghp_..." }'
 ```
@@ -70,21 +70,21 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and swap it into the built-in `email` notifier (see [Choosing the providers](#choosing-the-providers)). Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `ses` (Amazon SES over SMTP), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
-| Env                       | Purpose                             | Default  |
-| ------------------------- | ----------------------------------- | -------- |
-| `SMTP_HOST`               | SMTP relay host (unset = no sender) | —        |
-| `SMTP_PORT`               | Relay port                          | `587`    |
-| `SMTP_SECURE`             | `1`/`true` for implicit TLS (465)   | STARTTLS |
-| `SMTP_USER` / `SMTP_PASS` | Relay credentials                   | —        |
-| `SMTP_FROM`               | Sender address (`fromEmail`)        | —        |
+| Env                                   | Purpose                             | Default  |
+| ------------------------------------- | ----------------------------------- | -------- |
+| `SHELF_SMTP_HOST`                     | SMTP relay host (unset = no sender) | —        |
+| `SHELF_SMTP_PORT`                     | Relay port                          | `587`    |
+| `SHELF_SMTP_SECURE`                   | `1`/`true` for implicit TLS (465)   | STARTTLS |
+| `SHELF_SMTP_USER` / `SHELF_SMTP_PASS` | Relay credentials                   | —        |
+| `SHELF_SMTP_FROM`                     | Sender address (`fromEmail`)        | —        |
 
 **Amazon SES.** `sesPresetFromEnv` (or `sesPreset({ region, user, pass, from })`) points the same SMTP transport at `email-smtp.<region>.amazonaws.com:587` with STARTTLS; there is no AWS SDK.
 
-| Env                                  | Purpose                                                       |
-| ------------------------------------ | ------------------------------------------------------------- |
-| `SES_REGION` (or `AWS_REGION`)       | SES region, such as `eu-west-1`                               |
-| `SES_SMTP_USER` / `SES_SMTP_PASS`    | SES SMTP credentials (not an IAM access key)                  |
-| `SES_FROM`                           | Sender address; its address or domain must be a verified SES identity in that region |
+| Env                                           | Purpose                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SHELF_SES_REGION` (or `AWS_REGION`)          | SES region, such as `eu-west-1`                                                      |
+| `SHELF_SES_SMTP_USER` / `SHELF_SES_SMTP_PASS` | SES SMTP credentials (not an IAM access key)                                         |
+| `SHELF_SES_FROM`                              | Sender address; its address or domain must be a verified SES identity in that region |
 
 Verify the sending identity in the SES console first; a new account is in the SES sandbox and can only send to verified recipients until you request production access.
 
@@ -98,7 +98,7 @@ Password recovery is both: users can request a reset email when a sender is conf
 
 ## Choosing the providers
 
-Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SHELF_SMTP_HOST` and `SHELF_SMTP_FROM`, or a sender you pass); `nodemailer` is needed only for SMTP: `npm install nodemailer`.
 
 A project is offered only the integrations the server can deliver. Without an email transport, email is unavailable: projects see no email option and no **My notifications** card, and creating an email channel through the API answers 400 with the reason. The same holds for a provider the operator turned off. A channel that already exists for such a provider is kept but hidden from its project and not delivered to; **System → Integrations** lists every integration as available, unavailable (with the reason) or turned off, and the channels held back. Site admins also see one line in a project's settings naming what is missing. Turn the integration back on and its channels return. The site-admin `POST /api/v1/health` lists the same under `integrations`.
 
@@ -126,7 +126,7 @@ createShelfApp({
     notifiers: (builtIn) => [
       ...builtIn.map((provider) =>
         provider.metadata.kind === "email" && emailSender
-          ? createEmailNotifier(emailSender, { from: process.env.SMTP_FROM })
+          ? createEmailNotifier(emailSender, { from: process.env.SHELF_SMTP_FROM })
           : provider,
       ),
       myPagerNotifier, // a NotifierProvider of your own, with a unique `kind`

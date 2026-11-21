@@ -9,6 +9,7 @@ import {
   writeStorybookConfig,
 } from "../config.ts";
 import { printError, printLine } from "../output.ts";
+import { readSetting } from "../settings.ts";
 
 /** Options for the `init` command (client config). */
 export interface InitOptions {
@@ -119,8 +120,8 @@ function mergeWithExisting(
   options: InitOptions,
   existing: StorybookConfig | null,
 ): MergedInitOptions {
-  const url = options.url ?? process.env["STORYSHELF_URL"];
-  const slug = options.slug ?? process.env["STORYSHELF_SLUG"];
+  const url = options.url ?? readSetting(process.env, "SHELF_URL");
+  const slug = options.slug ?? readSetting(process.env, "SHELF_SLUG");
   if (!existing) {
     return {
       url,
@@ -256,8 +257,8 @@ async function trySyncToken(
 /** Candidate tokens for the meta sync, in try order. */
 function collectSyncTokens(token?: string): string[] {
   return [
-    token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"],
-    process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"],
+    token ?? readSetting(process.env, "SHELF_TOKEN"),
+    readSetting(process.env, "SHELF_ADMIN_TOKEN"),
   ].filter((candidate): candidate is string => Boolean(candidate));
 }
 

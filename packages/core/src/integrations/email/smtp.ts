@@ -1,5 +1,6 @@
 import type { Transporter } from "nodemailer";
 import type { EmailMessage, EmailSender } from "../../adapters/email-sender.ts";
+import { readSetting } from "../../env-settings/read.ts";
 import type { Logger } from "../../logger.ts";
 import type { SmtpPresetOptions } from "./types.ts";
 import { version } from "./version.ts";
@@ -62,9 +63,9 @@ export async function smtpPreset(
 }
 
 /**
- * SMTP sender from the environment (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
- * `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`). Returns undefined unless
- * `SMTP_HOST` is set, so unconfigured servers keep current behavior.
+ * SMTP sender from the environment (`SHELF_SMTP_HOST`, `SHELF_SMTP_PORT`, `SHELF_SMTP_SECURE`,
+ * `SHELF_SMTP_USER`, `SHELF_SMTP_PASS`, `SHELF_SMTP_FROM`). Returns undefined unless
+ * `SHELF_SMTP_HOST` is set, so unconfigured servers keep current behavior.
  *
  * Needs the optional `nodemailer` peer when a sender is built.
  */
@@ -76,22 +77,24 @@ export async function smtpPresetFromEnv(
   return options ? await smtpPreset({ ...options, logger }) : undefined;
 }
 
-/** The SMTP options in `env`, or undefined unless `SMTP_HOST` and `SMTP_FROM` are both set. */
+/** The SMTP options in `env`, or undefined unless `SHELF_SMTP_HOST` and `SHELF_SMTP_FROM` are both set. */
 function smtpOptionsFromEnv(
   env: Record<string, string | undefined>,
 ): SmtpPresetOptions | undefined {
-  const host = env["SMTP_HOST"];
-  const from = env["SMTP_FROM"];
+  const host = readSetting(env, "SHELF_SMTP_HOST");
+  const from = readSetting(env, "SHELF_SMTP_FROM");
   if (!host || !from) {
     return undefined;
   }
-  const port = Number(env["SMTP_PORT"] ?? 587);
+  const port = Number(readSetting(env, "SHELF_SMTP_PORT") ?? 587);
   return {
     host,
     port: Number.isSafeInteger(port) && port > 0 ? port : 587,
-    secure: env["SMTP_SECURE"] === "1" || env["SMTP_SECURE"] === "true",
-    user: env["SMTP_USER"],
-    pass: env["SMTP_PASS"],
+    secure:
+      readSetting(env, "SHELF_SMTP_SECURE") === "1" ||
+      readSetting(env, "SHELF_SMTP_SECURE") === "true",
+    user: readSetting(env, "SHELF_SMTP_USER"),
+    pass: readSetting(env, "SHELF_SMTP_PASS"),
     from,
   };
 }

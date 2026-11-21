@@ -2,6 +2,7 @@ import { access } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { detectPackageRunner, installCommand } from "../../config.ts";
 import { printError } from "../../output.ts";
+import { overrideSetting } from "../../settings.ts";
 import { defaultSpawnProcess, type SpawnProcess } from "../server/serve.ts";
 
 export interface McpServeOptions {
@@ -57,9 +58,9 @@ export async function runMcpServe(
 
 function childEnv(options: McpServeOptions): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  if (options.url !== undefined) env["STORYSHELF_URL"] = options.url;
-  if (options.slug !== undefined) env["STORYSHELF_SLUG"] = options.slug;
-  if (options.token !== undefined) env["STORYSHELF_TOKEN"] = options.token;
+  if (options.url !== undefined) overrideSetting(env, "SHELF_URL", options.url);
+  if (options.slug !== undefined) overrideSetting(env, "SHELF_SLUG", options.slug);
+  if (options.token !== undefined) overrideSetting(env, "SHELF_TOKEN", options.token);
   if (options.port !== undefined) env["PORT"] = options.port;
   return env;
 }

@@ -204,7 +204,7 @@ The old stack read the RDS-managed master password from Secrets Manager at start
 
 The module creates the instance with IAM authentication on (`iam_database_authentication_enabled`), and the migration applies that in place, with no restart of the app's data.
 
-1. Apply the migrated stack. The task role gets `rds-db:connect` for the database user the module names in its `db_iam_user` output (`shelf`), and the container starts with `DATABASE_IAM_HOST`, `DATABASE_IAM_USER`, `DATABASE_IAM_NAME` and `DATABASE_IAM_REGION` instead of `DATABASE_URL`.
+1. Apply the migrated stack. The task role gets `rds-db:connect` for the database user the module names in its `db_iam_user` output (`shelf`), and the container starts with `SHELF_DATABASE_IAM_HOST`, `SHELF_DATABASE_IAM_USER`, `SHELF_DATABASE_IAM_NAME` and `SHELF_DATABASE_IAM_REGION` instead of `DATABASE_URL`.
 2. Once, from inside the VPC, connect with the master secret (`db_master_secret_arn`) and run:
 
    ```sql
@@ -212,6 +212,7 @@ The module creates the instance with IAM authentication on (`iam_database_authen
    ```
 
    **Run this last.** After the grant `shelf` can log in only with an IAM token; its password, including the master secret, stops working. To keep a usable password login for administration, create a separate application user, grant it `rds_iam` and the schema rights it needs, and set the module's database user to it.
+
 3. Let the ECS service roll and check `/api/v1/health`.
 
 An existing database you manage yourself can stay as it is: set `existing_database_url_secret_arn` to a secret that holds the connection URL.

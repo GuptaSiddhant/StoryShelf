@@ -29,7 +29,7 @@ output "database_url_secret_id" {
 }
 
 output "admin_token_secret_id" {
-  description = "Secret Manager secret id of the break-glass ADMIN_TOKEN (read it with gcloud; it is not an output value)."
+  description = "Secret Manager secret id of the break-glass SHELF_ADMIN_TOKEN (read it with gcloud; it is not an output value)."
   value       = google_secret_manager_secret.admin_token.secret_id
 }
 
@@ -46,7 +46,7 @@ output "service_account_roles" {
   )
 }
 
-output "auth_password_secret_id" {
+output "admin_password_secret_id" {
   description = "Secret Manager id of the generated admin password (read it with gcloud; it is not an output value)."
   value       = google_secret_manager_secret.auth_password.secret_id
 }

@@ -34,9 +34,9 @@ Two auth mechanisms are supported:
 Create a token from the project settings page (**Tokens** tab) or with the CLI (requires site-admin token):
 
 ```sh
-npx storyshelf create --url $STORYSHELF_URL --name MyProject --token $STORYSHELF_ADMIN_TOKEN
+npx storyshelf create --url $SHELF_URL --name MyProject --token $SHELF_ADMIN_TOKEN
 # or initialize client config for an existing project:
-npx storyshelf init --url $STORYSHELF_URL --slug my-project
+npx storyshelf init --url $SHELF_URL --slug my-project
 ```
 
 Unconfigured servers (no auth adapter) accept all requests.
@@ -70,19 +70,19 @@ The core CI flow in three calls:
 1. **List (or create) the project**
 
    ```sh
-   curl -sS $STORYSHELF_URL/api/v1/projects
+   curl -sS $SHELF_URL/api/v1/projects
    ```
 
 2. **Upload the built Storybook** — create the build with JSON metadata, then stream the zip
 
    ```sh
-   CREATE=$(curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds \
-     -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+   CREATE=$(curl -sS -X POST $SHELF_URL/api/v1/projects/my-app/builds \
+     -H "Authorization: Bearer $SHELF_TOKEN" \
      -H "Content-Type: application/json" \
      -d "{\"gitSha\":\"$GITHUB_SHA\",\"gitBranch\":\"$GITHUB_REF_NAME\"}")
    UPLOAD_URL=$(echo "$CREATE" | jq -r .uploadUrl)
    curl -sS --fail-with-body -X PUT "$STORYSHELF_URL$UPLOAD_URL" \
-     -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+     -H "Authorization: Bearer $SHELF_TOKEN" \
      -H "Content-Type: application/zip" \
      --data-binary @storybook-static.zip
    ```
@@ -92,14 +92,14 @@ The core CI flow in three calls:
 3. **Follow the build to its terminal state**
 
    ```sh
-   curl -sS $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>
+   curl -sS $SHELF_URL/api/v1/projects/my-app/builds/<buildId>
    ```
 
    Query builds by `?status=` and `?branch=`, and filter by a label value with `?labelKey=` + `?labelValue=`:
 
    ```sh
-   curl -sS "$STORYSHELF_URL/api/v1/projects/my-app/builds?branch=main"
-   curl -sS "$STORYSHELF_URL/api/v1/projects/my-app/builds?labelKey=environment&labelValue=staging"
+   curl -sS "$SHELF_URL/api/v1/projects/my-app/builds?branch=main"
+   curl -sS "$SHELF_URL/api/v1/projects/my-app/builds?labelKey=environment&labelValue=staging"
    ```
 
    The label filter returns only builds carrying that label value (AND with any `status`/`branch` filters).
@@ -109,13 +109,13 @@ The core CI flow in three calls:
 Snapshots with a pixel diff are `status: changed`. Approving a changed snapshot copies it to the branch baseline (per-branch baselines with default-branch fallback, ADR 0009):
 
 ```sh
-curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/snapshots/<snapshotId>/approve
+curl -sS -X POST $SHELF_URL/api/v1/projects/my-app/builds/<buildId>/snapshots/<snapshotId>/approve
 ```
 
 Or approve everything at once:
 
 ```sh
-curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/approve-all
+curl -sS -X POST $SHELF_URL/api/v1/projects/my-app/builds/<buildId>/approve-all
 ```
 
 If the baseline changed after the diff was computed (for example a merge to the default branch re-baselined
@@ -124,7 +124,7 @@ not review. Recompute the diffs against the current baselines from the stored sc
 builds are never recaptured automatically):
 
 ```sh
-curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/rediff
+curl -sS -X POST $SHELF_URL/api/v1/projects/my-app/builds/<buildId>/rediff
 ```
 
 or approve anyway with `?force=true` on the `approve` / `approve-all` endpoint. `approve-all` skips snapshots
@@ -133,7 +133,7 @@ with a changed baseline and lists their ids in `skipped`.
 Raw PNGs are served per snapshot — image, pixel-diff overlay, and baseline:
 
 ```sh
-curl -sS $STORYSHELF_URL/api/v1/projects/my-app/builds/<buildId>/snapshots/<snapshotId>/image
+curl -sS $SHELF_URL/api/v1/projects/my-app/builds/<buildId>/snapshots/<snapshotId>/image
 ```
 
 ## Label types
@@ -142,23 +142,23 @@ Project-defined build label schemas live under `/api/v1/projects/{slug}/label-ty
 
 ```sh
 # List label types
-curl -sS $STORYSHELF_URL/api/v1/projects/my-app/label-types
+curl -sS $SHELF_URL/api/v1/projects/my-app/label-types
 
 # Create a label type
-curl -sS -X POST $STORYSHELF_URL/api/v1/projects/my-app/label-types \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+curl -sS -X POST $SHELF_URL/api/v1/projects/my-app/label-types \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "key": "environment", "name": "Environment", "color": "#0f766e" }'
 
 # Update a label type (any of name / linkTemplate / color)
-curl -sS -X PATCH $STORYSHELF_URL/api/v1/projects/my-app/label-types/environment \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+curl -sS -X PATCH $SHELF_URL/api/v1/projects/my-app/label-types/environment \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "color": "#0f766e", "linkTemplate": "https://console.example.com/env/{value}" }'
 
 # Delete a label type
-curl -sS -X DELETE $STORYSHELF_URL/api/v1/projects/my-app/label-types/environment \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN"
+curl -sS -X DELETE $SHELF_URL/api/v1/projects/my-app/label-types/environment \
+  -H "Authorization: Bearer $SHELF_TOKEN"
 ```
 
 The built-in `persistent` and `branch` label types are seeded and read-only — `PATCH`/`DELETE` on them returns `400`. `PATCH` returns the updated `LabelType`; `DELETE` returns `204`.
@@ -178,7 +178,7 @@ Every error body is `{ "error": { "message": string } }`. Requests that an HTMX 
 Because the spec is a static JSON document, you can drive code generation or SDK tooling from it:
 
 ```sh
-curl -sS $STORYSHELF_URL/api/v1/openapi.json > openapi.json
+curl -sS $SHELF_URL/api/v1/openapi.json > openapi.json
 ```
 
 Point your favorite OpenAPI generator (or the Swagger UI console at `/api/v1/docs`) at the file. The schemas at the bottom of the document (e.g. `Project`, `Build`, `Snapshot`) are the canonical shapes for the API types.

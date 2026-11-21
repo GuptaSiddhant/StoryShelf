@@ -19,7 +19,7 @@ StoryShelf works without git. `sha` and `branch` are opaque strings throughout t
 A project with no git at all uploads with zero identity flags:
 
 ```bash
-storyshelf upload --token $STORYSHELF_TOKEN
+storyshelf upload --token $SHELF_TOKEN
 # No git checkout detected — using synthetic identity sha=local-a1b2c3d4e5f6 branch="local" (pass --sha/--branch to override)
 ```
 
@@ -30,7 +30,7 @@ Synthetic shas are unique per upload (satisfying the build identity constraint) 
 A branch is a baseline namespace, not necessarily a git branch. Pass an environment name to get isolated baselines per environment:
 
 ```bash
-storyshelf upload --token $STORYSHELF_TOKEN --sha <run-id> --branch staging
+storyshelf upload --token $SHELF_TOKEN --sha <run-id> --branch staging
 ```
 
 Pair with `public_branch_regex` to publish per-environment Storybooks. Accepts on `staging` never affect `main` baselines, and every environment still falls back to the default branch for stories it hasn't baselined itself.
@@ -40,7 +40,7 @@ Pair with `public_branch_regex` to publish per-environment Storybooks. Accepts o
 A pipeline that builds the Storybook without cloning — artifact-driven CI, design tools exporting static builds — uploads with explicit values per run:
 
 ```bash
-storyshelf upload --token $STORYSHELF_TOKEN --sha <run-id> --branch <env>
+storyshelf upload --token $SHELF_TOKEN --sha <run-id> --branch <env>
 ```
 
 Each unique sha chains baselines normally. Omitting both falls back to synthetic identity (see above); omitting one resolves the other through the same chain.

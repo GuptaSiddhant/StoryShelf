@@ -1,7 +1,12 @@
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import {
+  parseTrustProxy,
+  readSetting,
+  renamedSettingsIn,
+  warnRenamedSettings,
+} from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
@@ -34,36 +39,40 @@ if (legacy.length > 0) {
       .join("\n")}`,
   );
 }
-const dataDir = env["DATA_DIR"] ?? ".dev-data";
+// Old variable names still work (#1308): two names of one setting set to different values stop
+// boot here; each old name in use is logged once the logger exists.
+renamedSettingsIn(env);
+const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
+const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
-const secret = env["SECRET"];
-const authPassword = env["AUTH_PASSWORD"];
-const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
-const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
-const publicBaseUrl = env["PUBLIC_BASE_URL"];
+const secret = readSetting(env, "SHELF_SECRET");
+const authPassword = readSetting(env, "SHELF_ADMIN_PASSWORD");
+const authEmail = readSetting(env, "SHELF_ADMIN_EMAIL") ?? "admin@example.com";
+const adminToken = readSetting(env, "SHELF_ADMIN_TOKEN");
+const publicBaseUrl = readSetting(env, "SHELF_PUBLIC_BASE_URL");
 // Proxies allowed to name the client for rate limits (#911); unset trusts none.
-const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
+const trustProxy = parseTrustProxy(readSetting(env, "SHELF_TRUST_PROXY"));
 
-// Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
+// Scheduled build purge is opt-in (ADR 0039): `SHELF_PURGE_TTL_DAYS` turns it on; unset leaves it off, so
 // an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
 function purgeTtlDaysFromEnv(): number | undefined {
-  const raw = env["PURGE_TTL_DAYS"];
+  const raw = readSetting(env, "SHELF_PURGE_TTL_DAYS");
   if (raw === undefined || raw === "") return undefined;
   if (!/^[1-9]\d*$/u.test(raw)) {
-    throw new Error("PURGE_TTL_DAYS must be a positive whole number of days");
+    throw new Error("SHELF_PURGE_TTL_DAYS must be a positive whole number of days");
   }
   return Number(raw);
 }
 const purgeTtlDays = purgeTtlDaysFromEnv();
 
-// Bound of the SIGTERM drain (#912): `SHUTDOWN_GRACE_SECONDS` hands the jobs still running near its
+// Bound of the SIGTERM drain (#912): `SHELF_SHUTDOWN_GRACE_SECONDS` hands the jobs still running near its
 // end back to the queue, without spending an attempt. Unset waits for every job. Mirrors
 // apps/fly-app/shutdown.ts (without its Fly default).
 function shutdownGraceMsFromEnv(): number | undefined {
-  const raw = env["SHUTDOWN_GRACE_SECONDS"];
+  const raw = readSetting(env, "SHELF_SHUTDOWN_GRACE_SECONDS");
   if (raw === undefined || raw === "") return undefined;
   if (!/^\d+$/u.test(raw)) {
-    throw new Error("SHUTDOWN_GRACE_SECONDS must be a whole number of seconds");
+    throw new Error("SHELF_SHUTDOWN_GRACE_SECONDS must be a whole number of seconds");
   }
   return Number(raw) * 1000;
 }
@@ -118,6 +127,7 @@ const ui = buildUi();
 // the pino mixin correlates every log line with the active trace.
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
+warnRenamedSettings(env, shelfLogger);
 
 // Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
 // SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
@@ -133,18 +143,18 @@ const app = createShelfApp({
       emailSender
         ? builtIn.map((provider) =>
             provider.metadata.kind === "email"
-              ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+              ? createEmailNotifier(emailSender, { from: smtpFrom })
               : provider,
           )
         : builtIn,
-    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
+    ...(smtpFrom ? { config: { fromEmail: smtpFrom } } : {}),
   },
-  // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
+  // Enable local-account login by setting SHELF_ADMIN_PASSWORD (and SHELF_SECRET): the
   // engine provisions an admin identity from the env on every boot.
-  // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
+  // SHELF_ADMIN_PASSWORD must be at least 12 characters; SHELF_ADMIN_EMAIL overrides the
   // admin address (defaults to admin@example.com). No viewer tier exists anymore.
   auth:
-    // AUTH_PASSWORD without a valid SECRET refuses to start (createShelfAuth throws); never auth off.
+    // SHELF_ADMIN_PASSWORD without a valid SHELF_SECRET refuses to start (createShelfAuth throws); never auth off.
     authPassword
       ? createShelfAuth({
           db: database,
@@ -152,7 +162,7 @@ const app = createShelfApp({
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
-          fromEmail: env["SMTP_FROM"],
+          fromEmail: smtpFrom,
           onAuthSystemEvent: createAuthSystemHook(),
           logger: shelfLogger,
         }).adapter
@@ -161,14 +171,14 @@ const app = createShelfApp({
   logger: shelfLogger,
   observability,
   config: {
-    // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
+    // `SHELF_SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
-    // `STORYSHELF_ADMIN_TOKEN` bootstraps site-admin API access.
+    // `SHELF_ADMIN_TOKEN` bootstraps site-admin API access.
     // `serverTiming` emits Server-Timing response headers (total + db/storage).
     secret,
-    // Rotation: keep the old SECRET here until stored credentials are re-encrypted.
-    previousSecret: env["SECRET_PREVIOUS"] === "" ? undefined : env["SECRET_PREVIOUS"],
-    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
+    // Rotation: keep the old SHELF_SECRET here until stored credentials are re-encrypted.
+    previousSecret: readSetting(env, "SHELF_SECRET_PREVIOUS") || undefined,
+    migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
     adminToken,
     publicBaseUrl,
     ...(trustProxy === undefined ? {} : { trustProxy }),
@@ -183,7 +193,7 @@ const logger = app.lifecycle.logger;
 
 if (authPassword) {
   await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
+  logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
 }
 
 const server = serve({ fetch: app.fetch, port }, () => {

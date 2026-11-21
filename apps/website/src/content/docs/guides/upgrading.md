@@ -35,9 +35,58 @@ Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0
 
 4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.
 
+### StoryShelf's environment variables use the `SHELF_` prefix
+
+**Who is affected:** everyone who sets StoryShelf's variables (a server, the image, the CLI in CI, an MCP client). Nothing breaks: every old name still works.
+
+StoryShelf's own settings are now `SHELF_*`. A name stays unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning: `PORT`, `HOST`, `NODE_ENV`, `DATABASE_URL`, `AWS_*`, `AZURE_CLIENT_ID`, `GOOGLE_CLOUD_PROJECT`, `OTEL_*`, `PLAYWRIGHT_SERVICE_*`, `ANTHROPIC_API_KEY`, `TURSO_*`, and platform facts such as `CI_*`, `GITHUB_*`, `VERCEL_*` and `FLY_APP_NAME`.
+
+- An old name is still read. The server logs one warning per old name at boot, `{ old, new }`, never the value; the CLI prints one line per old name.
+- An old and a new name of one setting with **different** values stop the server (and the CLI command), naming both variables and never a value. The same value under both names is accepted, with the warning.
+- Old names keep working until at least the third minor release after 1.0. Removing them will be its own breaking release note.
+- `storyshelf server init` and the Terraform modules write only the new names. A server you generated earlier keeps its own `process.env` reads; change them when you rename the variables.
+
+To move, set the new name with the same value, deploy, then unset the old name (secrets first: `SHELF_SECRET`, `SHELF_ADMIN_TOKEN`, `SHELF_ADMIN_PASSWORD`). In CI, rename the variable your workflow passes (`SHELF_TOKEN`); the repository secret behind it can keep its name.
+
+| Old name                                                                                         | New name                                                                           |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `SECRET`                                                                                         | `SHELF_SECRET`                                                                     |
+| `SECRET_PREVIOUS`                                                                                | `SHELF_SECRET_PREVIOUS`                                                            |
+| `SECRET_MIGRATE`                                                                                 | `SHELF_SECRET_MIGRATE`                                                             |
+| `ADMIN_TOKEN`, `STORYSHELF_ADMIN_TOKEN`                                                          | `SHELF_ADMIN_TOKEN`                                                                |
+| `AUTH_PASSWORD`                                                                                  | `SHELF_ADMIN_PASSWORD`                                                             |
+| `AUTH_EMAIL`                                                                                     | `SHELF_ADMIN_EMAIL`                                                                |
+| `PUBLIC_BASE_URL`                                                                                | `SHELF_PUBLIC_BASE_URL`                                                            |
+| `DATA_DIR`                                                                                       | `SHELF_DATA_DIR`                                                                   |
+| `TRUST_PROXY`                                                                                    | `SHELF_TRUST_PROXY`                                                                |
+| `LOG_LEVEL`                                                                                      | `SHELF_LOG_LEVEL`                                                                  |
+| `CAPTURE_CONCURRENCY`, `STORYSHELF_CAPTURE_CONCURRENCY`                                          | `SHELF_CAPTURE_CONCURRENCY`                                                        |
+| `PURGE_TTL_DAYS`                                                                                 | `SHELF_PURGE_TTL_DAYS`                                                             |
+| `SHUTDOWN_GRACE_SECONDS`                                                                         | `SHELF_SHUTDOWN_GRACE_SECONDS`                                                     |
+| `AWS_BUCKET`, `S3_BUCKET`, `BUCKET_NAME`                                                         | `SHELF_S3_BUCKET`                                                                  |
+| `GCS_BUCKET`                                                                                     | `SHELF_GCS_BUCKET`                                                                 |
+| `AZURE_STORAGE_ACCOUNT`                                                                          | `SHELF_AZURE_ACCOUNT`                                                              |
+| `AZURE_STORAGE_CONTAINER`                                                                        | `SHELF_AZURE_CONTAINER`                                                            |
+| `AZURE_STORAGE_CONNECTION`                                                                       | `SHELF_AZURE_CONNECTION_STRING`                                                    |
+| `DATABASE_CA`, `DATABASE_CA_FILE`                                                                | `SHELF_DATABASE_CA`, `SHELF_DATABASE_CA_FILE`                                      |
+| `DATABASE_POOL_MAX`                                                                              | `SHELF_DATABASE_POOL_MAX`                                                          |
+| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`, `_PORT`                                        | `SHELF_DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`, `_PORT`                    |
+| `SMTP_HOST`, `_PORT`, `_SECURE`, `_USER`, `_PASS`, `_FROM`                                       | `SHELF_SMTP_HOST`, `_PORT`, `_SECURE`, `_USER`, `_PASS`, `_FROM`                   |
+| `SES_REGION`, `SES_SMTP_USER`, `SES_SMTP_PASS`, `SES_FROM`                                       | `SHELF_SES_REGION`, `SHELF_SES_SMTP_USER`, `SHELF_SES_SMTP_PASS`, `SHELF_SES_FROM` |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                                            | `SHELF_OIDC_ISSUER`, `SHELF_OIDC_CLIENT_ID`, `SHELF_OIDC_CLIENT_SECRET`            |
+| `FIGMA_CLIENT_ID`, `FIGMA_CLIENT_SECRET`                                                         | `SHELF_FIGMA_CLIENT_ID`, `SHELF_FIGMA_CLIENT_SECRET`                               |
+| `STORYSHELF_URL`, `STORYSHELF_HOST`                                                              | `SHELF_URL`                                                                        |
+| `STORYSHELF_TOKEN`                                                                               | `SHELF_TOKEN` (already read before)                                                |
+| `STORYSHELF_SLUG`                                                                                | `SHELF_SLUG`                                                                       |
+| `STORYSHELF_FULL`, `STORYSHELF_ZIP`, `STORYSHELF_SKIP_UNCHANGED`                                 | `SHELF_FULL`, `SHELF_ZIP`, `SHELF_SKIP_UNCHANGED`                                  |
+| `STORYSHELF_ALLOW_SERVERLESS`                                                                    | `SHELF_ALLOW_SERVERLESS`                                                           |
+| `STORYSHELF_DIFF_WORKERS`, `STORYSHELF_IMAGE_ENGINE`                                             | `SHELF_DIFF_WORKERS`, `SHELF_IMAGE_ENGINE`                                         |
+| `STORYSHELF_REUSE_PAGES`, `STORYSHELF_BROWSER_RECYCLE_EVERY`, `STORYSHELF_NAVIGATION_TIMEOUT_MS` | `SHELF_REUSE_PAGES`, `SHELF_BROWSER_RECYCLE_EVERY`, `SHELF_NAVIGATION_TIMEOUT_MS`  |
+| `STORYSHELF_OTEL_ENABLED`, `STORYSHELF_OTEL_METRICS_INTERVAL_MS`                                 | `SHELF_OTEL_ENABLED`, `SHELF_OTEL_METRICS_INTERVAL_MS`                             |
+
 ### Nothing else is pending
 
-Besides the runner, no other breaking or changed entry is waiting in `.changeset/` today.
+Besides the runner and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
 
 ## 0.14.0 (2026-11-21)
 

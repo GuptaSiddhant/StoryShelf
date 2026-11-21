@@ -26,16 +26,16 @@ versions together and reading the release notes. A runnable example is in `examp
 
 ## What it creates
 
-| Part     | Resources                                                                       |
-| -------- | ------------------------------------------------------------------------------- |
-| Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway  |
-| Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling      |
-| Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)        |
-| Storage  | S3 bucket: private, versioned, encrypted, TLS only                              |
-| Identity | Optional (`enable_cognito`): Cognito user pool, app client, SAML federation     |
-| Secrets  | Secrets Manager: `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET` |
-| DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener              |
-| Logs     | CloudWatch log group                                                            |
+| Part     | Resources                                                                                                |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway                           |
+| Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling                               |
+| Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)                                 |
+| Storage  | S3 bucket: private, versioned, encrypted, TLS only                                                       |
+| Identity | Optional (`enable_cognito`): Cognito user pool, app client, SAML federation                              |
+| Secrets  | Secrets Manager: `SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, `SHELF_OIDC_CLIENT_SECRET` |
+| DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener                                       |
+| Logs     | CloudWatch log group                                                                                     |
 
 Tasks run in the public subnets with a public IP (to pull the image and reach AWS APIs) and their
 security group admits only the ALB. The database is reachable from the task security group only.
@@ -62,8 +62,8 @@ security group admits only the ALB. The database is reachable from the task secu
 | `database_allocated_storage`                          | `20`                                      | GiB, created database only                                                                                     |
 | `database_backup_retention_days`                      | `7`                                       | Automated backup retention in days (1-35)                                                                      |
 | `database_init_image`                                 | ECR Public `postgres:16-alpine` by digest | Image of the `db-init` container (needs `psql`); it receives the master credentials, so pin a mirror by digest |
-| `enable_cognito`                                      | `false`                                   | Create the Cognito pool, client and `OIDC_CLIENT_SECRET` (image does not read OIDC yet)                        |
-| `auth_email`                                          | `admin@example.com`                       | Local admin login email (`AUTH_EMAIL`)                                                                         |
+| `enable_cognito`                                      | `false`                                   | Create the Cognito pool, client and `SHELF_OIDC_CLIENT_SECRET` (image does not read OIDC yet)                  |
+| `admin_email`                                         | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                  |
 | `deletion_protection`                                 | `true`                                    | Database protection and final snapshot; `false` also empties the bucket on destroy                             |
 | `github_app_id` / `github_app_private_key_secret_arn` | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                        |
 | `github_api_url`                                      | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                      |
@@ -76,24 +76,24 @@ security group admits only the ALB. The database is reachable from the task secu
 
 `url`, `alb_dns_name`, `s3_bucket`, `db_endpoint`, `db_master_secret_arn`, `db_iam_user`,
 `user_pool_id`, `app_client_id`, `cluster_name`, `service_name`, `admin_token_secret_arn`,
-`auth_password_secret_arn`, `oidc_client_secret_arn`, `task_role_arn`, `task_role_policy_json` and
+`admin_password_secret_arn`, `oidc_client_secret_arn`, `task_role_arn`, `task_role_policy_json` and
 `execution_role_policy_json`. Secret outputs are ARNs (references), never values.
 
 ## Secrets
 
 App secrets reach the task as ECS `secrets` references from Secrets Manager. No output carries a value.
 
-- **`SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`** are generated (`random_password`). **Terraform
+- **`SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`** are generated (`random_password`). **Terraform
   state holds their values, so it must be encrypted** (for example an S3 backend with KMS and a
   restricted bucket policy) and readable by few people.
-- **Sign-in.** The image turns sign-in on when `AUTH_PASSWORD` and `SECRET` are both set, and the
+- **Sign-in.** The image turns sign-in on when `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` are both set, and the
   module always sets both, so the app never boots open. Read the password with
-  `aws secretsmanager get-secret-value --secret-id "$(terraform output -raw auth_password_secret_arn)"`
-  and sign in as `admin@example.com` (or `auth_email`). The load balancer admits only
+  `aws secretsmanager get-secret-value --secret-id "$(terraform output -raw admin_password_secret_arn)"`
+  and sign in as `admin@example.com` (or `admin_email`). The load balancer admits only
   `allowed_cidr_blocks`.
 - **Cognito** is off (`enable_cognito = false`): the image does not read OIDC yet, so the user pool,
-  client and `OIDC_CLIENT_SECRET` are not created.
-- **`OIDC_CLIENT_SECRET`** (with `enable_cognito`) is an operator step. Terraform writes `change-me` once and never
+  client and `SHELF_OIDC_CLIENT_SECRET` are not created.
+- **`SHELF_OIDC_CLIENT_SECRET`** (with `enable_cognito`) is an operator step. Terraform writes `change-me` once and never
   overwrites it. Put the real value in and restart the service:
 
   ```sh
@@ -168,9 +168,9 @@ execution role, so the task role has no logs permission.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
-  rest back to the queue. The module sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay
+  rest back to the queue. The module sets `SHELF_SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay
   (equal to the grace) and the ECS `stopTimeout` (the grace plus 10 seconds; Fargate allows at most
-  120). The image reads `SHUTDOWN_GRACE_SECONDS` and bounds its drain by it, so the three agree.
+  120). The image reads `SHELF_SHUTDOWN_GRACE_SECONDS` and bounds its drain by it, so the three agree.
 
 ## Domain and TLS
 
@@ -213,20 +213,20 @@ marked _not read_, which the image does not use yet.
 
 | Variable                                                                                         | Source                                | Status   |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------- | -------- |
-| `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY`                                     | module                                | read     |
-| `SHUTDOWN_GRACE_SECONDS`                                                                         | `shutdown_grace_seconds`              | read     |
-| `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                                                         | Secrets Manager                       | read     |
-| `AUTH_EMAIL`                                                                                     | `auth_email`                          | read     |
+| `SHELF_S3_BUCKET`, `AWS_REGION`, `SHELF_PUBLIC_BASE_URL`, `SHELF_TRUST_PROXY`                    | module                                | read     |
+| `SHELF_SHUTDOWN_GRACE_SECONDS`                                                                   | `shutdown_grace_seconds`              | read     |
+| `SHELF_SECRET`, `SHELF_ADMIN_TOKEN`, `SHELF_ADMIN_PASSWORD`                                      | Secrets Manager                       | read     |
+| `SHELF_ADMIN_EMAIL`                                                                              | `admin_email`                         | read     |
 | `DATABASE_URL`                                                                                   | `existing_database_url_secret_arn`    | read     |
-| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`                                                 | the created RDS instance              | read     |
-| `DATABASE_POOL_MAX`                                                                              | `database_pool_size`                  | read     |
+| `SHELF_DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`                                           | the created RDS instance              | read     |
+| `SHELF_DATABASE_POOL_MAX`                                                                        | `database_pool_size`                  | read     |
 | `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)                 | read     |
 | `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secrets Manager references (optional) | read     |
-| `OIDC_CLIENT_SECRET` (with `enable_cognito`)                                                     | Secrets Manager                       | not read |
+| `SHELF_OIDC_CLIENT_SECRET` (with `enable_cognito`)                                               | Secrets Manager                       | not read |
 
-The image reads the `DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses
+The image reads the `SHELF_DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses
 to start when they are set but incomplete, and never falls back to SQLite. Cognito sign-in is not
-wired: the image does not read the OIDC settings yet, so sign in with `AUTH_PASSWORD`.
+wired: the image does not read the OIDC settings yet, so sign in with `SHELF_ADMIN_PASSWORD`.
 
 ## Checks
 

@@ -9,6 +9,7 @@ import {
   writeStorybookConfig,
 } from "../config.ts";
 import { printError, printLine } from "../output.ts";
+import { readSetting } from "../settings.ts";
 
 /** Options for the `create` command (project creation). */
 export interface CreateOptions {
@@ -16,7 +17,7 @@ export interface CreateOptions {
   url?: string;
   /** Project name. */
   name?: string;
-  /** Admin token (fallback to STORYSHELF_ADMIN_TOKEN / ADMIN_TOKEN env); not needed when the server has sign-in off. */
+  /** Admin token (fallback to SHELF_ADMIN_TOKEN / SHELF_ADMIN_TOKEN env); not needed when the server has sign-in off. */
   token?: string;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
@@ -43,9 +44,9 @@ async function readCreateInputs(options: CreateOptions, cwd: string): Promise<Cr
   const rawName = options.name === "" ? undefined : options.name;
   const name = rawName ?? (await detectPackageName(cwd));
   return {
-    url: options.url ?? process.env["STORYSHELF_URL"] ?? process.env["STORYSHELF_HOST"],
+    url: options.url ?? readSetting(process.env, "SHELF_URL"),
     name: name ?? undefined,
-    token: options.token ?? process.env["STORYSHELF_ADMIN_TOKEN"] ?? process.env["ADMIN_TOKEN"],
+    token: options.token ?? readSetting(process.env, "SHELF_ADMIN_TOKEN"),
     gitRepository: detectGitRepository(cwd) ?? undefined,
     gitDefaultBranch: detectGitDefaultBranch(cwd) ?? undefined,
     storybookMeta: await detectStorybookMeta(cwd),
@@ -54,7 +55,7 @@ async function readCreateInputs(options: CreateOptions, cwd: string): Promise<Cr
 
 function createInputError(inputs: CreateInputs): string | null {
   if (!inputs.url) {
-    return "--url is required (or STORYSHELF_URL env)";
+    return "--url is required (or SHELF_URL env)";
   }
   if (!inputs.name) {
     return "--name is required (or ensure package.json has a name)";
@@ -64,7 +65,7 @@ function createInputError(inputs: CreateInputs): string | null {
 
 /** Why the server needs an admin token, shown when none was given and sign-in is on or unknown. */
 const TOKEN_REQUIRED =
-  "--token is required for site-admin (or STORYSHELF_ADMIN_TOKEN env) because the server has sign-in enabled";
+  "--token is required for site-admin (or SHELF_ADMIN_TOKEN env) because the server has sign-in enabled";
 
 /** Whether the server reports sign-in on; an unreachable or older server counts as off (the old behaviour). */
 async function serverHasAuth(url: string): Promise<boolean> {
@@ -136,7 +137,7 @@ function printTokenPointer(url: string, slug: string): void {
     `The server has sign-in on, so no CI token is created here (one made with the admin token could not upload).`,
   );
   printLine(
-    `Next: open ${url.replace(/\/+$/u, "")}/projects/${slug}/builds, sign in, create a token under "Get your first build", and store it as STORYSHELF_TOKEN.`,
+    `Next: open ${url.replace(/\/+$/u, "")}/projects/${slug}/builds, sign in, create a token under "Get your first build", and store it as SHELF_TOKEN.`,
   );
 }
 
@@ -149,14 +150,14 @@ async function mintCiToken(
   try {
     const tokenRes = (await client.projects.tokens.create(slug, { name: "ci" })) as TokenResponse;
     printLine(`CI token: ${tokenRes.token}`);
-    printLine("Store CI token in secrets (STORYSHELF_TOKEN) — not in git");
+    printLine("Store CI token in secrets (SHELF_TOKEN) — not in git");
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     printError(
       `Project "${slug}" was created and ${written} written, but the CI token could not be created: ${reason}`,
     );
     printError(
-      `Next: create a token for "${slug}" in the project's settings (or rerun with a valid --token), then store it as STORYSHELF_TOKEN. Do not run create again: the project exists.`,
+      `Next: create a token for "${slug}" in the project's settings (or rerun with a valid --token), then store it as SHELF_TOKEN. Do not run create again: the project exists.`,
     );
     process.exitCode = 1;
   }

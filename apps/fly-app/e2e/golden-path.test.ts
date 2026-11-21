@@ -1,8 +1,8 @@
 /**
- * Browser golden path against the running Fly container (issue #941; gated by `STORYSHELF_E2E=1`).
+ * Browser golden path against the running Fly container (issue #941; gated by `SHELF_E2E=1`).
  *
  * The Fly dry run (`.github/workflows/fly-dry-run.yml`, `e2e: true`) has already booted the
- * production image with password sign-in and a confirmed `PUBLIC_BASE_URL`, and seeded the demo
+ * production image with password sign-in and a confirmed `SHELF_PUBLIC_BASE_URL`, and seeded the demo
  * with `apps/fly-app/seed.sh` (a `main` baseline). This spec adds what a person does next: upload
  * one changed build to a feature branch, sign in, review it with the keyboard, check the git status
  * the verdict produced (the `git-log` provider, read from `docker logs`), open the private build's
@@ -26,11 +26,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 const run = promisify(execFile);
 const env = process.env;
-const enabled = env["STORYSHELF_E2E"] === "1";
+const enabled = env["SHELF_E2E"] === "1";
 const repoRoot = resolve(import.meta.dirname, "../../..");
 
-const BASE = env["STORYSHELF_URL"] ?? "http://127.0.0.1:3000";
-const ADMIN_TOKEN = env["STORYSHELF_ADMIN_TOKEN"] ?? "";
+const BASE = env["SHELF_URL"] ?? "http://127.0.0.1:3000";
+const SHELF_ADMIN_TOKEN = env["SHELF_ADMIN_TOKEN"] ?? "";
 const EMAIL = env["E2E_EMAIL"] ?? "";
 const PASSWORD = env["E2E_PASSWORD"] ?? "";
 const CONTAINER = env["E2E_CONTAINER"] ?? "storyshelf";
@@ -60,7 +60,7 @@ interface BuildBody {
 
 const api = async <T>(path: string): Promise<T> => {
   const response = await fetch(`${BASE}/api/v1${path}`, {
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    headers: { authorization: `Bearer ${SHELF_ADMIN_TOKEN}` },
   });
   if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
   return (await response.json()) as T;
@@ -69,7 +69,7 @@ const api = async <T>(path: string): Promise<T> => {
 const apiPost = async (path: string, body: unknown): Promise<void> => {
   const response = await fetch(`${BASE}/api/v1${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${SHELF_ADMIN_TOKEN}`, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -97,7 +97,7 @@ async function upload(buildDir: string, sha: string): Promise<string> {
     "--slug",
     SLUG,
     "--token",
-    ADMIN_TOKEN,
+    SHELF_ADMIN_TOKEN,
     "--sha",
     sha,
     "--branch",
@@ -145,8 +145,8 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
 
   beforeAll(async () => {
     expect(
-      ADMIN_TOKEN && EMAIL && PASSWORD,
-      "STORYSHELF_ADMIN_TOKEN, E2E_EMAIL, E2E_PASSWORD",
+      SHELF_ADMIN_TOKEN && EMAIL && PASSWORD,
+      "SHELF_ADMIN_TOKEN, E2E_EMAIL, E2E_PASSWORD",
     ).toBeTruthy();
     scratch = await mkdtemp(join(tmpdir(), "storyshelf-e2e-"));
     browser = await chromium.launch();

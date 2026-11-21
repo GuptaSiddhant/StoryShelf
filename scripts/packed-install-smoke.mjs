@@ -269,12 +269,12 @@ async function startServer(project) {
     env: {
       ...process.env,
       PORT: String(port),
-      DATA_DIR: join(project, "data"),
-      SECRET,
+      SHELF_DATA_DIR: join(project, "data"),
+      SHELF_SECRET: SECRET,
       // The default scaffold uses local accounts, which need all three variables.
-      PUBLIC_BASE_URL: `http://127.0.0.1:${port}`,
-      AUTH_PASSWORD: PASSWORD,
-      STORYSHELF_ADMIN_TOKEN: ADMIN_TOKEN,
+      SHELF_PUBLIC_BASE_URL: `http://127.0.0.1:${port}`,
+      SHELF_ADMIN_PASSWORD: PASSWORD,
+      SHELF_ADMIN_TOKEN: ADMIN_TOKEN,
     },
     // Its own process group, so stopping it also stops the node process `npm start` runs.
     detached: true,
@@ -359,7 +359,7 @@ async function createAndUpload(cli, url, sb) {
   ];
   const uploaded = run(process.execPath, [cli, "upload", ...uploadArgs], {
     cwd: sb,
-    env: { ...process.env, STORYSHELF_TOKEN: ciToken },
+    env: { ...process.env, SHELF_TOKEN: ciToken },
   });
   console.log(uploaded);
   return ciToken;

@@ -22,4 +22,4 @@ export const STATE_GITIGNORE = ["*.tfstate*", ".terraform/", "tfplan"] as const;
 
 /** Printed after the stub is written: the local state is a secret, not a build artifact. */
 export const STATE_WARNING =
-  "The Terraform state holds the generated secrets (SECRET, ADMIN_TOKEN, passwords): keep it in an encrypted remote backend, never in git.";
+  "The Terraform state holds the generated secrets (SHELF_SECRET, SHELF_ADMIN_TOKEN, passwords): keep it in an encrypted remote backend, never in git.";

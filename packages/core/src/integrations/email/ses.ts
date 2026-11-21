@@ -1,4 +1,5 @@
 import type { EmailSender } from "../../adapters/email-sender.ts";
+import { readSetting } from "../../env-settings/read.ts";
 import type { Logger } from "../../logger.ts";
 import { smtpPreset } from "./smtp.ts";
 import type { SesPresetOptions } from "./types.ts";
@@ -35,18 +36,18 @@ export async function sesPreset(
 }
 
 /**
- * SES sender from the environment (`SES_REGION` or `AWS_REGION`, `SES_SMTP_USER`,
- * `SES_SMTP_PASS`, `SES_FROM`). Returns undefined unless all four resolve, so unconfigured
+ * SES sender from the environment (`SHELF_SES_REGION` or `AWS_REGION`, `SHELF_SES_SMTP_USER`,
+ * `SHELF_SES_SMTP_PASS`, `SHELF_SES_FROM`). Returns undefined unless all four resolve, so unconfigured
  * servers keep current behavior.
  */
 export async function sesPresetFromEnv(
   env: Record<string, string | undefined> = process.env,
   logger?: Logger,
 ): Promise<EmailSender | undefined> {
-  const region = env["SES_REGION"] ?? env["AWS_REGION"];
-  const user = env["SES_SMTP_USER"];
-  const pass = env["SES_SMTP_PASS"];
-  const from = env["SES_FROM"];
+  const region = readSetting(env, "SHELF_SES_REGION") ?? env["AWS_REGION"];
+  const user = readSetting(env, "SHELF_SES_SMTP_USER");
+  const pass = readSetting(env, "SHELF_SES_SMTP_PASS");
+  const from = readSetting(env, "SHELF_SES_FROM");
   if (!region || !user || !pass || !from) {
     return undefined;
   }

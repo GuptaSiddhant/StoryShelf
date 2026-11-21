@@ -312,7 +312,7 @@ sequenceDiagram
     Orc->>Orc: scratchDir cleanup
 ```
 
-**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
+**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `SHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
 
 ---
 
@@ -507,7 +507,7 @@ erDiagram
         text id PK
         text project_id FK
         text url
-        text secret_encrypted "AES-256-GCM with SECRET"
+        text secret_encrypted "AES-256-GCM with SHELF_SECRET"
         text events "JSON array or null=all"
         text created_at
         text updated_at
@@ -767,7 +767,7 @@ flowchart TB
         Queue2["Database queue<br/>concurrency 2"]
     end
 
-    Compose["docker-compose.yml<br/>ports 3000:3000<br/>env: SECRET, CAPTURE_CONCURRENCY,<br/>PURGE_TTL_DAYS, OIDC_*/AUTH_PASSWORD"]
+    Compose["docker-compose.yml<br/>ports 3000:3000<br/>env: SHELF_SECRET, SHELF_CAPTURE_CONCURRENCY,<br/>SHELF_PURGE_TTL_DAYS, SHELF_OIDC_*/SHELF_ADMIN_PASSWORD"]
     CI2["CI — storyshelf upload"]
 
     CI2 --> Node

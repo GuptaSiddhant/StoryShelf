@@ -16,7 +16,7 @@ Only baselines move. Builds, snapshots, and review history are transient by desi
 ## Export
 
 ```sh
-curl -fsS -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+curl -fsS -H "Authorization: Bearer $SHELF_TOKEN" \
   -o baselines.zip \
   "https://storyshelf.example.com/api/v1/projects/my-app/baselines/export"
 ```
@@ -28,7 +28,7 @@ Anyone who can view the project (role **viewer** or higher, including project to
 ## Import
 
 ```sh
-curl -fsS -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+curl -fsS -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/zip" \
   --data-binary @baselines.zip \
   "https://storyshelf.example.com/api/v1/projects/my-app/baselines/import"
@@ -128,7 +128,7 @@ curl -fsS -H "Authorization: Bearer $PROD_APPROVER_TOKEN" -H "Content-Type: appl
 **Nightly backup**
 
 ```sh
-curl -fsS -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+curl -fsS -H "Authorization: Bearer $SHELF_TOKEN" \
   -o "baselines-$(date +%F).zip" \
   "https://storyshelf.example.com/api/v1/projects/my-app/baselines/export"
 ```

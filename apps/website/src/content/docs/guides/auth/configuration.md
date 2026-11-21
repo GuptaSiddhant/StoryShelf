@@ -12,8 +12,8 @@ import { resolveAuthOptions } from "@storyshelf/auth";
 
 const authOptions = await resolveAuthOptions({
   db: database,
-  secret: "{env:SECRET}",
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: "{env:SHELF_SECRET}",
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
   sso: { providers: [...] },
   resolveSecrets: async (names) => vault.read(names),
 });

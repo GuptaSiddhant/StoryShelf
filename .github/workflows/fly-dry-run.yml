@@ -5,7 +5,7 @@ name: Fly dry run
 # the demo captures. Called by ci.yml and nightly.yml.
 #
 # `e2e: true` adds the browser golden path (#941) on the same container: password sign-in and a
-# confirmed PUBLIC_BASE_URL are switched on at boot, and after the seed `apps/fly-app/e2e` uploads
+# confirmed SHELF_PUBLIC_BASE_URL are switched on at boot, and after the seed `apps/fly-app/e2e` uploads
 # one changed build, signs in, approves it with the keyboard, checks the git status recorded by the
 # `git-log` provider and the private Storybook, and runs axe on the pages it visits. Off by default;
 # ci.yml turns it on for `release/v*` PRs and manual runs, nightly.yml always.
@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      STORYSHELF_URL: http://127.0.0.1:3000
-      STORYSHELF_ADMIN_TOKEN: ci-admin-token
+      SHELF_URL: http://127.0.0.1:3000
+      SHELF_ADMIN_TOKEN: ci-admin-token
       # Throwaway values for the e2e container only (the password is 12+ characters).
       E2E_EMAIL: reviewer@example.com
       E2E_PASSWORD: e2e-password-123
@@ -56,13 +56,13 @@ jobs:
           # With e2e: password sign-in and a confirmed public origin, as a deployment would have.
           extra=()
           if [ "${{ inputs.e2e }}" = "true" ]; then
-            extra=(-e SECRET="$E2E_SECRET" -e AUTH_EMAIL="$E2E_EMAIL" -e AUTH_PASSWORD="$E2E_PASSWORD" \
-              -e PUBLIC_BASE_URL="$STORYSHELF_URL")
+            extra=(-e SHELF_SECRET="$E2E_SECRET" -e SHELF_ADMIN_EMAIL="$E2E_EMAIL" -e SHELF_ADMIN_PASSWORD="$E2E_PASSWORD" \
+              -e SHELF_PUBLIC_BASE_URL="$SHELF_URL")
           fi
           docker run -d --name storyshelf -p 3000:3000 \
-            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" "${extra[@]}" storyshelf-fly
+            -e SHELF_ADMIN_TOKEN="$SHELF_ADMIN_TOKEN" "${extra[@]}" storyshelf-fly
           for i in $(seq 1 30); do
-            curl -fsS "$STORYSHELF_URL/api/v1/health" && exit 0
+            curl -fsS "$SHELF_URL/api/v1/health" && exit 0
             sleep 2
           done
           echo "::error::the Fly image did not become healthy"
@@ -74,8 +74,8 @@ jobs:
       - name: Demo captures through the pipeline
         run: |
           for i in $(seq 1 90); do
-            status="$(curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
-              "$STORYSHELF_URL/api/v1/projects/demo-design-system/builds" | jq -r '[.[].status] | join(" ")')"
+            status="$(curl -fsS -H "Authorization: Bearer $SHELF_ADMIN_TOKEN" \
+              "$SHELF_URL/api/v1/projects/demo-design-system/builds" | jq -r '[.[].status] | join(" ")')"
             echo "build statuses: $status"
             case "$status" in
               *failed*) echo "::error::a demo build failed"; exit 1 ;;

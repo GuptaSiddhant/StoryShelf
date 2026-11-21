@@ -173,7 +173,9 @@ jobs:
             wait_healthy prev
             docker stop prev && docker rm prev
           fi
-          # SHELF_AUTH=none: the official image refuses to start without AUTH_PASSWORD unless told.
+          # SHELF_AUTH=none: the official image refuses to start without SHELF_ADMIN_PASSWORD unless told.
+          # The previous release's names on purpose (#1308): an upgrade keeps the operator's old
+          # variables, so the next image must boot on them through its aliases.
           docker run -d --name next -p 3000:3000 -v demo-data:/data -e SECRET="$SECRET" \
             -e PORT=3000 -e DATA_DIR=/data -e SHELF_AUTH=none demo-next
           wait_healthy next

@@ -180,7 +180,7 @@ export interface ShelfConfig {
    */
   migrateCredentialsOnBoot?: boolean;
   /**
-   * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
+   * Bootstrap site-admin bearer token (`SHELF_ADMIN_TOKEN`).
    * Grants site-admin API access when no admin user exists yet; never
    * mint sessions from it. Distinct from `secret` (session signing).
    */
@@ -205,7 +205,7 @@ export interface ShelfConfig {
   /**
    * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
    * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
-   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   * buckets. Hosts map it from `SHELF_TRUST_PROXY` with {@link parseTrustProxy}.
    */
   trustProxy?: TrustProxy;
   /**
@@ -348,7 +348,7 @@ const MAX_TRUSTED_HOPS = 10;
 const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
 
 /**
- * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * Map a `SHELF_TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
  * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
  * of IPs or CIDRs (checked by {@link validateConfig}).
  */
@@ -605,7 +605,7 @@ export interface ShelfNotificationsOptions {
 export interface ShelfCompareOptions {
   /**
    * Worker threads for pixel diffs: default CPU count minus one (min 1), `0` diffs on the main
-   * thread. Takes precedence over `STORYSHELF_DIFF_WORKERS`.
+   * thread. Takes precedence over `SHELF_DIFF_WORKERS`.
    */
   threads?: number;
 }
@@ -615,7 +615,7 @@ export interface ShelfImagesOptions {
   /**
    * Image library for diffs, diff overlays and AI thumbnails: `"pngjs"` (default, pure JavaScript,
    * runs anywhere) or `"sharp"` (native, several times faster on large PNGs; needs the optional
-   * `sharp` package installed). Falls back to `STORYSHELF_IMAGE_ENGINE`. The pixel comparison is
+   * `sharp` package installed). Falls back to `SHELF_IMAGE_ENGINE`. The pixel comparison is
    * pixelmatch either way, so verdicts match.
    */
   engine?: "pngjs" | "sharp";
@@ -714,3 +714,17 @@ export {
   sequentialTransactionsWarning,
 } from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";
+export {
+  aliasesOf,
+  readSetting,
+  renamedSettingsIn,
+  SETTING_ALIASES,
+  SettingConflictError,
+  UNPREFIXED_ALLOWED,
+  warnRenamedSettings,
+  type AliasedSetting,
+  type SettingName,
+  type SettingRename,
+  type SettingsEnv,
+  type SettingsWarnLogger,
+} from "./env-settings/index.ts";

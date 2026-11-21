@@ -42,7 +42,8 @@ jobs:
     name: upload to storyshelf-ui
     runs-on: ubuntu-latest
     env:
-      STORYSHELF_TOKEN: ${{ secrets.STORYSHELF_UI_TOKEN }}
+      # SHELF_TOKEN: every published CLI reads it (STORYSHELF_TOKEN is its old name, #1308).
+      SHELF_TOKEN: ${{ secrets.STORYSHELF_UI_TOKEN }}
     steps:
       # Fork PRs get no secrets and a missing token is a setup gap, not a failure: skip with a notice.
       - name: Check this run can upload
@@ -53,7 +54,7 @@ jobs:
           if [ "$IS_FORK" = "true" ]; then
             echo "::notice title=Skipped::Fork pull requests have no secrets, so the Storybook is not uploaded to the demo."
             echo "run=false" >> "$GITHUB_OUTPUT"
-          elif [ -z "$STORYSHELF_TOKEN" ]; then
+          elif [ -z "$SHELF_TOKEN" ]; then
             echo "::notice title=Skipped::STORYSHELF_UI_TOKEN is not set, so the Storybook is not uploaded to the demo."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
@@ -117,6 +118,9 @@ jobs:
           # ADR 0044: a commit that changes no story gets a skipped build instead of an upload. Set
           # through the environment (the same switch as --skip-unchanged) so an older published CLI
           # ignores it instead of failing on an unknown option. `--full` above always wins.
+          # Both names until the published CLI reads SHELF_SKIP_UNCHANGED (#1308): the same value under
+          # both is accepted, with a warning naming the old one.
+          SHELF_SKIP_UNCHANGED: "1"
           STORYSHELF_SKIP_UNCHANGED: "1"
         run: |
           # The Storybook imports the workspace packages through their built dist, so the module

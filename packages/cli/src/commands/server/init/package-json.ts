@@ -118,9 +118,10 @@ function dockerScripts(answers: Answers): Record<string, string> {
       "docker:logs": "docker compose logs -f",
     };
   }
-  // Forward the operator's SECRET (and AUTH_PASSWORD) from the shell: a literal here would be
+  // Forward the operator's SHELF_SECRET (and SHELF_ADMIN_PASSWORD) from the shell: a literal here would be
   // shorter than 32 characters, and the server refuses to start with it.
-  const env = answers.auth === "password" ? "-e SECRET -e AUTH_PASSWORD" : "-e SECRET";
+  const env =
+    answers.auth === "password" ? "-e SHELF_SECRET -e SHELF_ADMIN_PASSWORD" : "-e SHELF_SECRET";
   return {
     "docker:build": `docker build -t ${answers.name} .`,
     "docker:run": `docker run --rm -p 3000:3000 -v ${answers.name}-data:/data ${env} ${answers.name}`,

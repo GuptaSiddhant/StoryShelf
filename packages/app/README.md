@@ -32,7 +32,7 @@ process.on("SIGTERM", () => {
 
 Three tiers, pick the shallowest that fits:
 
-1. **Defaults** — omit `logger` and import nothing. The app creates its own instance; `LOG_LEVEL` env sets the level (`debug`, `info`, …; default `"info"`).
+1. **Defaults** — omit `logger` and import nothing. The app creates its own instance; `SHELF_LOG_LEVEL` env sets the level (`debug`, `info`, …; default `"info"`).
 2. **Configured app** — `createShelfLogger` (re-exported from `@storyshelf/app`, canonical home `@storyshelf/core/logger`), pass it in, and read it back via `app.lifecycle.logger` for your own logs:
 
    ```ts

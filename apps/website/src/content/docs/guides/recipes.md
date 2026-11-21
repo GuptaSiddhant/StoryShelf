@@ -17,7 +17,7 @@ Then follow [Getting started](/guides/getting-started/): start the server, run `
 
 ## Run it on one server
 
-Use Docker Compose with Postgres and local disk, and put HTTPS in front of it. Set a strong `SECRET` and turn on authentication before sharing it. See [Docker Compose](/guides/deployment/docker-compose/), [Security and data handling](/guides/security/) and [Sizing and cost](/guides/sizing/).
+Use Docker Compose with Postgres and local disk, and put HTTPS in front of it. Set a strong `SHELF_SECRET` and turn on authentication before sharing it. See [Docker Compose](/guides/deployment/docker-compose/), [Security and data handling](/guides/security/) and [Sizing and cost](/guides/sizing/).
 
 ## Block pull requests until the visual review is approved
 

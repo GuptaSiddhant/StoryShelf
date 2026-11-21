@@ -14,7 +14,7 @@ resource "google_secret_manager_secret" "shelf_secret" {
 
 resource "google_secret_manager_secret" "auth_password" {
   project   = var.project_id
-  secret_id = "${var.name}-auth-password"
+  secret_id = "${var.name}-admin-password"
   labels    = local.labels
 
   replication {
@@ -36,7 +36,7 @@ resource "google_secret_manager_secret" "admin_token" {
   depends_on = [google_project_service.apis]
 }
 
-# SECRET, AUTH_PASSWORD and ADMIN_TOKEN are generated, so their values also sit in the Terraform
+# SHELF_SECRET, SHELF_ADMIN_PASSWORD and SHELF_ADMIN_TOKEN are generated, so their values also sit in the Terraform
 # state: keep the state in an encrypted backend with restricted access.
 resource "random_password" "shelf_secret" {
   length  = 48
@@ -69,7 +69,7 @@ resource "google_secret_manager_secret_version" "admin_token" {
 }
 
 # The created database's URL (with its password) lives only in Secret Manager. verify-full plus
-# DATABASE_CA: the app checks the server certificate, whose CAS-issued SAN covers the private IP.
+# SHELF_DATABASE_CA: the app checks the server certificate, whose CAS-issued SAN covers the private IP.
 resource "google_secret_manager_secret" "database_url" {
   count = local.create_database ? 1 : 0
 

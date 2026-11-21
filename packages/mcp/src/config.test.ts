@@ -21,7 +21,21 @@ describe("resolveConfig", () => {
     );
   });
 
+  it("reads the new names", () => {
+    expect(resolveConfig({ SHELF_URL: "http://a", SHELF_TOKEN: "t", SHELF_SLUG: "s" })).toEqual({
+      url: "http://a",
+      token: "t",
+      slug: "s",
+    });
+  });
+
+  it("refuses an old and a new name that disagree", () => {
+    expect(() => resolveConfig({ SHELF_URL: "http://a", STORYSHELF_URL: "http://b" })).toThrow(
+      "SHELF_URL and STORYSHELF_URL are both set",
+    );
+  });
+
   it("throws without a url", () => {
-    expect(() => resolveConfig({})).toThrow("STORYSHELF_URL");
+    expect(() => resolveConfig({})).toThrow("SHELF_URL is required");
   });
 });

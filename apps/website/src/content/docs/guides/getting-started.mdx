@@ -20,10 +20,10 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 <Aside type="caution" title="Three values you must set">
   The server starts with sign-in on and refuses to start without these.
 
-  - `SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
-  - `PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
-  - `AUTH_PASSWORD`: the first admin's password, at least 12 characters.
-</Aside>
+- `SHELF_SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
+- `SHELF_PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
+- `SHELF_ADMIN_PASSWORD`: the first admin's password, at least 12 characters.
+  </Aside>
 
 ## 1. Start the server
 
@@ -32,17 +32,17 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     One command, with Chromium for capture, SQLite and local storage on a volume. Needs Docker.
 
     ```sh
-    export SECRET="$(openssl rand -hex 32)"
-    export PUBLIC_BASE_URL=http://localhost:3000
+    export SHELF_SECRET="$(openssl rand -hex 32)"
+    export SHELF_PUBLIC_BASE_URL=http://localhost:3000
     # Choose a private admin password (12 or more characters); it is not echoed.
-    printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
-    export AUTH_PASSWORD
+    printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
+    export SHELF_ADMIN_PASSWORD
     docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data \
-      -e SECRET -e PUBLIC_BASE_URL -e AUTH_PASSWORD \
+      -e SHELF_SECRET -e SHELF_PUBLIC_BASE_URL -e SHELF_ADMIN_PASSWORD \
       ghcr.io/guptasiddhant/storyshelf
     ```
 
-    The server listens on `http://localhost:3000`. Keep `SECRET`: the same `storyshelf` volume needs it on every start.
+    The server listens on `http://localhost:3000`. Keep `SHELF_SECRET`: the same `storyshelf` volume needs it on every start.
 
   </TabItem>
   <TabItem label="npm">
@@ -54,11 +54,11 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
     ```sh
     cd my-storyshelf
-    export SECRET="$(openssl rand -hex 32)"
-    export PUBLIC_BASE_URL=http://localhost:3000
+    export SHELF_SECRET="$(openssl rand -hex 32)"
+    export SHELF_PUBLIC_BASE_URL=http://localhost:3000
     # Choose a private admin password (12 or more characters); it is not echoed.
-    printf 'Admin password: '; stty -echo; read -r AUTH_PASSWORD; stty echo; echo
-    export AUTH_PASSWORD
+    printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
+    export SHELF_ADMIN_PASSWORD
     npm install
     npm start
     ```
@@ -72,7 +72,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
 ## 2. Sign in and create a project
 
-Open `http://localhost:3000` and sign in as `admin@example.com` with your `AUTH_PASSWORD`. Choose **New project**, give it a name, and open it. A project with no builds shows **Get your first build**:
+Open `http://localhost:3000` and sign in as `admin@example.com` with your `SHELF_ADMIN_PASSWORD`. Choose **New project**, give it a name, and open it. A project with no builds shows **Get your first build**:
 
 1. **Create a token.** It is shown once; copy it.
 2. **Upload.** The card shows the command with your server URL and the project's slug filled in.
@@ -87,7 +87,7 @@ From your Storybook project, run the command from the card:
   args="upload --url http://localhost:3000 --slug my-design-system"
 />
 
-Set the token first: `STORYSHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
+Set the token first: `SHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
 
 ```text
 ==> Creating build
@@ -107,9 +107,9 @@ View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNPP
 Add `--wait` to follow the build until it is captured; the exit code says how it ended (see [Gating CI with `--wait`](/guides/cli/client/#gating-ci-with---wait)).
 
 <Aside type="tip">
-  To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `STORYSHELF_TOKEN` (a CI secret), never in the file. See [CI setup](/guides/ci/) for a pipeline.
+  To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `SHELF_TOKEN` (a CI secret), never in the file. See [CI setup](/guides/ci/) for a pipeline.
 
-On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on, `create` needs the site admin token (`--token`, or `STORYSHELF_ADMIN_TOKEN`) and refuses without it; the UI steps above need no token and are the way to start. With the admin token it creates the project only and points you to its page for the CI token, because a token made on the command line has no user behind it and could not upload.
+On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on, `create` needs the site admin token (`--token`, or `SHELF_ADMIN_TOKEN`) and refuses without it; the UI steps above need no token and are the way to start. With the admin token it creates the project only and points you to its page for the CI token, because a token made on the command line has no user behind it and could not upload.
 
 </Aside>
 

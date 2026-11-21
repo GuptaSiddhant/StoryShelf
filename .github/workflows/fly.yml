@@ -153,9 +153,9 @@ jobs:
       - name: Check admin token
         id: token
         env:
-          STORYSHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
+          SHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
         run: |
-          if [ -z "$STORYSHELF_ADMIN_TOKEN" ]; then
+          if [ -z "$SHELF_ADMIN_TOKEN" ]; then
             echo "::notice::STORYSHELF_ADMIN_TOKEN secret is not set; skipping the demo seed."
             echo "present=false" >> "$GITHUB_OUTPUT"
           else
@@ -185,6 +185,6 @@ jobs:
       - name: Seed demo project
         if: steps.token.outputs.present == 'true'
         env:
-          STORYSHELF_URL: https://storyshelf.fly.dev
-          STORYSHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
+          SHELF_URL: https://storyshelf.fly.dev
+          SHELF_ADMIN_TOKEN: ${{ secrets.STORYSHELF_ADMIN_TOKEN }}
         run: apps/fly-app/seed.sh

@@ -36,7 +36,7 @@ variable "image_repository" {
 }
 
 variable "public_base_url" {
-  description = "Public origin of the app (PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty means the service's deterministic Cloud Run URL (https://<name>-app-<project number>.<region>.run.app)."
+  description = "Public origin of the app (SHELF_PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty means the service's deterministic Cloud Run URL (https://<name>-app-<project number>.<region>.run.app)."
   type        = string
   default     = ""
 }
@@ -88,13 +88,13 @@ variable "max_instances" {
 }
 
 variable "database_pool_size" {
-  description = "Most database connections each copy opens (DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
+  description = "Most database connections each copy opens (SHELF_DATABASE_POOL_MAX). Keep max_instances x this below the database's connection limit."
   type        = number
   default     = 10
 }
 
 variable "shutdown_grace_seconds" {
-  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHUTDOWN_GRACE_SECONDS). Cloud Run sends SIGTERM and stops the container 10 seconds later and that is not configurable, so the grace must stay below it."
+  description = "How long a stopping copy drains running captures before it hands them back to the queue (SHELF_SHUTDOWN_GRACE_SECONDS). Cloud Run sends SIGTERM and stops the container 10 seconds later and that is not configurable, so the grace must stay below it."
   type        = number
   default     = 8
 
@@ -183,8 +183,8 @@ variable "gitlab_host" {
   default     = ""
 }
 
-variable "auth_email" {
-  description = "Email of the local admin login created from the generated AUTH_PASSWORD (AUTH_EMAIL)."
+variable "admin_email" {
+  description = "Email of the local admin login created from the generated SHELF_ADMIN_PASSWORD (SHELF_ADMIN_EMAIL)."
   type        = string
   default     = "admin@example.com"
 }

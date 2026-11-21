@@ -24,15 +24,15 @@ storyshelf init
 # also: --build-dir, --build-command, --build-script-name, --skip, -c/--config
 ```
 
-Writes `.storybook/storyshelf.json: { "slug": "...", "url": "...", "buildDir": "...", "skip": "..." }` (no token, see [Configuration](/guides/config/)). Token stays in `STORYSHELF_TOKEN` env / `--token`.
+Writes `.storybook/storyshelf.json: { "slug": "...", "url": "...", "buildDir": "...", "skip": "..." }` (no token, see [Configuration](/guides/config/)). Token stays in `SHELF_TOKEN` env / `--token`.
 
 ## `storyshelf create`
 
 Create a project on the server (requires site-admin token) and write `.storybook/storyshelf.json`.
 
 ```bash
-storyshelf create --url http://localhost:3000 --name "My Design System" --token $STORYSHELF_ADMIN_TOKEN
-# also reads STORYSHELF_ADMIN_TOKEN / ADMIN_TOKEN env if --token omitted
+storyshelf create --url http://localhost:3000 --name "My Design System" --token $SHELF_ADMIN_TOKEN
+# also reads SHELF_ADMIN_TOKEN env if --token omitted
 ```
 
 Prints `Project slug: ...` and `CI token: ...`.
@@ -69,9 +69,9 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 
 | Flag                              | Description                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--url`                           | Server URL (or file / `STORYSHELF_URL`)                                                                                                                                               |
-| `--slug`                          | Project slug (or file / `STORYSHELF_SLUG`)                                                                                                                                            |
-| `--token`                         | Project API token (`Authorization: Bearer`, or `STORYSHELF_TOKEN`)                                                                                                                    |
+| `--url`                           | Server URL (or file / `SHELF_URL`)                                                                                                                                                    |
+| `--slug`                          | Project slug (or file / `SHELF_SLUG`)                                                                                                                                                 |
+| `--token`                         | Project API token (`Authorization: Bearer`, or `SHELF_TOKEN`)                                                                                                                         |
 | `--sha`                           | Revision SHA (flag, CI env, local git HEAD, or synthesized `local-*`)                                                                                                                 |
 | `--branch`                        | Baseline namespace (flag, CI env, local git branch, or `local`)                                                                                                                       |
 | `--build-dir` / `-d`              | Built Storybook directory (default `storybook-static`)                                                                                                                                |
@@ -87,15 +87,15 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--skip-unchanged`                | Record a commit that changed no story as a skipped build instead of uploading (default off; see [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits)) |
 | `--untraced <glob>`               | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`; unions with `untraced` in config)                                                               |
 | `--stats-file <path>`             | Bundler stats file (default `<buildDir>/preview-stats.json`)                                                                                                                          |
-| `--zip`                           | Upload one zip instead of hashing files; for servers without the hash routes (or `STORYSHELF_ZIP=1`)                                                                                  |
-| `--json`                          | Print one JSON object on stdout when the command finishes (see [Machine-readable output](#machine-readable-output)); all human output goes to stderr |
+| `--zip`                           | Upload one zip instead of hashing files; for servers without the hash routes (or `SHELF_ZIP=1`)                                                                                       |
+| `--json`                          | Print one JSON object on stdout when the command finishes (see [Machine-readable output](#machine-readable-output)); all human output goes to stderr                                  |
 | `--wait`                          | After the upload, follow the build until it stops needing the server, and exit by how it ended (see [Gating CI with `--wait`](#gating-ci-with---wait))                                |
 | `--timeout <duration>`            | With `--wait`, stop waiting after this long: `90`, `90s`, `30m`, `2h` (default `30m`). Never cancels the build                                                                        |
 | `--dry-run`                       | Validate/build but send no requests                                                                                                                                                   |
 
-Affected capture is on by default: the CLI traces `git diff baseline..HEAD` through the build's dependency graph, posts the affected set, and prints a summary (`Affected capture: rendering 3 stories (baseline abc1234)`). Anything it cannot prove unchanged renders anyway — see [Affected capture](/concepts/affected-capture/). `STORYSHELF_FULL=1` and `"affectedOnly": false` opt out the same way as `--full`.
+Affected capture is on by default: the CLI traces `git diff baseline..HEAD` through the build's dependency graph, posts the affected set, and prints a summary (`Affected capture: rendering 3 stories (baseline abc1234)`). Anything it cannot prove unchanged renders anyway — see [Affected capture](/concepts/affected-capture/). `SHELF_FULL=1` and `"affectedOnly": false` opt out the same way as `--full`.
 
-`--skip-unchanged` (or `"skipUnchanged": true`, or `STORYSHELF_SKIP_UNCHANGED=1`) asks the server for the build to repeat before it creates one. When no story is affected, it prints `Skipped: no story changed since abc1234 (build 01J…)` and sends no Storybook. Every other case, errors included, prints one line saying why and uploads normally; skipping never fails an upload. `--full` always disables it.
+`--skip-unchanged` (or `"skipUnchanged": true`, or `SHELF_SKIP_UNCHANGED=1`) asks the server for the build to repeat before it creates one. When no story is affected, it prints `Skipped: no story changed since abc1234 (build 01J…)` and sends no Storybook. Every other case, errors included, prints one line saying why and uploads normally; skipping never fails an upload. `--full` always disables it.
 
 :::note
 The CLI does **not** run Playwright. It hashes the static build, sends only the files the server does not hold yet, then posts the manifest; the server renders and diffs asynchronously. A second upload of an unchanged build sends the manifest alone.
@@ -106,17 +106,22 @@ The CLI does **not** run Playwright. It hashes the static build, sends only the 
 Scripts should not parse the text output, which can change between releases. `storyshelf upload --json` prints exactly one JSON object on stdout when the command finishes; phases, progress and every other message go to stderr, and the exit codes are unchanged.
 
 ```json
-{ "buildId": "01J…", "url": "https://shelf.example.com/projects/demo/builds/01J…", "status": "created", "skipped": false }
+{
+  "buildId": "01J…",
+  "url": "https://shelf.example.com/projects/demo/builds/01J…",
+  "status": "created",
+  "skipped": false
+}
 ```
 
-| Field      | Meaning                                                                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `buildId`  | The build's id; `null` when no build was made (`--dry-run`, or a branch skipped by the config's `skip`)                                    |
-| `url`      | The build page, as the server returned it; `null` for a server that returns none                                                           |
-| `status`   | `created`, `skipped` (a skipped build, or the config skips the branch) or `dry-run`                                                         |
-| `skipped`  | `true` when no Storybook was uploaded because nothing needed it                                                                            |
-| `verdict`  | With `--wait`: `approved`, `needs-review`, `rejected`, `failed`, `cancelled`, `timeout` or `interrupted`                                   |
-| `exitCode` | With `--wait`: the exit code the command ends with                                                                                         |
+| Field      | Meaning                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| `buildId`  | The build's id; `null` when no build was made (`--dry-run`, or a branch skipped by the config's `skip`)  |
+| `url`      | The build page, as the server returned it; `null` for a server that returns none                         |
+| `status`   | `created`, `skipped` (a skipped build, or the config skips the branch) or `dry-run`                      |
+| `skipped`  | `true` when no Storybook was uploaded because nothing needed it                                          |
+| `verdict`  | With `--wait`: `approved`, `needs-review`, `rejected`, `failed`, `cancelled`, `timeout` or `interrupted` |
+| `exitCode` | With `--wait`: the exit code the command ends with                                                       |
 
 The output never contains a token. With `jq`, on any CI system:
 
@@ -167,7 +172,7 @@ A build with nothing to review prints `Build approved` and `View: <url>` instead
 
 **Servers without `testing`.** An instance that [hosts Storybooks only](/concepts/hosting-only/) reports `testing: false` when the build is created. `storyshelf upload` then skips the affected-capture computation, uploads as usual, and ends with `Testing is off on this server: the Storybook is published, but no captures or visual checks will run.`
 
-**Servers without the hash routes.** An older server answers `404` to `/dedup`. The CLI then prints `The server has no hash upload routes; uploading a zip instead` and sends the zip as before. `--zip` (or `STORYSHELF_ZIP=1`) skips the hash path and always sends the zip.
+**Servers without the hash routes.** An older server answers `404` to `/dedup`. The CLI then prints `The server has no hash upload routes; uploading a zip instead` and sends the zip as before. `--zip` (or `SHELF_ZIP=1`) skips the hash path and always sends the zip.
 
 **Large Storybooks on hosts without a job consumer.** With `--zip`, a zip over the server's `maxInlineUnzipSize` is normally published by a background job. A serverless host runs no consumer, so it answers `413` with a message pointing to the file-by-file route (`/dedup`, `/content`, `/manifest`). `storyshelf upload --zip` handles that by itself: it prints `Zip is over the server's inline publish limit; uploading file by file instead`, hashes the build directory, uploads only the files the server lacks, and posts the manifest, which completes publishing. A `413` for `maxUploadBytes` is not retried this way; raise the limit instead.
 
@@ -193,8 +198,8 @@ storyshelf whoami
 ## `storyshelf retry` / `purge`
 
 ```bash
-storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id <id> [--token $STORYSHELF_TOKEN]
-storyshelf purge --url http://localhost:3000 --token $STORYSHELF_ADMIN_TOKEN
+storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id <id> [--token $SHELF_TOKEN]
+storyshelf purge --url http://localhost:3000 --token $SHELF_ADMIN_TOKEN
 ```
 
 `retry` re-runs capture. `purge` runs retention GC. `cancel [--dry-run]` cancels older unfinished builds.

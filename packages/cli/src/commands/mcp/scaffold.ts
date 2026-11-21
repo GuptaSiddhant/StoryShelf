@@ -19,7 +19,7 @@ export interface McpScaffoldAnswers {
 export function generateMcpEntry(transport: McpTransport): string {
   if (transport === "stdio") {
     return [
-      `// Serves MCP over stdio. Configuration comes from STORYSHELF_URL / STORYSHELF_TOKEN / STORYSHELF_SLUG.`,
+      `// Serves MCP over stdio. Configuration comes from SHELF_URL / SHELF_TOKEN / SHELF_SLUG.`,
       `import "@storyshelf/mcp";`,
       ``,
     ].join("\n");
@@ -29,8 +29,8 @@ export function generateMcpEntry(transport: McpTransport): string {
     ``,
     `// Each MCP client sends its own "Authorization: Bearer <StoryShelf token>"; it is forwarded to /api/v1.`,
     `await serveHttp({`,
-    `  url: process.env.STORYSHELF_URL!,`,
-    `  slug: process.env.STORYSHELF_SLUG,`,
+    `  url: process.env.SHELF_URL!,`,
+    `  slug: process.env.SHELF_SLUG,`,
     `  port: Number(process.env.PORT) || 3333,`,
     `  host: process.env.HOST || "127.0.0.1",`,
     `});`,
@@ -67,23 +67,19 @@ export function generateMcpEnvExample(answers: McpScaffoldAnswers): string {
     answers.transport === "stdio"
       ? [
           "# A project token with at least the viewer role (developer to post comments)",
-          "STORYSHELF_TOKEN=",
+          "SHELF_TOKEN=",
         ]
       : [
           "# HTTP clients send their own Bearer token; no token is stored on this server",
           "PORT=3333",
           "HOST=0.0.0.0",
         ];
-  const lines = [
-    `STORYSHELF_URL=${answers.url}`,
-    `STORYSHELF_SLUG=${answers.slug}`,
-    ...transportLines,
-  ];
+  const lines = [`SHELF_URL=${answers.url}`, `SHELF_SLUG=${answers.slug}`, ...transportLines];
   return `${lines.join("\n")}\n`;
 }
 
 // oxlint-disable-next-line no-template-curly-in-string -- literal client-side env interpolation
-const TOKEN_REF = "${STORYSHELF_TOKEN}";
+const TOKEN_REF = "${SHELF_TOKEN}";
 
 /** Client config for Claude Code (`.mcp.json`) and Cursor (`.cursor/mcp.json`). */
 export function generateMcpClientConfig(answers: McpScaffoldAnswers): string {
@@ -93,9 +89,9 @@ export function generateMcpClientConfig(answers: McpScaffoldAnswers): string {
           command: "npx",
           args: ["-y", "@storyshelf/mcp"],
           env: {
-            STORYSHELF_URL: answers.url,
-            STORYSHELF_SLUG: answers.slug,
-            STORYSHELF_TOKEN: TOKEN_REF,
+            SHELF_URL: answers.url,
+            SHELF_SLUG: answers.slug,
+            SHELF_TOKEN: TOKEN_REF,
           },
         }
       : {

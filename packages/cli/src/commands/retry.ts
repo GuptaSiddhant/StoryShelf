@@ -1,5 +1,6 @@
 import { createClient } from "../client.ts";
 import { printLine } from "../output.ts";
+import { readSetting } from "../settings.ts";
 
 interface BuildResponse {
   id: string;
@@ -23,7 +24,7 @@ export interface RetryOptions {
  * @param options - Retry command options.
  */
 export async function runRetry(options: RetryOptions): Promise<void> {
-  const token = options.token ?? process.env["STORYSHELF_TOKEN"] ?? process.env["SHELF_TOKEN"];
+  const token = options.token ?? readSetting(process.env, "SHELF_TOKEN");
   const client = createClient(options.url, token);
   const build = await client.projects.builds.retry(options.slug, options.buildId);
   const buildData = build as BuildResponse;
