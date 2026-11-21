@@ -5,6 +5,12 @@ import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLocalStorage } from "./index.ts";
 
+/** A sorted copy (`toSorted` is not in the type-aware lint lib for tests). */
+function sorted(values: readonly string[]): string[] {
+  // oxlint-disable-next-line unicorn/no-array-sort, typescript/require-array-sort-compare -- see above
+  return [...values].sort();
+}
+
 /** When set, the next `writeFile` writes only a prefix of its data and then fails, like a kill. */
 const torn = vi.hoisted(() => ({ next: false }));
 
@@ -64,7 +70,7 @@ describe("createLocalStorage", () => {
     await storage.write("a/b.txt", Buffer.from("hello"));
     await storage.write("a/c.txt", Buffer.from("world"));
     const listA = await storage.list("a");
-    expect(listA.toSorted()).toEqual(["a/b.txt", "a/c.txt"]);
+    expect(sorted(listA)).toEqual(["a/b.txt", "a/c.txt"]);
   });
 
   it("lists the whole tree and missing prefixes", async () => {
@@ -72,7 +78,7 @@ describe("createLocalStorage", () => {
     await storage.write("a/b.txt", Buffer.from("hello"));
     await storage.write("d.txt", Buffer.from("top"));
     const all = await storage.list("");
-    expect(all.toSorted()).toEqual(["a/b.txt", "d.txt"]);
+    expect(sorted(all)).toEqual(["a/b.txt", "d.txt"]);
     expect(await storage.list("missing")).toEqual([]);
   });
 
@@ -124,7 +130,7 @@ describe("createLocalStorage", () => {
     const storage = createLocalStorage(dir);
     const keys = ["p1/content/a.png", "p1/content/.claims/x.json", "p1/builds/b1/s/desktop.png"];
     await Promise.all(keys.map(async (key) => await storage.write(key, Buffer.from(key))));
-    expect((await storage.list("p1/")).toSorted()).toEqual(keys.toSorted());
+    expect(sorted(await storage.list("p1/"))).toEqual(sorted(keys));
     expect(await storage.list("p1/content/")).toEqual(
       expect.arrayContaining(["p1/content/a.png", "p1/content/.claims/x.json"]),
     );
