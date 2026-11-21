@@ -43,8 +43,9 @@ StoryShelf's own settings are now `SHELF_*`. A name stays unprefixed only when a
 
 - The old names are not read any more; there are no aliases.
 - So that an upgrade cannot silently drop a setting, the server (the image, the Fly app and the dev server), the CLI and the MCP server refuse to start while any old name in the table below is set. The refusal lists each old name with its new one and never prints a value. This holds even when the new name is set too: unset the old one.
-- If another service in the same environment sets one of these generic names for itself (`LOG_LEVEL`, `DATA_DIR`, `BUCKET_NAME`, `SECRET`, `SMTP_*` in a shared compose `.env`, …), set `SHELF_ALLOW_OLD_NAMES=1`. StoryShelf then starts, logs one warning naming the old variables it found (never their values), and still does not read them.
+- If another service in the same environment sets one of these generic names for itself (`LOG_LEVEL`, `DATA_DIR`, `S3_BUCKET`, `SECRET`, `SMTP_*` in a shared compose `.env`, …), set `SHELF_ALLOW_OLD_NAMES=1`. StoryShelf then starts, logs one warning naming the old variables it found (never their values), and still does not read them.
 - The guard is temporary: it is removed in the first release of 2027. From then on the old names are simply ignored.
+- `BUCKET_NAME` is not renamed: Fly's Tigris attachment (`fly storage create`) injects it beside `AWS_ENDPOINT_URL_S3` and the AWS keys, so StoryShelf still reads it as the S3 bucket when `SHELF_S3_BUCKET` is unset. Leave the secret your storage attachment manages in place.
 - `storyshelf server init` and the Terraform modules write only the new names. A server you generated earlier keeps its own `process.env` reads; change them when you rename the variables.
 
 To move, set every new name with the old value, unset the old names, then deploy the new release. In CI, rename the variable your workflow passes (`SHELF_TOKEN`, `SHELF_URL`); the repository secret behind it can keep its name.
@@ -64,7 +65,7 @@ To move, set every new name with the old value, unset the old names, then deploy
 | `CAPTURE_CONCURRENCY`, `STORYSHELF_CAPTURE_CONCURRENCY`                                          | `SHELF_CAPTURE_CONCURRENCY`                                                        |
 | `PURGE_TTL_DAYS`                                                                                 | `SHELF_PURGE_TTL_DAYS`                                                             |
 | `SHUTDOWN_GRACE_SECONDS`                                                                         | `SHELF_SHUTDOWN_GRACE_SECONDS`                                                     |
-| `AWS_BUCKET`, `S3_BUCKET`, `BUCKET_NAME`                                                         | `SHELF_S3_BUCKET`                                                                  |
+| `AWS_BUCKET`, `S3_BUCKET`                                                                        | `SHELF_S3_BUCKET`                                                                  |
 | `GCS_BUCKET`                                                                                     | `SHELF_GCS_BUCKET`                                                                 |
 | `AZURE_STORAGE_ACCOUNT`                                                                          | `SHELF_AZURE_ACCOUNT`                                                              |
 | `AZURE_STORAGE_CONTAINER`                                                                        | `SHELF_AZURE_CONTAINER`                                                            |

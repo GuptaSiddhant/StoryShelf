@@ -518,6 +518,23 @@ describe("unverifiedDatabaseTls", () => {
   });
 });
 
+describe("BUCKET_NAME, the bucket Fly's Tigris attachment injects (#1308)", () => {
+  it("selects S3 only when SHELF_S3_BUCKET is unset, and counts as S3 for the one-backend rule", () => {
+    const { set, as } = factories();
+    expect(storageFromEnv({ BUCKET_NAME: "fly" }, "/d", as).log.storage).toBe("s3");
+    expect(set.s3).toHaveBeenLastCalledWith(expect.objectContaining({ bucket: "fly" }));
+    storageFromEnv({ BUCKET_NAME: "fly", SHELF_S3_BUCKET: "own" }, "/d", as);
+    expect(set.s3).toHaveBeenLastCalledWith(expect.objectContaining({ bucket: "own" }));
+    expect(() => storageFromEnv({ BUCKET_NAME: "fly", SHELF_GCS_BUCKET: "g" }, "/d", as)).toThrow(
+      /Set one storage backend/u,
+    );
+  });
+
+  it("is not an old name: boot does not refuse it", () => {
+    expect(refuseRenamedSettings({ BUCKET_NAME: "fly" })).toEqual([]);
+  });
+});
+
 describe("old variable names (#1308)", () => {
   const secret = "s".repeat(32);
 
@@ -528,7 +545,7 @@ describe("old variable names (#1308)", () => {
   });
 
   it("are never read: an old bucket name leaves storage on the volume", () => {
-    for (const name of ["AWS_BUCKET", "S3_BUCKET", "BUCKET_NAME"]) {
+    for (const name of ["AWS_BUCKET", "S3_BUCKET"]) {
       const { set, as } = factories();
       expect(storageFromEnv({ [name]: "b" }, "/d", as).log).toEqual({ storage: "local" });
       expect(set.s3).not.toHaveBeenCalled();

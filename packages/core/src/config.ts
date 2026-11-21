@@ -718,6 +718,7 @@ export {
   ALLOW_OLD_NAMES_ENV,
   OLD_NAMES_ALLOWED_MESSAGE,
   oldNamesAllowedFields,
+  readS3Bucket,
   readSetting,
   refuseRenamedSettings,
   renamedSettingsIn,

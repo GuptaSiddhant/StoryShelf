@@ -1,7 +1,12 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { readSetting, RenamedSettingError, type SettingName } from "@storyshelf/core/config";
+import {
+  readS3Bucket,
+  readSetting,
+  RenamedSettingError,
+  type SettingName,
+} from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
@@ -226,7 +231,6 @@ export interface StorageChoice {
 
 /** The storage variables, one set per backend; setting more than one backend refuses to boot. */
 const STORAGE_SELECTORS = [
-  ["SHELF_S3_BUCKET", "S3"],
   ["SHELF_GCS_BUCKET", "GCS"],
   ["SHELF_AZURE_ACCOUNT", "Azure Blob"],
   ["SHELF_AZURE_CONNECTION_STRING", "Azure Blob"],
@@ -236,9 +240,12 @@ const STORAGE_SELECTORS = [
 function assertOneStorage(env: Env): void {
   const chosen = new Set(
     STORAGE_SELECTORS.filter(([name]) => nonEmpty(readSetting(env, name)) !== undefined).map(
-      ([, kind]) => kind,
+      ([, kind]) => kind as string,
     ),
   );
+  if (readS3Bucket(env) !== undefined) {
+    chosen.add("S3");
+  }
   if (chosen.size > 1) {
     throw new Error(
       "Set one storage backend: SHELF_S3_BUCKET, SHELF_GCS_BUCKET, or SHELF_AZURE_ACCOUNT/SHELF_AZURE_CONNECTION_STRING",
@@ -280,9 +287,9 @@ function gcsFromEnv(env: Env, bucket: string, factories: Factories): StorageChoi
   };
 }
 
-/** S3-compatible storage from `SHELF_S3_BUCKET`, else the data volume. */
+/** S3-compatible storage from `SHELF_S3_BUCKET` (or Fly's `BUCKET_NAME`), else the data volume. */
 function s3OrLocalFromEnv(env: Env, dataDir: string, factories: Factories): StorageChoice {
-  const bucket = nonEmpty(readSetting(env, "SHELF_S3_BUCKET"));
+  const bucket = readS3Bucket(env);
   if (bucket === undefined) {
     return { storage: factories.local(dataDir), log: { storage: "local" } };
   }

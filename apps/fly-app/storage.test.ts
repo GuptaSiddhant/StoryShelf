@@ -37,15 +37,30 @@ describe("storageFromEnv", () => {
     expect(chosen.log).toEqual({ storage: "s3", endpointOrigin: null });
   });
 
-  it("never reads the old AWS_BUCKET or BUCKET_NAME (boot refuses them instead)", () => {
+  it("never reads the old AWS_BUCKET (boot refuses it instead)", () => {
     const { s3, set } = factories();
-    expect(storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set).log).toEqual({
-      storage: "local",
-    });
     expect(storageFromEnv({ AWS_BUCKET: "explicit" }, "/data", set).log).toEqual({
       storage: "local",
     });
     expect(s3).not.toHaveBeenCalled();
+  });
+
+  it("uses the BUCKET_NAME that fly storage create injects, unless SHELF_S3_BUCKET names one", () => {
+    const { s3, set } = factories();
+    expect(storageFromEnv({ BUCKET_NAME: "from-fly" }, "/data", set).log.storage).toBe("s3");
+    expect(s3).toHaveBeenLastCalledWith({
+      bucket: "from-fly",
+      endpoint: undefined,
+      region: "auto",
+    });
+    storageFromEnv({ BUCKET_NAME: "from-fly", SHELF_S3_BUCKET: "own" }, "/data", set);
+    expect(s3).toHaveBeenLastCalledWith({ bucket: "own", endpoint: undefined, region: "auto" });
+    storageFromEnv({ BUCKET_NAME: "from-fly", SHELF_S3_BUCKET: "" }, "/data", set);
+    expect(s3).toHaveBeenLastCalledWith({
+      bucket: "from-fly",
+      endpoint: undefined,
+      region: "auto",
+    });
   });
 
   it.each([{}, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: "" }, { SHELF_S3_BUCKET: undefined }])(

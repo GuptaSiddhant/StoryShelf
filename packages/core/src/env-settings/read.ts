@@ -21,6 +21,20 @@ export function readSetting(env: SettingsEnv, name: SettingName): string | undef
 }
 
 /**
+ * The S3 bucket: `SHELF_S3_BUCKET`, else `BUCKET_NAME`, the name Fly's Tigris attachment
+ * (`fly storage create`) injects beside `AWS_ENDPOINT_URL_S3` and the AWS keys. An empty value counts
+ * as unset, so `SHELF_S3_BUCKET` always wins when it holds a bucket.
+ */
+export function readS3Bucket(env: SettingsEnv): string | undefined {
+  const own = readSetting(env, "SHELF_S3_BUCKET");
+  if (own !== undefined && own !== "") {
+    return own;
+  }
+  const platform = env["BUCKET_NAME"];
+  return platform === undefined || platform === "" ? undefined : platform;
+}
+
+/**
  * Every old name set to a non-empty value in `env`, with its new name. `names` narrows the check to
  * the settings a process reads (the MCP server checks only its own three).
  */

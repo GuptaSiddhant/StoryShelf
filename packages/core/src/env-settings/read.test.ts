@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   OLD_NAMES_ALLOWED_MESSAGE,
   oldNamesAllowedFields,
+  readS3Bucket,
   readSetting,
   refuseRenamedSettings,
   RenamedSettingError,
@@ -55,16 +56,16 @@ describe("refuseRenamedSettings (the boot guard)", () => {
   });
 
   it("lists every old name that is set, one line each", () => {
-    const error = refusal({ DATA_DIR: "/d", AWS_BUCKET: "b", BUCKET_NAME: "b", SHELF_TOKEN: "t" });
+    const error = refusal({ DATA_DIR: "/d", AWS_BUCKET: "b", S3_BUCKET: "b", SHELF_TOKEN: "t" });
     expect(error?.renames).toEqual([
       { old: "DATA_DIR", new: "SHELF_DATA_DIR" },
       { old: "AWS_BUCKET", new: "SHELF_S3_BUCKET" },
-      { old: "BUCKET_NAME", new: "SHELF_S3_BUCKET" },
+      { old: "S3_BUCKET", new: "SHELF_S3_BUCKET" },
     ]);
     expect(error?.message.split("\n").slice(1, -1)).toEqual([
       "  DATA_DIR -> SHELF_DATA_DIR",
       "  AWS_BUCKET -> SHELF_S3_BUCKET",
-      "  BUCKET_NAME -> SHELF_S3_BUCKET",
+      "  S3_BUCKET -> SHELF_S3_BUCKET",
     ]);
   });
 
@@ -73,14 +74,14 @@ describe("refuseRenamedSettings (the boot guard)", () => {
   });
 
   it("with SHELF_ALLOW_OLD_NAMES=1, boots and returns the old names to warn about (names only)", () => {
-    const env = { SECRET: SECRET_VALUE, BUCKET_NAME: "other-service", SHELF_ALLOW_OLD_NAMES: "1" };
+    const env = { SECRET: SECRET_VALUE, LOG_LEVEL: "other-service", SHELF_ALLOW_OLD_NAMES: "1" };
     const ignored = refuseRenamedSettings(env);
     expect(ignored).toEqual([
       { old: "SECRET", new: "SHELF_SECRET" },
-      { old: "BUCKET_NAME", new: "SHELF_S3_BUCKET" },
+      { old: "LOG_LEVEL", new: "SHELF_LOG_LEVEL" },
     ]);
     expect(oldNamesAllowedFields(ignored)).toEqual({
-      oldNames: ["SECRET -> SHELF_SECRET", "BUCKET_NAME -> SHELF_S3_BUCKET"],
+      oldNames: ["SECRET -> SHELF_SECRET", "LOG_LEVEL -> SHELF_LOG_LEVEL"],
     });
     expect(JSON.stringify(oldNamesAllowedFields(ignored))).not.toContain(SECRET_VALUE);
     expect(OLD_NAMES_ALLOWED_MESSAGE).toContain("SHELF_ALLOW_OLD_NAMES=1");
@@ -108,6 +109,20 @@ describe("refuseRenamedSettings (the boot guard)", () => {
     expect(renamedSettingsIn(env, ["SHELF_URL", "SHELF_TOKEN", "SHELF_SLUG"])).toEqual([
       { old: "STORYSHELF_URL", new: "SHELF_URL" },
     ]);
+  });
+});
+
+describe("readS3Bucket", () => {
+  it("prefers SHELF_S3_BUCKET, else takes Fly's BUCKET_NAME, and treats empty as unset", () => {
+    expect(readS3Bucket({ SHELF_S3_BUCKET: "own", BUCKET_NAME: "fly" })).toBe("own");
+    expect(readS3Bucket({ BUCKET_NAME: "fly" })).toBe("fly");
+    expect(readS3Bucket({ SHELF_S3_BUCKET: "", BUCKET_NAME: "fly" })).toBe("fly");
+    expect(readS3Bucket({ BUCKET_NAME: "" })).toBeUndefined();
+    expect(readS3Bucket({ AWS_BUCKET: "old", S3_BUCKET: "old" })).toBeUndefined();
+  });
+
+  it("is not an old name, so the guard lets it boot", () => {
+    expect(refuseRenamedSettings({ BUCKET_NAME: "fly" })).toEqual([]);
   });
 });
 

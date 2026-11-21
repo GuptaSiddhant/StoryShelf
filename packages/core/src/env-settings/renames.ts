@@ -34,7 +34,9 @@ export const RENAMED_SETTINGS = {
   SHELF_OTEL_ENABLED: ["STORYSHELF_OTEL_ENABLED"],
   SHELF_OTEL_METRICS_INTERVAL_MS: ["STORYSHELF_OTEL_METRICS_INTERVAL_MS"],
   // Storage: one S3 name, not three
-  SHELF_S3_BUCKET: ["AWS_BUCKET", "S3_BUCKET", "BUCKET_NAME"],
+  // BUCKET_NAME is not here: Fly's `fly storage create` (Tigris) injects it, so it is a platform name
+  // (see UNPREFIXED_ALLOWED and `readS3Bucket`).
+  SHELF_S3_BUCKET: ["AWS_BUCKET", "S3_BUCKET"],
   SHELF_GCS_BUCKET: ["GCS_BUCKET"],
   SHELF_AZURE_ACCOUNT: ["AZURE_STORAGE_ACCOUNT"],
   SHELF_AZURE_CONTAINER: ["AZURE_STORAGE_CONTAINER"],
@@ -97,6 +99,9 @@ export const UNPREFIXED_ALLOWED: readonly string[] = [
   "DB",
   // Cloud SDKs
   "AWS_",
+  // Fly's Tigris attachment (`fly storage create`) injects it beside AWS_ENDPOINT_URL_S3 and the AWS
+  // keys; read only as the S3 bucket when SHELF_S3_BUCKET is unset (`readS3Bucket`).
+  "BUCKET_NAME",
   "AZURE_CLIENT_ID",
   "GOOGLE_CLOUD_PROJECT",
   // Specifications and third-party SDKs
