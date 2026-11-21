@@ -58,15 +58,23 @@ function fail(message) {
   throw new Error(message);
 }
 
-/** Run a command to completion, inheriting nothing; fail with its output unless it exits 0. */
-function run(command, argv, options = {}) {
+/** Run a command to completion, inheriting nothing; fail with its output unless it exits 0. `merge` returns stderr too. */
+function run(command, argv, { merge = false, ...options } = {}) {
   const result = spawnSync(command, argv, { encoding: "utf8", ...options });
   if (result.status !== 0) {
     fail(
       `\`${command} ${argv.join(" ")}\` exited ${result.status}\n${result.stdout ?? ""}\n${result.stderr ?? ""}`,
     );
   }
-  return result.stdout;
+  return merge ? `${result.stdout}\n${result.stderr}` : result.stdout;
+}
+
+/** A scaffold's `npm install` must print no `ERESOLVE` or `npm warn` line (#1236): a first install must look clean. */
+function assertCleanInstall(output) {
+  const noisy = output.split("\n").filter((line) => /ERESOLVE|npm warn/u.test(line));
+  if (noisy.length > 0) {
+    fail(`npm install of the scaffold printed warnings:\n${noisy.join("\n")}`);
+  }
 }
 
 /** Pack every public package into `dest`; the manifests are restored afterwards. Returns name → tarball path. */
@@ -222,7 +230,9 @@ async function installFromTarballs(scratch, tarballs) {
   }
   const pkg = useTarballs(project, tarballs);
   log(`scaffold depends on: ${Object.keys(pkg.dependencies).join(", ")}`);
-  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project });
+  assertCleanInstall(
+    run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project, merge: true }),
+  );
   return { cli, project };
 }
 
