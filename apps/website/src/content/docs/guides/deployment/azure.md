@@ -42,47 +42,48 @@ module "storyshelf" {
 }
 ```
 
-The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `storyshelf server init --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, and a `terraform.tfvars` with your answers. Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `storyshelf server init --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 
-| Name | Default | Meaning |
-| --- | --- | --- |
-| `name` | required | Name prefix, 2 to 20 characters |
-| `image_version` | required | Release version of the image (no `v`) |
-| `allowed_cidr_blocks` | required | Who may reach the app (the ingress IP restrictions) |
-| `location` | `eastus` | Region |
-| `image_repository` | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror |
-| `cpu`, `memory` | `2`, `4Gi` | Capture renders in the container, so do not go much lower |
-| `min_instances`, `max_instances` | `1`, `1` | Identical copies. At least 1. See [Running several instances](/guides/deployment/#running-several-instances) |
-| `database_pool_size` | `10` | Connections per copy. `max_instances` × this must fit the database's limit |
-| `shutdown_grace_seconds` | `30` | Sets `SHUTDOWN_GRACE_SECONDS` and the termination grace (see [Shutdown](#shutdown)) |
-| `existing_database_url_secret_id` | `""` | A Postgres URL in Key Vault. No database is created |
-| `database_sku_name`, `database_storage_mb` | `B_Standard_B1ms`, `32768` | Created database only |
-| `deletion_protection` | `true` | Delete lock on the database, purge protection on the vault |
-| `playwright_workspace_endpoint_secret_id`, `playwright_workspace_token_secret_id` | `""` | Optional Azure Playwright Workspace (secret references, both or none) |
-| `log_retention_days` | `30` | Log Analytics retention |
-| `tags` | `{}` | Added to every taggable resource |
+| Name                                                                              | Default                            | Meaning                                                                                                      |
+| --------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `name`                                                                            | required                           | Name prefix, 2 to 20 characters                                                                              |
+| `image_version`                                                                   | required                           | Release version of the image (no `v`)                                                                        |
+| `allowed_cidr_blocks`                                                             | required                           | Who may reach the app (the ingress IP restrictions)                                                          |
+| `location`                                                                        | `eastus`                           | Region                                                                                                       |
+| `image_repository`                                                                | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                                                                  |
+| `cpu`, `memory`                                                                   | `2`, `4Gi`                         | Capture renders in the container, so do not go much lower                                                    |
+| `min_instances`, `max_instances`                                                  | `1`, `1`                           | Identical copies. At least 1. See [Running several instances](/guides/deployment/#running-several-instances) |
+| `database_pool_size`                                                              | `10`                               | Connections per copy. `max_instances` × this must fit the database's limit                                   |
+| `shutdown_grace_seconds`                                                          | `30`                               | Sets `SHUTDOWN_GRACE_SECONDS` and the termination grace (see [Shutdown](#shutdown))                          |
+| `existing_database_url_secret_id`                                                 | `""`                               | A Postgres URL in Key Vault. No database is created                                                          |
+| `database_sku_name`, `database_storage_mb`                                        | `B_Standard_B1ms`, `32768`         | Created database only                                                                                        |
+| `deletion_protection`                                                             | `true`                             | Delete lock on the database, purge protection on the vault                                                   |
+| `playwright_workspace_endpoint_secret_id`, `playwright_workspace_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none)                                        |
+| `auth_email`                                                                      | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                                                       |
+| `log_retention_days`                                                              | `30`                               | Log Analytics retention                                                                                      |
+| `tags`                                                                            | `{}`                               | Added to every taggable resource                                                                             |
 
 ### Outputs
 
-| Output | Meaning |
-| --- | --- |
-| `url` | The app's HTTPS address on the Container Apps default domain |
-| `resource_group_name`, `container_app_name` | For `az containerapp` commands |
-| `storage_account_name`, `storage_container_name` | The Blob container for Storybooks |
-| `database_fqdn` | The Postgres server's private hostname |
-| `key_vault_name`, `admin_token_secret_id`, `oidc_client_secret_id` | The vault and secret ids (references), never values |
-| `identity_principal_id`, `identity_client_id` | The app's managed identity |
-| `role_assignments` | The exact roles (next section) |
+| Output                                                                                        | Meaning                                                      |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `url`                                                                                         | The app's HTTPS address on the Container Apps default domain |
+| `resource_group_name`, `container_app_name`                                                   | For `az containerapp` commands                               |
+| `storage_account_name`, `storage_container_name`                                              | The Blob container for Storybooks                            |
+| `database_fqdn`                                                                               | The Postgres server's private hostname                       |
+| `key_vault_name`, `admin_token_secret_id`, `auth_password_secret_id`, `oidc_client_secret_id` | The vault and secret ids (references), never values          |
+| `identity_principal_id`, `identity_client_id`                                                 | The app's managed identity                                   |
+| `role_assignments`                                                                            | The exact roles (next section)                               |
 
 ## Permissions
 
 `role_assignments` lists them. The app's identity has exactly:
 
-| Role | Scope | Why |
-| --- | --- | --- |
-| `Key Vault Secrets User` | The module's Key Vault | Resolve the app's secret references |
+| Role                            | Scope                          | Why                                    |
+| ------------------------------- | ------------------------------ | -------------------------------------- |
+| `Key Vault Secrets User`        | The module's Key Vault         | Resolve the app's secret references    |
 | `Storage Blob Data Contributor` | The `storybook` Blob container | Read, write and delete Storybook files |
 
 A secret in another vault (an existing database URL, a Playwright Workspace) needs `Key Vault Secrets User` for `identity_principal_id` on that vault; the module does not grant it. Terraform's own principal gets `Key Vault Secrets Officer` on the vault to write the secrets, then waits 60 seconds for it to take effect. The identity running Terraform needs `Owner` or `User Access Administrator` to create the role assignments.
@@ -101,8 +102,9 @@ Outside Azure, the image also takes `AZURE_STORAGE_CONNECTION` (a connection str
 
 ## Database and secrets
 
-- **Private database.** Postgres Flexible Server has no public endpoint. Only the VNet reaches it, through a private DNS zone. The module's URL uses `sslmode=require`, which encrypts but does not verify the certificate: use `verify-full` and set `DATABASE_CA` or `DATABASE_CA_FILE` to the CA bundle. See [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
-- **Secrets.** `SECRET` and `ADMIN-TOKEN` are generated and reach the app as Container Apps secrets that are Key Vault references, resolved by the managed identity. Their values and the database password are also in the Terraform state, so keep the state in an encrypted backend with restricted access.
+- **Private database.** Postgres Flexible Server has no public endpoint. Only the VNet reaches it, through a private DNS zone. The module's URL says `sslmode=verify-full` and uses the server's FQDN, whose certificate chains to a public root, so the app verifies it with the system CAs. No live run has confirmed this yet. With your own database URL, see [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
+- **Sign-in.** The module generates `AUTH-PASSWORD` and passes it with `AUTH_EMAIL` (default `admin@example.com`), so sign-in is on from the first boot. Read the password from the vault with `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`.
+- **Secrets.** `SECRET`, `AUTH-PASSWORD` and `ADMIN-TOKEN` are generated and reach the app as Container Apps secrets that are Key Vault references, resolved by the managed identity. Their values and the database password are also in the Terraform state, so keep the state in an encrypted backend with restricted access.
 - **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never overwrites it. Put the real value in with `az keyvault secret set` and restart the revision. The image does not read OIDC settings yet.
 - **Existing database.** With `existing_database_url_secret_id` the module creates no database, subnet or private DNS zone. The network path to that database is yours.
 
@@ -136,13 +138,13 @@ If your team won't use the module, you need three things:
 1. **The image.** `ghcr.io/guptasiddhant/storyshelf:<version>` (`amd64` and `arm64`). It listens on port 3000 and bundles Chromium. Use at least 2 vCPU and 4 GB for capture and one replica minimum; the `-hosting` variant has no browser, for hosting without capture.
 2. **The environment.** This is what the module passes:
 
-   | Variable | Value |
-   | --- | --- |
+   | Variable                                                              | Value                                                                                                         |
+   | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
    | `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID` | The account, the container and the user-assigned identity. Setting another storage backend too stops the boot |
-   | `PUBLIC_BASE_URL`, `TRUST_PROXY` | The public `https://` origin, and `1` behind a proxy |
-   | `SECRET`, `ADMIN_TOKEN` | At least 32 random characters, the same on every copy (secret references) |
-   | `DATABASE_URL`, `DATABASE_POOL_MAX` | A Postgres URL (the server's private hostname), and connections per copy |
-   | `SHUTDOWN_GRACE_SECONDS` | Drain time on SIGTERM. Keep it below your platform's termination grace |
+   | `PUBLIC_BASE_URL`, `TRUST_PROXY`                                      | The public `https://` origin, and `1` behind a proxy                                                          |
+   | `SECRET`, `ADMIN_TOKEN`                                               | At least 32 random characters, the same on every copy (secret references)                                     |
+   | `DATABASE_URL`, `DATABASE_POOL_MAX`                                   | A Postgres URL (the server's private hostname), and connections per copy                                      |
+   | `SHUTDOWN_GRACE_SECONDS`                                              | Drain time on SIGTERM. Keep it below your platform's termination grace                                        |
 
 3. **The permissions** in the section above, attached to the container's own identity. Never put cloud access keys in environment files, and turn shared keys off on the storage account.
 

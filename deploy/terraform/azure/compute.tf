@@ -70,6 +70,10 @@ resource "azurerm_container_app" "app" {
         value = "1"
       }
       env {
+        name  = "AUTH_EMAIL"
+        value = var.auth_email
+      }
+      env {
         name  = "SHUTDOWN_GRACE_SECONDS"
         value = tostring(var.shutdown_grace_seconds)
       }
@@ -88,6 +92,15 @@ resource "azurerm_container_app" "app" {
       env {
         name  = "AZURE_CLIENT_ID"
         value = azurerm_user_assigned_identity.app.client_id
+      }
+
+      dynamic "env" {
+        for_each = local.git_env
+
+        content {
+          name  = env.key
+          value = env.value
+        }
       }
 
       dynamic "env" {

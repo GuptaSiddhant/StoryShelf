@@ -20,8 +20,8 @@ locals {
     local.create_database ? aws_db_instance.main[0].master_user_secret[0].secret_arn : "",
     aws_secretsmanager_secret.admin_token.arn,
     var.existing_database_url_secret_arn,
-    var.remote_browser_endpoint_secret_arn,
-    var.remote_browser_token_secret_arn,
+    var.github_app_private_key_secret_arn,
+    var.gitlab_token_secret_arn,
   ])
 }
 
@@ -78,12 +78,6 @@ data "aws_iam_policy_document" "task" {
         "arn:aws:rds-db:${var.region}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.main[0].resource_id}/${local.database_user}",
       ]
     }
-  }
-
-  statement {
-    sid       = "AppLogs"
-    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = ["${aws_cloudwatch_log_group.app.arn}:*"]
   }
 }
 

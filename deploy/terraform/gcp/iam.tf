@@ -1,12 +1,13 @@
 locals {
-  # Secrets the service reads, by secret id: the app's own, the database URL and the optional
-  # remote-browser references.
+  # Secrets the service reads, by secret id: the app's own, the database URL and the optional git
+  # connection references.
   app_secret_ids = compact([
     google_secret_manager_secret.shelf_secret.secret_id,
     google_secret_manager_secret.admin_token.secret_id,
     local.create_database ? google_secret_manager_secret.database_url[0].secret_id : var.existing_database_url_secret_id,
-    var.remote_browser_endpoint_secret_id,
-    var.remote_browser_token_secret_id,
+    google_secret_manager_secret.auth_password.secret_id,
+    var.github_app_private_key_secret_id,
+    var.gitlab_token_secret_id,
   ])
 }
 
@@ -36,6 +37,7 @@ resource "google_secret_manager_secret_iam_member" "app" {
   depends_on = [
     google_secret_manager_secret.shelf_secret,
     google_secret_manager_secret.admin_token,
+    google_secret_manager_secret.auth_password,
     google_secret_manager_secret.database_url,
   ]
 }

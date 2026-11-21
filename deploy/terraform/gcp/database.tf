@@ -32,6 +32,10 @@ resource "google_sql_database_instance" "main" {
       ipv4_enabled    = false
       private_network = local.network
       ssl_mode        = "ENCRYPTED_ONLY"
+
+      # A CAS-issued server certificate names the instance's IP addresses, so the app can verify it
+      # (verify-full against DATABASE_CA) while connecting over the private IP.
+      server_ca_mode = "GOOGLE_MANAGED_CAS_CA"
     }
   }
 

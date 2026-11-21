@@ -3,9 +3,11 @@ import "reflect-metadata";
 import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
+import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
 import {
   createEmailNotifier,
+  gitFromEnv,
   integrationsFromEnv,
   smtpPresetFromEnv,
 } from "@storyshelf/core/integrations";
@@ -21,7 +23,9 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * `DATABASE_POOL_MAX`, `DATABASE_CA` / `DATABASE_CA_FILE`, `AWS_BUCKET`, `GCS_BUCKET` or Azure Blob (`AZURE_STORAGE_CONTAINER` is required, with either
  * `AZURE_STORAGE_ACCOUNT` [+ `AZURE_CLIENT_ID`] or `AZURE_STORAGE_CONNECTION`) for one object store (local storage on `/data` when none is set),
  * `SECRET` (`SECRET_PREVIOUS` and `SECRET_MIGRATE` to rotate it), `PUBLIC_BASE_URL`, `AUTH_PASSWORD`,
- * `AUTH_EMAIL`, `SMTP_*`,
+ * `AUTH_EMAIL`, `SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
+ * `SHELF_GITHUB_APP_PRIVATE_KEY[_FILE]`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`,
+ * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
  * `SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
  * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
@@ -55,7 +59,8 @@ const graceMs = shutdownGraceMs(env);
 const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
 
 // Every refusal below throws before the server listens. Node would print the throwing source line
-// first, so the reason (naming the variable, never its value) is printed as the first line instead.
+// and a bundle stack, so a refusal prints only its reason (naming the variable, never its value);
+// any other error still prints its stack.
 process.on("uncaughtException", (error) => {
   process.stderr.write(describeBootFailure(error));
   process.exit(1);
@@ -80,6 +85,16 @@ if (unverifiedDatabaseTls(env)) {
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 // SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
 const integrations = integrationsFromEnv(env);
+// Git connections from the environment (ADR 0054, decision 9): a half-set one stops the server here,
+// naming the variable and never its value. The key and the token are read once and never logged.
+const git = gitFromEnv(env);
+shelfLogger.info(
+  {
+    gitConnections: (git.connections ?? []).map((connection) => connection.id),
+    gitLinks: git.links?.length ?? 0,
+  },
+  "git connections",
+);
 const testing = captureEnabled(env)
   ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
@@ -96,6 +111,8 @@ const auth =
         fromEmail: env["SMTP_FROM"],
         onAuthSystemEvent: createAuthSystemHook(),
         logger: shelfLogger,
+        // Shared accounts that sign in and read but never write (#1274), comma-separated emails.
+        readOnlyAccounts: parseReadOnlyAccounts(env["SHELF_READ_ONLY_ACCOUNTS"]),
       }).adapter
     : undefined;
 
@@ -104,6 +121,7 @@ const app = createShelfApp({
   storage,
   ...(testing ? { testing } : {}),
   design: integrations.design,
+  git,
   notifications: {
     notifiers: (builtIn) =>
       integrations.notifiers(

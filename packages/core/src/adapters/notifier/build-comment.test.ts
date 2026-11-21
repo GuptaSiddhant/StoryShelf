@@ -112,6 +112,22 @@ describe("buildCommentMarkdown: testing on", () => {
     `);
   });
 
+  it("never lets a commit id escape its code span or mention anyone", () => {
+    const hostile = "`]@bob";
+    const markdown = [
+      buildCommentMarkdown(
+        input({ status: "cancelled", supersededBy: { sha: hostile, url: "https://s/b2" } }),
+      ),
+      buildCommentMarkdown(input({ sha: hostile })),
+      buildCommentMarkdown(
+        input({ earlier: [{ state: "✅ approved", sha: hostile, url: "https://s/b0" }] }),
+      ),
+      skippedCommentMarkdown({ buildUrl: "u", source: { sha: hostile, url: "s" } }),
+    ].join("\n");
+    expect(markdown).not.toContain("@bob");
+    expect(markdown).toContain("`bob`");
+  });
+
   it("says a cancelled build was superseded", () => {
     expect(
       buildCommentMarkdown(
@@ -229,6 +245,20 @@ describe("buildCommentMarkdown: limits and safety", () => {
       input({ changes: [change(1, { story: "A | <b>x</b>\n[y](z) `c`" })] }),
     );
     expect(markdown).toContain("A \\| \\<b\\>x\\</b\\> \\[y\\](z) \\`c\\`");
+  });
+
+  it("posts no live mention for a story, test or removed story named like a user", () => {
+    const markdown = buildCommentMarkdown(
+      input({
+        changes: [change(1, { story: "@acme/button / Primary", target: "@acme" })],
+        failedTests: ["@acme/form"],
+        removed: ["@acme/old"],
+        failure: "@acme",
+        status: "reviewing",
+      }),
+    );
+    expect(markdown).toContain("@\u200Dacme/button");
+    expect(markdown).not.toMatch(/@(?!\u200D)acme/u);
   });
 
   it("is one line for a skipped build, with or without its source", () => {

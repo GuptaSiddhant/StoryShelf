@@ -28,15 +28,15 @@ changing both versions together and reading the release notes. A runnable exampl
 
 ## What it creates
 
-| Part     | Resources                                                                            |
-| -------- | ------------------------------------------------------------------------------------ |
-| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                    |
-| Compute  | Container Apps environment (Consumption profile), one app of identical copies        |
-| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL) |
-| Storage  | Storage account and a private `storybook` Blob container                             |
-| Identity | One user-assigned managed identity for the app                                       |
-| Secrets  | Key Vault (RBAC): `SECRET`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL`      |
-| Logs     | Log Analytics workspace                                                              |
+| Part     | Resources                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                |
+| Compute  | Container Apps environment (Consumption profile), one app of identical copies                    |
+| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)             |
+| Storage  | Storage account and a private `storybook` Blob container                                         |
+| Identity | One user-assigned managed identity for the app                                                   |
+| Secrets  | Key Vault (RBAC): `SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`, `OIDC-CLIENT-SECRET`, `DATABASE-URL` |
+| Logs     | Log Analytics workspace                                                                          |
 
 The app is served on the Container Apps default domain over HTTPS; `allowed_cidr_blocks` becomes its
 ingress IP restrictions. A custom domain and sign-in federation (Entra) are not part of the module.
@@ -44,28 +44,33 @@ The database has no public endpoint: only the VNet reaches it.
 
 ## Inputs
 
-| Name                                                           | Default                            | Meaning                                                               |
-| -------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------- |
-| `name`                                                         | required                           | Name prefix, 2-20 characters                                          |
-| `image_version`                                                | required                           | Release version of the image (no `v`)                                 |
-| `allowed_cidr_blocks`                                          | required                           | Who may reach the app                                                 |
-| `location`                                                     | `eastus`                           | Region                                                                |
-| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                           |
-| `cpu` / `memory`                                               | `2` / `4Gi`                        | Capture renders in the container: do not go much lower                |
-| `min_instances` / `max_instances`                              | `1` / `1`                          | Identical copies; at least 1 (see "Capture, scaling and shutdown")    |
-| `database_pool_size`                                           | `10`                               | Connections per copy: `max_instances` x this must fit the database    |
-| `shutdown_grace_seconds`                                       | `30`                               | See "Capture, scaling and shutdown"                                   |
-| `existing_database_url_secret_id`                              | `""`                               | A Postgres URL in Key Vault; no database is created                   |
-| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`        | Created database only                                                 |
-| `deletion_protection`                                          | `true`                             | Delete lock on the database, purge protection on the vault            |
-| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none) |
-| `log_retention_days`                                           | `30`                               | Log Analytics retention                                               |
-| `tags`                                                         | `{}`                               | Added to every taggable resource                                      |
+| Name                                                           | Default                            | Meaning                                                                 |
+| -------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `name`                                                         | required                           | Name prefix, 2-20 characters                                            |
+| `image_version`                                                | required                           | Release version of the image (no `v`)                                   |
+| `allowed_cidr_blocks`                                          | required                           | Who may reach the app                                                   |
+| `location`                                                     | `eastus`                           | Region                                                                  |
+| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                             |
+| `cpu` / `memory`                                               | `2` / `4Gi`                        | Capture renders in the container: do not go much lower                  |
+| `min_instances` / `max_instances`                              | `1` / `1`                          | Identical copies; at least 1 (see "Capture, scaling and shutdown")      |
+| `database_pool_size`                                           | `10`                               | Connections per copy: `max_instances` x this must fit the database      |
+| `shutdown_grace_seconds`                                       | `30`                               | See "Capture, scaling and shutdown"                                     |
+| `existing_database_url_secret_id`                              | `""`                               | A Postgres URL in Key Vault; no database is created                     |
+| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`        | Created database only                                                   |
+| `deletion_protection`                                          | `true`                             | Delete lock on the database, purge protection on the vault              |
+| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none)   |
+| `github_app_id` / `github_app_private_key_secret_id`           | `""`                               | Server-wide GitHub App connection (both or none; see "Git connections") |
+| `github_api_url`                                               | `""`                               | GitHub Enterprise Server API base; empty means github.com               |
+| `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                               | Server-wide GitLab connection (both or none)                            |
+| `gitlab_host`                                                  | `""`                               | GitLab base URL; empty means gitlab.com                                 |
+| `auth_email`                                                   | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                  |
+| `log_retention_days`                                           | `30`                               | Log Analytics retention                                                 |
+| `tags`                                                         | `{}`                               | Added to every taggable resource                                        |
 
 ## Outputs
 
 `url`, `resource_group_name`, `container_app_name`, `storage_account_name`, `storage_container_name`,
-`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `oidc_client_secret_id`,
+`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `auth_password_secret_id`, `oidc_client_secret_id`,
 `identity_principal_id`, `identity_client_id` and `role_assignments`. Secret outputs are Key Vault
 ids (references), never values.
 
@@ -74,10 +79,14 @@ ids (references), never values.
 The app gets every secret as a Container Apps secret that is a **Key Vault reference** resolved by its
 managed identity. No output carries a value.
 
-- **`SECRET`, `ADMIN-TOKEN`** are generated. Their values, the database password and the storage
-  account's access keys and connection strings are also in the Terraform state (the provider records
-  them as computed attributes of the account, whether or not anything uses them): keep the state in an encrypted backend with
-  restricted access.
+- **`SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`** are generated. Their values, the database password,
+  the storage account's access keys and connection strings, and the Log Analytics workspace's shared
+  keys are also in the Terraform state (the provider records the keys as computed attributes, whether
+  or not anything uses them): keep the state in an encrypted backend with restricted access.
+- **Sign-in.** The image turns sign-in on from `AUTH_PASSWORD` and `SECRET`, and the module always
+  sets both, so the app never boots open. Read the password with
+  `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`
+  and sign in as `admin@example.com` (or `auth_email`).
 - **`OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
 
@@ -141,21 +150,45 @@ needs an account that allows shared keys, so it does not work against this modul
   `shutdown_grace_seconds` (`SHUTDOWN_GRACE_SECONDS`), then hands the rest back to the queue. The
   container's termination grace is the grace plus 10 seconds, so it is never killed mid-drain.
 
+## Git connections
+
+Optional, for merge gates and pull-request comments without anyone pasting a key (ADR 0054). Create
+the GitHub App's private key, or a GitLab group or project access token (`api` scope), as a
+Key Vault secret yourself, then pass its reference. Terraform holds only the reference, so the key
+and the token never enter configuration or state; the app reads them as
+`SHELF_GITHUB_APP_PRIVATE_KEY` and `SHELF_GITLAB_TOKEN`. The app's identity reads only this stack's vault (`Key Vault Secrets User`), so create them there, or grant the identity that role on your own vault. A half-set connection fails the plan,
+and the image refuses to boot on one too, naming the variable and never its value. Rotating a key is
+a new secret version and a new revision.
+
+```sh
+az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name GITHUB-APP-PRIVATE-KEY --file app.private-key.pem
+```
+
 ## Image contract
 
-| Variable                                                              | Source                          | Status |
-| --------------------------------------------------------------------- | ------------------------------- | ------ |
-| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`            | module                          | read   |
-| `SECRET`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                         | Key Vault                       | read   |
-| `DATABASE_URL`, `DATABASE_POOL_MAX`                                   | Key Vault, `database_pool_size` | read   |
-| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`           | Key Vault references (optional) | read   |
-| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID` | the module                      | read   |
+| Variable                                                                                         | Source                          | Status |
+| ------------------------------------------------------------------------------------------------ | ------------------------------- | ------ |
+| `PUBLIC_BASE_URL`, `TRUST_PROXY`, `SHUTDOWN_GRACE_SECONDS`                                       | module                          | read   |
+| `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET`                                   | Key Vault                       | read   |
+| `AUTH_EMAIL`                                                                                     | `auth_email`                    | read   |
+| `DATABASE_URL`, `DATABASE_POOL_MAX`                                                              | Key Vault, `database_pool_size` | read   |
+| `PLAYWRIGHT_SERVICE_URL`, `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`                                      | Key Vault references (optional) | read   |
+| `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_CLIENT_ID`                            | the module                      | read   |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)           | read   |
+| `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Key Vault references (optional) | read   |
 
 The image stores uploads in the Blob container when `AZURE_STORAGE_ACCOUNT` is set (managed identity),
 or `AZURE_STORAGE_CONNECTION` for a host without one. Setting more than one storage backend refuses to
 boot. The module's live apply stays behind the repository variable `LIVE_AZURE_MODULE_APPLY`: it is
 billed, so the owner turns it on. No live Azure run has confirmed this path yet; the adapter is tested
 against a faked SDK.
+
+## Database TLS
+
+The module's `DATABASE_URL` says `sslmode=verify-full` and connects by the server's FQDN. Flexible
+Server certificates chain to public roots and name that FQDN, so the app verifies the certificate
+against the system CAs and never sends the password to an unverified peer. _Unverified:_ no live run
+has confirmed the check over the private DNS zone yet.
 
 ## Existing database
 

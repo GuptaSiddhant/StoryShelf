@@ -39,7 +39,7 @@ const tabPage = (tab: SettingsTab, changes: Partial<ProjectSettingsData> = {}): 
   });
 
 /** General: name, repository, default branch and public branch regex, the package links and the danger zone. */
-export const General = pageStory(() => tabPage("general"));
+export const General = pageStory(() => tabPage("general", { canDeleteProject: true }));
 
 /** Capture & tests: thresholds, browsers, the test switches and design links. */
 export const CaptureAndTests = pageStory(() => tabPage("capture"));

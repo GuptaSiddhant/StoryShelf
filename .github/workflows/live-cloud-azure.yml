@@ -16,9 +16,11 @@ on:
 permissions:
   contents: read
 
+# Never cancel a run in progress: a cancelled module-apply would lose its runner-local state and
+# orphan a billed stack that destroy can no longer find. A second dispatch waits instead.
 concurrency:
   group: live-cloud-azure
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # Real Blob suites. Hermetic tests in the same packages also run (they must

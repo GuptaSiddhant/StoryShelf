@@ -27,6 +27,7 @@ import {
 import { requestId } from "hono/request-id";
 import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
@@ -42,6 +43,7 @@ import {
   requireReview,
   requireTesting,
   rateLimitKey,
+  readOnlyWrites,
   requestLogging,
   resolveRequestUser,
   sameSiteWrites,
@@ -50,8 +52,9 @@ import {
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
+import { registerAdminGit } from "./routers/admin-git.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
-import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
+import { registerPublicOriginRoutes } from "./routers/admin-public-origin.tsx";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
@@ -212,7 +215,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   mountPortalBoundary(app, config);
-  mountAccessGates(app);
+  mountAccessGates(app, wiring.options);
 }
 
 /**
@@ -242,10 +245,12 @@ function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
 }
 
 /**
- * What the request is allowed to see, inside the request store: the not-found page (it needs to
- * know who is asking) wraps the sign-in gate and the project gates, whose 404s it dresses.
+ * What the request is allowed to see, inside the request store: a read-only shared account's writes
+ * are refused first (#1274); the not-found page (it needs to know who is asking) wraps the sign-in
+ * gate and the project gates, whose 404s it dresses.
  */
-function mountAccessGates(app: ShelfRouter): void {
+function mountAccessGates(app: ShelfRouter, options: Pick<ResolvedShelfOptions, "auth">): void {
+  app.use("*", readOnlyWrites(options.auth));
   app.use("*", notFoundPage());
   app.use("*", authGate());
   mountProjectGates(app);
@@ -368,8 +373,10 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       design,
       notifiers,
       integrations: options.integrations,
+      gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
+      gitConnections: gitConnectionsOf(options, config),
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
   );
@@ -435,11 +442,21 @@ function registerPageRoutes(
   registerStorybook(app);
   registerTokenStorybook(app);
   registerPreviewToken(app);
-  registerAdminPages(app, health, options.auth);
-  registerPublicOriginRoutes(app);
+  registerSystemPages(app, options, health);
   registerUiPages(app);
   registerReviewForms(app);
   registerInsightFragments(app);
+}
+
+/** The site-admin System page, its public-origin routes and System → Git. */
+function registerSystemPages(
+  app: ShelfRouter,
+  options: ResolvedShelfOptions,
+  health: HealthDeps,
+): void {
+  registerAdminPages(app, health, options.auth);
+  registerPublicOriginRoutes(app);
+  registerAdminGit(app);
 }
 
 /** Register every API router and page set, then the error answers that cover them. */

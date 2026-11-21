@@ -709,6 +709,37 @@ describe("createSqliteDatabase", () => {
     }
   });
 
+  it("adds git_repository_links.last_delivered_at to a volume created before it, keeping its links", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-link-delivery-"));
+    const path = join(dir, "legacy.db");
+    try {
+      const seed = createSqliteDatabase(path);
+      await initDb(seed);
+      await closeDb(seed);
+      const raw = new DatabaseSync(path);
+      raw.exec(`
+        ALTER TABLE git_repository_links DROP COLUMN last_delivered_at;
+        INSERT INTO projects (id, name, slug, created_at, updated_at) VALUES ('p', 'P', 'p', 't', 't');
+        INSERT INTO git_connections (id, provider, name, config, created_at, updated_at) VALUES ('c', 'github', 'GitHub', '{}', 't', 't');
+        INSERT INTO git_repository_links (id, project_id, connection_id, host, owner, repo, outputs, created_at, updated_at) VALUES ('l', 'p', 'c', 'api.github.com', 'acme', 'web', '{}', 't', 't');
+      `);
+      raw.close();
+      const db = createSqliteDatabase(path);
+      await initDb(db);
+      expect((await db.get(schema.gitRepositoryLinks, "l"))?.["lastDeliveredAt"]).toBeNull();
+      await db.update(schema.gitRepositoryLinks, "l", {
+        lastDeliveredAt: "2026-01-02T00:00:00.000Z",
+      });
+      await initDb(db);
+      expect((await db.get(schema.gitRepositoryLinks, "l"))?.["lastDeliveredAt"]).toBe(
+        "2026-01-02T00:00:00.000Z",
+      );
+      await closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("adds subscriptions.review_requests to an older volume with review requests on", async () => {
     const dir = mkdtempSync(join(tmpdir(), "storyshelf-sqlite-review-requests-"));
     const path = join(dir, "legacy.db");

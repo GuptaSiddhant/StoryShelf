@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { NotifyRequest } from "./notify-job.ts";
 import { createBuildStatePublisher, PAUSED_MESSAGE } from "./publisher.ts";
 import { statusLog, world } from "./test-world.ts";
 
@@ -31,7 +32,7 @@ describe("createBuildStatePublisher", () => {
       config: { prefix: "alt" },
       secret: "t",
     });
-    const enqueue = vi.fn(async (_job: { channelId: string; buildId: string }) => {});
+    const enqueue = vi.fn(async (_job: NotifyRequest) => {});
     await createBuildStatePublisher({ deps: w.deps, enqueue }).request(w.build.id);
     expect(enqueue.mock.calls.map(([job]) => job)).toEqual([
       { channelId: w.channelId, buildId: w.build.id },
@@ -48,7 +49,7 @@ describe("createBuildStatePublisher", () => {
       config: { prefix: "alt" },
       secret: "t",
     });
-    const enqueue = vi.fn(async (_job: { channelId: string; buildId: string }) => {});
+    const enqueue = vi.fn(async (_job: NotifyRequest) => {});
     await createBuildStatePublisher({ deps: w.deps, enqueue }).request(w.build.id, {
       channelId: second.id,
     });
@@ -92,7 +93,7 @@ describe("createBuildStatePublisher", () => {
       publicOrigin: async () => await Promise.resolve(origin),
       logger: { ...w.deps.logger, warn } as unknown as typeof w.deps.logger,
     };
-    const enqueue = vi.fn(async (_job: { channelId: string; buildId: string }) => {});
+    const enqueue = vi.fn(async (_job: NotifyRequest) => {});
     const publisher = createBuildStatePublisher({ deps, enqueue });
     await w.channels.recordOutcome(w.channelId, "old error");
     await publisher.request(w.build.id);

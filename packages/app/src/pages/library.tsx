@@ -18,6 +18,7 @@ import {
   statusLabel,
   statusTone,
   Badge,
+  Time,
 } from "../ui/components.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { GetStarted } from "./get-started.tsx";
@@ -184,18 +185,18 @@ function LibraryHeader(props: {
           <a href={urls.build(project.slug, build.id)}>
             {build.gitBranch} · {build.gitSha.slice(0, 7)}
           </a>{" "}
-          · {new Date(build.createdAt).toLocaleString()}{" "}
+          · <Time value={build.createdAt} />{" "}
           <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
         </>
       }
       actions={
         <HStack>
           <FilterInput label="Filter stories" placeholder="Filter stories…" />
-          <Button variant="ghost" size="sm" icon="external-link" href={urls.short(build.id)}>
+          <Button variant="ghost" icon="external-link" href={urls.short(build.id)}>
             View Storybook
           </Button>
           {getStore().design.length > 0 ? (
-            <Button variant="ghost" size="sm" href={urls.designCoverage(project.slug)}>
+            <Button variant="ghost" href={urls.designCoverage(project.slug)}>
               Design coverage
             </Button>
           ) : null}

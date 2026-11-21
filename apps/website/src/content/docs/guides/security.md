@@ -87,7 +87,7 @@ There is no analytics, telemetry or update check in the server. The web UI ships
 1. **Turn on authentication** for any instance more than one person reaches, and choose [how people sign in](/guides/auth/).
 2. **Set `SECRET`** to 32 or more random characters (`openssl rand -hex 32`) and keep it in your secret store. Plan how you would [rotate it](/guides/deployment/secret-rotation/).
 3. **Set `PUBLIC_BASE_URL`** (or confirm the address on **System**), so links and notifications point at the right host. See [Public origin](/guides/config/#public-origin).
-4. **Serve it over HTTPS**, in front of the server (a load balancer or reverse proxy); the reference stacks include DNS and certificates.
+4. **Serve it over HTTPS**, in front of the server (a load balancer or reverse proxy); the [cloud modules](/guides/deployment/cloud/) serve HTTPS (the AWS module with your `domain_name`, GCP and Azure on the platform's own domain).
 5. **Keep tokens narrow.** A token has the role of the user who created it, so create the CI token from an account that is only a `developer` on that project, not a project or site admin. Keep `STORYSHELF_ADMIN_TOKEN` out of routine uploads.
 6. **Limit who is a project `admin` or `approver`**, and who can reach the storage bucket and the database directly.
 7. **Pick what is public on purpose.** Leave `public_branch_regex` empty unless you want a branch's Storybook open to everyone.

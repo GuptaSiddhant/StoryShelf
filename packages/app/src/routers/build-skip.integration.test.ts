@@ -64,14 +64,14 @@ async function seed({ testing = true, skippedBuilds = true, runTests = false }: 
     return created;
   };
   let key = 0;
-  const hint = async (sha = "head", branch = "main") =>
+  const hint = async (sha = "4ead000", branch = "main") =>
     await (await app.request(`${SKIP_SOURCE}?branch=${branch}&sha=${sha}`)).json();
   const post = async (sourceBuildId: string, extra: Record<string, unknown> = {}) =>
     await app.request(SKIPPED, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        gitSha: "head",
+        gitSha: "4ead000",
         gitBranch: "main",
         sourceBuildId,
         changedFiles: ["README.md"],
@@ -101,8 +101,8 @@ describe("GET /builds/skip-source: which candidate may be skipped from", () => {
     ["cancelled", false],
   ])("a %s candidate: eligible is %s", async (status, eligible) => {
     const { build, hint } = await seed();
-    const source = await build("base", status);
-    expect(await hint()).toEqual(eligible ? { sourceBuildId: source.id, sha: "base" } : null);
+    const source = await build("b45e000", status);
+    expect(await hint()).toEqual(eligible ? { sourceBuildId: source.id, sha: "b45e000" } : null);
   });
 
   it("answers null for the first build on a branch", async () => {
@@ -119,31 +119,31 @@ describe("GET /builds/skip-source: which candidate may be skipped from", () => {
 
   it("ignores builds of the same commit and of other branches", async () => {
     const { build, hint } = await seed();
-    const source = await build("base", "approved");
-    await build("head", "rejected");
+    const source = await build("b45e000", "approved");
+    await build("4ead000", "rejected");
     await build("other", "rejected", "feature");
-    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "base" });
+    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "b45e000" });
   });
 
   it("resolves a skipped candidate to its real source while that source is approved", async () => {
     const { db, build, hint } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const skipped = await new BuildModel(db).createSkipped({
       projectId: source.projectId,
-      gitSha: "mid",
+      gitSha: "31d0000",
       gitBranch: "main",
       sourceBuildId: source.id,
       changedFiles: [],
     });
     expect(skipped.status).toBe("skipped");
-    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "base" });
+    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "b45e000" });
     await db.update(db.tables.builds, source.id, { status: "rejected" });
     expect(await hint()).toBeNull();
   });
 
   it("answers null for a project that runs Storybook tests", async () => {
     const { build, hint } = await seed({ runTests: true });
-    await build("base", "approved");
+    await build("b45e000", "approved");
     expect(await hint()).toBeNull();
   });
 
@@ -160,15 +160,15 @@ describe("GET /builds/skip-source: which candidate may be skipped from", () => {
 describe("POST /builds/skipped", () => {
   it("creates the skipped build and answers with its id and page URL", async () => {
     const { build, post, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const response = await post(source.id, { message: "docs", author: { name: "Ada" } });
     expect(response.status).toBe(201);
     const body = (await response.json()) as { build: Record<string, unknown>; buildUrl: string };
     expect(body.build).toMatchObject({
       status: "skipped",
-      gitSha: "head",
+      gitSha: "4ead000",
       skippedFromBuildId: source.id,
-      baselineSha: "base",
+      baselineSha: "b45e000",
       message: "docs",
       authorName: "Ada",
     });
@@ -180,8 +180,8 @@ describe("POST /builds/skipped", () => {
 
   it("answers 409 when the source was rejected between the hint and the POST", async () => {
     const { build, hint, post, db } = await seed();
-    const source = await build("base", "approved");
-    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "base" });
+    const source = await build("b45e000", "approved");
+    expect(await hint()).toEqual({ sourceBuildId: source.id, sha: "b45e000" });
     await db.update(db.tables.builds, source.id, { status: "rejected" });
     const response = await post(source.id);
     expect(response.status).toBe(409);
@@ -190,8 +190,8 @@ describe("POST /builds/skipped", () => {
 
   it("answers 409 when a newer build appeared, a source on another branch, or an unknown source", async () => {
     const { build, post } = await seed();
-    const source = await build("base", "approved");
-    const other = await build("elsewhere", "approved", "feature");
+    const source = await build("b45e000", "approved");
+    const other = await build("e15e000", "approved", "feature");
     expect((await post(other.id)).status).toBe(409);
     expect((await post("missing")).status).toBe(409);
     await build("newer", "pending");
@@ -200,7 +200,7 @@ describe("POST /builds/skipped", () => {
 
   it("answers 409 when a story was added, removed or renamed since the source", async () => {
     const { build, post, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     for (const entryIds of [
       [...STORIES, "button--added"],
       [STORIES[0]],
@@ -215,10 +215,10 @@ describe("POST /builds/skipped", () => {
 
   it("accepts the entry ids in any order, and answers 409 for a source with no catalog", async () => {
     const { build, post, db, project } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     expect((await post(source.id, { entryIds: [...STORIES].toReversed() })).status).toBe(201);
     const bare = await createTestBuild(db, db.tables, project.id, {
-      gitSha: "bare",
+      gitSha: "ba4e000",
       gitBranch: "other",
     });
     await db.update(db.tables.builds, bare.id, { status: "approved" });
@@ -227,7 +227,7 @@ describe("POST /builds/skipped", () => {
 
   it("returns the build a repeated idempotencyKey already created", async () => {
     const { build, post, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const first = await post(source.id, { idempotencyKey: "run-1" });
     expect(first.status).toBe(201);
     const created = (await first.json()) as { build: { id: string } };
@@ -240,7 +240,7 @@ describe("POST /builds/skipped", () => {
 
   it("finishes the labels and the announcement on a retry after a failure following the insert", async () => {
     const { build, post, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const labels = [{ key: "persistent", value: "true" }];
     const attach = vi
       .spyOn(LabelModel.prototype, "attach")
@@ -268,7 +268,7 @@ describe("POST /builds/skipped", () => {
 
   it("attaches labels, including persistent", async () => {
     const { build, post, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const labels = [
       { key: "persistent", value: "true" },
       { key: "team", value: "web" },
@@ -285,11 +285,11 @@ describe("POST /builds/skipped", () => {
 
   it("is replaced by a normal build of the same commit", async () => {
     const { app, build, post, db, project } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const skipped = (await (await post(source.id)).json()) as { build: { id: string } };
     const other = await new BuildModel(db).createSkipped({
       projectId: project.id,
-      gitSha: "elsewhere",
+      gitSha: "e15e000",
       gitBranch: "main",
       sourceBuildId: source.id,
       changedFiles: [],
@@ -297,7 +297,7 @@ describe("POST /builds/skipped", () => {
     const response = await app.request("/api/v1/projects/web/builds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ gitSha: "head", gitBranch: "main" }),
+      body: JSON.stringify({ gitSha: "4ead000", gitBranch: "main" }),
     });
     const replacement = (await response.json()) as { id?: string; build?: { id: string } };
     const replacementId = replacement.id ?? replacement.build?.id;
@@ -307,11 +307,26 @@ describe("POST /builds/skipped", () => {
     expect((await models.get(other.id))?.supersededByBuildId ?? null).toBeNull();
   });
 
+  it.each(["`]@bob", "abc12", "local-`]@bob"])(
+    "rejects the commit id %j with 400",
+    async (gitSha) => {
+      const { build, post } = await seed();
+      const source = await build("b45e000", "approved");
+      expect((await post(source.id, { gitSha })).status).toBe(400);
+    },
+  );
+
+  it("accepts the local-<hex> identity the CLI synthesizes without git", async () => {
+    const { build, post } = await seed();
+    const source = await build("b45e000", "approved");
+    expect((await post(source.id, { gitSha: "local-0a1b2c3d4e5f" })).status).toBe(201);
+  });
+
   it("is already replaced when its commit's normal build exists first", async () => {
     const { build, post, db, project } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const normal = await createTestBuild(db, db.tables, project.id, {
-      gitSha: "head",
+      gitSha: "4ead000",
       gitBranch: "main",
     });
     const created = (await (await post(source.id)).json()) as { build: { id: string } };
@@ -321,10 +336,10 @@ describe("POST /builds/skipped", () => {
 
   it("keeps the replacement the first normal build assigned", async () => {
     const { build, post, db, project } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const created = (await (await post(source.id)).json()) as { build: { id: string } };
     const models = new BuildModel(db);
-    const input = { gitSha: "head", gitBranch: "main" };
+    const input = { gitSha: "4ead000", gitBranch: "main" };
     const first = await models.createSuperseding(project.id, input);
     const second = await models.createSuperseding(project.id, input);
     expect(first.replaced.map((row) => row.id)).toEqual([created.build.id]);
@@ -334,7 +349,7 @@ describe("POST /builds/skipped", () => {
 
   it("answers 409 for a project that runs Storybook tests", async () => {
     const { build, post } = await seed({ runTests: true });
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     expect((await post(source.id)).status).toBe(409);
   });
 
@@ -343,7 +358,7 @@ describe("POST /builds/skipped", () => {
       // oxlint-disable-next-line no-await-in-loop -- each setup is its own app
       const { build, post } = await seed(setup);
       // oxlint-disable-next-line no-await-in-loop -- see above
-      const source = await build("base", "approved");
+      const source = await build("b45e000", "approved");
       // oxlint-disable-next-line no-await-in-loop -- see above
       expect((await post(source.id)).status).toBe(404);
     }
@@ -365,7 +380,7 @@ describe("a skipped build cannot be acted on", () => {
     ["reject-all", undefined],
   ])("%s answers 409", async (path, body) => {
     const { build, post, act, db } = await seed();
-    const source = await build("base", "approved");
+    const source = await build("b45e000", "approved");
     const created = (await (await post(source.id)).json()) as { build: { id: string } };
     expect((await act(created.build.id, path, body)).status).toBe(409);
     expect((await new BuildModel(db).get(created.build.id))?.status).toBe("skipped");

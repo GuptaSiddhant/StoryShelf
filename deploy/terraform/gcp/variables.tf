@@ -36,7 +36,7 @@ variable "image_repository" {
 }
 
 variable "public_base_url" {
-  description = "Public origin of the app (PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty lets the app use the Cloud Run origin."
+  description = "Public origin of the app (PUBLIC_BASE_URL), e.g. when you map your own domain to the service. Empty means the service's deterministic Cloud Run URL (https://<name>-app-<project number>.<region>.run.app)."
   type        = string
   default     = ""
 }
@@ -99,8 +99,8 @@ variable "shutdown_grace_seconds" {
   default     = 8
 
   validation {
-    condition     = var.shutdown_grace_seconds >= 1 && var.shutdown_grace_seconds <= 9
-    error_message = "shutdown_grace_seconds must be 1-9: Cloud Run stops a container 10 seconds after SIGTERM."
+    condition     = var.shutdown_grace_seconds >= 1 && var.shutdown_grace_seconds <= 8
+    error_message = "shutdown_grace_seconds must be 1-8: Cloud Run stops a container 10 seconds after SIGTERM, and the process exits 1 second after the grace."
   }
 }
 
@@ -128,20 +128,63 @@ variable "deletion_protection" {
   default     = true
 }
 
-variable "remote_browser_endpoint_secret_id" {
-  description = "Optional Secret Manager secret id of a remote-browser endpoint, passed as REMOTE_BROWSER_ENDPOINT. Capture runs in the container when unset. The module builds no browser service."
-  type        = string
-  default     = ""
-}
-
-variable "remote_browser_token_secret_id" {
-  description = "Optional Secret Manager secret id of the remote-browser access token, passed as REMOTE_BROWSER_TOKEN."
-  type        = string
-  default     = ""
-}
-
 variable "labels" {
   description = "Labels added to every resource that supports them."
   type        = map(string)
   default     = {}
+}
+
+# Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+# GitLab token are Secret Manager secrets you create outside Terraform (same project), so their
+# values never enter configuration or state. Empty keeps a connection off.
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection, passed as SHELF_GITHUB_APP_ID. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret_id" {
+  description = "Secret Manager secret id holding the GitHub App private key (PEM), passed as SHELF_GITHUB_APP_PRIVATE_KEY. Set with github_app_id."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.github_app_id == "") == (var.github_app_private_key_secret_id == "")
+    error_message = "Set both github_app_id and github_app_private_key_secret_id, or neither."
+  }
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3), passed as SHELF_GITHUB_API_URL. Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret_id" {
+  description = "Secret Manager secret id holding a GitLab group or project access token (api scope), passed as SHELF_GITLAB_TOKEN. Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD), passed as SHELF_GITLAB_TOKEN_EXPIRES; the System page warns 30 days before. Set with gitlab_token_secret_id."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.gitlab_token_secret_id == "") == (var.gitlab_token_expires == "")
+    error_message = "Set both gitlab_token_secret_id and gitlab_token_expires, or neither."
+  }
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL, passed as SHELF_GITLAB_HOST. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
+}
+
+variable "auth_email" {
+  description = "Email of the local admin login created from the generated AUTH_PASSWORD (AUTH_EMAIL)."
+  type        = string
+  default     = "admin@example.com"
 }

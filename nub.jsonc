@@ -17,7 +17,6 @@
       "axe-core",
       "unzipper",
       "playwright-core",
-      "puppeteer-core",
       "postgres",
       "yaml",
     ],

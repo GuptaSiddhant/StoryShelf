@@ -1,6 +1,6 @@
 # StoryShelf Fly App (apps/fly-app)
 
-Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `storage-s3` (or on the volume with `storage-local` when no bucket is configured), `runner-playwright` for capture, and **workspace packages** (no publish).
+Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `storage-s3` (or on the volume with core's local storage when no bucket is configured), `runner-playwright` for capture, and **workspace packages** (no publish).
 
 - `server.ts` mirrors `apps/dev-server/src/server.ts:1` but with `DATA_DIR=/data`, `PORT=3000`, `SECRET`/`AUTH_PASSWORD` via Fly secrets.
 - `Dockerfile` is multi-stage, cache-efficient, and uses `ghcr.io/nubjs/nub:0.8.1` for `nub install --frozen-lockfile` with BuildKit cache mount, then `mcr.microsoft.com/playwright:v1.62.1-noble` for runtime. Build context must be **repo root**.
@@ -23,7 +23,7 @@ fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile
 fly status -a storyshelf
 ```
 
-`.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
+`.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed; it also makes sure the seeded `main` build is approved, with the "Approve all" API call, so the sign-in page's link `/_/demo-design-system/` serves it). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 
 ## Notes
 
@@ -40,7 +40,7 @@ The 1 GB volume used to hold SQLite **and** every published Storybook, screensho
 
 **Configuration** is Fly secrets only (`fly storage create` sets most of them). `server.ts` reads the bucket from `AWS_BUCKET` (or `BUCKET_NAME`), the endpoint from `AWS_ENDPOINT_URL_S3` (`https://t3.storage.dev`) and the region from `AWS_REGION` (`auto` when unset); the SDK takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment by itself. With no bucket set the app uses the volume as before, so removing the secret (`fly secrets unset AWS_BUCKET -a storyshelf`) is the rollback. At boot the server logs one `object storage` line with the storage kind and the endpoint origin, never the bucket, a key or a credential.
 
-**Existing data.** `storage-local` and `storage-s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
+**Existing data.** Core's local storage and `storage-s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
 
 ```sh
 fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh --dry-run"   # counts only, writes nothing

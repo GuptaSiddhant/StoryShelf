@@ -13,6 +13,14 @@ export type {
   StatusName,
 } from "./build-state.ts";
 export { buildCommentMarkdown } from "./build-comment.ts";
+export {
+  ALL_OUTPUTS,
+  cappedOutputs,
+  isCommentMode,
+  parseOutputs,
+  type CommentMode,
+  type StateOutputs,
+} from "./outputs.ts";
 export { channelPrefix, DEFAULT_STATUS_PREFIX, writeBuildState } from "./state.ts";
 export { formatNotification, formatSystemNotification } from "./format.ts";
 export { isStateProvider } from "./provider.ts";

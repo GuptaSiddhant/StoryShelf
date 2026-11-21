@@ -14,6 +14,7 @@ import { renderSettingsCapture } from "./settings-capture.tsx";
 import { ComponentOwnersCard } from "./settings-component-owners.tsx";
 import { renderSettingsDesign, type SettingsDesignData } from "./settings-design.tsx";
 import { renderSettingsGeneral } from "./settings-general.tsx";
+import { renderGitNotConnected, renderSettingsGit, type SettingsGitData } from "./settings-git.tsx";
 import { renderSettingsInsights, type SettingsInsightsData } from "./settings-insights.tsx";
 import { renderSettingsLabels } from "./settings-labels.tsx";
 import {
@@ -47,6 +48,8 @@ export interface ProjectSettingsData {
   activeTab: SettingsTab;
   /** The section a refused form belongs to: it alone shows `formState`. */
   formSection?: SettingsSection | undefined;
+  /** The Git section (ADR 0054); omitted while the server has no git connection. */
+  git?: SettingsGitData | undefined;
   /** The Insights tab; omitted when nothing on it applies (hosting-only, no AI). */
   insights?: SettingsInsightsData | undefined;
   labelTypes: LabelType[];
@@ -61,6 +64,8 @@ export interface ProjectSettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  /** The viewer is a site admin and may delete the project (omitted ⇒ no danger zone). */
+  canDeleteProject?: boolean | undefined;
   /** Notifiers are wired but no public origin resolves (ADR 0014, decision 11). */
   notificationsPaused?: boolean | undefined;
   /** AI availability and the profile choices (omitted ⇒ AI off). */
@@ -78,6 +83,8 @@ export interface ProjectSettingsData {
 export interface SettingsUnoffered {
   notifications: readonly UnofferedIntegrationView[];
   design: readonly UnofferedIntegrationView[];
+  /** The server has no git connection: the Git section is left out, and site admins are told. */
+  git?: boolean;
 }
 
 /** Form state shared by the settings tabs (field errors, global error, one-time secret). */
@@ -116,6 +123,9 @@ function integrationShown(section: SettingsSection, data: ProjectSettingsData): 
   }
   if (section === "design") {
     return data.design.providers.length > 0 || (data.unoffered?.design.length ?? 0) > 0;
+  }
+  if (section === "git") {
+    return data.git !== undefined || data.unoffered?.git === true;
   }
   return true;
 }
@@ -157,6 +167,10 @@ const REVIEW_SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
       formState={formState}
     />
   ),
+  git: (data, formState) =>
+    data.git
+      ? renderSettingsGit(data.project, data.git, data.isAdmin, formState)
+      : renderGitNotConnected(),
   labels: (data, formState) =>
     renderSettingsLabels(data.project, data.labelTypes, data.isAdmin, formState),
   notifications: (data, formState) =>
@@ -174,7 +188,8 @@ const REVIEW_SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
 
 const SECTIONS: Partial<Record<SettingsSection, SectionRenderer>> = {
   ...REVIEW_SECTIONS,
-  general: (data, formState) => renderSettingsGeneral(data.project, formState, data.isAdmin),
+  general: (data, formState) =>
+    renderSettingsGeneral(data.project, formState, data.isAdmin, data.canDeleteProject),
   links: (data, formState) =>
     renderSettingsLinks(data.project, data.links, data.linkCandidates, data.isAdmin, formState),
   thresholds: (data, formState) => renderSettingsThresholds(data.project, formState, data.isAdmin),
@@ -231,6 +246,7 @@ export function renderProjectSettingsPage(
   const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
   return (
     <DocumentLayout
+      layout="form"
       title={`${project.name} · Settings`}
       nav={{
         active: "settings",

@@ -9,14 +9,14 @@ const filterWrap = css`
   min-width: min(100%, 260px);
   & svg {
     position: absolute;
-    left: 0.65rem;
+    left: var(--space-3);
     color: var(--text-muted);
     pointer-events: none;
   }
   & input {
     width: 100%;
-    min-height: 36px;
-    padding: 0.35rem 0.7rem 0.35rem 2rem;
+    min-height: var(--control-md);
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-8);
     background: var(--surface-card);
     color: var(--text-primary);
     border: 1px solid var(--border);

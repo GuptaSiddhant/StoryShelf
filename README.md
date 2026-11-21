@@ -19,8 +19,8 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
-- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
-- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
+- **One `docker run` to self-host**, or versioned Terraform modules for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
+- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
@@ -77,14 +77,11 @@ packages/
   app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
   db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
   db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
-  storage-local/  @storyshelf/storage-local — local filesystem storage
+  storage-local/  @storyshelf/storage-local — deprecated re-export of core's `storage/local`
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
-  notify-git/     @storyshelf/notify-git    — GitHub/GitLab commit statuses and PR/MR comments as git notification channels
-  design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK
 apps/

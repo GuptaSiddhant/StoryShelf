@@ -22,7 +22,7 @@ const nav = css`
   top: calc(var(--topbar-height) + var(--space-4));
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   @media (max-width: 880px) {
     & {
       position: static;
@@ -39,9 +39,9 @@ const link = css`
   /* subnav-link */
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  min-height: 36px;
-  padding: 0.4rem var(--space-3);
+  gap: var(--space-3);
+  min-height: var(--control-sm);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   color: var(--text-secondary);
   font-size: var(--text-base);

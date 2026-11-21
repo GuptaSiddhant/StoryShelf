@@ -8,6 +8,25 @@ import { renderAdminSystemPage, type AdminSystemData } from "./admin-system.tsx"
 const meta: Meta = { title: "Pages/Admin/System" };
 export default meta;
 
+const healthyStatuses: HealthReport["statuses"] = [
+  { id: "telemetry", label: "Telemetry export", value: "off", tone: "off" },
+  {
+    id: "image-engine",
+    label: "Image engine",
+    value: "sharp",
+    tone: "ok",
+    detail: "3 diff workers",
+  },
+  {
+    id: "public-origin",
+    label: "Public origin",
+    value: "confirmed",
+    tone: "ok",
+    detail: "https://shelf.example.com (config)",
+  },
+  { id: "hosting", label: "Storybook hosting", value: "trusted", tone: "ok" },
+];
+
 const report = (status: HealthReport["status"], failing = false): HealthReport => ({
   status,
   uptimeSecs: 273_600,
@@ -40,7 +59,41 @@ const report = (status: HealthReport["status"], failing = false): HealthReport =
       state: status === "starting" ? "starting" : "ok",
     },
   ],
+  statuses: healthyStatuses,
 });
+
+const withDependencies = (aiState: "ok" | "failed"): HealthReport => {
+  const base = report("ok");
+  return {
+    ...base,
+    status: aiState === "ok" ? "ok" : "degraded",
+    adapters: [
+      ...base.adapters,
+      {
+        category: "ai",
+        kind: "ai",
+        name: "AI",
+        version: "-",
+        hasLifecycle: true,
+        state: aiState,
+        latencyMs: 1,
+        ...(aiState === "failed"
+          ? { detail: "unsupported model specification: acme-model-1" }
+          : {}),
+      },
+      {
+        category: "auth",
+        kind: "oidc",
+        name: "Keycloak",
+        version: "-",
+        hasLifecycle: true,
+        state: "ok",
+        latencyMs: 84,
+        detail: "discovery reachable at https://id.example.com",
+      },
+    ],
+  };
+};
 
 const data = (overrides: Partial<AdminSystemData> = {}): AdminSystemData => ({
   report: report("ok"),
@@ -168,6 +221,68 @@ export const IntegrationsTurnedOffChannels = pageStory(() =>
           },
         ],
       },
+    }),
+  ),
+);
+
+export const DependenciesHealthy = pageStory(() =>
+  renderAdminSystemPage(data({ report: withDependencies("ok") })),
+);
+
+export const DependencyFailing = pageStory(() =>
+  renderAdminSystemPage(data({ report: withDependencies("failed") })),
+);
+
+export const RuntimeNeedsAttention = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      report: {
+        ...report("ok"),
+        statuses: [
+          {
+            id: "telemetry",
+            label: "Telemetry export",
+            value: "on",
+            tone: "ok",
+            detail: "exporting to https://otel.example.com",
+          },
+          {
+            id: "image-engine",
+            label: "Image engine",
+            value: "pngjs",
+            tone: "ok",
+            detail: "diffs run on the main thread",
+          },
+          {
+            id: "public-origin",
+            label: "Public origin",
+            value: "not confirmed",
+            tone: "warn",
+            detail: "none configured, none reported; notifications and links are not sent",
+          },
+          {
+            id: "hosting",
+            label: "Storybook hosting",
+            value: "subdomain",
+            tone: "ok",
+            detail: "content host *.shelf.example.com",
+          },
+        ],
+      },
+    }),
+  ),
+);
+
+export const TargetUnreachable = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      targets: [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        { target: "chromium@sprite", reach: "url", status: "ready" },
+      ],
+      unreachable: new Map([
+        ["chromium@sprite", { reason: "connection", since: "2026-11-20T15:55:00.000Z" }],
+      ]),
     }),
   ),
 );

@@ -44,55 +44,53 @@ module "storyshelf" {
 }
 ```
 
-Or run `storyshelf server init --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version and a `terraform.tfvars` with your answers. Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+Or run `storyshelf server init --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 
-| Name | Default | Meaning |
-| --- | --- | --- |
-| `name` | required | Name prefix, 2 to 20 characters |
-| `image_version` | required | Release version of the image (no `v`) |
-| `allowed_cidr_blocks` | required | IPv4 ranges that may reach the load balancer. `["0.0.0.0/0"]` publishes the app |
-| `region` | `us-east-1` | Must match the provider's region |
-| `image_repository` | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror |
-| `domain_name` | `""` | Enables HTTPS with a Route 53 zone and an ACM certificate |
-| `allow_http` | `false` | Plain HTTP when there is no domain. Throwaway stacks only |
-| `vpc_id` | `""` | An existing VPC. Subnets are found by their `Tier` tag (`public`, `private`) |
-| `enable_cognito`, `saml_metadata_url` | `false`, `""` | Create the Cognito pool and client (the image does not read OIDC settings yet), and its SAML federation |
-| `auth_email` | `admin@example.com` | The local admin's sign-in email |
-| `task_cpu`, `task_memory` | `2048`, `4096` | Capture renders in the container, so do not go much lower |
-| `min_instances`, `max_instances` | `1`, `1` | Identical copies, scaled on CPU. See [Running several instances](/guides/deployment/#running-several-instances) |
-| `database_pool_size` | `10` | Connections per copy. `max_instances` × this must fit the database's limit |
-| `existing_database_url_secret_arn` | `""` | A Postgres URL in Secrets Manager. No database is created |
-| `database_instance_class`, `database_allocated_storage` | `db.t4g.micro`, `20` | Created database only (GiB) |
-| `database_backup_retention_days` | `7` | Automated backup retention, 1 to 35 days |
-| `database_init_image` | ECR Public `postgres:16-alpine` | Image of the first-boot `db-init` container (needs `psql`); override for a mirror |
-| `deletion_protection` | `true` | Database protection and a final snapshot. `false` also empties the bucket on destroy |
-| `remote_browser_endpoint_secret_arn`, `remote_browser_token_secret_arn` | `""` | Optional [remote browser](/guides/remote-browsers/), as secret references |
-| `shutdown_grace_seconds` | `30` | Sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay and the ECS stop timeout (see [Shutdown](#shutdown)) |
-| `log_retention_days`, `tags` | `30`, `{}` | CloudWatch retention and tags |
+| Name                                                    | Default                                           | Meaning                                                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                                  | required                                          | Name prefix, 2 to 20 characters                                                                                               |
+| `image_version`                                         | required                                          | Release version of the image (no `v`)                                                                                         |
+| `allowed_cidr_blocks`                                   | required                                          | IPv4 ranges that may reach the load balancer. `["0.0.0.0/0"]` publishes the app                                               |
+| `region`                                                | `us-east-1`                                       | Must match the provider's region                                                                                              |
+| `image_repository`                                      | `ghcr.io/guptasiddhant/storyshelf`                | Registry path, for a mirror                                                                                                   |
+| `domain_name`                                           | `""`                                              | Enables HTTPS with a Route 53 zone and an ACM certificate                                                                     |
+| `allow_http`                                            | `false`                                           | Plain HTTP when there is no domain. Throwaway stacks only                                                                     |
+| `vpc_id`                                                | `""`                                              | An existing VPC. Subnets are found by their `Tier` tag (`public`, `private`)                                                  |
+| `enable_cognito`, `saml_metadata_url`                   | `false`, `""`                                     | Create the Cognito pool and client (the image does not read OIDC settings yet), and its SAML federation                       |
+| `auth_email`                                            | `admin@example.com`                               | The local admin's sign-in email                                                                                               |
+| `task_cpu`, `task_memory`                               | `2048`, `4096`                                    | Capture renders in the container, so do not go much lower                                                                     |
+| `min_instances`, `max_instances`                        | `1`, `1`                                          | Identical copies, scaled on CPU. See [Running several instances](/guides/deployment/#running-several-instances)               |
+| `database_pool_size`                                    | `10`                                              | Connections per copy. `max_instances` × this must fit the database's limit                                                    |
+| `existing_database_url_secret_arn`                      | `""`                                              | A Postgres URL in Secrets Manager. No database is created                                                                     |
+| `database_instance_class`, `database_allocated_storage` | `db.t4g.micro`, `20`                              | Created database only (GiB)                                                                                                   |
+| `database_backup_retention_days`                        | `7`                                               | Automated backup retention, 1 to 35 days                                                                                      |
+| `database_init_image`                                   | ECR Public `postgres:16-alpine`, pinned by digest | Image of the first-boot `db-init` container (needs `psql`). It receives the master credentials, so pin a mirror by digest too |
+| `deletion_protection`                                   | `true`                                            | Database protection and a final snapshot. `false` also empties the bucket on destroy                                          |
+| `shutdown_grace_seconds`                                | `30`                                              | Sets `SHUTDOWN_GRACE_SECONDS`, the ALB deregistration delay and the ECS stop timeout (see [Shutdown](#shutdown))              |
+| `log_retention_days`, `tags`                            | `30`, `{}`                                        | CloudWatch retention and tags                                                                                                 |
 
 ### Outputs
 
-| Output | Meaning |
-| --- | --- |
-| `url`, `alb_dns_name` | The public base URL and the load balancer's DNS name |
-| `s3_bucket` | The Storybook bucket |
-| `db_endpoint`, `db_iam_user`, `db_master_secret_arn` | The database host, the IAM user and the master secret (a reference) |
-| `user_pool_id`, `app_client_id` | Cognito (empty unless `enable_cognito`) |
-| `cluster_name`, `service_name` | For `aws ecs update-service` |
-| `admin_token_secret_arn`, `auth_password_secret_arn`, `oidc_client_secret_arn` | Secret references, never values |
-| `task_role_arn`, `task_role_policy_json`, `execution_role_policy_json` | The exact permissions (next section) |
+| Output                                                                         | Meaning                                                             |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `url`, `alb_dns_name`                                                          | The public base URL and the load balancer's DNS name                |
+| `s3_bucket`                                                                    | The Storybook bucket                                                |
+| `db_endpoint`, `db_iam_user`, `db_master_secret_arn`                           | The database host, the IAM user and the master secret (a reference) |
+| `user_pool_id`, `app_client_id`                                                | Cognito (empty unless `enable_cognito`)                             |
+| `cluster_name`, `service_name`                                                 | For `aws ecs update-service`                                        |
+| `admin_token_secret_arn`, `auth_password_secret_arn`, `oidc_client_secret_arn` | Secret references, never values                                     |
+| `task_role_arn`, `task_role_policy_json`, `execution_role_policy_json`         | The exact permissions (next section)                                |
 
 ## Permissions
 
 The task role is exactly the `task_role_policy_json` output, so a platform team can copy it into its own stack:
 
 - `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on the Storybook bucket's objects, and `s3:ListBucket` on the bucket;
-- `rds-db:connect` on the database user `shelf` (not added when you pass your own database URL);
-- `logs:CreateLogStream` and `logs:PutLogEvents` on the app's log group.
+- `rds-db:connect` on the database user `shelf` (not added when you pass your own database URL).
 
-The separate execution role (ECS itself, before the app starts) has `AmazonECSTaskExecutionRolePolicy` plus `secretsmanager:GetSecretValue` on the app's secret ARNs only (`execution_role_policy_json`).
+The separate execution role (ECS itself, before the app starts) has `AmazonECSTaskExecutionRolePolicy` plus `secretsmanager:GetSecretValue` on the app's secret ARNs only (`execution_role_policy_json`). The `awslogs` driver writes the container's logs with the execution role, so the task role has no logs permission.
 
 ## Database and sign-in
 
@@ -104,7 +102,7 @@ The separate execution role (ECS itself, before the app starts) has `AmazonECSTa
 
 ## Domain and TLS
 
-Without `domain_name` the plan fails unless `allow_http = true`. With a domain, ACM validates only once the domain's name servers point at the new Route 53 zone, so apply in two steps:
+Without `domain_name` the plan fails unless `allow_http = true`. The HTTPS listener allows TLS 1.2 and 1.3 only (`ELBSecurityPolicy-TLS13-1-2-2021-06`), and the load balancer drops invalid header fields. With a domain, ACM validates only once the domain's name servers point at the new Route 53 zone, so apply in two steps:
 
 ```sh
 terraform apply -target='module.storyshelf.aws_route53_zone.main'
@@ -138,15 +136,15 @@ If your team won't use the module, you need three things:
 1. **The image.** `ghcr.io/guptasiddhant/storyshelf:<version>` (`amd64` and `arm64`). It listens on port 3000 and bundles Chromium. Use at least 2 vCPU and 4 GB for capture; the `-hosting` variant has no browser.
 2. **The environment.** This is what the module passes:
 
-   | Variable | Value |
-   | --- | --- |
-   | `AWS_BUCKET`, `AWS_REGION` | The bucket and its region. Credentials come from the task role |
-   | `PUBLIC_BASE_URL`, `TRUST_PROXY` | The public `https://` origin, and `1` behind a load balancer |
-   | `SECRET` | At least 32 random characters, the same on every copy (a secret reference) |
-   | `AUTH_PASSWORD`, `ADMIN_TOKEN` | Admin sign-in and API token (secret references) |
-   | `DATABASE_URL` | A Postgres URL (`?sslmode=verify-full` with `DATABASE_CA_FILE` to verify the certificate), **or** the four `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION` for IAM authentication |
-   | `DATABASE_POOL_MAX` | Connections per copy |
-   | `SHUTDOWN_GRACE_SECONDS` | Drain time on SIGTERM. Keep it below your platform's stop timeout |
+   | Variable                         | Value                                                                                                                                                                              |
+   | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `AWS_BUCKET`, `AWS_REGION`       | The bucket and its region. Credentials come from the task role                                                                                                                     |
+   | `PUBLIC_BASE_URL`, `TRUST_PROXY` | The public `https://` origin, and `1` behind a load balancer                                                                                                                       |
+   | `SECRET`                         | At least 32 random characters, the same on every copy (a secret reference)                                                                                                         |
+   | `AUTH_PASSWORD`, `ADMIN_TOKEN`   | Admin sign-in and API token (secret references)                                                                                                                                    |
+   | `DATABASE_URL`                   | A Postgres URL (`?sslmode=verify-full` with `DATABASE_CA_FILE` to verify the certificate), **or** the four `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION` for IAM authentication |
+   | `DATABASE_POOL_MAX`              | Connections per copy                                                                                                                                                               |
+   | `SHUTDOWN_GRACE_SECONDS`         | Drain time on SIGTERM. Keep it below your platform's stop timeout                                                                                                                  |
 
 3. **The permissions** in the section above, attached to the task's own role. Never put access keys in environment files.
 

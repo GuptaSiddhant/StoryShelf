@@ -5,12 +5,14 @@ import {
   gitHeadSha,
   LOCAL_BRANCH,
   localSha,
+  selectAffectedStories,
   type AffectedResult,
 } from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
 import {
+  buildPageUrl,
   createClient,
   describeBuildLink,
   normalizeBaseUrl,
@@ -18,13 +20,36 @@ import {
   type BuildCreated,
 } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
-import { createSpinner, printLine, spinnerFrames } from "../output.ts";
-import { HashRoutesMissingError, isOverInlineLimit, uploadFileByFile } from "./file-by-file.ts";
+import {
+  createReporter,
+  describeByteProgress,
+  formatBytes,
+  type PhaseHandle,
+  printLine,
+  type Reporter,
+  setHumanOutputToStderr,
+} from "../output.ts";
+import {
+  HashRoutesMissingError,
+  isOverInlineLimit,
+  measureBuild,
+  uploadFileByFile,
+} from "./file-by-file.ts";
+import { readEntries, readEntryIds } from "./index-entries.ts";
 import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 import { findSupersedes } from "./supersede.ts";
-import { trySkipUnchanged } from "./upload-skip.ts";
+import { printJsonResult, writeGithubOutputs, type UploadResult } from "./upload-result.ts";
+import { trySkipUnchanged, type SkipContext } from "./upload-skip.ts";
+import {
+  parseTimeout,
+  reportOutcome,
+  verdictName,
+  waitForBuild,
+  DEFAULT_WAIT_TIMEOUT_MS,
+} from "./wait.ts";
+import type { WaitOptions } from "./wait.ts";
 
 /**
  * Upload a built Storybook and create a build record.
@@ -32,20 +57,57 @@ import { trySkipUnchanged } from "./upload-skip.ts";
  * @param options - Upload command options.
  */
 export async function runUpload(options: UploadOptions): Promise<void> {
-  const cwd = options.cwd ?? process.cwd();
-  const cfg = await loadStorybookConfig(cwd, options.config);
-  const collected = collectUploadOptions(cwd, options, cfg);
-  if (collected.synthesized) {
-    printLine(
-      `No git checkout detected — using synthetic identity sha=${collected.sha} branch="${collected.branch}" (pass --sha/--branch to override)`,
-    );
+  let result: UploadResult | undefined;
+  const previous = setHumanOutputToStderr(options.json === true);
+  try {
+    await uploadFlow({
+      ...options,
+      onResult: (next) => {
+        result = next;
+        options.onResult?.(next);
+      },
+    });
+  } finally {
+    setHumanOutputToStderr(previous);
   }
-  if (shouldSkipUpload(collected.skip, collected.branch)) {
-    printLine(`Skipped per config skip="${collected.skip}" for branch "${collected.branch}"`);
+  if (result === undefined) return;
+  writeGithubOutputs(result);
+  if (options.json === true) printJsonResult(result);
+}
+
+/** The upload itself; reports its {@link UploadResult} through `onResult`. */
+async function uploadFlow(options: UploadOptions): Promise<void> {
+  const cwd = options.cwd ?? process.cwd();
+  const reporter = options.reporter ?? createReporter();
+  const collected = await reporter.phase("Checking config", "Checked config", async () => {
+    const cfg = await loadStorybookConfig(cwd, options.config);
+    const found = collectUploadOptions(cwd, options, cfg);
+    if (found.synthesized) {
+      printLine(
+        `No git checkout detected — using synthetic identity sha=${found.sha} branch="${found.branch}" (pass --sha/--branch to override)`,
+      );
+    }
+    if (shouldSkipUpload(found.skip, found.branch)) {
+      printLine(`Skipped per config skip="${found.skip}" for branch "${found.branch}"`);
+      options.onResult?.({ buildId: null, url: null, status: "skipped", skipped: true });
+      return null;
+    }
+    assertUploadOptions(found);
+    assertWaitOptions(options);
+    return found;
+  });
+  if (collected === null) {
     return;
   }
-  assertUploadOptions(collected);
-  await buildAndPost(cwd, collected, options.forceBuild, options.dryRun);
+  await buildAndPost(reporter, cwd, collected, options.forceBuild, options.dryRun, options);
+}
+
+/** `--timeout` needs `--wait` and must parse, so a typo fails before any build work. */
+function assertWaitOptions(options: UploadOptions): void {
+  if (options.timeout !== undefined && options.wait !== true) {
+    throw new Error("--timeout only applies with --wait");
+  }
+  if (options.timeout !== undefined) parseTimeout(options.timeout);
 }
 
 /** Options for the `upload` command. */
@@ -98,6 +160,18 @@ export interface UploadOptions {
   dryRun?: boolean;
   /** Working directory (defaults to process.cwd()). Test seam for fs access. */
   cwd?: string;
+  /** After the upload, follow the build until it stops needing the server and exit by how it ended. */
+  wait?: boolean;
+  /** Print one JSON result object on stdout; all human output goes to stderr. */
+  json?: boolean;
+  /** Test seam: receives the result as it becomes known (the last call is the final one). */
+  onResult?: (result: UploadResult) => void;
+  /** How long `wait` follows the build: `90`, `90s`, `30m` or `2h` (default 30m). Never cancels the build. */
+  timeout?: string;
+  /** Test seam: the clock, sleep and abort signal of the wait. */
+  waitDeps?: Pick<WaitOptions, "now" | "sleep" | "signal">;
+  /** Phase reporter (defaults to one writing to stderr). Test seam for the clock and terminal. */
+  reporter?: Reporter;
 }
 
 /** Git probe for identity auto-detection; injectable for tests. */
@@ -264,8 +338,15 @@ function shouldSkipUpload(skip: string | undefined, branch: string | undefined):
 }
 
 /** Zip the built Storybook directory as a stream (bounded memory). */
-function zipBuildDirStream(cwd: string, buildDir: string): ZipArchive {
+function zipBuildDirStream(
+  cwd: string,
+  buildDir: string,
+  onProgress?: (processedBytes: number) => void,
+): ZipArchive {
   const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.on("progress", (data: { fs: { processedBytes: number } }) => {
+    onProgress?.(data.fs.processedBytes);
+  });
   archive.on("warning", (warning: Error) => {
     printLine(`Zip warning: ${warning.message}`);
   });
@@ -279,52 +360,200 @@ function zipBuildDirStream(cwd: string, buildDir: string): ZipArchive {
   return archive;
 }
 
-/** Ensure, create, and stream the build directory. */
-// oxlint-disable-next-line eslint(max-statements) -- buildAndPost orchestrates 11 steps
+/** Ensure, create, and stream the build directory, one reported phase per step. */
+// oxlint-disable-next-line eslint(max-statements) -- buildAndPost orchestrates the phases in order
 async function buildAndPost(
+  reporter: Reporter,
   cwd: string,
   collected: ResolvedUploadOptions,
   force?: boolean,
   dryRun?: boolean,
+  waitOptions?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps" | "onResult">,
 ): Promise<void> {
-  await ensureBuildDir({
-    cwd,
-    buildDir: collected.buildDir,
-    buildCommand: collected.buildCommand,
-    buildScriptName: collected.buildScriptName,
-    force,
-    affected: collected.affectedOnly,
-    buildStats: collected.buildStats,
-    statsFile: collected.statsFile,
+  await reporter.phase("Building Storybook", "Built Storybook", async () => {
+    await ensureBuildDir({
+      cwd,
+      buildDir: collected.buildDir,
+      buildCommand: collected.buildCommand,
+      buildScriptName: collected.buildScriptName,
+      force,
+      affected: collected.affectedOnly,
+      buildStats: collected.buildStats,
+      statsFile: collected.statsFile,
+    });
+    await assertBuildOutput(cwd, collected.buildDir);
   });
-  await assertBuildOutput(cwd, collected.buildDir);
   if (dryRun) {
     printLine(
       `Dry run: would upload ${collected.buildDir} as ${collected.sha} on ${collected.branch}`,
     );
+    waitOptions?.onResult?.({ buildId: null, url: null, status: "dry-run", skipped: false });
     return;
   }
   const client = createClient(collected.url, collected.token);
-  if (collected.skipUnchanged && (await trySkipUnchanged(client, { ...collected, cwd }))) {
+  const skipCtx = withSkipResult(collected, waitOptions?.onResult);
+  if (collected.skipUnchanged && (await skipPhase(reporter, client, cwd, skipCtx))) {
     return;
   }
-  const supersedes = await findSupersedes(client, {
-    slug: collected.slug,
-    cwd,
-    branch: collected.branch,
-    headSha: collected.sha,
+  const created = await reporter.phase("Creating build", "Created build", async () => {
+    const supersedes = await findSupersedes(client, {
+      slug: collected.slug,
+      cwd,
+      branch: collected.branch,
+      headSha: collected.sha,
+    });
+    return await createBuild(client, collected, supersedes);
   });
-  const created = await createBuild(client, collected, supersedes);
+  await finishUpload(reporter, { client, created, cwd, collected, wait: waitOptions });
+}
+
+/** The resolved options plus the hook that reports a skipped build as the result. */
+function withSkipResult(
+  collected: ResolvedUploadOptions,
+  onResult: UploadOptions["onResult"],
+): ResolvedUploadOptions & Pick<SkipContext, "onSkipped"> {
+  return {
+    ...collected,
+    onSkipped: (skipped) => {
+      onResult?.({
+        buildId: skipped.build.id,
+        url: buildPageUrl(collected.url, skipped.buildUrl),
+        status: "skipped",
+        skipped: true,
+      });
+    },
+  };
+}
+
+/** Everything a phase after the build exists needs. */
+interface UploadContext {
+  client: ReturnType<typeof createClient>;
+  created: BuildCreated;
+  cwd: string;
+  collected: ResolvedUploadOptions;
+  wait?: Pick<UploadOptions, "wait" | "timeout" | "waitDeps" | "onResult"> | undefined;
+}
+
+/** The affected, package-usage and upload phases, then the summary. */
+async function finishUpload(reporter: Reporter, ctx: UploadContext): Promise<void> {
+  const { client, created, cwd, collected } = ctx;
   const hostingOnly = created.testing === false;
-  if (!hostingOnly) {
-    await reportAffectedCapture(client, created, cwd, collected);
-  }
-  await reportPackageUsage(client, created, cwd, collected);
-  await uploadBuild(client, created, cwd, collected);
-  printLine(describeBuildLink(collected.url, created.build, created.buildUrl));
+  const stories = hostingOnly
+    ? undefined
+    : await reporter.phase("Selecting affected stories", "Selected affected stories", async () => {
+        return await reportAffectedCapture(client, created, cwd, collected);
+      });
+  await reporter.phase("Recording package usage", "Recorded package usage", async () => {
+    await reportPackageUsage(client, created, cwd, collected);
+  });
+  ctx.wait?.onResult?.(createdResult(collected.url, created));
+  const sent = await reporter.phase("Uploading Storybook", "Uploaded Storybook", async (handle) => {
+    return await uploadBuild(client, created, cwd, collected, handle);
+  });
+  printSummary({ ...sent, stories, hostingOnly, total: totalStories(cwd, collected.buildDir) }, [
+    `Build:    ${created.build.id}`,
+    `Time:     ${reporter.elapsed()}`,
+    describeBuildLink(collected.url, created.build, created.buildUrl),
+  ]);
   if (hostingOnly) {
     printLine(HOSTING_ONLY_NOTICE);
   }
+  if (ctx.wait?.wait === true) {
+    await followBuild(reporter, ctx, hostingOnly);
+  }
+}
+
+/** Follow the build (`--wait`); Ctrl+C stops the wait only. The exit code says how it ended. */
+async function followBuild(
+  reporter: Reporter,
+  ctx: UploadContext,
+  hostingOnly: boolean,
+): Promise<void> {
+  const { client, created, collected, wait } = ctx;
+  const controller = new AbortController();
+  const stop = (): void => {
+    controller.abort();
+  };
+  process.once("SIGINT", stop);
+  try {
+    const result = await waitForBuild({
+      client,
+      slug: collected.slug,
+      buildId: created.build.id,
+      buildLink: buildPageUrl(collected.url, created.buildUrl),
+      hostingOnly,
+      timeoutMs: wait?.timeout === undefined ? DEFAULT_WAIT_TIMEOUT_MS : parseTimeout(wait.timeout),
+      reporter,
+      signal: controller.signal,
+      ...wait?.waitDeps,
+    });
+    const code = reportOutcome(result);
+    if (code !== 0) process.exitCode = code;
+    wait?.onResult?.({
+      ...createdResult(collected.url, created),
+      verdict: verdictName(code),
+      exitCode: code,
+    });
+  } finally {
+    process.off("SIGINT", stop);
+  }
+}
+
+/** The result of a build the server created: ids and links exactly as the server returned them. */
+function createdResult(serverUrl: string | undefined, created: BuildCreated): UploadResult {
+  return {
+    buildId: created.build.id,
+    url: buildPageUrl(serverUrl, created.buildUrl),
+    status: "created",
+    skipped: false,
+  };
+}
+
+/** The skip check as a phase; true when the commit was recorded as skipped. */
+async function skipPhase(
+  reporter: Reporter,
+  client: ReturnType<typeof createClient>,
+  cwd: string,
+  collected: ResolvedUploadOptions & Pick<SkipContext, "onSkipped">,
+): Promise<boolean> {
+  return await reporter.phase("Checking for unchanged stories", "Checked for changes", async () => {
+    return await trySkipUnchanged(client, { ...collected, cwd });
+  });
+}
+
+/** What the summary block says about the upload. */
+interface UploadSummary {
+  files: number;
+  bytes: number;
+  /** Affected count; null is a full capture; undefined means no capture ran. */
+  stories: number | null | undefined;
+  hostingOnly: boolean;
+  total: number | null;
+}
+
+/** Number of catalog entries in the built Storybook, or null when its index cannot be read. */
+function totalStories(cwd: string, buildDir: string): number | null {
+  return readEntryIds(cwd, buildDir)?.length ?? null;
+}
+
+/** Print the result block to stdout: files, size, stories affected, then the given lines. */
+function printSummary(summary: UploadSummary, lines: string[]): void {
+  printLine("Summary");
+  printLine(`  Files:    ${summary.files}`);
+  printLine(`  Size:     ${formatBytes(summary.bytes)}`);
+  printLine(`  Stories:  ${describeStories(summary)}`);
+  for (const line of lines.slice(0, -1)) printLine(`  ${line}`);
+  printLine(lines.at(-1) ?? "");
+}
+
+function describeStories(summary: UploadSummary): string {
+  if (summary.hostingOnly) return "not captured (testing is off)";
+  if (typeof summary.stories === "number") {
+    return summary.total === null
+      ? `${summary.stories} affected`
+      : `${summary.stories} of ${summary.total} affected`;
+  }
+  return summary.total === null ? "full capture" : `full capture (${summary.total} stories)`;
 }
 
 /** Create the build record, naming the builds it supersedes (ADR 0045). */
@@ -371,20 +600,20 @@ async function reportPackageUsage(
   }
 }
 
-/** Compute the affected set and post it, never failing the upload. */
+/** Compute the affected set and post it, never failing the upload; the count is null for a full capture. */
 async function reportAffectedCapture(
   client: ReturnType<typeof createClient>,
   created: BuildCreated,
   cwd: string,
   collected: ResolvedUploadOptions,
-): Promise<void> {
+): Promise<number | null> {
   if (!collected.affectedOnly) {
     printLine("Full capture (--full): rendering all stories");
-    return;
+    return null;
   }
   if (!created.baselineSha) {
     printLine("Full capture (no baseline build yet): rendering all stories");
-    return;
+    return null;
   }
   try {
     const result = await computeAffected({
@@ -400,21 +629,41 @@ async function reportAffectedCapture(
       changedFiles: result.changedFiles,
       affectedImportPaths: result.affectedImportPaths,
     });
-    printLine(describeAffected(result, created.baselineSha));
+    const count = countAffectedStories(cwd, collected.buildDir, result.affectedImportPaths);
+    printLine(describeAffected(result, count, created.baselineSha));
+    return count;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     printLine(`Full capture (affected post failed: ${reason}): rendering all stories`);
+    return null;
   }
 }
 
+/**
+ * Stories the server will render for these affected import paths (one file can hold many), or the
+ * path count when the index cannot be read. Null is a full capture.
+ */
+function countAffectedStories(
+  cwd: string,
+  buildDir: string,
+  paths: readonly string[] | null,
+): number | null {
+  if (paths === null) return null;
+  const entries = readEntries(cwd, buildDir);
+  return entries === null ? paths.length : selectAffectedStories(entries, paths).render.length;
+}
+
 /** Human-readable summary of an affected computation. */
-function describeAffected(result: AffectedResult, baselineSha: string): string {
+function describeAffected(
+  result: AffectedResult,
+  count: number | null,
+  baselineSha: string,
+): string {
   if (result.affectedImportPaths === null) {
     return `Full capture (${result.fullReason ?? "unknown reason"}): rendering all stories`;
   }
-  const count = result.affectedImportPaths.length;
   const short = baselineSha.slice(0, 7);
-  if (count === 0) {
+  if (count === null || count === 0) {
     return `Affected capture: no stories affected (baseline ${short})`;
   }
   return `Affected capture: rendering ${count} ${count === 1 ? "story" : "stories"} (baseline ${short})`;
@@ -430,7 +679,9 @@ async function uploadBuild(
   created: BuildCreated,
   cwd: string,
   collected: ResolvedUploadOptions,
-): Promise<void> {
+  handle: PhaseHandle,
+): Promise<{ files: number; bytes: number }> {
+  const measured = await measureBuild(cwd, collected.buildDir);
   const target = {
     slug: collected.slug,
     buildId: created.build.id,
@@ -439,8 +690,10 @@ async function uploadBuild(
   };
   if (!collected.zip) {
     try {
-      await uploadFileByFile(client, target, printLine);
-      return;
+      await uploadFileByFile(client, target, printLine, (text) => {
+        handle.progress(text);
+      });
+      return measured;
     } catch (error) {
       if (!(error instanceof HashRoutesMissingError)) {
         throw error;
@@ -449,7 +702,7 @@ async function uploadBuild(
     }
   }
   try {
-    await putZipStream(client, created, cwd, collected.buildDir);
+    await putZipStream(client, created, cwd, collected.buildDir, handle, measured.bytes);
   } catch (error) {
     if (error instanceof RequestError && error.status === 422) {
       error.message +=
@@ -462,23 +715,24 @@ async function uploadBuild(
       throw error;
     }
     printLine("Zip is over the server's inline publish limit; uploading file by file instead");
-    await uploadFileByFile(client, target, printLine);
+    await uploadFileByFile(client, target, printLine, (text) => {
+      handle.progress(text);
+    });
   }
+  return measured;
 }
 
-/** PUT the streamed zip, then report the created build id. */
+/** PUT the streamed zip, reporting how much of the source bytes the archive has read. */
 async function putZipStream(
   client: ReturnType<typeof createClient>,
   created: BuildCreated,
   cwd: string,
   buildDir: string,
+  handle: PhaseHandle,
+  totalBytes: number,
 ): Promise<void> {
-  const spinner = createSpinner("Uploading...", spinnerFrames);
-  try {
-    await client.projects.builds.uploadZip(created.uploadUrl, zipBuildDirStream(cwd, buildDir));
-    spinner.stop("Upload complete");
-  } catch (error) {
-    spinner.stop(isOverInlineLimit(error) ? "Zip refused as too large" : "Upload failed");
-    throw error;
-  }
+  const body = zipBuildDirStream(cwd, buildDir, (done) => {
+    handle.progress(describeByteProgress(done, totalBytes));
+  });
+  await client.projects.builds.uploadZip(created.uploadUrl, body);
 }

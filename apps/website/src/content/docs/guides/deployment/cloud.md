@@ -13,7 +13,7 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 | **Cloudflare Workers** | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (R2)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Workers entry           |
 | **Azure Functions**    | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (Azure Blob) | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Azure Functions handler |
 | **AWS Lambda**         | `@storyshelf/db-sqlite/turso`                                 | `@storyshelf/storage-s3` (S3)         | Hosting only (no `testing`)   | `@storyshelf/auth` | Hono + Lambda handler          |
-| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `storage-local` or `storage-s3`       | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
+| **Bun**                | `@storyshelf/db-sqlite` or `@storyshelf/db-sqlite/bun-sqlite` | `core/storage/local` or `storage-s3` | `testing` (long-running host) | `@storyshelf/auth` | Hono + Bun.serve               |
 
 ## Serverless: Storybook hosting only
 
@@ -103,5 +103,5 @@ See the [`@storyshelf/db-postgres` package reference](/packages/db-postgres/) fo
 
 ## Related
 
-- [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) — reference Terraform stacks
+- [AWS](/guides/deployment/aws/) · [Azure](/guides/deployment/azure/) · [GCP](/guides/deployment/gcp/) — versioned Terraform modules on the published image
 - [Docker Compose](/guides/deployment/docker-compose/) — single-host deploy

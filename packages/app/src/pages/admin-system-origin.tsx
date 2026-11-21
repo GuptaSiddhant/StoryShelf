@@ -6,12 +6,13 @@ import {
   Badge,
   Button,
   Card,
-  Field,
-  FormActions,
+  DialogLink,
   HStack,
   Meta,
   SectionTitle,
 } from "../ui/components.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { EDIT_ORIGIN_DIALOG } from "./public-origin-forms.tsx";
 /** What the System page knows about the public origin. */
 export interface PublicOriginView {
   /** What background jobs use now (configured, platform or confirmed); `null` when nothing is confirmed. */
@@ -52,19 +53,51 @@ export function PublicOriginCard(props: {
         <Resolved resolved={resolved} />
       )}
       {reports ? <div data-report-origin="/admin/public-origin/report" /> : null}
-      {fixed ? null : <OriginForms learns={learns} stored={stored} />}
+      {fixed ? null : <OriginActions learns={learns} stored={stored} />}
     </Card>
   );
 }
 
-function OriginForms(props: {
+/** Edit (or confirm, or enter) opens a dialog; forgetting a stored origin asks first. */
+function OriginActions(props: {
   learns: boolean;
   stored: StoredPublicOrigin | null;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  if (!props.learns) {
+  const { learns, stored } = props;
+  if (!learns) {
     return <></>;
   }
-  return props.stored === null ? <EnterForm /> : <StoredForm stored={props.stored} />;
+  const label = stored === null ? "Enter origin" : stored.confirmed ? "Edit" : "Confirm";
+  return (
+    <HStack>
+      <DialogLink
+        dialogId={EDIT_ORIGIN_DIALOG}
+        href="/admin/public-origin/edit"
+        variant="secondary"
+        size="sm"
+      >
+        {label}
+      </DialogLink>
+      {stored === null ? null : (
+        <form
+          method="post"
+          action="/admin/public-origin/clear"
+          hx-post="/admin/public-origin/clear"
+          hx-target="body"
+        >
+          {csrfField()}
+          <Button type="submit" variant="secondary" size="sm">
+            Forget stored origin
+          </Button>
+        </form>
+      )}
+      <FormDialog
+        id={EDIT_ORIGIN_DIALOG}
+        title="Public origin"
+        submitLabel={label === "Confirm" ? "Confirm" : "Save"}
+      />
+    </HStack>
+  );
 }
 
 function NothingResolved(props: {
@@ -100,70 +133,5 @@ function Resolved(props: {
       <Badge tone="success">{SOURCE_LABELS[resolved.source]}</Badge>
       {resolved.source === "admin" ? null : <Meta>Nothing to confirm.</Meta>}
     </HStack>
-  );
-}
-
-/** Confirm the detected origin, replace it, or drop it. */
-function StoredForm(props: {
-  stored: StoredPublicOrigin;
-}): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { stored } = props;
-  return (
-    <>
-      <form
-        method="post"
-        action="/admin/public-origin"
-        hx-post="/admin/public-origin"
-        hx-target="body"
-      >
-        {csrfField()}
-        <Field
-          label="Stored origin"
-          name="origin"
-          value={stored.origin}
-          hint={
-            stored.confirmed
-              ? "Confirmed. Change it if this is not the address people use."
-              : "Detected from your browser. Confirm it, or enter the address people use."
-          }
-        />
-        <FormActions>
-          <Button type="submit" variant="secondary" size="sm">
-            {stored.confirmed ? "Save" : "Confirm"}
-          </Button>
-        </FormActions>
-      </form>
-      <form
-        method="post"
-        action="/admin/public-origin/clear"
-        hx-post="/admin/public-origin/clear"
-        hx-target="body"
-      >
-        {csrfField()}
-        <Button type="submit" variant="secondary" size="sm">
-          Forget stored origin
-        </Button>
-      </form>
-    </>
-  );
-}
-
-/** Enter an origin by hand when none was reported. */
-function EnterForm(): HtmlEscapedString | Promise<HtmlEscapedString> {
-  return (
-    <form
-      method="post"
-      action="/admin/public-origin"
-      hx-post="/admin/public-origin"
-      hx-target="body"
-    >
-      {csrfField()}
-      <Field label="Origin" name="origin" placeholder="https://shelf.example.com" />
-      <FormActions>
-        <Button type="submit" variant="secondary" size="sm">
-          Save
-        </Button>
-      </FormActions>
-    </form>
   );
 }

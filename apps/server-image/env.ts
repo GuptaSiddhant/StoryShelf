@@ -1,6 +1,7 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db-mysql";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
@@ -9,13 +10,20 @@ import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { azurePlaywright } from "@storyshelf/runner-playwright/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
 import { readFileSync } from "node:fs";
 
 /** The process environment, or a test's. */
 export type Env = Readonly<Record<string, string | undefined>>;
+
+/**
+ * A refusal to start because of how the image is configured. Its message names the variable, never
+ * its value, and is the whole report: a stack trace would only point at the bundle.
+ */
+export class BootRefusal extends Error {
+  override readonly name = "BootRefusal";
+}
 
 /** An environment value, or undefined when it is unset or empty. */
 export function nonEmpty(value: string | undefined): string | undefined {
@@ -57,7 +65,7 @@ export function databaseCaFromEnv(
   const pem = nonEmpty(env["DATABASE_CA"]);
   const file = nonEmpty(env["DATABASE_CA_FILE"]);
   if (pem !== undefined && file !== undefined) {
-    throw new Error("Set only one of DATABASE_CA and DATABASE_CA_FILE");
+    throw new BootRefusal("Set only one of DATABASE_CA and DATABASE_CA_FILE");
   }
   return file === undefined ? pem : readCaFile(file, readFile);
 }
@@ -68,10 +76,10 @@ function readCaFile(path: string, readFile: (path: string) => string): string {
   try {
     text = readFile(path);
   } catch {
-    throw new Error("DATABASE_CA_FILE could not be read");
+    throw new BootRefusal("DATABASE_CA_FILE could not be read");
   }
   if (text.trim() === "") {
-    throw new Error("DATABASE_CA_FILE is empty");
+    throw new BootRefusal("DATABASE_CA_FILE is empty");
   }
   return text;
 }
@@ -180,7 +188,7 @@ function urlDatabase(
     return { database: factories.mysql(url, ca), log: { database: "mysql" } };
   }
   // The scheme only: a URL carries the password.
-  throw new Error("DATABASE_URL must start with postgres://, postgresql:// or mysql://");
+  throw new BootRefusal("DATABASE_URL must start with postgres://, postgresql:// or mysql://");
 }
 
 /**
@@ -323,7 +331,7 @@ export function storybookHostingFromEnv(env: Env): { mode: "trusted" | "sandboxe
     return undefined;
   }
   if (mode !== "trusted" && mode !== "sandboxed") {
-    throw new Error("SHELF_STORYBOOK_HOSTING must be trusted (the default) or sandboxed");
+    throw new BootRefusal("SHELF_STORYBOOK_HOSTING must be trusted (the default) or sandboxed");
   }
   return { mode };
 }
@@ -358,12 +366,12 @@ export function authFromEnv(env: Env): ImageAuth {
   const password = nonEmpty(env["AUTH_PASSWORD"]);
   if (mode === "none") {
     if (password !== undefined) {
-      throw new Error("SHELF_AUTH=none and AUTH_PASSWORD are both set: unset one of them");
+      throw new BootRefusal("SHELF_AUTH=none and AUTH_PASSWORD are both set: unset one of them");
     }
     return { mode: "none" };
   }
   if (mode !== "password") {
-    throw new Error("SHELF_AUTH must be password (the default) or none");
+    throw new BootRefusal("SHELF_AUTH must be password (the default) or none");
   }
   return passwordAuth(env, password);
 }
@@ -372,14 +380,16 @@ export function authFromEnv(env: Env): ImageAuth {
 function passwordAuth(env: Env, password: string | undefined): ImageAuth {
   const secret = nonEmpty(env["SECRET"]);
   if (password === undefined) {
-    throw new Error(`AUTH_PASSWORD is unset: ${AUTH_MODE_HINT}`);
+    throw new BootRefusal(`AUTH_PASSWORD is unset: ${AUTH_MODE_HINT}`);
   }
   if (secret === undefined) {
-    throw new Error(`SECRET is unset: ${AUTH_MODE_HINT}`);
+    throw new BootRefusal(`SECRET is unset: ${AUTH_MODE_HINT}`);
   }
   // Checked again by createShelfAuth; refused here too, before any adapter is created.
   if (secret.length < MIN_SECRET_LENGTH) {
-    throw new Error(`SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`);
+    throw new BootRefusal(
+      `SECRET is shorter than ${MIN_SECRET_LENGTH} characters: ${AUTH_MODE_HINT}`,
+    );
   }
   return {
     mode: "password",
@@ -395,12 +405,16 @@ export function isLoopback(hostname: string): boolean {
 }
 
 /**
- * What a failed start prints: `storyshelf: <reason>` as the first line, then the stack. A refusal's
- * reason names the variable and never its value, so the first line is safe to show and to grep.
+ * What a failed start prints. A `BootRefusal` is one line, `storyshelf: <reason>`: the reason names
+ * the variable and never its value, so it is safe to show and to grep. Any other error is a real
+ * crash: the same first line, then its stack frames, so it is never hidden.
  */
 export function describeBootFailure(error: unknown): string {
   if (!(error instanceof Error)) {
     return `storyshelf: ${String(error)}\n`;
+  }
+  if (error instanceof BootRefusal) {
+    return `storyshelf: ${error.message}\n`;
   }
   const frames = (error.stack ?? "")
     .split("\n")

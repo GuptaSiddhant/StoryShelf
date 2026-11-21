@@ -14,9 +14,11 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  RelativeTime,
   Table,
   VStack,
   statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -104,8 +106,10 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                   <div>{key.name ?? "Unnamed key"}</div>
                   <div class={profileMeta}>{key.deviceType}</div>
                 </td>
-                <td>{new Date(key.createdAt).toLocaleDateString()}</td>
                 <td>
+                  <Time value={key.createdAt} format="date" />
+                </td>
+                <td class="nowrap">
                   <HStack>
                     {key.backedUp ? <Badge>Synced</Badge> : null}
                     <form
@@ -130,8 +134,8 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
 
 type SessionInfo = SecurityState["sessions"][number];
 
-/** One signed-in device with its revoke action. */
-const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
+/** One signed-in device with its revoke action (none for a read-only shared account). */
+const SessionRow: FC<{ session: SessionInfo; readOnly: boolean }> = ({ session, readOnly }) => {
   return (
     <tr>
       <td>
@@ -140,11 +144,13 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
           <span class="mono">{session.ipAddress ?? "—"}</span>
         </div>
       </td>
-      <td>{new Date(session.createdAt).toLocaleString()}</td>
-      <td>
+      <td class="nowrap">
+        <RelativeTime value={session.createdAt} />
+      </td>
+      <td class="nowrap">
         {session.current ? (
           <Badge>This device</Badge>
-        ) : (
+        ) : readOnly ? null : (
           <form
             method="post"
             action="/profile/sessions/revoke"
@@ -162,7 +168,10 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
 };
 
 /** Active device sessions with per-device revoke and sign-out-others. */
-const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
+const SessionsSection: FC<{ security: SecurityState; readOnly: boolean }> = ({
+  security,
+  readOnly,
+}) => {
   return (
     <Card>
       <SectionTitle>Devices</SectionTitle>
@@ -178,12 +187,12 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
           </thead>
           <tbody>
             {security.sessions.map((session) => (
-              <SessionRow key={session.id} session={session} />
+              <SessionRow key={session.id} session={session} readOnly={readOnly} />
             ))}
           </tbody>
         </table>
       </Table>
-      {security.sessions.length > 1 ? (
+      {security.sessions.length > 1 && !readOnly ? (
         <form
           method="post"
           action="/profile/sessions/revoke-others"
@@ -224,6 +233,67 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   );
 };
 
+/** The display-name form. */
+const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
+  <Card>
+    <SectionTitle>Display name</SectionTitle>
+    <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
+    <form method="post" action="/profile" novalidate>
+      <Field label="Display name" name="displayName" type="text" required value={displayName} />
+      <Button variant="primary" type="submit">
+        Save name
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The password form, for local accounts. */
+const PasswordCard: FC = () => (
+  <Card>
+    <SectionTitle>Change password</SectionTitle>
+    <Meta>For local accounts only</Meta>
+    <form method="post" action="/profile/password" novalidate>
+      <Field
+        label="Current password"
+        name="currentPassword"
+        type="password"
+        required
+        autocomplete="current-password"
+      />
+      <Field
+        label="New password"
+        name="newPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Field
+        label="Confirm new password"
+        name="confirmPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Button variant="primary" type="submit">
+        Change password
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The display-name and password forms; a read-only shared account (#1274) gets neither. */
+const AccountForms: FC<{ displayName: string; isLocal: boolean; readOnly: boolean }> = ({
+  displayName,
+  isLocal,
+  readOnly,
+}) =>
+  readOnly ? null : (
+    <>
+      <DisplayNameCard displayName={displayName} />
+      {isLocal ? <PasswordCard /> : null}
+    </>
+  );
+
 /** Personal profile page (editable display name, password for local accounts). */
 // oxlint-disable-next-line eslint/max-lines-per-function -- profile page composes several sections, cohesive
 export function renderProfilePage(state: ProfilePageState): RenderedContent {
@@ -231,6 +301,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
   const avatar = safeImageUrl(user.avatarUrl);
   const displayName = dbUser?.displayNameOverride ?? user.name;
   const provider = dbUser?.authProvider ?? user.providerId ?? "oidc";
+  // A read-only shared account (#1274) sees its profile but none of the controls that change it.
+  const readOnly = user.readOnly === true;
   return (
     <DocumentLayout title="Profile" nav={{ active: "profile" }}>
       <PageHeader title="Profile" description="Your account and project memberships" />
@@ -258,59 +330,17 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             </VStack>
           </HStack>
           <div class={profileMeta}>
-            Member since {dbUser?.createdAt ? new Date(dbUser.createdAt).toLocaleDateString() : "—"}{" "}
-            · Last login {dbUser?.lastLoginAt ? new Date(dbUser.lastLoginAt).toLocaleString() : "—"}
+            Member since {dbUser?.createdAt ? <Time value={dbUser.createdAt} format="date" /> : "—"}{" "}
+            · Last login {dbUser?.lastLoginAt ? <Time value={dbUser.lastLoginAt} /> : "—"}
           </div>
         </VStack>
       </Card>
 
-      <Card>
-        <SectionTitle>Display name</SectionTitle>
-        <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
-        <form method="post" action="/profile" novalidate>
-          <Field label="Display name" name="displayName" type="text" required value={displayName} />
-          <Button variant="primary" type="submit">
-            Save name
-          </Button>
-        </form>
-      </Card>
+      <AccountForms displayName={displayName} isLocal={isLocal === true} readOnly={readOnly} />
 
-      {isLocal ? (
-        <Card>
-          <SectionTitle>Change password</SectionTitle>
-          <Meta>For local accounts only</Meta>
-          <form method="post" action="/profile/password" novalidate>
-            <Field
-              label="Current password"
-              name="currentPassword"
-              type="password"
-              required
-              autocomplete="current-password"
-            />
-            <Field
-              label="New password"
-              name="newPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Field
-              label="Confirm new password"
-              name="confirmPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Button variant="primary" type="submit">
-              Change password
-            </Button>
-          </form>
-        </Card>
-      ) : null}
+      {security ? <SessionsSection security={security} readOnly={readOnly} /> : null}
 
-      {security ? <SessionsSection security={security} /> : null}
-
-      {security?.passkeysEnabled ? <PasskeysSection security={security} /> : null}
+      {security?.passkeysEnabled && !readOnly ? <PasskeysSection security={security} /> : null}
 
       <Card>
         <SectionTitle>Project memberships</SectionTitle>
@@ -378,14 +408,16 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                         </td>
                         <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
                         <td>
-                          <form method="post" action="/profile/notifications">
-                            {csrfField()}
-                            <input type="hidden" name="slug" value={m.projectSlug} />
-                            <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
-                            <Button variant="secondary" size="sm" type="submit">
-                              {subscribed ? "Disable" : "Enable"}
-                            </Button>
-                          </form>
+                          {readOnly ? null : (
+                            <form method="post" action="/profile/notifications">
+                              {csrfField()}
+                              <input type="hidden" name="slug" value={m.projectSlug} />
+                              <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
+                              <Button variant="secondary" size="sm" type="submit">
+                                {subscribed ? "Disable" : "Enable"}
+                              </Button>
+                            </form>
+                          )}
                         </td>
                       </tr>
                     );

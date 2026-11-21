@@ -3,7 +3,7 @@
 Guidance for AI agents (and humans) working in the StoryShelf monorepo.
 
 StoryShelf is a self-hosted visual-testing platform for Storybook (a Chromatic alternative): upload
-a built Storybook, render stories server-side with Playwright/Puppeteer, pixel-diff against per-branch
+a built Storybook, render stories server-side with Playwright, pixel-diff against per-branch
 baselines, then review and approve. `docs/architecture/` is the current-state spec;
 `docs/repo-structure.md` is the spatial index; `docs/adr/` records decisions.
 
@@ -55,7 +55,6 @@ Real-browser suite (gated; `turbo test` stays hermetic):
 npx -y playwright@1.63.0 install chromium   # one-time browser install
 (cd packages/runner-playwright && nub run test:integration)
 (cd packages/runner-playwright && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
-# Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
 ```
 
 CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
@@ -69,8 +68,8 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}`,
-  `notify-{git,chat,email}`, `design-figma`, `observability`, `ai`, `mcp`.
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-playwright`,
+  `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
@@ -112,8 +111,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `BuildStatePublisher.request(buildId)` (app: `requestBuildState`) queues one `notify` job per git
   channel. A new status is a new case in `statusesForBuild`; a refused write throws so the consumer
   retries. GitHub check runs share that mapper
-  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the channel secret and must
-  never appear in config, logs, errors or API output.
+  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the connection secret (a
+  per-project channel secret until it moves) and must never appear in config, logs, errors or API output.
 - **`cancelled` is terminal.** Cancel through `announceBuildStatus` (`build:cancelled`; no
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
@@ -135,7 +134,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
@@ -167,9 +166,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `RenderedSnapshot.a11y`; they are stored in `snapshots.a11y_violations` and read only through
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
   a finding. Never change a status, failure set or git state because of a11y results.
-- **Settling and Storybook tests.** Runners wait for Storybook's own events through the public
-  `Channel.on` (`packages/runner-*/src/settle.ts`), falling back to `delay ?? 500`; keep the two
-  runners' copies identical. `projects.run_tests` (default off) runs `subtype: "test"` entries through
+- **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
+  `Channel.on` (`packages/runner-playwright/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
+  the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through
   `runProjectTests`/`CaptureRunner.runTests`; results are stored once as JSON in
   `builds.test_results` (`BuildModel.setTestResults`). A failing test is a blocking failure; never
   render a test entry as a story or add a test table.
@@ -244,7 +243,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   is accepted: the one service worker caches only opted-in default-branch Storybooks and the
   offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
   move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
-  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  stops requiring observability; the compatibility packages were retired in 0.14.0 (§8). ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image. ADR 0052 (story switching during
   capture) is accepted behind `projects.switch_stories` (default off) and ships only after its

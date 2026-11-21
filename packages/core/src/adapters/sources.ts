@@ -14,5 +14,14 @@ export function adapterSourcesOf(
     notifiers: options.notifications?.notifiers,
     emailSender: options.notifications?.emailSender,
     auth: options.auth,
+    ...(options.ai === undefined ? {} : { ai: options.ai }),
+    ...authProvidersOf(options),
   };
+}
+
+function authProvidersOf(
+  options: ResolvedShelfOptions,
+): Pick<AdapterSetupSources, "authProviders"> {
+  const checks = options.auth?.providerChecks?.() ?? [];
+  return checks.length === 0 ? {} : { authProviders: checks };
 }

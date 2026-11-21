@@ -151,9 +151,9 @@ variable "database_backup_retention_days" {
 }
 
 variable "database_init_image" {
-  description = "Image of the db-init container that creates the app's database user before the app starts (it needs psql). Override it to pull from a mirror."
+  description = "Image of the db-init container that creates the app's database user before the app starts (it needs psql). It receives the RDS master credentials, so the default is pinned by digest; pin a mirror by digest too."
   type        = string
-  default     = "public.ecr.aws/docker/library/postgres:16-alpine"
+  default     = "public.ecr.aws/docker/library/postgres:16-alpine@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857"
 }
 
 variable "enable_cognito" {
@@ -168,18 +168,6 @@ variable "auth_email" {
   default     = "admin@example.com"
 }
 
-variable "remote_browser_endpoint_secret_arn" {
-  description = "Optional Secrets Manager ARN of a remote-browser endpoint, passed as REMOTE_BROWSER_ENDPOINT. Capture runs in the container when unset. The module builds no browser service."
-  type        = string
-  default     = ""
-}
-
-variable "remote_browser_token_secret_arn" {
-  description = "Optional Secrets Manager ARN of the remote-browser access token, passed as REMOTE_BROWSER_TOKEN."
-  type        = string
-  default     = ""
-}
-
 variable "log_retention_days" {
   description = "CloudWatch log retention."
   type        = number
@@ -190,4 +178,53 @@ variable "tags" {
   description = "Tags added to every resource that supports them."
   type        = map(string)
   default     = {}
+}
+
+# Git connections (ADR 0054, decision 9). The App ID is plain configuration; the private key and the
+# GitLab token are Secrets Manager secrets you create outside Terraform, so their values never enter
+# configuration or state. Empty keeps a connection off.
+variable "github_app_id" {
+  description = "GitHub App ID of the server's git connection, passed as SHELF_GITHUB_APP_ID. Empty leaves it off."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_private_key_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the GitHub App private key (PEM), passed as SHELF_GITHUB_APP_PRIVATE_KEY. Set with github_app_id."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.github_app_id == "") == (var.github_app_private_key_secret_arn == "")
+    error_message = "Set both github_app_id and github_app_private_key_secret_arn, or neither."
+  }
+}
+
+variable "github_api_url" {
+  description = "GitHub Enterprise Server API base (https://ghe.example.com/api/v3), passed as SHELF_GITHUB_API_URL. Empty means github.com."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding a GitLab group or project access token (api scope), passed as SHELF_GITLAB_TOKEN. Empty leaves GitLab off."
+  type        = string
+  default     = ""
+}
+
+variable "gitlab_token_expires" {
+  description = "Expiry of the GitLab token (YYYY-MM-DD), passed as SHELF_GITLAB_TOKEN_EXPIRES; the System page warns 30 days before. Set with gitlab_token_secret_arn."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = (var.gitlab_token_secret_arn == "") == (var.gitlab_token_expires == "")
+    error_message = "Set both gitlab_token_secret_arn and gitlab_token_expires, or neither."
+  }
+}
+
+variable "gitlab_host" {
+  description = "GitLab base URL, passed as SHELF_GITLAB_HOST. Empty means https://gitlab.com."
+  type        = string
+  default     = ""
 }

@@ -1,6 +1,6 @@
 import type { Logger } from "../../logger.ts";
 import { httpJson } from "../../utils/index.ts";
-import { apiBase, gitlabHeaders, projectId } from "./gitlab-api.ts";
+import { apiBase, gitlabHeaders, projectRef } from "./gitlab-api.ts";
 import { findMrIid } from "./gitlab-pr.ts";
 import type { GitLabProject } from "./gitlab-status.ts";
 import {
@@ -67,7 +67,7 @@ export async function upsertMrNote(
 ): Promise<string> {
   const { host, owner, repo, token } = project;
   const base = apiBase(host);
-  const pid = projectId(owner, repo);
+  const pid = projectRef(project);
   const headers = gitlabHeaders(token);
   return await upsertReviewComment({
     project: input.project,
@@ -76,7 +76,8 @@ export async function upsertMrNote(
     markdown: input.markdown,
     sha: input.sha,
     logger: input.logger,
-    resolveNumber: async () => await findMrIid({ host, owner, repo, token, sha: input.sha }),
+    resolveNumber: async () =>
+      await findMrIid({ host, owner, repo, projectId: project.projectId, token, sha: input.sha }),
     thread: (iid) => createThread(base, pid, iid, headers),
   });
 }

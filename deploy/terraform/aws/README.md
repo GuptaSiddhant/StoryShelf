@@ -31,7 +31,7 @@ versions together and reading the release notes. A runnable example is in `examp
 | Network  | VPC with 2 public and 2 private subnets (or your own `vpc_id`), no NAT gateway  |
 | Compute  | ECS cluster, one Fargate service of identical copies, ALB, CPU autoscaling      |
 | Database | RDS Postgres in private subnets, IAM authentication on (or your own URL)        |
-| Storage  | S3 bucket: private, versioned, encrypted, TLS only                                       |
+| Storage  | S3 bucket: private, versioned, encrypted, TLS only                              |
 | Identity | Optional (`enable_cognito`): Cognito user pool, app client, SAML federation     |
 | Secrets  | Secrets Manager: `SECRET`, `AUTH_PASSWORD`, `ADMIN_TOKEN`, `OIDC_CLIENT_SECRET` |
 | DNS      | With `domain_name`: Route 53 zone, ACM certificate, HTTPS listener              |
@@ -42,33 +42,35 @@ security group admits only the ALB. The database is reachable from the task secu
 
 ## Inputs
 
-| Name                                 | Default                            | Meaning                                                                            |
-| ------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------- |
-| `name`                               | required                           | Name prefix, 2-20 characters                                                       |
-| `image_version`                      | required                           | Release version of the image (no `v`)                                              |
-| `region`                             | `us-east-1`                        | Must match the provider's region                                                   |
-| `image_repository`                   | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                                        |
-| `vpc_id`                             | `""`                               | Existing VPC; subnets are found by their `Tier` tag (`public`, `private`)          |
-| `allowed_cidr_blocks`                | required                           | IPv4 ranges that may reach the load balancer; `["0.0.0.0/0"]` publishes the app    |
-| `allow_http`                         | `false`                            | Plain HTTP without a domain; the plan fails otherwise                              |
-| `domain_name`                        | `""`                               | Enables HTTPS (see "Domain and TLS")                                               |
-| `saml_metadata_url`                  | `""`                               | Cognito SAML federation                                                            |
-| `task_cpu` / `task_memory`           | `2048` / `4096`                    | Capture renders in the container: do not go much lower                             |
-| `min_instances` / `max_instances`    | `1` / `1`                          | Identical copies; every copy serves and consumes the queue (ADR 0006)              |
-| `database_pool_size`                 | `10`                               | Connections per copy: `max_instances` x this must fit the database's limit         |
-| `shutdown_grace_seconds`             | `30`                               | See "Shutdown"                                                                     |
-| `existing_database_url_secret_arn`   | `""`                               | A Postgres URL in Secrets Manager; no database is created                          |
-| `database_instance_class`            | `db.t4g.micro`                     | Created database only                                                              |
-| `database_allocated_storage`         | `20`                               | GiB, created database only                                                         |
-| `database_backup_retention_days`     | `7`                                | Automated backup retention in days (1-35)                                          |
-| `database_init_image`                | ECR Public `postgres:16-alpine`    | Image of the `db-init` container (needs `psql`); override for a mirror             |
-| `enable_cognito`                     | `false`                            | Create the Cognito pool, client and `OIDC_CLIENT_SECRET` (image does not read OIDC yet) |
-| `auth_email`                         | `admin@example.com`                | Local admin login email (`AUTH_EMAIL`)                                             |
-| `deletion_protection`                | `true`                             | Database protection and final snapshot; `false` also empties the bucket on destroy |
-| `remote_browser_endpoint_secret_arn` | `""`                               | Optional remote browser (secret reference)                                         |
-| `remote_browser_token_secret_arn`    | `""`                               | Optional remote browser token (secret reference)                                   |
-| `log_retention_days`                 | `30`                               | CloudWatch retention                                                               |
-| `tags`                               | `{}`                               | Added to every taggable resource                                                   |
+| Name                                                  | Default                                   | Meaning                                                                                                        |
+| ----------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`                                                | required                                  | Name prefix, 2-20 characters                                                                                   |
+| `image_version`                                       | required                                  | Release version of the image (no `v`)                                                                          |
+| `region`                                              | `us-east-1`                               | Must match the provider's region                                                                               |
+| `image_repository`                                    | `ghcr.io/guptasiddhant/storyshelf`        | Registry path, for a mirror                                                                                    |
+| `vpc_id`                                              | `""`                                      | Existing VPC; subnets are found by their `Tier` tag (`public`, `private`)                                      |
+| `allowed_cidr_blocks`                                 | required                                  | IPv4 ranges that may reach the load balancer; `["0.0.0.0/0"]` publishes the app                                |
+| `allow_http`                                          | `false`                                   | Plain HTTP without a domain; the plan fails otherwise                                                          |
+| `domain_name`                                         | `""`                                      | Enables HTTPS (see "Domain and TLS")                                                                           |
+| `saml_metadata_url`                                   | `""`                                      | Cognito SAML federation                                                                                        |
+| `task_cpu` / `task_memory`                            | `2048` / `4096`                           | Capture renders in the container: do not go much lower                                                         |
+| `min_instances` / `max_instances`                     | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                          |
+| `database_pool_size`                                  | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                                     |
+| `shutdown_grace_seconds`                              | `30`                                      | See "Shutdown"                                                                                                 |
+| `existing_database_url_secret_arn`                    | `""`                                      | A Postgres URL in Secrets Manager; no database is created                                                      |
+| `database_instance_class`                             | `db.t4g.micro`                            | Created database only                                                                                          |
+| `database_allocated_storage`                          | `20`                                      | GiB, created database only                                                                                     |
+| `database_backup_retention_days`                      | `7`                                       | Automated backup retention in days (1-35)                                                                      |
+| `database_init_image`                                 | ECR Public `postgres:16-alpine` by digest | Image of the `db-init` container (needs `psql`); it receives the master credentials, so pin a mirror by digest |
+| `enable_cognito`                                      | `false`                                   | Create the Cognito pool, client and `OIDC_CLIENT_SECRET` (image does not read OIDC yet)                        |
+| `auth_email`                                          | `admin@example.com`                       | Local admin login email (`AUTH_EMAIL`)                                                                         |
+| `deletion_protection`                                 | `true`                                    | Database protection and final snapshot; `false` also empties the bucket on destroy                             |
+| `github_app_id` / `github_app_private_key_secret_arn` | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                        |
+| `github_api_url`                                      | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                      |
+| `gitlab_token_secret_arn` / `gitlab_token_expires`    | `""`                                      | Server-wide GitLab connection (both or none)                                                                   |
+| `gitlab_host`                                         | `""`                                      | GitLab base URL; empty means gitlab.com                                                                        |
+| `log_retention_days`                                  | `30`                                      | CloudWatch retention                                                                                           |
+| `tags`                                                | `{}`                                      | Added to every taggable resource                                                                               |
 
 ## Outputs
 
@@ -106,8 +108,8 @@ every new connection, verified against the Amazon RDS root certificates. There i
 password for the app to read, and nothing to rotate.
 
 **First boot needs no operator step.** RDS cannot grant `rds_iam`, so each task runs a `db-init`
-container first (`database_init_image`, `postgres:16-alpine` from the ECR Public mirror, which has
-`psql`). It logs in as the master user over TLS with the RDS-managed secret, then idempotently
+container first (`database_init_image`: `postgres:16-alpine` from the ECR Public mirror, which has
+`psql`, pinned by digest because it receives the master credentials). It logs in as the master user over TLS with the RDS-managed secret, then idempotently
 creates the app user `shelf` (`db_iam_user`), grants it `rds_iam`, and gives it rights on the
 database and the `public` schema. The app container starts only after `db-init` succeeds
 (`dependsOn: SUCCESS`); its output is in the log group under the `db-init` stream prefix.
@@ -149,12 +151,6 @@ own stack. With the module's resources it reads:
       "Effect": "Allow",
       "Action": "rds-db:connect",
       "Resource": "arn:aws:rds-db:<region>:<account>:dbuser:<db-resource-id>/shelf"
-    },
-    {
-      "Sid": "AppLogs",
-      "Effect": "Allow",
-      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
-      "Resource": "arn:aws:logs:<region>:<account>:log-group:/ecs/<name>-app:*"
     }
   ]
 }
@@ -162,13 +158,13 @@ own stack. With the module's resources it reads:
 
 The separate execution role (ECS itself, before the app starts) has
 `AmazonECSTaskExecutionRolePolicy` plus `secretsmanager:GetSecretValue` on the app's secret ARNs
-only (`execution_role_policy_json`).
+only (`execution_role_policy_json`). The `awslogs` driver writes the container's logs with the
+execution role, so the task role has no logs permission.
 
 ## Capture, scaling and shutdown
 
-- **Capture runs in the container** (the image ships Chromium). For a remote browser, put its
-  endpoint and token in Secrets Manager and pass the two ARNs; they become `REMOTE_BROWSER_ENDPOINT`
-  and `REMOTE_BROWSER_TOKEN`. The module builds no browser service.
+- **Capture runs in the container** (the image ships Chromium). The module builds no browser
+  service, and has no remote-browser input until the image reads one from its environment.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
@@ -179,7 +175,8 @@ only (`execution_role_policy_json`).
 ## Domain and TLS
 
 Without `domain_name` the plan fails unless `allow_http = true`, which serves plain HTTP (passwords and session cookies unencrypted): use it for throwaway stacks only. With a domain, the module creates a Route 53 zone,
-an ACM certificate validated by DNS in it, an HTTPS listener and a 301 from port 80. ACM validates
+an ACM certificate validated by DNS in it, an HTTPS listener (`ELBSecurityPolicy-TLS13-1-2-2021-06`:
+TLS 1.2 and 1.3 only) and a 301 from port 80. The load balancer drops invalid header fields. ACM validates
 only once the domain's name servers point at the new zone, so apply in two steps:
 
 ```sh
@@ -195,22 +192,37 @@ Tag at least two public subnets in different zones `Tier = public` (ALB and task
 to an internet gateway) and at least two private subnets in different zones `Tier = private` (the
 database subnet group).
 
+## Git connections
+
+Optional, for merge gates and pull-request comments without anyone pasting a key (ADR 0054). Create
+the GitHub App's private key, or a GitLab group or project access token (`api` scope), as a
+Secrets Manager secret yourself, then pass its reference. Terraform holds only the reference, so the key
+and the token never enter configuration or state; the app reads them as
+`SHELF_GITHUB_APP_PRIVATE_KEY` and `SHELF_GITLAB_TOKEN`. The execution role may read exactly these two ARNs, besides the app's own secrets. A half-set connection fails the plan,
+and the image refuses to boot on one too, naming the variable and never its value. Rotating a key is
+a new secret version and a new revision.
+
+```sh
+aws secretsmanager create-secret --name "<name>/GITHUB_APP_PRIVATE_KEY" --secret-string file://app.private-key.pem
+```
+
 ## Image contract
 
 The module passes these to the image. Every variable below is read by the image except those
 marked _not read_, which the image does not use yet.
 
-| Variable                                                     | Source                             | Status   |
-| ------------------------------------------------------------ | ---------------------------------- | -------- |
-| `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY` | module                             | read     |
-| `SHUTDOWN_GRACE_SECONDS`                                     | `shutdown_grace_seconds`           | read     |
-| `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                     | Secrets Manager                    | read     |
-| `AUTH_EMAIL`                                                 | `auth_email`                       | read     |
-| `DATABASE_URL`                                               | `existing_database_url_secret_arn` | read     |
-| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`             | the created RDS instance           | read     |
-| `DATABASE_POOL_MAX`                                          | `database_pool_size`               | read     |
-| `OIDC_CLIENT_SECRET` (with `enable_cognito`)                 | Secrets Manager                    | not read |
-| `REMOTE_BROWSER_ENDPOINT`, `REMOTE_BROWSER_TOKEN`            | secret references                  | not read |
+| Variable                                                                                         | Source                                | Status   |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------- | -------- |
+| `AWS_BUCKET`, `AWS_REGION`, `PUBLIC_BASE_URL`, `TRUST_PROXY`                                     | module                                | read     |
+| `SHUTDOWN_GRACE_SECONDS`                                                                         | `shutdown_grace_seconds`              | read     |
+| `SECRET`, `ADMIN_TOKEN`, `AUTH_PASSWORD`                                                         | Secrets Manager                       | read     |
+| `AUTH_EMAIL`                                                                                     | `auth_email`                          | read     |
+| `DATABASE_URL`                                                                                   | `existing_database_url_secret_arn`    | read     |
+| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`                                                 | the created RDS instance              | read     |
+| `DATABASE_POOL_MAX`                                                                              | `database_pool_size`                  | read     |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)                 | read     |
+| `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secrets Manager references (optional) | read     |
+| `OIDC_CLIENT_SECRET` (with `enable_cognito`)                                                     | Secrets Manager                       | not read |
 
 The image reads the `DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses
 to start when they are set but incomplete, and never falls back to SQLite. Cognito sign-in is not

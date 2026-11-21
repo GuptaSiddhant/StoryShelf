@@ -8,6 +8,7 @@ vi.mock("../../../config.ts", () => ({ cliVersion: (): string => "0.12.0" }));
 
 import prompts from "prompts";
 import { generateMainTf, generateTfvars, isCloud, runCloudInit } from "./cloud.ts";
+import { STATE_WARNING } from "./state-files.ts";
 
 let root = "";
 let printed = "";
@@ -103,6 +104,20 @@ describe("runCloudInit", () => {
     expect(readFileSync(join(dir, "main.tf"), "utf8")).toContain("?ref=v0.12.0");
     expect(readFileSync(join(dir, "terraform.tfvars"), "utf8")).toContain('name = "shelf"');
     expect(printed).toContain("terraform init");
+  });
+
+  it("ignores the state and plan, and says the state holds secrets", async () => {
+    vi.mocked(prompts).mockResolvedValueOnce({
+      name: "shelf",
+      location: "us-central1",
+      projectId: "p",
+    });
+    const dir = join(root, "gcp-infra");
+    await runCloudInit("gcp", dir);
+    const ignored = readFileSync(join(dir, ".gitignore"), "utf8").split("\n");
+    expect(ignored).toEqual(expect.arrayContaining(["*.tfstate*", ".terraform/", "tfplan"]));
+    expect(printed).toContain(STATE_WARNING);
+    expect(STATE_WARNING).toMatch(/encrypted remote backend/u);
   });
 
   it("cancels without a name, or without a GCP project", async () => {

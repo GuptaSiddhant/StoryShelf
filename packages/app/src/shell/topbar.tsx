@@ -39,8 +39,8 @@ const shellTopbar = css`
   }
   .topbar__menu button {
     min-width: 36px;
-    min-height: 36px;
-    padding: 0 0.5rem;
+    min-height: var(--control-sm);
+    padding: 0 var(--space-2);
   }
   .topbar__left nav {
     min-width: 0;
@@ -99,7 +99,7 @@ const shellTopbar = css`
     & .topbar__left summary {
       min-width: 36px;
       justify-content: center;
-      padding: 0.25rem 0.5rem;
+      padding: var(--space-1) var(--space-2);
     }
     & .topbar__pick[data-single] summary > [data-dropdown-chevron] {
       display: none;
@@ -124,8 +124,8 @@ const toastRegion = css`
   .toast {
     display: flex;
     align-items: flex-start;
-    gap: 0.6rem;
-    padding: 0.7rem 0.9rem;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface-card);
@@ -135,7 +135,7 @@ const toastRegion = css`
     animation: toast-in var(--dur-base) var(--ease);
   }
   .toast svg {
-    margin-top: 0.1rem;
+    margin-top: 0;
   }
   .toast[data-tone="success"] svg {
     color: var(--status-approved);
