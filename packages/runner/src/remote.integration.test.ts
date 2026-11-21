@@ -18,7 +18,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 import { ensureFixtureBuilt, readJson, uploadBuild, waitForBuild } from "./integration-harness.ts";
 import { playwrightServer } from "./remote/playwright-server.ts";
 import { remote } from "./remote/remote.ts";
@@ -95,7 +95,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     });
 
     it("renders over the connection, reaching the loopback Storybook through exposeNetwork", async () => {
-      const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", grid()] });
+      const runner = createCaptureRunner({ browsers: ["chromium", grid()] });
       await runner.lifecycle?.setup({} as never);
       expect(runner.metadata.targets).toEqual([
         { target: "chromium", reach: "loopback", status: "ready" },
@@ -123,7 +123,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     }, 120_000);
 
     it("reads story parameters on a remote target too", async () => {
-      const runner = createPlaywrightCaptureRunner({ browsers: [grid()] });
+      const runner = createCaptureRunner({ browsers: [grid()] });
       const parameters = await runner.extractParameters?.({
         buildId: "remote-2",
         storybookDir: staticDir,
@@ -145,7 +145,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
         reach: "url",
         connect: { endpoint: `http://127.0.0.1:${port}` },
       });
-      const runner = createPlaywrightCaptureRunner({ browsers: [cdp] });
+      const runner = createCaptureRunner({ browsers: [cdp] });
       const input = {
         buildId: "remote-3",
         storybookDir: staticDir,
@@ -176,7 +176,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
     it("has no authentication of its own, and a wrong path is refused at the handshake", async () => {
       // The spike: a bare run-server guards only by its --path (here a secret one); anything that
       // reaches the port with the path can drive a browser, so the guide puts it behind a proxy.
-      const wrong = createPlaywrightCaptureRunner({
+      const wrong = createCaptureRunner({
         browsers: [
           playwrightServer({
             name: "wrong",
@@ -210,7 +210,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("remote capture through 
     const dataDir = join(tmp, "data");
     await mkdir(dataDir, { recursive: true });
     db = createSqliteDatabase(join(tmp, "shelf.db"));
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [
         "chromium",
         playwrightServer({
@@ -312,7 +312,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")(
         database: createSqliteDatabase(join(tmp, "shelf.db")),
         storage: createLocalStorage(dataDir),
         testing: {
-          runner: createPlaywrightCaptureRunner({ browsers: [cdp] }),
+          runner: createCaptureRunner({ browsers: [cdp] }),
           concurrency: 1,
         },
         config: {

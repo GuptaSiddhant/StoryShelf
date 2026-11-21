@@ -9,7 +9,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 import { ensureFixtureBuilt, readJson, uploadBuild, waitForBuild } from "./integration-harness.ts";
 
 /**
@@ -65,7 +65,7 @@ async function silentStorybook(channel: boolean): Promise<string> {
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("render-settled signalling", () => {
   it("waits for Storybook's own event: no fixed-wait fallback, and a stable screenshot", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const log = logger();
     const input = {
       buildId: "settle-1",
@@ -86,7 +86,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("render-settled signalli
   }, 120_000);
 
   it("settles on a story whose play function throws, and says what Storybook reported", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const log = logger();
     const id = "components-button--flaky-tag";
     const result = await runner.render({
@@ -108,7 +108,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("render-settled signalli
   }, 120_000);
 
   it("falls back to the fixed wait on a page with no Storybook channel", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const log = logger();
     const started = performance.now();
     const result = await runner.render({
@@ -124,7 +124,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("render-settled signalli
   }, 60_000);
 
   it("falls back after the timeout when the channel never announces the render", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const log = logger();
     const started = performance.now();
     const result = await runner.render({
@@ -145,7 +145,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("render-settled signalli
 
 describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("Storybook tests (.test())", () => {
   it("runs each test entry in the iframe and reports pass or fail from Storybook's events", async () => {
-    const runner = createPlaywrightCaptureRunner();
+    const runner = createCaptureRunner();
     const outcomes = await runner.runTests?.({
       buildId: "tests-1",
       storybookDir: staticDir,
@@ -175,7 +175,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("Storybook tests (.test(
       app = createShelfApp({
         database: createSqliteDatabase(join(tmp, "shelf.db")),
         storage: createLocalStorage(dataDir),
-        testing: { runner: createPlaywrightCaptureRunner(), concurrency: 1 },
+        testing: { runner: createCaptureRunner(), concurrency: 1 },
         config: { scratchDir: dataDir, purgeTtlDays: 30 },
       });
       await app.lifecycle.setup();

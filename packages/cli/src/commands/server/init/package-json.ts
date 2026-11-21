@@ -89,11 +89,7 @@ function coreNames(answers: Answers): string[] {
 /** The storage, runner and auth packages the answers ask for (integrations are built in). */
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
-  return [
-    STORAGE_PACKAGE[answers.storage],
-    "@storyshelf/runner-playwright",
-    ...(auth === null ? [] : [auth]),
-  ];
+  return [STORAGE_PACKAGE[answers.storage], "@storyshelf/runner", ...(auth === null ? [] : [auth])];
 }
 
 function buildDeps(answers: Answers): Record<string, string> {

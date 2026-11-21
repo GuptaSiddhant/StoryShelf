@@ -1,21 +1,21 @@
 ---
-title: "@storyshelf/runner-playwright"
+title: "@storyshelf/runner"
 description: Pure Playwright CaptureRunner — renders Storybook screenshots in-process for the StoryShelf server.
 ---
 
 import { PackageManagers } from "starlight-package-managers";
 
-`@storyshelf/runner-playwright` is the default **pure** `CaptureRunner` implementation for StoryShelf. It serves an already-extracted Storybook directory over a local HTTP server, launches the project's browser target (Chromium by default; Firefox, WebKit and Chrome when you list them), renders every story at each configured viewport, and returns the screenshot buffers. It performs **no** database, storage, or build-state management — core's capture orchestrator (ADR 0015) owns that.
+`@storyshelf/runner` is the default **pure** `CaptureRunner` implementation for StoryShelf. It serves an already-extracted Storybook directory over a local HTTP server, launches the project's browser target (Chromium by default; Firefox, WebKit and Chrome when you list them), renders every story at each configured viewport, and returns the screenshot buffers. It performs **no** database, storage, or build-state management — core's capture orchestrator (ADR 0015) owns that.
 
 For what the runner reads from a built Storybook (the preview page, the story index, `play`), see [How Storybook works](/concepts/how-storybook-works/).
 
 ## Install
 
-<PackageManagers pkg="@storyshelf/runner-playwright" />
+<PackageManagers pkg="@storyshelf/runner" />
 
-- [npm package](https://www.npmjs.com/package/@storyshelf/runner-playwright) — install tarballs and version history.
-- [Public API reference](/reference/runner-playwright/) — generated docs for every export; start here to learn the API.
-- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/runner-playwright) — package directory on `main`.
+- [npm package](https://www.npmjs.com/package/@storyshelf/runner) — install tarballs and version history.
+- [Public API reference](/reference/runner/) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/runner) — package directory on `main`.
 
 ## Usage
 

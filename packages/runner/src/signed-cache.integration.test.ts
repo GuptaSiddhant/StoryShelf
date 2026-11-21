@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { chromium, type Browser, type BrowserContext } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 
 const SECRET = "signed-cache-secret-signed-cache-secret";
 const ASSET = Buffer.from("globalThis.assetRuns = (globalThis.assetRuns ?? 0) + 1;\n".repeat(50));
@@ -65,7 +65,7 @@ async function startShelf(cacheMaxAgeSeconds?: number): Promise<Shelf> {
   const app = createShelfApp({
     database: db,
     storage,
-    testing: { runner: createPlaywrightCaptureRunner() },
+    testing: { runner: createCaptureRunner() },
     config: {
       secret: SECRET,
       ...(cacheMaxAgeSeconds === undefined ? {} : { captureAssets: { cacheMaxAgeSeconds } }),

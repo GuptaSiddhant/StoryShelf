@@ -1,2 +1,5 @@
-export { createPlaywrightCaptureRunner } from "./capture-runner.ts";
-export { local, type BrowserEntry, type LocalBrowser, type LocalOptions } from "./targets.ts";
+/**
+ * @deprecated `@storyshelf/runner-playwright` is now `@storyshelf/runner`. This package only
+ * re-exports it for one minor release (0.15.0) and then retires.
+ */
+export * from "@storyshelf/runner";

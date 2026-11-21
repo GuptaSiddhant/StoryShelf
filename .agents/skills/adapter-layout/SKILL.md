@@ -9,7 +9,7 @@ metadata:
 
 # Adapter Layout — One Concern Per File
 
-Adapters are the most-read code in this repo. A module earns a split when it exceeds **~150 lines** or holds **3+ distinct concerns** (client construction, lifecycle, serialization, operations, streaming, error mapping). Copy the per-kind layout below; copy the exemplar packages (`storage-s3`, `runner-playwright`) — never invent a new shape.
+Adapters are the most-read code in this repo. A module earns a split when it exceeds **~150 lines** or holds **3+ distinct concerns** (client construction, lifecycle, serialization, operations, streaming, error mapping). Copy the per-kind layout below; copy the exemplar packages (`storage-s3`, `runner`) — never invent a new shape.
 
 ## When to use me
 

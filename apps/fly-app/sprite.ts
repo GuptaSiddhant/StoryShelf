@@ -4,7 +4,7 @@ import {
   type BrowserName,
   RemoteConnectError,
   type RemoteBrowser,
-} from "@storyshelf/runner-playwright/remote";
+} from "@storyshelf/runner/remote";
 /**
  * The demo's browser on a Fly Sprite: a Playwright server on a hibernating computer (see
  * `sprite/`), reached through `remote()` as the `chromium@sprite` target (ADR 0007).

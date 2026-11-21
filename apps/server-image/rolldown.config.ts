@@ -49,7 +49,7 @@ export default defineConfig({
       "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
       "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
       "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
-      "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
+      "@storyshelf/runner": resolve(root, "packages/runner/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
       "@storyshelf/db-postgres": resolve(root, "packages/db-postgres/src/index.ts"),
       "@storyshelf/db-mysql": resolve(root, "packages/db-mysql/src/index.ts"),

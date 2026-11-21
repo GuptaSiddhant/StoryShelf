@@ -20,10 +20,10 @@ A remote target is named `<engine>@<name>`, for example `chromium@grid`. The nam
 Remote services are entries of the runner's `browsers` list, imported from the `/remote` subpath of the runner package. Each is plain configuration; no vendor SDK is needed.
 
 ```ts
-import { createPlaywrightCaptureRunner, local } from "@storyshelf/runner-playwright";
-import { azurePlaywright, playwrightServer } from "@storyshelf/runner-playwright/remote";
+import { createCaptureRunner, local } from "@storyshelf/runner";
+import { azurePlaywright, playwrightServer } from "@storyshelf/runner/remote";
 
-const runner = createPlaywrightCaptureRunner({
+const runner = createCaptureRunner({
   browsers: [
     "chromium", // local; the first target is the default for new projects
     playwrightServer({
@@ -47,10 +47,10 @@ Credentials are operator-level: they are passed in the server's code, from the e
 
 | Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
 | ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
-| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
-| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
-| `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
-| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
+| `playwrightServer(...)`                     | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)` (experimental)          | `@storyshelf/runner/remote` | Playwright                     | a Storybook URL                                     |
+| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -216,7 +216,7 @@ remote<{ id: string }>({
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
 - `maxConnections` (on `remote()`, `playwrightServer()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Each lease counts separately, including every lease of one `refCounted` pool, because each is a real connection to the provider: size `maxConnections` against the connections a scale-to-zero pool will open, not against its one shared resource. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
-- `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
+- `createCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
 - Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
 **Errors**
@@ -227,7 +227,7 @@ remote<{ id: string }>({
 
 **Sharing one server: `refCounted`**
 
-When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner-playwright/remote` counts the connections for you:
+When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner/remote` counts the connections for you:
 
 ```ts
 const computer = refCounted({
@@ -253,7 +253,7 @@ remote({
 The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards. The Sprite runs `playwright run-server` behind a small proxy that refuses requests without a shared secret. The target is plain configuration: `refCounted` wakes the Sprite by polling its `/healthz`, and the Sprite pauses by itself once the connections close, so `close` has nothing to do.
 
 ```ts
-import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
+import { refCounted, remote } from "@storyshelf/runner/remote";
 
 const secret = process.env.SPRITE_BROWSER_SECRET ?? "";
 const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });

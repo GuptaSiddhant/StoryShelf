@@ -13,7 +13,7 @@ import {
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * The StoryShelf product image's server (`docker run ghcr.io/guptasiddhant/storyshelf`).
  *
@@ -87,7 +87,7 @@ shelfLogger.info(
   "git connections",
 );
 const testing = captureEnabled(env)
-  ? { runner: createPlaywrightCaptureRunner({ browsers: browsersFromEnv(env) }) }
+  ? { runner: createCaptureRunner({ browsers: browsersFromEnv(env) }) }
   : undefined;
 
 // Sign-in first: a short SECRET throws here, before anything listens.

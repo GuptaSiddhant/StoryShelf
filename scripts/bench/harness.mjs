@@ -32,7 +32,7 @@ export async function startApp(dir) {
     load("packages/app/dist/index.mjs"),
     load("packages/db-sqlite/dist/index.mjs"),
     load("packages/storage-local/dist/index.mjs"),
-    load("packages/runner-playwright/dist/index.mjs"),
+    load("packages/runner/dist/index.mjs"),
     load("packages/core/dist/models.mjs"),
   ]);
   const rawDb = sqlite.createSqliteDatabase(join(dir, "shelf.db"));
@@ -47,7 +47,7 @@ export async function startApp(dir) {
     database: instrument(rawDb, dbCalls),
     storage: instrument(local.createLocalStorage(dir), storageCalls),
     testing: {
-      runner: playwright.createPlaywrightCaptureRunner({ concurrency: PAGES }),
+      runner: playwright.createCaptureRunner({ concurrency: PAGES }),
       concurrency: 1,
     },
     logger,

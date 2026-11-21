@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 import {
   ensureFixtureBuilt,
   readJson,
@@ -41,7 +41,7 @@ async function createHarness(): Promise<void> {
   await mkdir(dataDir, { recursive: true });
   const db = createSqliteDatabase(join(tmp, "shelf.db"));
   const storage = createLocalStorage(dataDir);
-  const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox"] });
+  const runner = createCaptureRunner({ browsers: ["chromium", "firefox"] });
   const app = createShelfApp({
     database: db,
     storage,
@@ -239,7 +239,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
     const { app, staticDir } = getHarness();
 
     // Runner level: the annotation text names the rule.
-    const rendered = await createPlaywrightCaptureRunner({ concurrency: 1 }).render({
+    const rendered = await createCaptureRunner({ concurrency: 1 }).render({
       buildId: "a11y-direct",
       storybookDir: staticDir,
       stories: [
@@ -381,7 +381,7 @@ describe.skipIf(process.env["RUN_INTEGRATION"] !== "1")("browser integration smo
   }, 300_000);
 
   it("reports which declared engines are installed, never launching to find out", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
+    const runner = createCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
     await runner.lifecycle?.setup({} as never);
     const targets = runner.metadata.targets ?? [];
     expect(targets.map((entry) => entry.target)).toEqual(["chromium", "firefox", "webkit"]);

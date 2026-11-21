@@ -39,7 +39,7 @@ describe("generatePackageJson", () => {
       "@hono/node-server",
       "@storyshelf/app",
       "@storyshelf/db-sqlite",
-      "@storyshelf/runner-playwright",
+      "@storyshelf/runner",
       "@storyshelf/storage-local",
     ]);
   });
