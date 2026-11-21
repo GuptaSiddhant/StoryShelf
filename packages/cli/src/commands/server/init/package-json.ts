@@ -42,8 +42,8 @@ const DB_PACKAGE: Record<DatabaseChoice, string> = {
   tidb: "@storyshelf/db-mysql",
 };
 
-const STORAGE_PACKAGE: Record<StorageChoice, string> = {
-  local: "@storyshelf/storage-local",
+/** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
+const STORAGE_PACKAGE: Record<Exclude<StorageChoice, "local">, string> = {
   s3: "@storyshelf/storage-s3",
   azure: "@storyshelf/storage-azure",
   gcs: "@storyshelf/storage-gcs",
@@ -78,7 +78,8 @@ function ownPackages(names: readonly string[]): Record<string, string> {
 /** The app, the database package and, with observability or SMTP, the packages those add. */
 function coreNames(answers: Answers): string[] {
   const names = ["@storyshelf/app", DB_PACKAGE[answers.database]];
-  const withCore = wantsObservability(answers) || wantsNotifications(answers);
+  const withCore =
+    wantsObservability(answers) || wantsNotifications(answers) || answers.storage === "local";
   return [
     ...names,
     ...(withCore ? ["@storyshelf/core"] : []),
@@ -89,7 +90,11 @@ function coreNames(answers: Answers): string[] {
 /** The storage, runner and auth packages the answers ask for (integrations are built in). */
 function featureNames(answers: Answers): string[] {
   const auth = AUTH_PACKAGE[answers.auth];
-  return [STORAGE_PACKAGE[answers.storage], "@storyshelf/runner", ...(auth === null ? [] : [auth])];
+  return [
+    ...(answers.storage === "local" ? [] : [STORAGE_PACKAGE[answers.storage]]),
+    "@storyshelf/runner",
+    ...(auth === null ? [] : [auth]),
+  ];
 }
 
 function buildDeps(answers: Answers): Record<string, string> {

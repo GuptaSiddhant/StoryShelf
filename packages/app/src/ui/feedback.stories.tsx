@@ -1,5 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
+import { onAPhone } from "../../.storybook/page.tsx";
 import { jsxStory } from "../../.storybook/render.tsx";
 import {
   Alert,
@@ -123,6 +124,29 @@ export const MetaStyles = jsxStory(() => (
 ));
 
 /** Roles, providers and verdicts read in sentence case, like build statuses. */
+/** A long unbroken value wraps inside the 375px phone viewport instead of widening the page (#1259). */
+export const MetaCodeLongOnAPhone = onAPhone(
+  jsxStory(() => (
+    <MetaText as="code">
+      {
+        '{"buildId":"01M7YHE2SYBV237RNQ0SVGSPW8","attemptNo":1,"queue":"main","reason":"lease expired"}'
+      }
+    </MetaText>
+  )),
+);
+
+/** A link in running text is underlined, so colour is not the only cue (WCAG 1.4.1, #1259). */
+export const LinkInText = jsxStory(() => (
+  <VStack>
+    <MetaText>
+      Confirm the address on the <a href="/admin">System page</a> to turn notifications on.
+    </MetaText>
+    <Alert tone="info">
+      Some integrations are not offered. See <a href="/admin#integrations">System</a>.
+    </Alert>
+  </VStack>
+));
+
 export const SentenceCaseLabels = jsxStory(() => (
   <HStack>
     {["admin", "viewer", "via password", "github", "slack", "error", "resolved"].map((label) => (

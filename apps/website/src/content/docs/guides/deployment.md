@@ -85,7 +85,7 @@ This generates `src/index.ts`, `package.json` and `tsconfig.json` with the corre
 | Layer         | Package                     | Notes                                        |
 | ------------- | --------------------------- | -------------------------------------------- |
 | Database      | `@storyshelf/db-sqlite`     | node:sqlite + Drizzle, WAL mode, single file |
-| Storage       | `@storyshelf/storage-local` | Local filesystem, `--data-dir`               |
+| Storage       | `@storyshelf/core/storage/local` | Local filesystem, `--data-dir`               |
 | Capture queue | Database queue (built-in)   | `capture_jobs` in your database, leased      |
 | Auth          | `@storyshelf/auth`          | Local accounts, social, SSO/SAML, passkeys   |
 

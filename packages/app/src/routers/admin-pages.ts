@@ -19,7 +19,7 @@ import { renderAdminAiPage } from "../pages/admin-ai.tsx";
 import type { IntegrationsView } from "../pages/admin-system-integrations.tsx";
 import { renderAdminSystemPage, type AdminSystemData } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
-import { runnerTargets } from "../targets.ts";
+import { runnerTargets, unreachableTargets } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { collectHealthReport } from "./health-report.ts";
 import { collectStatusRows } from "./health-status.ts";
@@ -135,13 +135,19 @@ async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> 
 async function captureView(): Promise<
   Pick<
     AdminSystemData,
-    "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause" | "integrations"
+    | "targets"
+    | "unreachable"
+    | "publicOrigin"
+    | "notificationsPaused"
+    | "retentionPause"
+    | "integrations"
   >
 > {
   return {
     integrations: await integrationsView(getStore().db),
     retentionPause: getStore().db.retentionPause,
     targets: await runnerTargets(),
+    unreachable: unreachableTargets(),
     publicOrigin: await publicOriginView(),
     notificationsPaused: await pausedBannerShown(getStore()),
   };

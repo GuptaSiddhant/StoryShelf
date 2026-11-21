@@ -14,7 +14,7 @@
  *
  * `--latency <ms>` adds that delay to every storage `exists`, `read` and `delete`, to stand in for a
  * remote store (S3, GCS, Azure; a manifest costs one `exists` and one `read`, a removed blob a `delete`); local disk is the floor. Prints one JSON line per run (pass time) and one for memory.
- * Needs the built `dist/` of core, db-sqlite and storage-local (`nubx turbo build`). Not wired
+ * Needs the built `dist/` of core and db-sqlite (`nubx turbo build`). Not wired
  * into CI: run it by hand to re-measure after a change to `retention/content-gc.ts`.
  */
 import { createHash } from "node:crypto";
@@ -27,7 +27,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const load = async (path) => await import(pathToFileURL(join(root, path)).href);
 const { createSqliteDatabase } = await load("packages/db-sqlite/dist/index.mjs");
-const { createLocalStorage } = await load("packages/storage-local/dist/index.mjs");
+const { createLocalStorage } = await load("packages/core/dist/storage/local.mjs");
 const { collectUnreferencedContent } = await load("packages/core/dist/retention.mjs");
 
 function option(name, fallback) {

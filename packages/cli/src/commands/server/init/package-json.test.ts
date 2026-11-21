@@ -38,9 +38,9 @@ describe("generatePackageJson", () => {
     expect(Object.keys(pkg().dependencies).toSorted()).toEqual([
       "@hono/node-server",
       "@storyshelf/app",
+      "@storyshelf/core",
       "@storyshelf/db-sqlite",
       "@storyshelf/runner",
-      "@storyshelf/storage-local",
     ]);
   });
 
@@ -105,8 +105,10 @@ describe("generatePackageJson", () => {
     }
   });
 
-  it("adds the storage package the scaffold imports, local included", () => {
-    expect(pkg({ storage: "local" }).dependencies["@storyshelf/storage-local"]).toBeDefined();
+  it("adds the storage package the scaffold imports; local comes from core", () => {
+    const local = pkg({ storage: "local" }).dependencies;
+    expect(local["@storyshelf/storage-local"]).toBeUndefined();
+    expect(local["@storyshelf/core"]).toBeDefined();
     expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage-s3"]).toBeDefined();
     expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage-azure"]).toBeDefined();
     expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage-gcs"]).toBeDefined();
@@ -118,13 +120,14 @@ describe("generatePackageJson", () => {
     expect(pkg({ auth: "oauth" }).dependencies["@storyshelf/auth"]).toBeDefined();
   });
 
-  it("adds nodemailer and core only when SMTP is chosen", () => {
+  it("adds nodemailer only when SMTP is chosen, and core only for SMTP or local storage", () => {
     const { dependencies } = pkg({ notifications: true });
     expect(dependencies["nodemailer"]).toBeDefined();
     expect(dependencies["@storyshelf/core"]).toBeDefined();
-    const off = pkg({ notifications: false }).dependencies;
+    const off = pkg({ notifications: false, storage: "s3" }).dependencies;
     expect(off["nodemailer"]).toBeUndefined();
     expect(off["@storyshelf/core"]).toBeUndefined();
+    expect(pkg({ notifications: false }).dependencies["@storyshelf/core"]).toBeDefined();
   });
 
   it("adds the observability packages only when asked", () => {

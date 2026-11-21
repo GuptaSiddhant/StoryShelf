@@ -121,4 +121,6 @@ export type SystemEventName =
   | "sys:capture-failed"
   | "sys:purge-completed"
   | "sys:notify-failed"
-  | "sys:ai-budget";
+  | "sys:ai-budget"
+  | "sys:target-unreachable"
+  | "sys:target-recovered";

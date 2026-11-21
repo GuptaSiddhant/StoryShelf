@@ -18,7 +18,6 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner": "workspace:*",
-    "@storyshelf/storage-local": "workspace:*",
     "nodemailer": "^10.2.1"
   },
   "devDependencies": {
