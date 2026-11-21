@@ -1,8 +1,10 @@
+import { createShelfLogger } from "@storyshelf/core/logger";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { createSqliteDatabase } from "./index.ts";
 import { BUSY_WAIT_MS, createExecutors } from "./proxy-executors.ts";
 
 function memory(): DatabaseSync {
@@ -95,5 +97,30 @@ describe("createExecutors", () => {
     holder.exec("COMMIT");
     holder.close();
     waiter.close();
+  });
+});
+
+describe("createSqliteDatabase over the executors", () => {
+  it("maps the rows Drizzle reads back to the column types: booleans stay booleans", async () => {
+    const adapter = createSqliteDatabase(":memory:");
+    await adapter.lifecycle?.setup({ config: {}, logger: createShelfLogger({ level: "silent" }) });
+    const now = "2026-11-21T10:00:00.000Z";
+    const table = adapter.tables.projects;
+    const inserted = (await adapter.insert(table, {
+      id: "p1",
+      name: "Project",
+      slug: "project",
+      createdAt: now,
+      updatedAt: now,
+    } as never)) as Record<string, unknown>;
+    const read = (await adapter.get(table, "p1")) as Record<string, unknown> | null;
+    const [listed] = (await adapter.list(table)) as Record<string, unknown>[];
+    for (const row of [inserted, read, listed]) {
+      expect(row?.["runA11y"]).toBe(true);
+      expect(row?.["executePlay"]).toBe(false);
+      expect(row?.["createdAt"]).toBe(now);
+    }
+    expect(await adapter.count(table)).toBe(1);
+    await adapter.lifecycle?.teardown();
   });
 });
