@@ -2,9 +2,14 @@ import { commitCode, escapeText, plural } from "./build-comment-text.ts";
 /** The headline (one state, one emoji) and the action links of the pull-request comment. */
 import type { BuildCommentInput } from "./build-comment-types.ts";
 
-/** `` `@name` `` in a code span: a StoryShelf user is not a git host user, so it must never ping one. */
+/**
+ * ` by \`name\``: the display name in a code span, so it never pings a git host user. Every
+ * whitespace run (newlines included) becomes one space, so a name with a blank line cannot end the
+ * span early; a backtick is dropped. A name that is empty after that shows no byline.
+ */
 function byline(reviewer: string | undefined): string {
-  return reviewer === undefined ? "" : ` by \`@${reviewer.replaceAll("`", "")}\``;
+  const name = reviewer?.replaceAll("`", "").replaceAll(/\s+/gu, " ").trim();
+  return name === undefined || name === "" ? "" : ` by \`${name}\``;
 }
 
 /** Changes still waiting for a verdict. */
