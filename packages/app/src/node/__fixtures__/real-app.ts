@@ -24,6 +24,12 @@ export interface RealApp {
 export interface RealAppOptions {
   /** Make the storage adapter's setup throw this message (a failed boot). */
   failSetup?: string;
+  /**
+   * Hold the storage teardown this long (ms). The signal test sends its second signal right after
+   * the first; a shutdown that finishes before a slow sender's second `kill` leaves no handler to
+   * absorb it, so under load the child died of it (exit 143) instead of reporting `closed`.
+   */
+  teardownDelayMs?: number;
 }
 
 /** A real app with counted adapter teardown. */
@@ -47,6 +53,11 @@ export function realApp(options: RealAppOptions = {}): RealApp {
       },
       teardown: async () => {
         teardowns += 1;
+        if (options.teardownDelayMs) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, options.teardownDelayMs);
+          });
+        }
         await hooks.teardown();
       },
     },

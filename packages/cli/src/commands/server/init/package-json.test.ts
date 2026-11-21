@@ -36,7 +36,6 @@ function pkg(overrides: Partial<Answers> = {}): Generated {
 describe("generatePackageJson", () => {
   it("keeps the default dependencies lean", () => {
     expect(Object.keys(pkg().dependencies).toSorted()).toEqual([
-      "@hono/node-server",
       "@storyshelf/app",
       "@storyshelf/core",
       "@storyshelf/db-sqlite",
@@ -55,15 +54,20 @@ describe("generatePackageJson", () => {
     expect(pkg().dependencies["@storyshelf/app"]).toBe("0.0.0");
   });
 
-  it("pins @hono/node-server past GHSA-rmxm-3fg6-px4f", () => {
-    const { dependencies } = pkg({ database: "sqlite", storage: "local" });
-    expect(dependencies["@hono/node-server"]).toBe("^2.1.11");
+  it("does not write @hono/node-server: storyshelf-server serves through @storyshelf/app", () => {
+    expect(pkg().dependencies).not.toHaveProperty("@hono/node-server");
+  });
+
+  it("names the instance module for storyshelf-server", () => {
+    expect((pkg() as unknown as { storyshelf: { server: string } }).storyshelf).toEqual({
+      server: "src/index.ts",
+    });
   });
 
   it("runs entries with plain node and requires Node 24+", () => {
     const { scripts, engines } = pkg({ database: "postgres", storage: "s3" });
-    expect(scripts["start"]).toBe("node src/index.ts");
-    expect(scripts["dev"]).toBe("node --watch src/index.ts");
+    expect(scripts["start"]).toBe("storyshelf-server serve");
+    expect(scripts["dev"]).toBe("storyshelf-server serve --watch");
     expect(scripts["typecheck"]).toBe("tsc");
     // Node 26 rejects --experimental-transform-types; Node 24+ strips types unflagged.
     expect(JSON.stringify(scripts)).not.toContain("experimental");
@@ -99,9 +103,9 @@ describe("generatePackageJson", () => {
     ][]) {
       const names = Object.keys(pkg({ database }).dependencies);
       expect(names).toContain(adapter);
-      expect(
-        names.filter((name) => !name.startsWith("@storyshelf/") && name !== "@hono/node-server"),
-      ).toEqual(peer === undefined ? [] : [peer]);
+      expect(names.filter((name) => !name.startsWith("@storyshelf/"))).toEqual(
+        peer === undefined ? [] : [peer],
+      );
     }
   });
 

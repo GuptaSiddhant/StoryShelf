@@ -93,6 +93,16 @@ describe("materialize-exports", () => {
     assert.deepEqual(next.publishConfig, { access: "public" });
   });
 
+  it("writes publishConfig.bin over bin, which has a source twin", () => {
+    const next = materializeExports({
+      ...pkg,
+      bin: { tool: "./src/bin.ts" },
+      publishConfig: { ...pkg.publishConfig, bin: { tool: "./dist/bin.mjs" } },
+    });
+    assert.deepEqual(next.bin, { tool: "./dist/bin.mjs" });
+    assert.deepEqual(next.publishConfig, { access: "public" });
+  });
+
   it("leaves a package without publishConfig.exports alone, and refuses changed keys", () => {
     assert.equal(materializeExports({ name: "b", exports: {} }), null);
     assert.throws(() => materializeExports({ ...pkg, exports: { "./x": "./x.js" } }), /same keys/u);

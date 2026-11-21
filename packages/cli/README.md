@@ -70,11 +70,7 @@ storyshelf upload --url <url> --slug <slug> --token <token> \
 
 The default `--build-dir` is `storybook-static` or `buildDir` from `.storybook/storyshelf.json` (see [Configuration](../../apps/website/src/content/docs/guides/config.md)). If `buildDir` is missing/empty, `upload` runs `buildCommand` or `npm run <buildScriptName>`.
 
-`storyshelf purge` — purge expired builds (requires admin token when auth enabled).
-
-```sh
-storyshelf purge --url <url> [--token <admin-token>]
-```
+Instance commands (`serve`, `migrate`, `purge`, `check-storage`, `doctor`) are in `storyshelf-server`, a bin of `@storyshelf/app`; `storyshelf purge` and `storyshelf server serve|check-storage` no longer exist.
 
 `storyshelf retry` — retry a failed build.
 

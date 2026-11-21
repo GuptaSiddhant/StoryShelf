@@ -9,8 +9,8 @@ describe("generateDockerfile", () => {
     expect(dockerfile).toContain("COPY src/ ./src/");
   });
 
-  it("runs the TypeScript entry directly, like npm start", () => {
-    expect(generateDockerfile()).toContain('CMD ["node", "src/index.ts"]');
+  it("starts the instance with storyshelf-server, like npm start", () => {
+    expect(generateDockerfile()).toContain('CMD ["node_modules/.bin/storyshelf-server", "serve"]');
   });
 
   it("does not bundle: no esbuild, no dist output", () => {

@@ -26,8 +26,26 @@ export interface ShelfContext {
 /** Hono router type carrying the shelf context variables. */
 export type ShelfRouter = OpenAPIHono<{ Variables: ShelfContext }>;
 
+/**
+ * What a created app does on its own (ADR 0053, `storyshelf-server`):
+ * - `serve` (default): sets the adapters up in the background, runs the job consumer, the timers and
+ *   the boot tasks (git-link sync, replay of open builds).
+ * - `migrate`: sets the database up (the migrations) and nothing else.
+ * - `tool`: nothing runs by itself: no setup, consumer, timers or replay. For one-shot commands that
+ *   read or change an instance that is already migrated.
+ */
+export type ShelfAppMode = "serve" | "migrate" | "tool";
+
+/** The second argument of `createShelfApp`. */
+export interface ShelfAppOptions {
+  /** Default `serve`. */
+  mode?: ShelfAppMode;
+}
+
 /** App-scoped adapter lifecycle namespace (single `lifecycle` prop avoids Hono collisions). */
 export interface ShelfLifecycle {
+  /** The mode the app was created in. */
+  readonly mode: ShelfAppMode;
   /** Settled summary of the eager background setup run; never rejects. */
   readonly ready: Promise<AdapterSetupResult>;
   /** The resolved logger: the passed-in instance, or the app-created default. */

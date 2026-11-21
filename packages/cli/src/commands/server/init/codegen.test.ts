@@ -43,11 +43,29 @@ describe("generateServer", () => {
     }
   });
 
-  it("ends with the listener and the shutdown hooks", () => {
+  it("exports a definition, never a constructed app, and leaves listening to storyshelf-server", () => {
     const code = server();
-    expect(code).toContain("await app.lifecycle.setup();");
-    expect(code).toContain('for (const signal of ["SIGINT", "SIGTERM"] as const) {');
-    expect(code.endsWith("}\n")).toBe(true);
+    expect(code).toContain("export default defineShelfInstance(");
+    expect(code).not.toContain("createShelfApp");
+    expect(code).not.toContain("lifecycle");
+    expect(code).not.toContain("node-server");
+    expect(code).not.toContain("SIGTERM");
+    expect(code).not.toContain("process.exit");
+    expect(code).not.toContain("loadEnvFile");
+    expect(code.endsWith(");\n")).toBe(true);
+  });
+
+  it("runs the password admin from the afterSetup hook, which only serve runs", () => {
+    const code = server({ auth: "password" });
+    expect(code).toContain("afterSetup: async ({ options }) => {");
+    expect(code).toContain("await ensurePasswordAdmin(options.database, {");
+    expect(code.indexOf("return {")).toBeLessThan(code.indexOf("afterSetup"));
+    expect(server({ auth: "none" })).not.toContain("afterSetup");
+  });
+
+  it("throws on a missing required variable instead of exiting", () => {
+    const code = server({ auth: "password" });
+    expect(code).toContain("throw new Error(`Set ${missing.join");
   });
 
   it("merges imports that share a module into one line", () => {
@@ -100,7 +118,7 @@ describe("generateServer", () => {
     expect(code).toContain(
       'import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";',
     );
-    expect(code).toContain("await ensurePasswordAdmin(database, {");
+    expect(code).toContain("await ensurePasswordAdmin(options.database, {");
   });
 
   it("emits OIDC wiring for oauth on non-AWS targets", () => {
@@ -120,8 +138,8 @@ describe("generateServer", () => {
   it("stops with one line when a required variable is unset (local accounts)", () => {
     const code = server({ auth: "password" });
     expect(code).toContain('["SHELF_SECRET", "SHELF_PUBLIC_BASE_URL", "SHELF_ADMIN_PASSWORD"]');
-    expect(code).toContain("process.exit(1)");
-    expect(code.indexOf("process.exit(1)")).toBeLessThan(code.indexOf("createShelfApp({"));
+    expect(code).toContain("throw new Error(`Set ${missing.join");
+    expect(code.indexOf("throw new Error(`Set")).toBeLessThan(code.indexOf("return {"));
   });
 
   it("passes SHELF_PUBLIC_BASE_URL and the admin token into config", () => {

@@ -136,7 +136,7 @@ describe("runServerInit", () => {
     expect(existsSync(join(dir, "src", "index.ts"))).toBe(true);
     expect(existsSync(join(dir, "src", "worker.ts"))).toBe(false);
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(code).toContain("createShelfApp");
+    expect(code).toContain("defineShelfInstance");
     expect(code).toContain("createCaptureRunner");
     expect(code).toContain("testing: { runner: captureRunner },");
     expect(code).toContain("scratchDir: dataDir,");
