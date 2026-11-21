@@ -2,6 +2,7 @@ import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { CatalogLoader } from "@storyshelf/core/capture";
 import type { Build } from "@storyshelf/core/schema";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
+import { SHARED_READ_ONLY_MEMBERSHIP } from "./accounts.ts";
 import {
   baselines,
   buildComponents,
@@ -77,11 +78,17 @@ function onlyBuilds(dataset: StoryDataset): Build[] | null {
   return dataset === "backlog" ? backlogBuilds() : null;
 }
 
+/** Both projects, and the read-only account's viewer grant on "Design system". */
+async function insertProjects(db: DatabaseAdapter): Promise<void> {
+  await insertAll(db, db.tables.projects, [project, otherProject]);
+  await insertAll(db, db.tables.projectMembers, [SHARED_READ_ONLY_MEMBERSHIP]);
+}
+
 /** A fresh in-memory database holding the chosen dataset, and the catalog its builds publish. */
 export async function seedStoryDatabase(dataset: StoryDataset): Promise<Seeded> {
   const { db } = makeDatabase();
   if (dataset === "blank") return { db, catalog: NO_CATALOG };
-  await insertAll(db, db.tables.projects, [project, otherProject]);
+  await insertProjects(db);
   if (dataset === "empty") return { db, catalog: NO_CATALOG };
   const only = onlyBuilds(dataset);
   if (only) {
