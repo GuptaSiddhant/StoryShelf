@@ -1,6 +1,18 @@
-/** Print a line to stdout with a trailing newline. */
+let humanToStderr = false;
+
+/**
+ * Send {@link printLine} to stderr, so stdout holds only a machine-readable result (`--json`).
+ * Returns the previous setting so a caller can restore it.
+ */
+export function setHumanOutputToStderr(on: boolean): boolean {
+  const previous = humanToStderr;
+  humanToStderr = on;
+  return previous;
+}
+
+/** Print a line to stdout (stderr under {@link setHumanOutputToStderr}) with a trailing newline. */
 export function printLine(message: string): void {
-  process.stdout.write(`${message}\n`);
+  (humanToStderr ? process.stderr : process.stdout).write(`${message}\n`);
 }
 
 /** Print a line to stderr (used for errors and warnings). */
