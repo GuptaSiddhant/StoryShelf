@@ -22,5 +22,11 @@ export function databaseDeps(db: DatabaseAdapter): DemoViewerDeps {
     addViewer: async (projectId, userId) => {
       await new MemberModel(db).set(projectId, userId, "viewer");
     },
+    ensureSiteMember: async (userId) => {
+      const user = await new UserModel(db).get(userId);
+      if (!user || user.role === "member") return false;
+      await db.update(db.tables.users, userId, { role: "member" });
+      return true;
+    },
   };
 }
