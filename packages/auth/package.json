@@ -52,8 +52,8 @@
     "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/engine.test.ts"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.6",
-    "@better-auth/sso": "1.7.6",
+    "@better-auth/passkey": "1.7.14",
+    "@better-auth/sso": "1.7.14",
     "@storyshelf/core": "workspace:*",
     "better-auth": "1.7.14",
     "zod": "catalog:"

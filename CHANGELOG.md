@@ -217,6 +217,12 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   The top bar names only ancestors and never repeats the section; the AI usage page now shows its parent. A quiet badge ("Approved") has the same height, padding and icon slot as other badges. On Settings → Capture, changing the primary browser re-renders the "Also capture on" boxes.
 
+- `npm install` of a fresh server scaffold no longer prints ERESOLVE peer warnings
+
+  `@better-auth/passkey` and `@better-auth/sso` were pinned at 1.7.6 next to `better-auth` 1.7.14, and 1.7.6 wanted an older `@better-auth/utils` than the one `better-auth` brings. All three now sit at 1.7.14, which accepts it. The packed-install smoke fails if the scaffold's install prints an `ERESOLVE` or `npm warn` line.
+
+  Schema: none.
+
 - The default `server init` scaffold now depends on `@storyshelf/storage-local`
 
   The generated `src/index.ts` imports `createLocalStorage`, but `package.json` left the package out,
