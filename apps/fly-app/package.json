@@ -20,7 +20,7 @@
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner": "workspace:*",
-    "@storyshelf/storage-s3": "workspace:*",
+    "@storyshelf/storage": "workspace:*",
     "nodemailer": "^10.2.1",
     "reflect-metadata": "^0.2.2"
   },

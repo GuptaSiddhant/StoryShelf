@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Real S3 suites. Hermetic tests in the same packages also run
+  # Real S3 suites. Hermetic tests in this subpath also run
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-s3:
     runs-on: ubuntu-latest
@@ -58,7 +58,7 @@ jobs:
 
       - name: Run S3 suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-s3' --force
+        run: nubx turbo test --filter='@storyshelf/storage' --force -- src/s3
 
   # The customer path (#891, ADR 0050): apply the AWS module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real AWS, billed: it runs only when the

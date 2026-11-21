@@ -36,7 +36,7 @@ export function detectInstalledAdapters(dir: string): DetectedAdapters {
   if (!deps) {
     return {};
   }
-  return { ...detectDatabase(dir, deps), ...detectStorage(deps), ...detectGit(deps) };
+  return { ...detectDatabase(dir, deps), ...detectStorage(dir, deps), ...detectGit(deps) };
 }
 
 type Database = NonNullable<DetectedAdapters["database"]>;
@@ -152,16 +152,24 @@ function detectFlavor(dir: string, deps: Set<string>, rules: FlavorRules): Datab
   return imported?.[1] ?? rules.fallback;
 }
 
-/** The storage package that is installed, in precedence order. */
-const STORAGE_PACKAGES: readonly (readonly [string, NonNullable<DetectedAdapters["storage"]>])[] = [
-  ["@storyshelf/storage-azure", "azure"],
-  ["@storyshelf/storage-gcs", "gcs"],
-  ["@storyshelf/storage-s3", "s3"],
+/** The cloud SDK a project installs for `@storyshelf/storage`, in precedence order, and its backend. */
+const STORAGE_SDKS: readonly (readonly [string, "azure" | "gcs" | "s3"])[] = [
+  ["@azure/storage-blob", "azure"],
+  ["@google-cloud/storage", "gcs"],
+  ["@aws-sdk/client-s3", "s3"],
 ];
 
-function detectStorage(deps: Set<string>): Pick<DetectedAdapters, "storage"> {
-  const storage = STORAGE_PACKAGES.find(([name]) => deps.has(name))?.[1];
-  return storage === undefined ? {} : { storage };
+/** The storage subpaths, in precedence order, read from generated sources when no SDK marks one. */
+const STORAGE_SUBPATHS = ["azure", "gcs", "s3"] as const;
+
+function detectStorage(dir: string, deps: Set<string>): Pick<DetectedAdapters, "storage"> {
+  if (deps.has("@storyshelf/storage")) {
+    const marker = STORAGE_SDKS.find(([name]) => deps.has(name))?.[1];
+    const text = marker === undefined ? readGeneratedSources(dir) : "";
+    const imported = STORAGE_SUBPATHS.find((path) => text.includes(`@storyshelf/storage/${path}`));
+    return { storage: marker ?? imported ?? "s3" };
+  }
+  return {};
 }
 
 function detectGit(deps: Set<string>): Pick<DetectedAdapters, "git"> {

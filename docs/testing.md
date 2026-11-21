@@ -37,7 +37,7 @@ The touched timing-sensitive files have a `test:flake` script in their package: 
 
 ### 2. Adapter contract tests
 
-Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), local storage (core's `storage/local`) via a temp dir, storage-s3 via a recorded/fake client, auth via the engine adapter over `:memory:` SQLite.
+Each adapter against its interface: SQLite via `:memory:` (Turso via a local libSQL stub), local storage (core's `storage/local`) via a temp dir, `@storyshelf/storage` (`/s3`, `/gcs`, `/azure`) via recorded/fake clients, plus `peer-isolation.test.ts` (each subpath imports with only its own SDK resolvable), auth via the engine adapter over `:memory:` SQLite.
 
 > Known environment limitation: `@libsql/client` (native binding ≤ 0.5.29)
 > segfaults at process teardown on current Node majors — even on a bare
@@ -54,7 +54,7 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement                                   | Storage (`storage-*`)                                                                                    | DB (`db-*`)                                                | Runner / git / auth / notify                               |
+| Requirement                                   | Storage (`@storyshelf/storage`)                                                                                    | DB (`db-*`)                                                | Runner / git / auth / notify                               |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
 | `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
 | `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |
@@ -290,9 +290,9 @@ in CI).
    ```sh
    export PATH="$HOME/.nub/bin:$PATH"
    LIVE_CLOUD=1 SHELF_S3_BUCKET=... \
-     nubx turbo test --filter='@storyshelf/storage-s3' --force
+     nubx turbo test --filter='@storyshelf/storage' --force -- src/s3
    ```
-   Per-package equivalent: `cd packages/storage-s3 && LIVE_CLOUD=1 SHELF_S3_BUCKET=... ./node_modules/.bin/vitest run`.
+   Per-package equivalent: `cd packages/storage && LIVE_CLOUD=1 SHELF_S3_BUCKET=... ./node_modules/.bin/vitest run src/s3` (`src/gcs`, `src/azure` for the others: each cloud runs only its own subpath).
 4. **Teardown:** suites delete their own keys/messages (unique
    `live/<run-id>/<uuid>` prefixes, per-run build ids), but the
    infrastructure is yours — `terraform destroy -var

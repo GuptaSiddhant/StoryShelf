@@ -29,16 +29,14 @@ StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`]
 
 Local filesystem storage is built into [`@storyshelf/core`](/packages/core/) as `@storyshelf/core/storage/local`. These packages add object stores.
 
-| Package                                                 | What it does                                         |
-| ------------------------------------------------------- | ---------------------------------------------------- |
-| [`@storyshelf/storage-s3`](/packages/storage-s3/)       | Amazon S3 and compatible stores (R2, MinIO, Spaces). |
-| [`@storyshelf/storage-azure`](/packages/storage-azure/) | Azure Blob Storage.                                  |
-| [`@storyshelf/storage-gcs`](/packages/storage-gcs/)     | Google Cloud Storage.                                |
+| Package                                     | What it does                                          |
+| ------------------------------------------- | ----------------------------------------------------- |
+| [`@storyshelf/storage`](/packages/storage/) | `/s3` (S3, R2, MinIO), `/gcs`, `/azure` and `/local`. |
 
 ## Capture runners
 
-| Package                                                         | What it does                                                   |
-| --------------------------------------------------------------- | -------------------------------------------------------------- |
+| Package                                   | What it does                                                   |
+| ----------------------------------------- | -------------------------------------------------------------- |
 | [`@storyshelf/runner`](/packages/runner/) | Renders stories with Playwright: Chromium, Firefox and WebKit. |
 
 Need a storage backend or notifier that is not listed? [Write your own adapter](/guides/custom-adapters/).

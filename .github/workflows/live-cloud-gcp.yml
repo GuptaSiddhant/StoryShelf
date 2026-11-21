@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Real GCS suites. Hermetic tests in the same packages also run
+  # Real GCS suites. Hermetic tests in this subpath also run
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-gcp:
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
 
       - name: Run GCS suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-gcs' --force
+        run: nubx turbo test --filter='@storyshelf/storage' --force -- src/gcs
 
   # The customer path (#892, ADR 0050): apply the GCP module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real GCP, billed: it runs only when the

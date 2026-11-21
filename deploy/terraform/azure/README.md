@@ -113,7 +113,7 @@ User` for `identity_principal_id` on that vault; the module does not grant it.
 ## Blob access
 
 Blob access uses the app's managed identity, not the account key. The image gets `SHELF_AZURE_ACCOUNT`,
-`SHELF_AZURE_CONTAINER` and `AZURE_CLIENT_ID`, and `storage-azure` signs in with
+`SHELF_AZURE_CONTAINER` and `AZURE_CLIENT_ID`, and `@storyshelf/storage/azure` signs in with
 `DefaultAzureCredential` (the user-assigned identity, by client id), which holds `Storage Blob Data
 Contributor` on the container. No connection string or account key is stored in Key Vault or passed to
 the app.

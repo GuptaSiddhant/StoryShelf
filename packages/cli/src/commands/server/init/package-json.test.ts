@@ -109,9 +109,12 @@ describe("generatePackageJson", () => {
     const local = pkg({ storage: "local" }).dependencies;
     expect(local["@storyshelf/storage-local"]).toBeUndefined();
     expect(local["@storyshelf/core"]).toBeDefined();
-    expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage-s3"]).toBeDefined();
-    expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage-azure"]).toBeDefined();
-    expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage-gcs"]).toBeDefined();
+    expect(pkg({ storage: "s3" }).dependencies["@storyshelf/storage"]).toBeDefined();
+    expect(pkg({ storage: "s3" }).dependencies["@aws-sdk/client-s3"]).toBeDefined();
+    expect(pkg({ storage: "azure" }).dependencies["@storyshelf/storage"]).toBeDefined();
+    expect(pkg({ storage: "azure" }).dependencies["@azure/storage-blob"]).toBeDefined();
+    expect(pkg({ storage: "gcs" }).dependencies["@storyshelf/storage"]).toBeDefined();
+    expect(pkg({ storage: "gcs" }).dependencies["@google-cloud/storage"]).toBeDefined();
   });
 
   it("declares the auth package only when auth is on", () => {
