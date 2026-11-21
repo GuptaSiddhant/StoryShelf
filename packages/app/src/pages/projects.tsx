@@ -1,8 +1,9 @@
 import { contentHostSuffix } from "@storyshelf/core/config";
-import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
+import { BuildModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { loadHealthBadge } from "../insights/health-panel.ts";
+import { visibleProjects } from "../project-visibility.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -104,7 +105,7 @@ function ProjectGrid({
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user, config } = getStore();
   const urls = createUrlBuilder("/", contentHostSuffix(config));
-  const projects = await new ProjectModel(db).list();
+  const projects = await visibleProjects(db);
   const summaries = await Promise.all(projects.map((project) => summarize(project)));
   const canCreate = !user || user.role === "admin" || user.role === "member";
   const newProject = canCreate ? (
