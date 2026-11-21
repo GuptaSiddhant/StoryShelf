@@ -231,7 +231,7 @@ const logger = app.lifecycle.logger;
 async function provisionDemoViewer(): Promise<void> {
   try {
     const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
-    if (done.userCreated || done.memberAdded || done.credentialSet)
+    if (done.userCreated || done.memberAdded || done.credentialSet || done.roleFixed)
       logger.info(done, "Demo viewer provisioned");
   } catch (err) {
     logger.error({ err }, "Demo viewer provisioning failed");

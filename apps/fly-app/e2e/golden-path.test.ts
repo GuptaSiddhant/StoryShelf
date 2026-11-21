@@ -327,15 +327,25 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
       await view.waitForURL(`${BASE}/`);
 
       // The server adds the membership once `storyshelf-ui` exists (`demo-viewer.ts`, each minute).
+      // `/` is a landing page; the project list is `/projects`, whose card links to the project.
       await vi.waitFor(
         async () => {
-          await view.goto(`${BASE}/`);
-          await view.getByText(DEMO_SLUG).first().waitFor({ state: "visible", timeout: 1000 });
+          await view.goto(`${BASE}/projects`);
+          await view
+            .locator(`a[href^="/projects/${DEMO_SLUG}/"]:visible`)
+            .first()
+            .waitFor({ state: "visible", timeout: 1000 });
         },
         { timeout: 120_000, interval: 5000 },
       );
-      // Only that project: this spec's own project is not listed for the demo account.
+      // Only that project: this spec's own project is listed nowhere on the page (cards or the
+      // project switcher), and its pages and API answer 404 as for a project that does not exist.
+      expect(await view.locator(`a[href^="/projects/${SLUG}/"]`).count()).toBe(0);
       expect(await view.getByText("E2E golden path").count()).toBe(0);
+      expect((await demo.request.get(`${BASE}/projects/${SLUG}/builds/${buildId}`)).status()).toBe(
+        404,
+      );
+      expect((await demo.request.get(`${BASE}/api/v1/projects/${SLUG}`)).status()).toBe(404);
 
       // Writes with the demo account's own session (same origin, so only its role can refuse).
       const write = (path: string, body: string, headers: Record<string, string> = {}) =>
