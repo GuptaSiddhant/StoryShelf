@@ -30,8 +30,11 @@ export function connectionModel(): ConnectionModel {
   return new ConnectionModel(db, credentialKeys(config));
 }
 
-/** Connecting needs authentication (a user to own it) and a server secret (to sign the flow). */
+/**
+ * Connecting needs authentication (a user to own it) and a server secret (to sign the flow). A
+ * read-only shared account (#1274) never connects: everyone signed in as it would share the tokens.
+ */
 export function canConnect(): boolean {
   const { authEnabled, user, config } = getStore();
-  return authEnabled && Boolean(user) && Boolean(config.secret);
+  return authEnabled && Boolean(user) && user?.readOnly !== true && Boolean(config.secret);
 }
