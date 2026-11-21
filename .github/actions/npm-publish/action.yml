@@ -77,6 +77,25 @@ runs:
       shell: bash
       run: node scripts/rewrite-workspace-protocol.mjs
 
+    - name: Write the dist-only exports into the manifests
+      # npm does not apply publishConfig.exports, so the `source` conditions would ship (#1265).
+      shell: bash
+      run: node scripts/materialize-exports.mjs
+
+    - name: Check what will be published
+      # Pack every package and fail on a missing export or bin target, a `source` condition or a source map.
+      shell: bash
+      run: |
+        set -e
+        dest="$RUNNER_TEMP/packed"
+        mkdir -p "$dest"
+        for dir in packages/*/; do
+          if [ -f "$dir/package.json" ] && [ "$(node -p "require('./$dir/package.json').private === true")" != "true" ]; then
+            (cd "$dir" && npm pack --pack-destination "$dest" --silent >/dev/null)
+          fi
+        done
+        node scripts/check-packed-archives.mjs "$dest"/*.tgz
+
     - name: Publish (trusted / provenance)
       # npm exchanges the job's OIDC token itself; no NODE_AUTH_TOKEN. Skips versions already on npm.
       shell: bash
