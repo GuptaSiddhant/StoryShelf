@@ -6,6 +6,7 @@ import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { UserModel } from "../../models/user.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
+import type { User } from "../../schema/user.ts";
 import { isA11yNote } from "../a11y/index.ts";
 import { parseList } from "../inherited-a11y.ts";
 import { parseTestResults } from "../tests.ts";
@@ -52,8 +53,25 @@ async function reviewerOf(deps: BuildStateDeps, build: Build): Promise<string | 
   const reviews = latestVerdicts(await new BuildReviewModel(deps.db).listByBuild(build.id));
   const userId = reviews.findLast((review) => review.verdict === verdict)?.userId;
   const user = userId ? await new UserModel(deps.db).get(userId) : null;
-  const shown = user?.displayNameOverride;
-  return shown !== undefined && shown !== null && shown !== "" ? shown : user?.name;
+  return user === null ? undefined : publicNameOf(user);
+}
+
+/**
+ * The name the comment may show: the display name, else the profile name, but never one that is an
+ * address. Sign-in paths without a profile name store the email as `name`, and the comment can be
+ * public, so any value with an `@` (or equal to the user's email) is left out.
+ */
+export function publicNameOf(
+  user: Pick<User, "name" | "email" | "displayNameOverride">,
+): string | undefined {
+  const email = user.email.toLowerCase();
+  return [user.displayNameOverride, user.name].find(
+    (name): name is string =>
+      typeof name === "string" &&
+      name.trim() !== "" &&
+      !name.includes("@") &&
+      name.trim().toLowerCase() !== email,
+  );
 }
 
 async function failureOf(deps: BuildStateDeps, build: Build): Promise<string | undefined> {

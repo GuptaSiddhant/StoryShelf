@@ -3,7 +3,7 @@ import { BuildReviewModel } from "../../models/build-review.ts";
 import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import { UserModel } from "../../models/user.ts";
-import { a11yCountOf, failedTestsOf, failureReasonOf } from "./comment-extras.ts";
+import { a11yCountOf, failedTestsOf, failureReasonOf, publicNameOf } from "./comment-extras.ts";
 import { deliverBuildState } from "./deliver.ts";
 import { world } from "./test-world.ts";
 
@@ -63,6 +63,23 @@ describe("a11yCountOf and failedTestsOf", () => {
   });
 });
 
+describe("publicNameOf", () => {
+  const user = { email: "Ada@Corp.example", name: "Ada L", displayNameOverride: null };
+
+  it("prefers the display name, then the profile name", () => {
+    expect(publicNameOf({ ...user, displayNameOverride: "Ada Lovelace" })).toBe("Ada Lovelace");
+    expect(publicNameOf(user)).toBe("Ada L");
+  });
+
+  it("never returns an address: a name equal to the email, or with an @, is left out", () => {
+    expect(publicNameOf({ ...user, name: "ada@corp.example" })).toBeUndefined();
+    expect(publicNameOf({ ...user, name: "someone@else.example" })).toBeUndefined();
+    expect(publicNameOf({ ...user, name: "ada@corp.example", displayNameOverride: "Ada" })).toBe(
+      "Ada",
+    );
+  });
+});
+
 describe("the comment's extra facts", () => {
   it("names the approver by display name, never by email", async () => {
     const w = await world();
@@ -77,6 +94,22 @@ describe("the comment's extra facts", () => {
     const body = await commentOf(w);
     expect(body).toContain("Approved by `@Ada L`");
     expect(body).not.toContain("corp.example");
+  });
+
+  it("posts no name for a user whose name is their email address", async () => {
+    const w = await world();
+    await new UserModel(w.db).upsert({
+      id: "u2",
+      email: "bob@corp.example",
+      name: "bob@corp.example",
+      role: "member",
+    });
+    await new BuildReviewModel(w.db).add(w.build.id, "u2", "approved");
+    await w.builds.setStatus(w.build.id, "approved");
+    const body = await commentOf(w);
+    expect(body).toContain("Approved");
+    expect(body).not.toContain("corp.example");
+    expect(body).not.toContain("bob");
   });
 
   it("gives a failed capture a class phrase and never the error text", async () => {
