@@ -2,7 +2,7 @@
 
 > Part of the [StoryShelf architecture spec](./README.md).
 
-The local filesystem adapter is built into core as `@storyshelf/core/storage/local` (`createLocalStorage(dataDir)`, ADR 0049 amendment 2026-11-21). The S3, Azure and GCS adapters are separate packages. All implement `StorageAdapter`.
+The local filesystem adapter is built into core as `@storyshelf/core/storage/local` (`createLocalStorage(dataDir)`, ADR 0049 amendment 2026-11-21). The S3, GCS and Azure adapters are subpaths of one package, `@storyshelf/storage` (`/s3`, `/gcs`, `/azure`), whose cloud SDKs are optional peers that only their own subpath loads; its `/local` subpath re-exports core's adapter. All implement `StorageAdapter`.
 
 ## Storage Layout
 

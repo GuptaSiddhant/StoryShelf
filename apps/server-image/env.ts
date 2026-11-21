@@ -14,9 +14,9 @@ import { createPostgresDatabase } from "@storyshelf/db-postgres";
 import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db-postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { azurePlaywright } from "@storyshelf/runner/remote";
-import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
-import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
-import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
+import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage/azure";
+import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage/gcs";
+import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage/s3";
 /** Choices the product image makes from its environment (adapters, capture, remote browsers). */
 import { readFileSync } from "node:fs";
 

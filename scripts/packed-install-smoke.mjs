@@ -237,6 +237,42 @@ async function waitForOk(url, server, timeoutMs, state) {
   fail(`no answer from ${url} within ${timeoutMs} ms\n${state.text}`);
 }
 
+/**
+ * `@storyshelf/storage` installed from its tarball with only the S3 SDK (#1294): no Google or Azure
+ * SDK may land in `node_modules`, and `/s3` must import and build an adapter from that install.
+ */
+function assertS3OnlyInstall(scratch, tarballs) {
+  const dir = join(scratch, "s3-only");
+  mkdirSync(dir);
+  const manifest = {
+    name: "s3-only",
+    private: true,
+    type: "module",
+    dependencies: {
+      "@storyshelf/storage": `file:${tarballs["@storyshelf/storage"]}`,
+      "@aws-sdk/client-s3": "^3.700.0",
+      "@aws-sdk/lib-storage": "3.700.0",
+    },
+    overrides: tarballOverrides(tarballs),
+  };
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  log("installing @storyshelf/storage with only the S3 SDK");
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: dir });
+  for (const absent of ["@google-cloud/storage", "@azure/storage-blob", "@azure/identity"]) {
+    if (existsSync(join(dir, "node_modules", absent))) {
+      fail(`an S3-only install of @storyshelf/storage pulled in ${absent}`);
+    }
+  }
+  const check = [
+    'const { createS3Storage } = await import("@storyshelf/storage/s3");',
+    'const { createLocalStorage } = await import("@storyshelf/storage/local");',
+    'const s3 = createS3Storage({ bucket: "b", endpoint: "http://127.0.0.1:1", region: "us-east-1" });',
+    'if (s3.metadata.kind !== "s3" || typeof createLocalStorage !== "function") throw new Error("bad exports");',
+    "await s3.lifecycle?.teardown?.();",
+  ].join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+}
+
 /** The CLI installed from its tarball, and the scaffold installed from the tarballs. */
 async function installFromTarballs(scratch, tarballs) {
   const tool = join(scratch, "tool");
@@ -412,6 +448,7 @@ async function main() {
     const tarballs = packAll(tarDir);
     log(`packed ${Object.keys(tarballs).length} packages`);
     assertArchives(tarballs);
+    assertS3OnlyInstall(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

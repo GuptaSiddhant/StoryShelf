@@ -85,7 +85,7 @@ flowchart TB
 
     subgraph StoreAdapters["Storage Adapters"]
         slocal["@storyshelf/core/storage/local\nfilesystem"]
-        ss3["@storyshelf/storage-s3\nAWS S3 / R2 / MinIO"]
+        ss3["@storyshelf/storage/s3\nAWS S3 / R2 / MinIO"]
     end
 
     subgraph AuthAdapters["Auth Singleton"]
@@ -790,7 +790,7 @@ flowchart TB
     subgraph Cloud["Cloud Deployment"]
         Edge["Edge — Vercel / Cloudflare Workers<br/>Hono FetchHandler (Web Request/Response)"]
         Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-sqlite/turso"]
-        S3["S3 / R2 — @storyshelf/storage-s3"]
+        S3["S3 / R2 — @storyshelf/storage/s3"]
     end
 
     Edge --> Turso
