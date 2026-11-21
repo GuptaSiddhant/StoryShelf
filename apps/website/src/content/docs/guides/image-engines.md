@@ -68,7 +68,7 @@ Where the gain comes from: decoding and encoding PNGs is what `sharp` accelerate
 The numbers depend on your hardware and screenshots. Reproduce them on yours:
 
 ```sh
-cd packages/image
+cd packages/core
 nub run bench                  # the StoryShelf UI screenshots
 nub run bench -- ./my-shots    # a folder of NAME-light.png / NAME-dark.png pairs
 ```

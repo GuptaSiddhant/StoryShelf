@@ -4,6 +4,7 @@ import {
   generateAzureApp,
   generateAzureDatabase,
   generateAzureDns,
+  generateAzureGitAccess,
   generateAzureIdentity,
   generateAzureMonitoring,
   generateAzureOutputs,
@@ -193,5 +194,23 @@ describe("Azure Terraform tfvars example", () => {
     expect(example).toContain("location");
     expect(example).toContain("domain_name");
     expect(example).toContain("entra_tenant_id");
+  });
+
+  it("takes git connections as Key Vault references, never as values (ADR 0054)", () => {
+    const variables = generateAzureVariables();
+    const app = generateAzureApp();
+    for (const name of [
+      "github_app_id",
+      "github_app_private_key_secret_name",
+      "gitlab_token_secret_name",
+    ]) {
+      expect(variables).toContain(`variable "${name}"`);
+    }
+    expect(app).toContain("key_vault_secret_id");
+    expect(app).toContain("secret_name = lower(replace(env.key");
+    expect(generateAzureSecrets()).not.toContain("GITHUB");
+    const access = generateAzureGitAccess();
+    expect(access).toContain("Key Vault Secrets User");
+    expect(access).toContain("count                = length(local.git_secrets) > 0 ? 1 : 0");
   });
 });

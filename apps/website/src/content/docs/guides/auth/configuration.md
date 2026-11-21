@@ -42,7 +42,9 @@ const app = createShelfApp({
 });
 ```
 
-Available keys: `title`, `subtitle`, `passwordLabel`, `passwordPlaceholder`, `submitLabel`, `ssoLabelTemplate` (must contain `{label}`), `helpText`, `footerText`. Page structure stays fixed — layout control remains via brand config.
+`publicLink: { href, label }` adds a secondary link under the form to something anyone may open without an account, such as a public build's Storybook (`/_/<project-slug>/`). `href` is an `https:` URL or a path on this server; nothing renders when it is unset. The link opens hosting only: a public build never opens review. On the dev and Fly servers it comes from `SHELF_AUTH_PUBLIC_LINK_URL` and `SHELF_AUTH_PUBLIC_LINK_LABEL`.
+
+Available keys: `title`, `subtitle`, `passwordLabel`, `passwordPlaceholder`, `submitLabel`, `ssoLabelTemplate` (must contain `{label}`), `helpText`, `publicLink`, `footerText`. Page structure stays fixed — layout control remains via brand config.
 
 ## Profile
 

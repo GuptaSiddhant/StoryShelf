@@ -84,3 +84,23 @@ describe("DocumentLayout stylesheet", () => {
     }
   });
 });
+
+describe("DocumentLayout content width", () => {
+  it("gives the settings page a form-width column and the builds list the list width", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: createShelfLogger({ level: "silent" }),
+    });
+    const project = await new ProjectModel(db).create({ name: "Docs" });
+    const res = await app.request(`/projects/${project.slug}/settings`, { redirect: "manual" });
+    const settings = await (
+      await app.request(res.headers.get("location") ?? `/projects/${project.slug}/settings`)
+    ).text();
+    const builds = await (await app.request(`/projects/${project.slug}/builds`)).text();
+    expect(settings).toContain("shell-content-form");
+    expect(builds).not.toContain("shell-content-form");
+  });
+});

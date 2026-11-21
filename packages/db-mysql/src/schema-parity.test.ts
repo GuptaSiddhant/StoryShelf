@@ -54,6 +54,26 @@ const DDL_ALLOWANCES: readonly ParityAllowance[] = [
     issue: "ADR 0041 decision 3",
   },
   {
+    table: "build_references",
+    reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
+    issue: "ADR 0041",
+  },
+  {
+    table: "build_reference_generations",
+    reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
+    issue: "ADR 0041",
+  },
+  {
+    table: "build_deletions",
+    reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
+    issue: "ADR 0041",
+  },
+  {
+    table: "build_content_releases",
+    reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
+    issue: "ADR 0041",
+  },
+  {
     table: "notification_channels",
     index: "notification_channels_project_id_idx",
     reason: "Index in the DDL, not declared in the Drizzle schema.",
@@ -107,34 +127,7 @@ const DDL_ALLOWANCES: readonly ParityAllowance[] = [
 const CORE_ALLOWANCES: readonly ParityAllowance[] = [];
 
 /** Tables and columns the DDL lacks on purpose. Every entry names the issue that removes it. */
-const REQUIRED_ALLOWANCES: readonly ParityAllowance[] = [
-  {
-    table: "build_references",
-    reason: "Retention lifecycle (ADR 0039) is not implemented for MySQL yet.",
-    issue: "#376",
-  },
-  {
-    table: "build_reference_generations",
-    reason: "Retention lifecycle (ADR 0039) is not implemented for MySQL yet.",
-    issue: "#376",
-  },
-  {
-    table: "build_deletions",
-    reason: "Retention lifecycle (ADR 0039) is not implemented for MySQL yet.",
-    issue: "#376",
-  },
-  {
-    table: "build_content_releases",
-    reason: "Retention lifecycle (ADR 0039) is not implemented for MySQL yet.",
-    issue: "#376",
-  },
-  {
-    table: "builds",
-    column: "retention_state",
-    reason: "Retention lifecycle (ADR 0039) is not implemented for MySQL yet.",
-    issue: "#376",
-  },
-];
+const REQUIRED_ALLOWANCES: readonly ParityAllowance[] = [];
 
 describe("mysql schema parity (ADR 0041)", () => {
   it("DDL and Drizzle schema agree on tables, columns, types, nullability, defaults and indexes", () => {

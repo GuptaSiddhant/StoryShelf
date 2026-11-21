@@ -1,7 +1,16 @@
-import type { HtmlEscapedString } from "hono/utils/html";
+import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
-import { Button, Card, Field, FormActions, Meta, SectionTitle, Table } from "../ui/components.tsx";
-type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
+import {
+  Button,
+  DialogLink,
+  Meta,
+  SectionTitle,
+  SummaryList,
+  VStack,
+  type SummaryItem,
+} from "../ui/components.tsx";
+import { ADD_DESIGN_FILE_DIALOG, MAP_COMPONENT_DIALOG } from "./design-forms.tsx";
+import { FormDialog } from "./dialog-form.tsx";
 
 /** Field-level and page-level errors of the Design settings forms. */
 export type DesignFormState = { errors?: Record<string, string>; globalError?: string };
@@ -20,120 +29,105 @@ export interface SettingsDesignComponent {
   url: string;
 }
 
-export function FilesCard(props: {
+/** Remove button of a summary row (posts, then asks first). */
+export const RemoveForm: FC<{ action: string; confirm: string; label: string }> = (props) => (
+  <form
+    method="post"
+    action={props.action}
+    hx-post={props.action}
+    hx-target="body"
+    hx-confirm={props.confirm}
+  >
+    {csrfField()}
+    <Button variant="ghost" size="sm" type="submit" aria-label={props.label}>
+      Remove
+    </Button>
+  </form>
+);
+
+function linkItems(
+  rows: { id: string; name: string; url: string; removeAction?: string; confirm: string }[],
+): SummaryItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    details: row.url,
+    actions: row.removeAction ? (
+      <RemoveForm action={row.removeAction} confirm={row.confirm} label={`Remove ${row.name}`} />
+    ) : undefined,
+  }));
+}
+
+/** Design files as a summary; linking one opens a dialog. */
+export const FilesCard: FC<{
   base: string;
   files: SettingsDesignFile[];
   isAdmin: boolean;
   formState?: DesignFormState;
   urlHint: string;
-}): Rendered {
-  const { base, files, isAdmin, formState, urlHint } = props;
+}> = ({ base, files, isAdmin }) => {
+  const add = isAdmin ? (
+    <DialogLink
+      dialogId={ADD_DESIGN_FILE_DIALOG}
+      href={`${base}/files/new`}
+      variant="primary"
+      icon="plus"
+    >
+      Add design file
+    </DialogLink>
+  ) : undefined;
   return (
-    <Card>
+    <VStack>
       <SectionTitle>Design files</SectionTitle>
       <Meta>
         Design files for this project. They appear in the library header; individual stories link to
         a design through their component (see below) or their story parameters.
       </Meta>
-      <LinkTable
-        rows={files.map((file) => ({
-          id: file.id,
-          key: file.label,
-          url: file.url,
-          removeAction: isAdmin ? `${base}/files/${file.id}/delete` : undefined,
-        }))}
-        keyHeading="Label"
+      <SummaryList
         label="Design files"
-        confirm="Remove this design file?"
+        items={linkItems(
+          files.map((file) => ({
+            id: file.id,
+            name: file.label,
+            url: file.url,
+            ...(isAdmin ? { removeAction: `${base}/files/${file.id}/delete` } : {}),
+            confirm: "Remove this design file?",
+          })),
+        )}
+        emptyTitle="No design files linked"
+        add={add}
       />
-      {files.length === 0 ? <Meta>No design files linked.</Meta> : null}
+      {files.length > 0 ? add : null}
       {isAdmin ? (
-        <AddFileForm base={base} urlHint={urlHint} error={formState?.errors?.["file"]} />
-      ) : null}
-    </Card>
-  );
-}
-
-/** Rows of `key → design link` with an optional remove action. */
-function LinkTable(props: {
-  rows: { id: string; key: string; url: string; removeAction?: string }[];
-  keyHeading: string;
-  /** The table's accessible name. */
-  label: string;
-  confirm: string;
-}): Rendered {
-  return (
-    <Table label={props.label}>
-      <table>
-        <thead>
-          <tr>
-            <th>{props.keyHeading}</th>
-            <th>Design</th>
-            <th>
-              <span class="visually-hidden">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.rows.map((row): Rendered => (
-            <tr key={row.id}>
-              <td>{row.key}</td>
-              <td class="truncate max-w-cell" title={row.url}>
-                <a href={row.url} target="_blank" rel="noopener noreferrer">
-                  {row.url}
-                </a>
-              </td>
-              <td>
-                {row.removeAction ? (
-                  <RemoveForm
-                    action={row.removeAction}
-                    confirm={props.confirm}
-                    label={`Remove ${row.key}`}
-                  />
-                ) : null}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Table>
-  );
-}
-
-function AddFileForm(props: { base: string; urlHint: string; error?: string }): Rendered {
-  const action = `${props.base}/files`;
-  return (
-    <form method="post" action={action} hx-post={action} hx-target="body">
-      {csrfField()}
-      <div class="grid grid--2">
-        <Field label="Label" name="label" required placeholder="Design system" />
-        <Field
-          label="Design URL"
-          name="url"
-          type="url"
-          required
-          placeholder={props.urlHint}
-          error={props.error}
+        <FormDialog
+          id={ADD_DESIGN_FILE_DIALOG}
+          title="Add design file"
+          submitLabel="Add design file"
         />
-      </div>
-      <FormActions>
-        <Button variant="primary" type="submit" icon="plus">
-          Add design file
-        </Button>
-      </FormActions>
-    </form>
+      ) : null}
+    </VStack>
   );
-}
+};
 
-export function ComponentsCard(props: {
+/** Component mappings as a summary; mapping one opens a dialog. */
+export const ComponentsCard: FC<{
   base: string;
   components: SettingsDesignComponent[];
   formState?: DesignFormState;
   urlHint: string;
-}): Rendered {
-  const { base, components, formState, urlHint } = props;
+}> = ({ base, components }) => {
+  const add = (
+    <DialogLink
+      dialogId={MAP_COMPONENT_DIALOG}
+      href={`${base}/components/new`}
+      variant="primary"
+      icon="plus"
+    >
+      Map component
+    </DialogLink>
+  );
   return (
-    <Card>
+    <VStack>
       <SectionTitle>Component mapping</SectionTitle>
       <Meta>
         Map a story file (its import path) to a design. A manual mapping overrides the story&apos;s
@@ -141,66 +135,22 @@ export function ComponentsCard(props: {
         builds. Mappings are keyed by the story file path, so update one after a file is renamed or
         moved.
       </Meta>
-      <LinkTable
-        rows={components.map((component) => ({
-          id: component.id,
-          key: component.importPath,
-          url: component.url,
-          removeAction: `${base}/components/${component.id}/delete`,
-        }))}
-        keyHeading="Story file"
+      <SummaryList
         label="Component design mappings"
-        confirm="Remove this mapping?"
+        items={linkItems(
+          components.map((component) => ({
+            id: component.id,
+            name: component.importPath,
+            url: component.url,
+            removeAction: `${base}/components/${component.id}/delete`,
+            confirm: "Remove this mapping?",
+          })),
+        )}
+        emptyTitle="No component mappings"
+        add={add}
       />
-      {components.length === 0 ? <Meta>No component mappings.</Meta> : null}
-      <MapComponentForm base={base} urlHint={urlHint} error={formState?.errors?.["component"]} />
-    </Card>
+      {components.length > 0 ? add : null}
+      <FormDialog id={MAP_COMPONENT_DIALOG} title="Map component" submitLabel="Map component" />
+    </VStack>
   );
-}
-
-function MapComponentForm(props: { base: string; urlHint: string; error?: string }): Rendered {
-  const action = `${props.base}/components`;
-  return (
-    <form method="post" action={action} hx-post={action} hx-target="body">
-      {csrfField()}
-      <div class="grid grid--2">
-        <Field
-          label="Story file"
-          name="importPath"
-          required
-          placeholder="./src/Button.stories.tsx"
-        />
-        <Field
-          label="Design URL"
-          name="url"
-          type="url"
-          required
-          placeholder={props.urlHint}
-          error={props.error}
-        />
-      </div>
-      <FormActions>
-        <Button variant="primary" type="submit" icon="plus">
-          Map component
-        </Button>
-      </FormActions>
-    </form>
-  );
-}
-
-export function RemoveForm(props: { action: string; confirm: string; label: string }): Rendered {
-  return (
-    <form
-      method="post"
-      action={props.action}
-      hx-post={props.action}
-      hx-target="body"
-      hx-confirm={props.confirm}
-    >
-      {csrfField()}
-      <Button variant="ghost" size="sm" type="submit" aria-label={props.label}>
-        Remove
-      </Button>
-    </form>
-  );
-}
+};

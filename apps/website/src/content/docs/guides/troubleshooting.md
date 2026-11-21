@@ -13,6 +13,8 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 ## Uploads from CI
 
+**A script that greps for `Build created:` finds nothing, or the server refuses to start after an upgrade.** Both changed in 0.14.0: read the id from the `Build:` row of the upload summary, and set `AUTH_PASSWORD` and `SECRET` (or `SHELF_AUTH=none`). See the [Upgrading guide](/guides/upgrading/).
+
 **`--url is required`, `--slug is required` or `--token is required`.** The upload has no server address, project slug or token. Set them with flags, in `.storybook/storyshelf.json` (`url`, `slug`), or in the `STORYSHELF_URL`, `STORYSHELF_SLUG` and `STORYSHELF_TOKEN` environment variables. The token belongs in a CI secret, not in the file. See [Configuration](/guides/config/).
 
 **`401 Unauthorized` or `403 Forbidden`.** `401` means the token is missing or not recognised: check you copied the whole token and that it belongs to this server. `403` means it is valid but its owner cannot upload to this project. A token has the role of the user who created it, so that user needs at least the `developer` role on the project. Run `storyshelf whoami` to confirm which server and project the CLI is using. See [Roles & tokens](/concepts/roles/).
@@ -39,13 +41,15 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 **A build is stuck in `capturing`.** If an instance crashes, its jobs are picked up again once their lease runs out (five minutes by default). If a capture is hung, use **Cancel build** on the build page, then retry it there or run `storyshelf retry`.
 
+**Builds are stuck in `pending` or `capturing` until someone opens the app.** The host is probably stopping the instance when traffic stops (scale to zero, auto-stop, a sleeping free tier), which kills captures running in the background and leaves their jobs leased until the next request wakes it. Keep at least one instance running: see [Keep one instance running](/guides/deployment/#keep-one-instance-running).
+
 **Capture refuses to start on a serverless host.** Capture needs a long-running host. Boot refuses it on AWS Lambda and with the Cloudflare D1 database preset, and warns on Vercel and Netlify. Run capture on a container or VM, or leave `testing` unset and use [hosting only](/concepts/hosting-only/).
 
 ## Diffs and baselines
 
 **Every story is `new` on a feature branch.** Baselines come from the default branch, so there must be a build of it first. Upload a build from your default branch, and check the project's default branch setting (`git_default_branch`, `main` unless you changed it) matches your repository. See [Baselines & branches](/concepts/baselines/).
 
-**Stories show tiny diffs that nobody changed.** The usual causes are animation, time, random data and fonts. The runner disables animations; for the rest, give a story a `delay`, a `diffThreshold` or `pauseAnimationAtEnd` parameter, make its data deterministic, or set the project's `pixel_threshold` and `max_diff_ratio`. Because capture runs on the server, screenshots do not differ because CI ran on a different machine. See [Modes](/guides/modes/) and [Interaction testing](/guides/interaction-testing/).
+**Stories show tiny diffs that nobody changed.** The usual causes are animation, time, random data and fonts, and after an upgrade a new browser ([When the browser changes](/guides/browser-changes/)). The runner disables animations; otherwise give a story a `delay`, a `diffThreshold` or `pauseAnimationAtEnd` parameter, make its data deterministic, or set the project's `pixel_threshold` and `max_diff_ratio`. See [Modes](/guides/modes/) and [Interaction testing](/guides/interaction-testing/).
 
 **"Baseline changed since this build was captured", or an approval is refused with `409 baseline_changed`.** Another build moved the baseline after this one was captured. **Re-diff** compares the stored screenshots with the baseline that applies now, without rendering; **Retry capture** renders everything again. See [Baselines & branches](/concepts/baselines/).
 

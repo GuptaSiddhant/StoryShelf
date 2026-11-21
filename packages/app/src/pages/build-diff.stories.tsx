@@ -1,7 +1,7 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
-import { pageStory } from "../../.storybook/page.tsx";
+import { onAPhone, pageStory } from "../../.storybook/page.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { SHARED_READ_ONLY_ACCOUNT } from "../stories-fixtures/accounts.ts";
 import {
@@ -48,6 +48,16 @@ async function buildPage(
     ...patch,
   });
 }
+
+/** On a phone the snapshot list sits behind "Snapshots · N to review", closed (#1133). */
+export const SnapshotListClosedOnAPhone = onAPhone(
+  pageStory(() => renderBuildDiffPage(reviewData())),
+);
+
+/** The same toggle open: the desktop list, capped in height, with its filters. */
+export const SnapshotListOpenOnAPhone = onAPhone(
+  pageStory(() => renderBuildDiffPage(reviewData()), { checked: ["film-toggle"] }),
+);
 
 /** Undecided changes: the stage, the Approve all / Reject all header and the collapsed details. */
 export const Reviewing = pageStory(() => buildPage(BUILD_REVIEW));

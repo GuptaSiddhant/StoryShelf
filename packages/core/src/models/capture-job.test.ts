@@ -94,6 +94,48 @@ describe("CaptureJobModel", () => {
     expect(await jobs.nextCandidate(["capture"], T1)).toBeNull();
   });
 
+  it("hands a running attempt back: queued one attempt back, its attempt row removed", async () => {
+    const { jobs } = model();
+    const job = await queued(jobs);
+    await jobs.claim({ job, attempt: 1, owner: "a", leaseUntil: T2 }, T0);
+    await jobs.markRunning("j1", 1, T0);
+    expect(await jobs.handBack("j1", 1, T1, T1)).toBe(true);
+    expect(await jobs.get("j1")).toMatchObject({ status: "queued", attempt: 0, visibleAt: T1 });
+    expect(await jobs.get(attemptRowId("j1", 1))).toBeNull();
+    // Not the running attempt any more: nothing happens.
+    expect(await jobs.handBack("j1", 1, T1, T2)).toBe(false);
+  });
+
+  it("leaves a job a peer claimed during the hand-back to the peer (#912)", async () => {
+    const { db, jobs } = model();
+    const job = await queued(jobs);
+    await jobs.claim({ job, attempt: 1, owner: "a", leaseUntil: T1 }, T0);
+    await jobs.markRunning("j1", 1, T0);
+    const peer = new CaptureJobModel(db);
+    let raced = false;
+    // The peer claims attempt 2 (attempt 1's lease ran out) just before the job row is written.
+    const beforeJobWrite = async (id: string): Promise<void> => {
+      if (id !== "j1" || raced) return;
+      raced = true;
+      await peer.claim({ job, attempt: 2, owner: "b", leaseUntil: T2 }, T1);
+      await peer.markRunning("j1", 2, T1);
+    };
+    const racing = new CaptureJobModel({
+      ...db,
+      update: async (table, id, values) => {
+        await beforeJobWrite(id);
+        return await db.update(table, id, values);
+      },
+      updateWhere: async (table, id, values, where) => {
+        await beforeJobWrite(id);
+        return await db.updateWhere(table, id, values, where);
+      },
+    });
+    expect(await racing.handBack("j1", 1, T1, T1)).toBe(false);
+    expect(await jobs.get("j1")).toMatchObject({ status: "running", attempt: 2 });
+    expect(await jobs.get(attemptRowId("j1", 2))).toMatchObject({ status: "running" });
+  });
+
   it("finishes attempts and jobs out of the poll's range", async () => {
     const { jobs } = model();
     const job = await queued(jobs);

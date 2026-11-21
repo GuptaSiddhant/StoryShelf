@@ -41,11 +41,13 @@ curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
   -d '{ "provider": "github", "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" }, "secret": "ghp_..." }'
 ```
 
-A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/packages/notify-git/#github-check-runs). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/guides/merge-gate/#github-app-checks). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+
+A server can also hold a **git connection** declared by its configuration or environment (`SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`, ...), so no project pastes a key; see [Server-wide connection from configuration](/guides/merge-gate/#server-wide-connection-from-configuration).
 
 **Self-hosted git hosts.** For GitHub Enterprise Server, set `apiUrl` in `config` to its REST API base, for example `"apiUrl": "https://ghes.example.com/api/v3"` (leave it out for github.com); statuses, check runs, the App token exchange and pull-request comments all use it. For self-managed GitLab, set `host`. Both URLs go through the same outbound guard as webhooks: `https` only, and a host that resolves to a private address is refused. The settings page then says why (not https, or a private address) and that the operator must add the exact hostname to `config.outbound.allowHosts`; it never shows the address the host resolved to. See [Outbound URLs set by projects](/guides/config/#outbound-urls-set-by-projects).
 
-Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no job queue. See [Delivery](/packages/notify-git/#delivery).
+Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no job queue. See [Delivery](/guides/notifications/#git-channels-commit-statuses-and-check-runs).
 
 **How soon a git status appears.** When the server itself changes a build's state, it queues the job and wakes its notification consumer at once. If a job for the same build and channel is already waiting, the new request is covered by it and wakes nothing, so that delivery waits for the next poll. When a forked capture worker (`testing.workerEntry`) changes the state, the worker queues the job but sends no wake-up, so the server's consumer finds it at its next poll: about 2 seconds later if that consumer handled a notification in the last minute, otherwise about 15 seconds later (each wait can be up to 20 % longer). The consumer polls only while one of its four delivery slots is free, so a job also waits while all four are busy delivering. How busy the server is with captures does not change any of this. If queueing the job fails, the state is delivered inline in the worker instead, without durability. If no consumer is running, the job is kept, not dropped and not delivered by the worker: the status appears once a consumer starts.
 
@@ -86,7 +88,13 @@ Password recovery is both: users can request a reset email when a sender is conf
 
 ## Choosing the providers
 
-Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); without one, an email channel reports that it has none. `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SMTP_HOST` and `SMTP_FROM`, or a sender you pass); `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+
+A project is offered only the integrations the server can deliver. Without an email transport, email is unavailable: projects see no email option and no **My notifications** card, and creating an email channel through the API answers 400 with the reason. The same holds for a provider the operator turned off. A channel that already exists for such a provider is kept but hidden from its project and not delivered to; **System → Integrations** lists every integration as available, unavailable (with the reason) or turned off, and the channels held back. Site admins also see one line in a project's settings naming what is missing. Turn the integration back on and its channels return. The site-admin `POST /api/v1/health` lists the same under `integrations`.
+
+### Turning integrations off without code
+
+The server image and the Fly demo read `SHELF_INTEGRATIONS_DISABLED`: a comma-separated list of provider kinds to turn off, for example `slack,teams,figma`. The kinds are `github`, `gitlab`, `git-log`, `email`, `slack-webhook` (or `slack`), `teams-workflow` (or `teams`), `log` and `figma`. An unknown kind stops startup and names it. In your own server, `integrationsFromEnv(process.env)` from `@storyshelf/core/integrations` returns the function forms to pass as `notifications.notifiers` and `design`.
 
 `notifications.notifiers`, `notifications.email` and `design` each take:
 
@@ -119,4 +127,4 @@ createShelfApp({
 
 A provider kind must be unique within its group; a repeated kind stops startup and names the kind.
 
-Migrating from `@storyshelf/notify-git`, `@storyshelf/notify-chat`, `@storyshelf/notify-email` or `@storyshelf/design-figma`: remove the dependency and its import, and delete `notifiers: [...chatNotifiers, ...gitNotifiers]` and `design: [createFigmaDesign()]`. Those lists replaced the built-ins; leaving them in keeps working but pins the old behaviour.
+Those packages were retired in 0.14.0 and are no longer published. Migrating from `@storyshelf/notify-git`, `@storyshelf/notify-chat`, `@storyshelf/notify-email` or `@storyshelf/design-figma`: remove the dependency and its import, and delete `notifiers: [...chatNotifiers, ...gitNotifiers]` and `design: [createFigmaDesign()]`. Those lists replaced the built-ins; leaving them in keeps working but pins the old behaviour.

@@ -18,6 +18,7 @@ import {
   RelativeTime,
   SectionTitle,
   Stat,
+  StatGroup,
   Table,
   VStack,
 } from "../ui/components.tsx";
@@ -69,7 +70,7 @@ export interface DesignCoverageData {
 /* Secondary columns drop out on phones; the date moves under the reason (see the spec on #458). */
 const wideOnly = css`
   /* coverage-wide-only */
-  @media (max-width: 640px) {
+  @media (max-width: 880px) {
     & {
       display: none;
     }
@@ -79,7 +80,7 @@ const wideOnly = css`
 const narrowOnly = css`
   /* coverage-narrow-only */
   display: none;
-  @media (max-width: 640px) {
+  @media (max-width: 880px) {
     & {
       display: block;
     }
@@ -114,10 +115,7 @@ export function renderDesignCoveragePage(data: DesignCoverageData): RenderedCont
         active: "library",
         projectSlug: project.slug,
         projectName: project.name,
-        trail: [
-          { label: "Library", href: urls.library(project.slug) },
-          { label: "Design coverage" },
-        ],
+        trail: [{ label: "Design coverage" }],
       }}
     >
       <PageHeader
@@ -162,7 +160,7 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
           testing. Components linked under Settings → Design are.
         </Alert>
       )}
-      <div class="grid grid--3">
+      <StatGroup>
         <a href="#no-link" class={statLink}>
           <Stat
             label="No design link"
@@ -184,7 +182,7 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
             tone={data.current > 0 ? "success" : "neutral"}
           />
         </a>
-      </div>
+      </StatGroup>
       <UnlinkedSection data={data} />
       <DriftSection data={data} />
       <CurrentSection data={data} />
@@ -349,7 +347,7 @@ function DriftAlert(props: { data: DesignCoverageData }): Rendered {
     <Alert tone="info" title="Drift can't be checked">
       {withoutToken.join(", ")} has no access token for this project, so StoryShelf cannot see which
       designs changed. Add one in Settings → Capture & tests.
-      <div class="mt-1">
+      <div>
         <Button
           variant="secondary"
           size="sm"

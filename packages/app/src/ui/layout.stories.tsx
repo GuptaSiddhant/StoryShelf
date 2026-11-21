@@ -6,10 +6,15 @@ import {
   Button,
   Card,
   CardSection,
+  FilterInput,
   HStack,
   Meta as MetaText,
   PageHeader,
   SectionTitle,
+  SelectField,
+  Stat,
+  StatGroup,
+  Table,
   VStack,
 } from "./components.tsx";
 
@@ -79,4 +84,67 @@ export const SectionTitles = jsxStory(() => (
       Danger level 3
     </SectionTitle>
   </VStack>
+));
+
+/** A card's children are one flow: title, text and table sit one gap apart, none touching. */
+export const CardFlow = jsxStory(() => (
+  <Card>
+    <SectionTitle>Adapters</SectionTitle>
+    <MetaText>Live probe per adapter, refreshed on every load.</MetaText>
+    <Table label="Adapters">
+      <table>
+        <thead>
+          <tr>
+            <th>Adapter</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Database</td>
+            <td>
+              <Badge tone="success">Healthy</Badge>
+            </td>
+          </tr>
+          <tr>
+            <td>Storage</td>
+            <td>
+              <Badge tone="warning">Slow</Badge>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </Table>
+  </Card>
+));
+
+/** Stats stay a row down to phone width. */
+export const StatRow = jsxStory(() => (
+  <Card>
+    <SectionTitle>Server</SectionTitle>
+    <StatGroup>
+      <Stat label="Status" value="Healthy" tone="success" />
+      <Stat label="Uptime" value="3 d" />
+      <Stat label="Version" value="1.4.0" />
+    </StatGroup>
+  </Card>
+));
+
+/** One toolbar, one height: filter, select and buttons share a size. */
+export const Toolbar = jsxStory(() => (
+  <HStack>
+    <FilterInput label="Filter components" />
+    <SelectField
+      label="Branch"
+      name="toolbar-branch"
+      value="main"
+      layout="inline"
+      options={[
+        { value: "main", label: "main" },
+        { value: "next", label: "next" },
+      ]}
+    />
+    <Button variant="secondary">View Storybook</Button>
+    <Button>View</Button>
+  </HStack>
 ));

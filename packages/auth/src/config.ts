@@ -18,6 +18,7 @@ import type {
   ShelfSSOProvider,
   ShelfSSOSaml,
 } from "./engine.ts";
+import { assertAuthSecret } from "./engine/secret.ts";
 
 /** `{env:NAME}` reference (whole-string match; surrounding text is literal). */
 const ENV_REF = /^\{env:(?<name>[A-Za-z_][A-Za-z0-9_]*)\}$/u;
@@ -296,8 +297,6 @@ export async function resolveAuthOptions(input: RawShelfAuthOptions): Promise<Sh
   const { options, plugins, resolveSecrets } = parseRawOptions(input);
   const secrets = await collectSecrets(options, resolveSecrets);
   const resolved = { ...options, ...secrets } as Omit<ShelfAuthOptions, "plugins">;
-  if (resolved.secret.length < 32) {
-    throw new Error("Shelf auth requires a secret of at least 32 characters");
-  }
+  assertAuthSecret(resolved.secret);
   return { ...resolved, ...(plugins ? { plugins } : {}) };
 }

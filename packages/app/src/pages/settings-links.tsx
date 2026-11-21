@@ -66,7 +66,7 @@ export function renderSettingsLinks(
 ): unknown {
   const base = `/projects/${project.slug}/settings/links`;
   return (
-    <div class="grid max-w-form">
+    <div class="grid">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Linked packages</SectionTitle>

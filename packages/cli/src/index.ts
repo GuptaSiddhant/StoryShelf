@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import type { BuildOptions } from "./commands/build.ts";
+import type { CancelOptions } from "./commands/cancel.ts";
 import type { ConnectionOptions } from "./commands/connection.ts";
 import type { CreateOptions } from "./commands/create.ts";
 import type { DoctorOptions } from "./commands/doctor.ts";
@@ -13,6 +14,7 @@ import type { ServerCheckStorageOptions } from "./commands/server/check-storage.
 import type { ServerInitOptions } from "./commands/server/init.ts";
 import type { ServerServeOptions } from "./commands/server/serve.ts";
 import type { UploadOptions } from "./commands/upload.ts";
+import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
 import { isMainModule } from "./is-main.ts";
 
@@ -38,6 +40,7 @@ export function createProgram(): Command {
     buildDoctorCommand(),
     buildWhoamiCommand(),
     buildRetryCommand(),
+    buildCancelCommand(),
     buildProtectCommand(),
   ];
   for (const command of commands) {
@@ -154,7 +157,7 @@ function buildPurgeCommand(): Command {
 }
 
 function buildUploadCommand(): Command {
-  return (
+  return addWaitOptions(
     new Command("upload")
       .description("Create a build record for a StoryShelf project")
       .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
@@ -197,8 +200,23 @@ function buildUploadCommand(): Command {
         (value: string, previous: string[]) => [...previous, value],
         [] as string[],
       )
-      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload))
+      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload)),
   );
+}
+
+/** `--wait`, `--timeout` and the exit-code help of `upload`. */
+function addWaitOptions(command: Command): Command {
+  return command
+    .option(
+      "--json",
+      "print one JSON object on stdout (buildId, url, status, skipped; with --wait also verdict, exitCode); all other output goes to stderr",
+    )
+    .option("--wait", "follow the build after the upload and exit by how it ended (see below)")
+    .option(
+      "--timeout <duration>",
+      "with --wait, stop waiting after 90, 90s, 30m or 2h (default 30m)",
+    )
+    .addHelpText("after", `\n${WAIT_EXIT_HELP}`);
 }
 
 function buildBuildCommand(): Command {
@@ -251,6 +269,19 @@ function buildRetryCommand(): Command {
     .requiredOption("--build-id <id>", "build id")
     .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
     .action(run<RetryOptions>(async () => (await import("./commands/retry.ts")).runRetry));
+}
+
+function buildCancelCommand(): Command {
+  return new Command("cancel")
+    .description("Cancel older unfinished builds, keeping the newest of each branch")
+    .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
+    .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
+    .option("--token <token>", "CI token (or STORYSHELF_TOKEN env)")
+    .option("-c, --config <path>", "config file path (default .storybook/storyshelf.json)")
+    .option("--branch <name>", "only cancel builds of this branch")
+    .option("--keep-newest <n>", "unfinished builds to keep per branch (default 1)")
+    .option("--dry-run", "list what would be cancelled without cancelling")
+    .action(run<CancelOptions>(async () => (await import("./commands/cancel.ts")).runCancel));
 }
 
 function buildProtectCommand(): Command {

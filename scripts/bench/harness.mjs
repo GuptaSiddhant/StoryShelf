@@ -99,7 +99,9 @@ export async function upload(system, buildDir, sha) {
     buildDir,
     "--full",
   ]);
-  const id = /Build created: (\w+)/u.exec(stdout)?.[1];
+  const id =
+    /^\s*Build:\s+([0-9A-Z]{26})\s*$/mu.exec(stdout)?.[1] ??
+    /Build created: (\w+)/u.exec(stdout)?.[1];
   if (!id) throw new Error(`no build id in CLI output: ${stdout}`);
   return id;
 }

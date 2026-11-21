@@ -1,8 +1,4 @@
-import type {
-  AdapterHealth,
-  AdapterLifecycle,
-  AdapterMetadata,
-} from "@storyshelf/core/adapter/metadata";
+import type { AdapterHealth, AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 /**
  * Shared adapter health probing for the JSON API and the admin System page.
  *
@@ -14,6 +10,7 @@ import type {
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { CredentialProbe } from "@storyshelf/core/models";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
+import type { StatusRow } from "./health-status.ts";
 
 export type AdapterState = "ok" | "starting" | "failed";
 
@@ -36,11 +33,22 @@ export interface HealthReport {
   uptimeSecs: number;
   version: string;
   adapters: AdapterReportFull[];
+  /** Informational rows (telemetry, image engine, origin, hosting); never change `status`. */
+  statuses: StatusRow[];
+}
+
+/** Identity of a probed dependency; wider than an adapter's, which has no AI or login-provider slot. */
+interface ProbeMetadata {
+  readonly name: string;
+  readonly version: string;
+  readonly description?: string;
+  readonly kind: string;
+  readonly category: string;
 }
 
 interface ProbeTarget {
-  readonly metadata: AdapterMetadata;
-  readonly lifecycle?: AdapterLifecycle;
+  readonly metadata: ProbeMetadata;
+  readonly lifecycle?: Pick<AdapterLifecycle, "health">;
 }
 
 const PROBE_TIMEOUT_MS = 2000;
@@ -64,7 +72,29 @@ function targetsOf(sources: AdapterSetupSources): ProbeTarget[] {
   pushAll(targets, sources.design ?? []);
   pushAll(targets, sources.notifiers ?? []);
   pushTarget(targets, sources.emailSender);
+  pushTarget(targets, aiTarget(sources));
+  pushAll(targets, authProviderTargets(sources));
   return targets;
+}
+
+/** The AI surface, probed through its free `health()` (a configuration check, never inference). */
+function aiTarget(sources: AdapterSetupSources): ProbeTarget | undefined {
+  const { ai } = sources;
+  if (ai === undefined) {
+    return undefined;
+  }
+  return {
+    metadata: { category: "ai", kind: "ai", name: "AI", version: "-" },
+    lifecycle: { health: async () => await ai.health() },
+  };
+}
+
+/** One target per OIDC login provider: a discovery fetch, bounded by the probe timeout. */
+function authProviderTargets(sources: AdapterSetupSources): ProbeTarget[] {
+  return (sources.authProviders ?? []).map((provider) => ({
+    metadata: { category: "auth", kind: "oidc", name: provider.label, version: "-" },
+    lifecycle: { health: async () => await provider.check() },
+  }));
 }
 
 function sanitize(detail: string): string {
@@ -253,6 +283,7 @@ function credentialsEntry(probe: CredentialProbe): AdapterReportFull {
  * @param bootTimeMs - Process boot timestamp for uptime.
  * @param version - Server version for the report header.
  * @param credentials - Stored-credential probe (omit when no secret is configured).
+ * @param statuses - Informational rows from `collectStatusRows` (admin callers only).
  */
 export async function collectHealthReport(
   sources: AdapterSetupSources,
@@ -260,6 +291,7 @@ export async function collectHealthReport(
   bootTimeMs: number,
   version: string,
   credentials?: CredentialProbe | null,
+  statuses: readonly StatusRow[] = [],
 ): Promise<HealthReport> {
   const setupErrors = collectSetupErrors(settled);
   const targets = targetsOf(sources);
@@ -275,5 +307,6 @@ export async function collectHealthReport(
     uptimeSecs: Math.floor((Date.now() - bootTimeMs) / 1000),
     version,
     adapters,
+    statuses: [...statuses],
   };
 }

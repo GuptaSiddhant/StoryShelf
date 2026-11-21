@@ -1,7 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
-import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, EmptyState } from "../ui/components.tsx";
-import { CredentialCard, type SettingsDesignProvider } from "./settings-design-credential.tsx";
+import { Alert, VStack } from "../ui/components.tsx";
+import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
+import { CredentialsSection, type SettingsDesignProvider } from "./settings-design-credential.tsx";
 import {
   ComponentsCard,
   FilesCard,
@@ -25,25 +25,26 @@ export interface SettingsDesignData {
   providers: SettingsDesignProvider[];
 }
 
-/** Design settings tab: project file links, component mapping and provider credentials (admin-only parts gated). */
+/**
+ * Design settings tab: project file links, component mapping and provider credentials (admin-only
+ * parts gated). With no provider offered (issue #1126), a site admin sees one line naming what is
+ * missing (`unoffered`, site admins only) and everyone else sees nothing.
+ */
 export function renderSettingsDesign(
   project: Project,
   design: SettingsDesignData,
   isAdmin: boolean,
   formState?: DesignFormState,
+  unoffered?: readonly UnofferedIntegrationView[],
 ): unknown {
   const base = `/projects/${project.slug}/settings/design`;
   const urlHint = design.providers.map((provider) => provider.urlHint).join(" or ");
   if (design.providers.length === 0) {
-    return (
-      <EmptyState
-        title="No design provider configured"
-        description="Figma is built in but the server turned it off. Pass a design list to createShelfApp({ design }) to link components to design files."
-      />
-    );
+    return <UnofferedNotice area="Design tools are" integrations={unoffered} />;
   }
   return (
-    <div class="grid max-w-form">
+    <VStack>
+      <UnofferedNotice area="Some design tools are" integrations={unoffered} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <FilesCard
         base={base}
@@ -60,16 +61,7 @@ export function renderSettingsDesign(
           urlHint={urlHint}
         />
       ) : null}
-      {isAdmin
-        ? design.providers.map((provider): HtmlEscapedString | Promise<HtmlEscapedString> => (
-            <CredentialCard
-              key={provider.kind}
-              base={base}
-              provider={provider}
-              formState={formState}
-            />
-          ))
-        : null}
-    </div>
+      {isAdmin ? <CredentialsSection base={base} providers={design.providers} /> : null}
+    </VStack>
   );
 }

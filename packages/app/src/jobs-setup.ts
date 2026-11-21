@@ -16,6 +16,7 @@ import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
 import { setupCapture, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
 import { notifyAssignedWith, notifyDepsFor, type NotifyDeps } from "./notify.ts";
@@ -60,6 +61,7 @@ export function setupJobs(
     runtime.config,
     {
       notifiers: runtime.notifiers,
+      gitConnections: gitConnectionsOf(options, runtime.config),
       buildState: buildState.publisher,
       publicOrigin: async () => await runtime.publicOrigin.url(),
     },

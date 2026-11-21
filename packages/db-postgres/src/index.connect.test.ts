@@ -38,6 +38,11 @@ describe("createPostgresDatabase from a connection string", () => {
     });
   });
 
+  it("passes no `ssl` key without the option, so the URL's sslmode applies", () => {
+    createPostgresDatabase({ url: "postgres://u:p@h/db?sslmode=require" });
+    expect(postgresMock.mock.calls[0]?.[1]).not.toHaveProperty("ssl");
+  });
+
   it("prefers `connectionString` over `url`", () => {
     createPostgresDatabase({ connectionString: "postgres://a/one", url: "postgres://b/two" });
     expect(postgresMock.mock.calls[0]?.[0]).toBe("postgres://a/one");

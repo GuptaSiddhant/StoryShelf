@@ -164,7 +164,10 @@ describe("AWS Terraform modules", () => {
       const block = compute.slice(compute.indexOf(`resource "aws_iam_role_policy" "${policy}"`));
       const statement = block.slice(0, block.indexOf("\n}\n"));
       expect(statement).toContain('Action = ["secretsmanager:GetSecretValue"]');
-      const resources = /Resource = \[(?<list>[^\]]*)\]/u.exec(statement)?.groups?.["list"] ?? "";
+      // The fixed list, then the optional git secret ARNs (empty unless the operator set a reference).
+      expect(statement).toContain("], local.git_secret_arns)");
+      const resources =
+        /Resource = concat\(\[(?<list>[^\]]*)\]/u.exec(statement)?.groups?.["list"] ?? "";
       const arns = resources
         .split(",")
         .map((arn) => arn.trim())
@@ -176,6 +179,29 @@ describe("AWS Terraform modules", () => {
     expect(storage.slice(0, storage.indexOf("\n}\n"))).toContain("aws_s3_bucket.storybook.arn");
     expect(compute).not.toContain('Resource = "*"');
     expect(compute).not.toContain("secretsmanager:*");
+  });
+
+  it("takes git connections as secret references, never as values (ADR 0054)", () => {
+    const variables = generateAwsVariables();
+    const compute = generateAwsCompute();
+    for (const name of [
+      "github_app_id",
+      "github_app_private_key_secret_arn",
+      "gitlab_token_secret_arn",
+    ]) {
+      expect(variables).toContain(`variable "${name}"`);
+    }
+    // The key and the token reach the task as ECS secrets (valueFrom an ARN), not environment values.
+    expect(compute).toContain(
+      '{ name = "SHELF_GITHUB_APP_PRIVATE_KEY", valueFrom = var.github_app_private_key_secret_arn }',
+    );
+    expect(compute).toContain(
+      '{ name = "SHELF_GITLAB_TOKEN", valueFrom = var.gitlab_token_secret_arn }',
+    );
+    expect(compute).not.toMatch(/name = "SHELF_(GITHUB_APP_PRIVATE_KEY|GITLAB_TOKEN)", value =/u);
+    // Off unless set, and no Terraform resource holds a value for them.
+    expect(compute).toContain('var.github_app_private_key_secret_arn == "" ? []');
+    expect(generateAwsSecrets()).not.toContain("GITHUB_APP");
   });
 
   it("runs the app as one ECS service behind the ALB, with no worker", () => {

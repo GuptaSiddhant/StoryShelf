@@ -101,7 +101,7 @@ describe("design settings", () => {
     const { app, design, credentials } = await seed();
     const page = await (await app.request("/projects/app/settings/capture")).text();
     expect(page).toContain("Design files");
-    expect(page).toContain("No design files linked.");
+    expect(page).toContain("No design files linked");
     expect(page).toContain("Component mapping");
 
     const file = await app.request(
@@ -585,10 +585,11 @@ async function bare() {
 }
 
 describe("without a design provider", () => {
-  it("shows an empty Design tab and no design actions anywhere", async () => {
+  it("shows a site admin one line in place of the Design section, and no design actions anywhere", async () => {
     const { app } = await bare();
     const settings = await (await app.request("/projects/app/settings/capture")).text();
-    expect(settings).toContain("No design provider configured");
+    expect(settings).toContain("Design tools are not offered to projects on this server");
+    expect(settings).toContain("Figma (Turned off by the operator)");
     expect(settings).not.toContain("Component mapping");
     const library = await (await app.request("/projects/app/library")).text();
     expect(library).not.toContain(">Figma<");

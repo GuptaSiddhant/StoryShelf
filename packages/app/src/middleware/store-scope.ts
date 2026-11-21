@@ -7,8 +7,9 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
 import type { BuildStatePublisher } from "@storyshelf/core/capture";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
+import type { GitLinkConfig, IntegrationStatus } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
-import type { PublicOriginResolver } from "@storyshelf/core/models";
+import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
 import type { PublishService } from "../publish-setup.ts";
@@ -38,8 +39,11 @@ export interface StoreScopeDeps {
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  integrations?: readonly IntegrationStatus[];
+  gitConfiguredLinks?: readonly GitLinkConfig[] | undefined;
   notificationsConfig?: NotificationsConfig;
   ai?: Ai;
+  gitConnections?: GitConnectionModel;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
 }
 
@@ -72,8 +76,11 @@ export function storeScope(deps: StoreScopeDeps) {
         publicOrigin: deps.publicOrigin,
         design: deps.design,
         notifiers: deps.notifiers,
+        integrations: deps.integrations,
+        gitConfiguredLinks: deps.gitConfiguredLinks,
         notificationsConfig: deps.notificationsConfig,
         ai: deps.ai,
+        gitConnections: deps.gitConnections,
       },
       async () => {
         await next();

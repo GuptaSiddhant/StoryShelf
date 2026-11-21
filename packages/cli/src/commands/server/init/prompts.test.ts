@@ -159,3 +159,17 @@ describe("collectAnswers", () => {
     expect(all).not.toContain("includeWorker");
   });
 });
+
+describe("collectAnswers with --dir", () => {
+  it("skips the directory question, defaults the name to it and uses it as the directory", async () => {
+    vi.mocked(prompts)
+      .mockResolvedValueOnce({ name: "srv", deployTarget: "local" })
+      .mockResolvedValueOnce({ advancedAdapters: false })
+      .mockResolvedValueOnce(ADAPTERS);
+    const answers = await collectAnswers("work/srv");
+    expect(answers?.dir).toBe("work/srv");
+    expect(asked(0)).toEqual(["name", "deployTarget"]);
+    const first = vi.mocked(prompts).mock.calls[0]?.[0] as { name: string; initial: unknown }[];
+    expect(first.find((prompt) => prompt.name === "name")?.initial).toBe("srv");
+  });
+});

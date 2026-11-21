@@ -39,9 +39,9 @@ describe("HStack/VStack", () => {
     expect(html).toContain("ss-vstack-");
     const css = collectedCss(html);
     expect(css).toContain("display:flex");
-    expect(css).toContain("gap:0.5rem");
+    expect(css).toContain("gap:var(--space-2)");
     expect(css).toContain("display:grid");
-    expect(css).toContain("gap:0.75rem");
+    expect(css).toContain("gap:var(--space-3)");
   });
 
   it("keeps a VStack column from growing to its widest child", async () => {
@@ -64,6 +64,6 @@ describe("HStack/VStack", () => {
     expect(css).toContain("justify-content:space-between");
     expect(css).toContain("align-items:flex-start");
     expect(css).toContain("flex-wrap:nowrap");
-    expect(css).toContain("gap:1rem");
+    expect(css).toContain("gap:var(--space-4)");
   });
 });
