@@ -51,7 +51,12 @@ export function changesSection(changes: readonly CommentChange[], hidden: number
   return blocks;
 }
 
-/** Failing Storybook tests block the merge, so they come first and in full view. */
+/**
+ * Failing Storybook tests come first and in full view. A failing test fails the build, which is what
+ * blocks the merge (`statusesForBuild` reads the build status, never a test result), except for a
+ * test of a story marked flaky: that one is logged, never blocking. The stored results do not say
+ * which is which, so the label says so rather than claiming a block for every one.
+ */
 export function failedTestsSection(names?: readonly string[]): string[] {
   if (names === undefined || names.length === 0) {
     return [];
@@ -60,7 +65,7 @@ export function failedTestsSection(names?: readonly string[]): string[] {
   const rest = names.length - shown.length;
   return [
     [
-      `**❌ ${plural(names.length, "failing Storybook test")}** (blocks the merge)`,
+      `**❌ ${plural(names.length, "failing Storybook test")}** (blocks the merge unless its story is marked flaky)`,
       ...shown,
       ...(rest > 0 ? [`- …and ${String(rest)} more`] : []),
     ].join("\n"),

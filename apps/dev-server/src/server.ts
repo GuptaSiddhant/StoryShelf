@@ -8,7 +8,7 @@ import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Local StoryShelf dev server.
  *
@@ -110,7 +110,7 @@ mkdirSync(dataDir, { recursive: true });
 // Adapters — swap these to try other combinations.
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
-const captureRunner = createPlaywrightCaptureRunner();
+const captureRunner = createCaptureRunner();
 
 const ui = buildUi();
 

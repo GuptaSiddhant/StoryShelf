@@ -217,7 +217,7 @@ reviews:
         - Missing objects map to typed errors; list limits are clamped; credentials and signed URLs never enter logs.
         Require path-traversal, missing-object, partial-write and contract-suite tests.
 
-    - path: "packages/runner-playwright/**"
+    - path: "packages/runner/**"
       instructions: |
         Browser runner review. Verify:
         - Every page/context/browser is closed in `finally`, including on navigation or render failure, timeout and cancellation.

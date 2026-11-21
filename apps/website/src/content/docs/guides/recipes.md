@@ -50,12 +50,12 @@ A serverless platform cannot run capture, but it can host Storybooks. Use a serv
 Chromium is the default. List the engines you want on the runner, and every project can then pick from them, each with its own baselines.
 
 ```ts
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 
-createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
+createCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
 ```
 
-Install the browsers on the host first. See [@storyshelf/runner-playwright](/packages/runner-playwright/#browsers).
+Install the browsers on the host first. See [@storyshelf/runner](/packages/runner/#browsers).
 
 ## Render in browsers on other machines
 
