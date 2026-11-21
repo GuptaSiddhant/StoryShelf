@@ -33,8 +33,7 @@ The CLI builds Storybook, zips the static output and uploads it. The server rend
 its own pinned browser environment; it never clones a repository or runs user build scripts.
 Everything after upload is asynchronous: the upload returns `202`, and a `capture` job on the
 database queue runs with `testing.concurrency` (ADR 0006). Capture exists only on instances with
-`testing`; browsers are local or remote (ADR 0007). Playwright is the reference runner; Puppeteer
-is the smaller Chromium-only alternative.
+`testing`; browsers are local or remote (ADR 0007). Playwright is the one capture runner.
 
 ### 2. `CaptureRunner` is a pure renderer
 
@@ -184,7 +183,6 @@ build contains), the orchestrator runs them once per build.
 - The upload is the full static build; the server must serve extracted statics during capture.
 - Rendering is the scaling bottleneck; ADR 0005 and ADR 0007 address throughput.
 - Flaky stories still cost capture time and storage.
-- Puppeteer is Chromium-only and sees only index-declared parameters.
 - Baselines of a removed mode are not pruned.
 - Shared approval differs from Chromatic, which reviews browsers separately.
 - Settled signalling depends on Storybook's public event names; a rename falls back to the fixed
@@ -193,19 +191,19 @@ build contains), the orchestrator runs them once per build.
 
 ## Alternatives considered
 
-| Alternative                                                     | Why rejected                                                     |
-| --------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Client-side capture in the user's CI                            | Determinism depends on the CI environment; CLI ships browsers    |
-| Server clones and builds the repository                         | Git credentials, Docker socket and a reconciliation loop         |
-| Puppeteer, BackstopJS or the Storybook test-runner as reference | Chromium-only, full-page only, or needs a running server         |
-| Runner that orchestrates                                        | Every runner re-implements orchestration and couples to storage  |
-| Execute `play` unconditionally                                  | Breaks repositories whose `play` functions are dev-only demos    |
-| Reviewer waive for failed `play`                                | Flakiness belongs in code (`flaky-test`), not a review click     |
-| Custom flaky tag or per-viewport flaky                          | Unneeded complexity; tags are story-level                        |
-| Parameters from `index.json` only                               | Storybook 8 omits them, silently ignoring `disableSnapshot`      |
-| Canonical query string as mode identity                         | Any value change creates a new baseline                          |
-| Copy chromium baselines to a new target                         | Font and anti-aliasing differences diff everything               |
-| Render targets in parallel                                      | Memory multiplies per engine                                     |
-| Call `play` through the story store for `.test()`               | The iframe URL already runs it; store internals differ           |
-| A `build_tests` table or build status for tests                 | A JSON column and the existing failure lane suffice              |
-| Separate approval per target                                    | Review load scales with targets; token bumps become unreviewable |
+| Alternative                                          | Why rejected                                                     |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| Client-side capture in the user's CI                 | Determinism depends on the CI environment; CLI ships browsers    |
+| Server clones and builds the repository              | Git credentials, Docker socket and a reconciliation loop         |
+| BackstopJS or the Storybook test-runner as reference | Full-page only, or needs a running server                        |
+| Runner that orchestrates                             | Every runner re-implements orchestration and couples to storage  |
+| Execute `play` unconditionally                       | Breaks repositories whose `play` functions are dev-only demos    |
+| Reviewer waive for failed `play`                     | Flakiness belongs in code (`flaky-test`), not a review click     |
+| Custom flaky tag or per-viewport flaky               | Unneeded complexity; tags are story-level                        |
+| Parameters from `index.json` only                    | Storybook 8 omits them, silently ignoring `disableSnapshot`      |
+| Canonical query string as mode identity              | Any value change creates a new baseline                          |
+| Copy chromium baselines to a new target              | Font and anti-aliasing differences diff everything               |
+| Render targets in parallel                           | Memory multiplies per engine                                     |
+| Call `play` through the story store for `.test()`    | The iframe URL already runs it; store internals differ           |
+| A `build_tests` table or build status for tests      | A JSON column and the existing failure lane suffice              |
+| Separate approval per target                         | Review load scales with targets; token bumps become unreviewable |

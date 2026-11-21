@@ -81,7 +81,6 @@ packages/
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
   runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner (deprecated, removed in 0.15.0)
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK
 apps/

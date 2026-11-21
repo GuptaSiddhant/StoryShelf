@@ -55,7 +55,7 @@ async function uploadZip(
   const created = await app.request(`/api/v1/projects/${slug}/builds`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ gitSha: "sha-1", gitBranch: "main" }),
+    body: JSON.stringify({ gitSha: "1111111", gitBranch: "main" }),
   });
   expect(created.status).toBe(202);
   const { build, uploadUrl } = (await created.json()) as {
@@ -83,7 +83,7 @@ async function uploadChunked(
   const created = await app.request(`/api/v1/projects/${slug}/builds`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ gitSha: "sha-1", gitBranch: "main" }),
+    body: JSON.stringify({ gitSha: "1111111", gitBranch: "main" }),
   });
   const { build, uploadUrl } = (await created.json()) as {
     build: { id: string };

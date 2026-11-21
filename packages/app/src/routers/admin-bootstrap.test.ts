@@ -105,7 +105,7 @@ describe("admin token bootstrap", () => {
     const response = await app.request(`/api/v1/projects/${slug}/builds`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ gitSha: "abc123", gitBranch: "main" }),
+      body: JSON.stringify({ gitSha: "abc1234", gitBranch: "main" }),
     });
     expect(response.status).toBe(202);
   });

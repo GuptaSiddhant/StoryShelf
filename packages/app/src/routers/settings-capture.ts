@@ -15,7 +15,7 @@ import { toProjectPatch } from "./capture-config.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Capture settings: browsers (primary + extras), the mode allowlist and the signed URL lifetime. */
 export function registerCaptureSettings(app: ShelfRouter): void {
@@ -85,7 +85,7 @@ async function saveCapture(
 }
 
 async function handleCaptureUpdate(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   try {
     const browsers = readBrowsers(form);

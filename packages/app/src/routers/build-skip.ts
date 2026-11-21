@@ -18,6 +18,7 @@ import {
   announceBuildStatus,
   attachLabels,
   buildLabelsSchema,
+  gitShaSchema,
 } from "./builds.handlers.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { buildSchema, errorSchema, notFound, unauthorized } from "./schemas.ts";
@@ -32,7 +33,7 @@ const skipSourceSchema = z
 
 const skippedBuildSchema = z
   .object({
-    gitSha: z.string().min(1),
+    gitSha: gitShaSchema,
     gitBranch: z.string().min(1),
     sourceBuildId: z.string().min(1),
     changedFiles: z.array(z.string()).max(20_000),

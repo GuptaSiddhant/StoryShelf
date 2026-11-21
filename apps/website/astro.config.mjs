@@ -125,6 +125,7 @@ export default defineConfig({
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
             { label: "When the browser changes", slug: "guides/browser-changes" },
+            { label: "Upgrading guide", slug: "guides/upgrading" },
             { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
@@ -262,7 +263,7 @@ export default defineConfig({
               "storage-azure",
               "storage-gcs",
             ]),
-            packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
+            packageGroup("Capture runners", ["runner-playwright"]),
           ],
         },
       ],

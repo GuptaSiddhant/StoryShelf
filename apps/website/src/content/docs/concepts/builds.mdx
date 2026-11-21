@@ -31,7 +31,7 @@ flowchart LR
 | Status                  | Meaning                            |
 | ----------------------- | ---------------------------------- |
 | `pending`               | Uploaded, queued                   |
-| `capturing`             | Playwright/Puppeteer rendering     |
+| `capturing`             | Playwright rendering               |
 | `comparing`             | Diffing against baselines          |
 | `reviewing`             | Diffs ready, needs human review    |
 | `approved` / `rejected` | Review complete                    |
@@ -72,7 +72,7 @@ A render no longer goes quiet between "partitioned" and "stories rendered". For 
 - `captured N/M screenshots` after every 10 screenshots (it counts story and viewport pairs, so a story with several viewports or modes counts several times).
 - `render pass finished` with the captured, failed and expected counts.
 
-Progress lines appear only for runners that stream captures (the bundled Playwright and Puppeteer runners do). Lines are written one at a time, so their order is stable even when several pages fail at once.
+Progress lines appear only for runners that stream captures (the bundled Playwright runner does). Lines are written one at a time, so their order is stable even when several pages fail at once.
 
 Retry a flaky capture with `POST …/builds/:id/retry` or `storyshelf retry --build-id`.
 

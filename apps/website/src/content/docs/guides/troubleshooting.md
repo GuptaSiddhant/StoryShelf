@@ -13,6 +13,8 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 ## Uploads from CI
 
+**A script that greps for `Build created:` finds nothing, or the server refuses to start after an upgrade.** Both changed in 0.14.0: read the id from the `Build:` row of the upload summary, and set `AUTH_PASSWORD` and `SECRET` (or `SHELF_AUTH=none`). See the [Upgrading guide](/guides/upgrading/).
+
 **`--url is required`, `--slug is required` or `--token is required`.** The upload has no server address, project slug or token. Set them with flags, in `.storybook/storyshelf.json` (`url`, `slug`), or in the `STORYSHELF_URL`, `STORYSHELF_SLUG` and `STORYSHELF_TOKEN` environment variables. The token belongs in a CI secret, not in the file. See [Configuration](/guides/config/).
 
 **`401 Unauthorized` or `403 Forbidden`.** `401` means the token is missing or not recognised: check you copied the whole token and that it belongs to this server. `403` means it is valid but its owner cannot upload to this project. A token has the role of the user who created it, so that user needs at least the `developer` role on the project. Run `storyshelf whoami` to confirm which server and project the CLI is using. See [Roles & tokens](/concepts/roles/).
