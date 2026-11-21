@@ -42,7 +42,7 @@ function StorageCard(props: { storage: StorageUsageView }): Rendered {
   const { bytes, blobs, unsized } = props.storage;
   return (
     <Card>
-      <SectionTitle level={3}>Storage used</SectionTitle>
+      <SectionTitle level={2}>Storage used</SectionTitle>
       {blobs + unsized === 0 ? (
         <Meta>Nothing is published yet.</Meta>
       ) : (
@@ -68,7 +68,7 @@ function TimingsCard(props: { latest: NonNullable<SettingsInsightsData["latest"]
   const { build, timings } = props.latest;
   return (
     <Card>
-      <SectionTitle level={3}>Capture timings</SectionTitle>
+      <SectionTitle level={2}>Capture timings</SectionTitle>
       {timings ? (
         <>
           <HStack justify="between" wrap>
@@ -93,7 +93,7 @@ function A11yCard(props: { latest: NonNullable<SettingsInsightsData["latest"]> }
   const { a11y } = props.latest;
   return (
     <Card>
-      <SectionTitle level={3}>Accessibility findings</SectionTitle>
+      <SectionTitle level={2}>Accessibility findings</SectionTitle>
       <HStack justify="between" wrap>
         <Stat label="Findings" value={a11y.findings} />
         <Stat label="Snapshots with findings" value={a11y.snapshots} />

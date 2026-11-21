@@ -13,6 +13,8 @@ function resetCss(): string {
     body { margin: 0; font-size: var(--text-base); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    /* A link inside running text is underlined, not told apart by colour alone (WCAG 1.4.1). */
+    p a:not([class]), .muted a:not([class]) { text-decoration: underline; text-underline-offset: 2px; }
     a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     code, kbd, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-xs); }
     kbd { display: inline-block; padding: 0 var(--space-1); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.2; }
