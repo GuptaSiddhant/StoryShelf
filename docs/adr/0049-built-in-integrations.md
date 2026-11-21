@@ -206,7 +206,8 @@ The amendment also records the test for every later "fold into core or keep as a
      `db` (persistence: tables, dialects, migrations, drivers). This mirrors `app` and needs both
      halves; code that only *could* be a lower layer stays in core.
 3. **Retiring.** A package folded into core is published as a deprecated re-export for **one minor
-   release**, then no longer published. The owner runs `npm deprecate` on it.
+   release**, then no longer published. The owner runs `npm deprecate` on it. Until 2027-01-01 the
+   amendment "No shims until 2027" below applies instead: no re-export is published at all.
 4. **Built in does not mean closed.** The adapter interfaces (`StorageAdapter`, `CaptureRunner`,
    notifier and design providers) stay the extension points. The database is the exception:
    dialects are built into `@storyshelf/db`, so `DatabaseAdapter` stops being a third-party
@@ -235,6 +236,22 @@ The audit of every package (2026-11-20) found these follow the rule: `core`, `ap
 
 The target is 12 packages: `core`, `app`, `cli`, `db`, `storage`, `runner`, `auth`, `ai`,
 `observability`, `mcp`, `affected`, `storybook-addon`.
+
+## Amendment 2026-11-21: no shims until 2027 (#1309)
+
+Owner, 2026-11-21: "Till 2026, all breaking changes are allowed so no need to support old packages,
+env vars and properties or columns." This changes rule 3 (Retiring) for every release before
+**2027-01-01**, the public launch:
+
+- A renamed or folded package is not published again. The release that moves it deletes it, with a
+  `Breaking:` changeset naming the new path. There is no deprecated re-export.
+- The owner runs `npm deprecate` on the old name after that release, with a message that names the
+  new package or path.
+- `@storyshelf/storage-local` follows this: it was never published as a re-export, and the
+  "one minor release" sentence of the amendment above does not apply to it.
+
+From 2027-01-01 rule 3 applies again: one minor release as a deprecated re-export, then no longer
+published. ADR 0053 has the matching amendment for the schema.
 
 ## Alternatives considered
 
