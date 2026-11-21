@@ -51,6 +51,8 @@ describe("neutral columns", () => {
     expect(column.spec.defaultValue).toBe('{"tags":[]}');
     expectTypeOf(column).toEqualTypeOf<NeutralColumn<{ tags: string[] }, true, true>>();
     expect(() => text("name").defaultJson("x")).toThrow("defaultJson on text column name");
+    // `JSON.stringify` returns `undefined` for a value with no JSON form; that is refused.
+    expect(() => json<symbol>("meta").defaultJson(Symbol("x"))).toThrow("must have a JSON form");
   });
 
   it("tracks the row type, nullability and default in the type", () => {

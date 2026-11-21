@@ -5,7 +5,12 @@
  */
 import { getTableColumns, type Column, type Table } from "drizzle-orm";
 import type { $Type, ColumnBuilderBase, HasDefault, NotNull } from "drizzle-orm";
-import type { ColumnReference, ColumnSpec, NeutralColumn } from "./columns.ts";
+import {
+  toJsonText,
+  type ColumnReference,
+  type ColumnSpec,
+  type NeutralColumn,
+} from "./columns.ts";
 import type { NeutralTable } from "./define-table.ts";
 
 type WithNotNull<TBuilder extends ColumnBuilderBase, TNotNull> = TNotNull extends true
@@ -32,6 +37,20 @@ export interface ModifiableBuilder {
   default(value: unknown): unknown;
 }
 
+/**
+ * How a `json<T>` column crosses the driver: JSON text in every dialect (no native JSON type, so
+ * the DDL stays `TEXT`). A driver that already parsed the value (a JSON-typed column read through
+ * a raw query) passes it through.
+ */
+export const jsonCodec = {
+  toDriver(value: unknown): string {
+    return toJsonText(value);
+  },
+  fromDriver(value: unknown): unknown {
+    return typeof value === "string" ? (JSON.parse(value) as unknown) : value;
+  },
+} as const;
+
 /** Apply a column's flags. `uniqueName` names a single-column unique constraint per dialect. */
 export function applyFlags<TBuilder extends ModifiableBuilder>(
   builder: TBuilder,
@@ -53,19 +72,27 @@ export function applyFlags<TBuilder extends ModifiableBuilder>(
   return builder;
 }
 
+/** A builder that can compute its insert default (`$defaultFn`, applied by Drizzle on insert). */
+export interface InsertDefaultBuilder extends ModifiableBuilder {
+  $defaultFn(fn: () => unknown): unknown;
+}
+
 /**
- * How a `json<T>` column crosses the driver: JSON text in every dialect (no native JSON type, so
- * the DDL stays `TEXT`). A driver that already parsed the value (a JSON-typed column read through
- * a raw query) passes it through.
+ * Give a `json<T>` column with a default an insert-time default holding the parsed value, so the
+ * driver encodes it once. Drizzle fills an omitted SQLite or MySQL column from the column itself
+ * (`defaultFn` first, then `default`), and passing the stored text through `toDriver` would encode
+ * it twice. The DDL default, where a dialect has one, still comes from `default(<json text>)`.
  */
-export const jsonCodec = {
-  toDriver(value: unknown): string {
-    return JSON.stringify(value);
-  },
-  fromDriver(value: unknown): unknown {
-    return typeof value === "string" ? (JSON.parse(value) as unknown) : value;
-  },
-} as const;
+export function withJsonInsertDefault<TBuilder extends InsertDefaultBuilder>(
+  builder: TBuilder,
+  spec: ColumnSpec,
+): TBuilder {
+  if (spec.kind === "json" && spec.defaultValue !== undefined) {
+    const parsed = jsonCodec.fromDriver(spec.defaultValue);
+    builder.$defaultFn(() => structuredClone(parsed));
+  }
+  return builder;
+}
 
 /** Looks up a table already built for this dialect (neutral or still hand-written) by SQL name. */
 export type TableResolver = (name: string) => Table;

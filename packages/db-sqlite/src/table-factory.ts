@@ -77,10 +77,13 @@ export function sqliteTableOf<T extends ns.NeutralTable>(
   const columns = Object.fromEntries(
     Object.entries(table.columns).map(([key, column]) => [
       key,
-      ns.applyFlags(
-        COLUMNS[column.spec.kind](column.spec),
+      ns.withJsonInsertDefault(
+        ns.applyFlags(
+          COLUMNS[column.spec.kind](column.spec) as ns.InsertDefaultBuilder,
+          column.spec,
+          `${table.name}_${column.spec.name}_unique`,
+        ),
         column.spec,
-        `${table.name}_${column.spec.name}_unique`,
       ),
     ]),
   );

@@ -85,16 +85,12 @@ const names: ns.ConstraintNames = {
  * none, as `ddl.ts` writes it.
  */
 function mysqlColumn(spec: ns.ColumnSpec): ns.ModifiableBuilder {
-  const builder = COLUMNS[spec.kind](spec);
-  if (spec.kind !== "json" || spec.defaultValue === undefined) {
+  const builder = COLUMNS[spec.kind](spec) as ns.InsertDefaultBuilder;
+  if (spec.kind !== "json") {
     return ns.applyFlags(builder, spec, spec.name);
   }
-  const { defaultValue, ...rest } = spec;
-  const flagged = ns.applyFlags(builder, rest, spec.name) as ns.ModifiableBuilder & {
-    $defaultFn(fn: () => unknown): unknown;
-  };
-  flagged.$defaultFn(() => ns.jsonCodec.fromDriver(defaultValue));
-  return flagged;
+  const { defaultValue: _textDefault, ...withoutDdlDefault } = spec;
+  return ns.withJsonInsertDefault(ns.applyFlags(builder, withoutDdlDefault, spec.name), spec);
 }
 
 /** Build the MySQL table of a neutral table. `resolve` finds referenced tables by SQL name. */

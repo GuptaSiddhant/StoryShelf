@@ -93,6 +93,8 @@ describe("MySQL table factory (spike #800)", () => {
     expect(built.body.mapToDriverValue({ a: 1 })).toBe('{"a":1}');
     expect(built.body.mapFromDriverValue('{"a":1}')).toEqual({ a: 1 });
     expect(built.body.defaultFn?.()).toEqual({});
+    // The insert default is the parsed value, so the driver encodes it once.
+    expect(built.body.mapToDriverValue(built.body.defaultFn?.())).toBe("{}");
     expect(built.body.hasDefault).toBe(true);
     const after = await generateDrizzleJson({ docs: built });
     const statements = await generateMigration(await generateDrizzleJson({}), after);

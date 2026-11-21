@@ -86,7 +86,7 @@ export class NeutralColumn<
     if (this.spec.kind !== "json") {
       throw new Error(`defaultJson on ${this.spec.kind} column ${this.spec.name}`);
     }
-    return new NeutralColumn({ ...this.spec, defaultValue: JSON.stringify(value) });
+    return new NeutralColumn({ ...this.spec, defaultValue: toJsonText(value) });
   }
 
   references(
@@ -101,6 +101,18 @@ export class NeutralColumn<
   $type<T extends TData>(): NeutralColumn<T, TNotNull, THasDefault> {
     return new NeutralColumn(this.spec);
   }
+}
+
+/**
+ * The JSON text of a `json<T>` value. Refuses a value with no JSON form (`undefined`, a function,
+ * a symbol), for which `JSON.stringify` returns `undefined` instead of text.
+ */
+export function toJsonText(value: unknown): string {
+  const serialized: unknown = JSON.stringify(value);
+  if (typeof serialized !== "string") {
+    throw new TypeError(`A json<T> value must have a JSON form; got ${typeof value}`);
+  }
+  return serialized;
 }
 
 /** Any neutral column, for constraints. */

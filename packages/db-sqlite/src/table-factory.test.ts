@@ -7,6 +7,8 @@ import * as ns from "@storyshelf/core/db";
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape } from "@storyshelf/core/test-helpers";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/sqlite";
+import { drizzle } from "drizzle-orm/node-sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { DDL, IDENTITY_STATEMENTS } from "./ddl.ts";
 import * as schema from "./schema/index.ts";
@@ -93,6 +95,31 @@ describe("SQLite table factory (spike #800)", () => {
     const after = await generateDrizzleJson({ docs: built });
     const statements = await generateMigration(await generateDrizzleJson({}), after);
     expect(statements.join("\n")).toMatch(JSON_DDL);
+  });
+
+  it("stores an omitted json<T> default as its JSON text, encoded once", async () => {
+    const docs = ns.defineTable("docs", {
+      id: ns.id("id").primaryKey(),
+      body: ns.json<{ tags: string[] }>("body").notNull().defaultJson({ tags: [] }),
+    });
+    const built = sqliteTableOf(docs, resolve);
+    const client = new DatabaseSync(":memory:");
+    const ddl = await generateMigration(
+      await generateDrizzleJson({}),
+      await generateDrizzleJson({ docs: built }),
+    );
+    client.exec(ddl.join(";\n"));
+    const db = drizzle({ client });
+    await db.insert(built).values([{ id: "a" }, { id: "b", body: { tags: ["x"] } }]);
+    expect(client.prepare("SELECT id, body FROM docs ORDER BY id").all()).toEqual([
+      { id: "a", body: '{"tags":[]}' },
+      { id: "b", body: '{"tags":["x"]}' },
+    ]);
+    expect((await db.select().from(built)).map((row) => row.body)).toEqual([
+      { tags: [] },
+      { tags: ["x"] },
+    ]);
+    client.close();
   });
 
   it("expresses a partial index", async () => {
