@@ -9,10 +9,10 @@ import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { respondWithForm } from "./form-response.tsx";
-import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
+import { publicMessage, requireSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { runSwitchOffPass } from "./review-switch-off.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** General project settings (name, repo, thresholds) and danger-zone delete. */
 export function registerGeneralSettings(app: ShelfRouter): void {
   app.get("/projects/:slug/settings/general/edit", async (c) => {
@@ -57,7 +57,7 @@ function readGeneralFields(form: FormData): Omit<GeneralFields, "name"> {
 
 async function handleGeneralUpdate(c: Context): Promise<Response> {
   const slug = c.req.param("slug") ?? "";
-  const project = await findProject(slug);
+  const project = await resolveAuthorizedProject(c, slug, "admin");
   const form = await c.req.formData();
   const name = form.get("name");
   if (typeof name !== "string" || name.trim() === "") {
@@ -124,7 +124,7 @@ async function persistGeneralUpdate(
 
 async function handleTestsUpdate(c: Context): Promise<Response> {
   const slug = c.req.param("slug") ?? "";
-  const project = await findProject(slug);
+  const project = await resolveAuthorizedProject(c, slug, "admin");
   const form = await c.req.formData();
   const { playTimeoutMs, ...switches } = readTestsFields(form);
   const rangeError = playTimeoutError(playTimeoutMs);
@@ -191,8 +191,10 @@ async function persistTestsUpdate(
   }
 }
 
+/** As `DELETE /api/v1/projects/:slug`: a site admin only, who is project admin by role. */
 async function handleDeleteProject(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  requireSiteAdmin(c);
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   await new ProjectModel(getStore().db).remove(project.id);
   flash(c, `Deleted ${project.name}`);
   return hxRedirect(c, "/projects");
