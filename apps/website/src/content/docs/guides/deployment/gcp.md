@@ -113,7 +113,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 
 - **Database.** Turn on Cloud SQL automated backups and point-in-time recovery for the created instance, or use your own policy for an existing database.
 - **Storage.** The bucket is versioned, so an overwritten or deleted blob can be recovered.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 

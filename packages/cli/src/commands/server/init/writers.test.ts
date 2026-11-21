@@ -72,7 +72,7 @@ describe("writeFiles", () => {
     const dockerfile = readFileSync(join(out, "Dockerfile"), "utf8");
     expect(dockerfile).toContain("mcr.microsoft.com/playwright");
     expect(dockerfile).toContain("COPY src/ ./src/");
-    expect(dockerfile).toContain('"src/index.ts"');
+    expect(dockerfile).toContain("storyshelf-server");
     expect(dockerfile).not.toContain("esbuild");
     expect(existsSync(join(out, ".dockerignore"))).toBe(true);
     expect(existsSync(join(out, "compose.yaml"))).toBe(false);

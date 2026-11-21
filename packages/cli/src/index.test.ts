@@ -20,7 +20,6 @@ describe("createProgram", () => {
       "init",
       "mcp",
       "protect",
-      "purge",
       "retry",
       "server",
       "upload",

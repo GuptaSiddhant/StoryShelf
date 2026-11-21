@@ -1,6 +1,6 @@
 declare const __PKG_VERSION__: string;
 
-import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_ENTRY } from "../../shared/scaffold.ts";
+import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_BIN } from "../../shared/scaffold.ts";
 import {
   needsCompose,
   resolveDeployTarget,
@@ -132,8 +132,8 @@ function dockerScripts(answers: Answers): Record<string, string> {
 function scriptsFor(answers: Answers): Record<string, string> {
   const target = resolveDeployTarget(answers);
   return {
-    start: `node ${SERVER_ENTRY}`,
-    dev: `node --watch ${SERVER_ENTRY}`,
+    start: "storyshelf-server serve",
+    dev: `node --watch ${SERVER_BIN} serve`,
     typecheck: "tsc",
     ...(target === "docker" ? dockerScripts(answers) : {}),
   };

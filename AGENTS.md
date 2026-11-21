@@ -70,7 +70,8 @@ rather than pushing and waiting.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
   subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
-- `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
+- `packages/cli` — `storyshelf` binary (project commands: upload/init/create/retry/cancel/protect; `server init` until `create-storyshelf`; no Playwright).
+- `storyshelf-server` — the instance binary, a `bin` of `@storyshelf/app` (`packages/app/src/server-bin/`): `serve` (via `startServer`), `migrate`, `purge`, `check-storage`, `doctor`. It imports the instance module (`src/index.ts` exports the app) and never reads `.storybook/storyshelf.json` (#367).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
 - `docs/` — `architecture/`, `repo-structure.md`, `testing.md`, `adr/`.
