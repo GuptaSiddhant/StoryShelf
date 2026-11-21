@@ -4,11 +4,11 @@ import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseTrustProxy } from "@storyshelf/core/config";
 import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
 import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { createLocalStorage } from "@storyshelf/storage-local";
 /**
  * Local StoryShelf dev server.
  *

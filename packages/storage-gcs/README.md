@@ -88,6 +88,6 @@ Helper that joins a storage prefix with a relative path into an object key.
 
 ## How it fits in
 
-`storage-gcs` is the `storage` option for `createShelfApp` in GCP deployments. It implements the same `StorageAdapter` interface as `@storyshelf/storage-local` and `@storyshelf/storage-s3`, so switching between local disk, S3, and GCS requires no changes elsewhere.
+`storage-gcs` is the `storage` option for `createShelfApp` in GCP deployments. It implements the same `StorageAdapter` interface as `@storyshelf/core/storage/local` and `@storyshelf/storage-s3`, so switching between local disk, S3, and GCS requires no changes elsewhere.
 
 See `docs/architecture.md` and ADR 0006.
