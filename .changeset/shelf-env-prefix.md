@@ -4,7 +4,7 @@
 "@storyshelf/auth": minor
 "@storyshelf/mcp": minor
 "@storyshelf/observability": minor
-"@storyshelf/runner-playwright": minor
+"@storyshelf/runner": minor
 "storyshelf": minor
 ---
 
