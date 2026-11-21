@@ -31,6 +31,9 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 - `@storyshelf/app` root barrel is the HTTP app: `createShelfApp` plus
   `ShelfApp`/`ShelfRouter`/`ShelfContext`/`ShelfLifecycle` and the re-exported
   option types (`ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme` from core).
+- `@storyshelf/app/node` is the Node host: `startServer({ app, port, handleSignals })` owns the
+  listener, readiness, the bounded drain and the app's teardown (#394). `@hono/node-server` is a
+  runtime dependency of app only; hosts that call `app.fetch` themselves never load it.
 - `@storyshelf/core` root barrel is domain-only (config/logger/types surface).
   Importing it must never pull Hono into bundles that do not serve it
   (e.g. runners, the forked capture child) — enforced by keeping all HTTP modules in app.
@@ -48,7 +51,7 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
-- `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; `packages/storage-local` is a deprecated re-export for one minor release (ADR 0049 amendment 2026-11-21).
+- `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; the `@storyshelf/storage-local` package is removed (ADR 0049 amendment 2026-11-21).
 - `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
   `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
   storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from

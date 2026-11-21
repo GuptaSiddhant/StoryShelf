@@ -20,7 +20,7 @@ Before 1.0, a minor release may change an adapter interface. The change is liste
 | State notifier   | `StateNotifierProvider` from `@storyshelf/core/adapter/notifier`   | GitHub, GitLab                                                                                      | A git host that shows a build as a named state (a status, a check). See [State notifiers](#state-notifiers).                                                                                                       |
 | Design provider  | `DesignProvider` from `@storyshelf/core/adapter/design`            | Figma                                                                                               | Another design tool whose links should show beside a story.                                                                                                                                                        |
 | Email sender     | `EmailSender` from `@storyshelf/core/adapter/email-sender`         | SMTP, HTTP, Mailpit and log presets (`@storyshelf/core/integrations`)                               | A mail API the presets do not reach.                                                                                                                                                                               |
-| Capture runner   | `CaptureRunner` from `@storyshelf/core/adapter/capture-runner`     | [Playwright](/packages/runner-playwright/)                                                          | Rarely: a different rendering engine.                                                                                                                                                                              |
+| Capture runner   | `CaptureRunner` from `@storyshelf/core/adapter/capture-runner`     | [Playwright](/packages/runner/)                                                                     | Rarely: a different rendering engine.                                                                                                                                                                              |
 | Capture queue    | `CaptureQueue` from `@storyshelf/core/adapter/capture-queue`       | The database job queue                                                                              | Rarely: you must run jobs on a queue service you already operate.                                                                                                                                                  |
 | Database         | Not an extension point                                             | SQLite, Postgres, MySQL                                                                             | A new driver for an existing dialect plugs in through the driver entry point of `@storyshelf/db` ([#1242](https://github.com/GuptaSiddhant/StoryShelf/issues/1242)), once that lands. See [Databases](#databases). |
 
@@ -322,7 +322,7 @@ import type {
   MessageNotifierProvider,
 } from "@storyshelf/core/adapter/notifier";
 import type { Logger } from "@storyshelf/core/logger";
-import { httpText } from "@storyshelf/core/utils";
+import { httpStatus } from "@storyshelf/core/utils";
 import { z } from "zod";
 
 /** What a project admin may set on a channel of this kind; the URL is the secret, not config. */
@@ -348,7 +348,9 @@ export const jsonWebhookNotifier: MessageNotifierProvider = {
         if (!url) throw new Error("JSON webhook channel is missing its URL secret");
         const subject = config.prefix ? `${config.prefix} ${formatted.subject}` : formatted.subject;
         // The URL was set by a project admin, so mark it `project`: https and public only.
-        await httpText(url, {
+        // `httpStatus` never reads the response body: a receiver that echoes the URL (the secret)
+        // in an error cannot get it into the thrown `HTTP <status>` message.
+        await httpStatus(url, {
           method: "POST",
           json: { subject, text: formatted.text },
           destination: "project",
@@ -418,6 +420,16 @@ describe("json-webhook notifier", () => {
     const adapter = jsonWebhookNotifier.create({ config: {}, secret: url });
     const failure = await adapter.send({ channel, formatted }).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).not.toContain("secret-path");
+  });
+
+  it("keeps a response body that echoes the URL out of the thrown message", async () => {
+    fetchSpy.mockResolvedValue(new Response(`bad hook ${url}`, { status: 500 }));
+    const adapter = jsonWebhookNotifier.create({ config: {}, secret: url });
+    const failure = await adapter.send({ channel, formatted }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("HTTP 500");
+    expect((failure as Error).message).not.toContain("bad hook");
     expect(String(failure)).not.toContain("secret-path");
   });
 

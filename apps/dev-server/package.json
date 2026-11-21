@@ -11,13 +11,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hono/node-server": "catalog:",
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@storyshelf/observability": "workspace:*",
-    "@storyshelf/runner-playwright": "workspace:*",
+    "@storyshelf/runner": "workspace:*",
     "nodemailer": "^10.2.1"
   },
   "devDependencies": {

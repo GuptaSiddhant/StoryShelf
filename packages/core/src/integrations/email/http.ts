@@ -1,6 +1,6 @@
 import type { EmailMessage, EmailSender } from "../../adapters/email-sender.ts";
 import type { Logger } from "../../logger.ts";
-import { httpText } from "../../utils/index.ts";
+import { httpStatus } from "../../utils/index.ts";
 import type { HttpPresetOptions } from "./types.ts";
 import { version } from "./version.ts";
 
@@ -19,7 +19,7 @@ export function httpPreset(options: HttpPresetOptions & { logger?: Logger }): Em
     },
     async send(message: EmailMessage): Promise<void> {
       logger?.debug({ to: message.to, subject: message.subject }, "sending email via HTTP");
-      await httpText(options.url, {
+      await httpStatus(options.url, {
         method: "POST",
         headers: options.headers,
         json: {

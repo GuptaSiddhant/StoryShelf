@@ -1,12 +1,18 @@
 // Must load first: tsyringe (via @peculiar/x509 in passkey auth) throws at import without it, and the
 // bundler does not preserve the transitive side-effect import.
 import "reflect-metadata";
-import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
+import { startServer } from "@storyshelf/app/node";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
 import { parseReadOnlyAccounts } from "@storyshelf/core/auth";
 import type { AuthUiConfig, UIConfig } from "@storyshelf/core/config";
-import { parseTrustProxy } from "@storyshelf/core/config";
+import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  parseTrustProxy,
+  readSetting,
+  refuseRenamedSettings,
+} from "@storyshelf/core/config";
 import {
   createEmailNotifier,
   gitFromEnv,
@@ -17,7 +23,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Fly demo server — SQLite on the volume, objects on the volume or in S3-compatible storage.
  *
@@ -26,9 +32,9 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * file from source instead.
  *
  * Mirrors apps/dev-server/src/server.ts wiring:
- *  - @storyshelf/db-sqlite → {DATA_DIR}/shelf.db
- *  - @storyshelf/storage-local → DATA_DIR, or @storyshelf/storage-s3 (Tigris) when AWS_BUCKET is set
- *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
+ *  - @storyshelf/db-sqlite → {SHELF_DATA_DIR}/shelf.db
+ *  - @storyshelf/core/storage/local → SHELF_DATA_DIR, or @storyshelf/storage-s3 (Tigris) when SHELF_S3_BUCKET is set
+ *  - @storyshelf/runner → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
@@ -38,27 +44,33 @@ import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { databaseDeps } from "./demo-viewer-db.ts";
 import { ensureDemoViewer } from "./demo-viewer.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
-import { exitBy, shutdownGraceMs } from "./shutdown.ts";
+import { shutdownGraceMs } from "./shutdown.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
 const env = process.env;
 refuseLegacyVariables(env);
-const dataDir = env["DATA_DIR"] ?? "/data";
+// The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
+// old name is set, listing each with its new name and never a value, so no setting is silently dropped.
+// With SHELF_ALLOW_OLD_NAMES=1 the old names found come back, to be logged once below.
+const ignoredOldNames = refuseRenamedSettings(env);
+const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
+const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
+const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
 const port = Number(env["PORT"] ?? 3000);
-const secret = env["SECRET"];
-const authPassword = env["AUTH_PASSWORD"];
-const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
-const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
-const publicBaseUrl = env["PUBLIC_BASE_URL"];
-// Bound of the SIGTERM drain: jobs still running then are handed back for another machine (#912).
+const secret = readSetting(env, "SHELF_SECRET");
+const authPassword = readSetting(env, "SHELF_ADMIN_PASSWORD");
+const authEmail = readSetting(env, "SHELF_ADMIN_EMAIL") ?? "admin@example.com";
+const adminToken = readSetting(env, "SHELF_ADMIN_TOKEN");
+const publicBaseUrl = readSetting(env, "SHELF_PUBLIC_BASE_URL");
+// Bound of the whole SIGTERM shutdown: jobs still running near it are handed back for another machine (#912).
 const graceMs = shutdownGraceMs(env);
 // Rate limits key on the client, not Fly's proxy (#911): on Fly (`FLY_APP_NAME` is set by the
-// platform) trust `Fly-Client-IP` unless `TRUST_PROXY` says otherwise; `TRUST_PROXY=false` opts out.
+// platform) trust `Fly-Client-IP` unless `SHELF_TRUST_PROXY` says otherwise; `SHELF_TRUST_PROXY=false` opts out.
 const trustProxy =
-  env["TRUST_PROXY"] === undefined && env["FLY_APP_NAME"]
+  readSetting(env, "SHELF_TRUST_PROXY") === undefined && env["FLY_APP_NAME"]
     ? "fly"
-    : parseTrustProxy(env["TRUST_PROXY"]);
+    : parseTrustProxy(readSetting(env, "SHELF_TRUST_PROXY"));
 
 function buildAuthUi(): AuthUiConfig | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -103,13 +115,13 @@ function buildUi(): UIConfig | undefined {
 }
 const ui = buildUi();
 
-// Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
+// Scheduled build purge is opt-in (ADR 0039): `SHELF_PURGE_TTL_DAYS` turns it on; unset leaves it off, so
 // an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
 function purgeTtlDaysFromEnv(): number | undefined {
-  const raw = env["PURGE_TTL_DAYS"];
+  const raw = readSetting(env, "SHELF_PURGE_TTL_DAYS");
   if (raw === undefined || raw === "") return undefined;
   if (!/^[1-9]\d*$/u.test(raw)) {
-    throw new Error("PURGE_TTL_DAYS must be a positive whole number of days");
+    throw new Error("SHELF_PURGE_TTL_DAYS must be a positive whole number of days");
   }
   return Number(raw);
 }
@@ -122,10 +134,9 @@ const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 // With FLY_SPRITES_TOKEN and SPRITE_BROWSER_SECRET set, `chromium@sprite` (a hibernating Fly Sprite,
 // apps/fly-app/sprite/) is selectable beside the VM's own Chromium; unset, only the latter.
 const sprite = spriteFromEnv(env);
-const captureRunner = createPlaywrightCaptureRunner({
+const captureRunner = createCaptureRunner({
   browsers: browsersFor(sprite),
-  // Unset: sized from the VM's detected CPU and memory.
-  concurrency: Number(env["CAPTURE_CONCURRENCY"]) || undefined,
+  // The runner reads SHELF_CAPTURE_CONCURRENCY itself; unset, it sizes from the VM's CPU and memory.
 });
 
 // AI insights (ADR 0016) only with ANTHROPIC_API_KEY set: text only, Haiku, a small daily budget.
@@ -143,7 +154,7 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
-// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// SHELF_SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 // SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
@@ -171,15 +182,15 @@ const app = createShelfApp({
         emailSender
           ? builtIn.map((provider) =>
               provider.metadata.kind === "email"
-                ? createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })
+                ? createEmailNotifier(emailSender, { from: smtpFrom })
                 : provider,
             )
           : builtIn,
       ),
-    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
+    ...(smtpFrom ? { config: { fromEmail: smtpFrom } } : {}),
   },
   auth:
-    // AUTH_PASSWORD without a valid SECRET refuses to start (createShelfAuth throws); never auth off.
+    // SHELF_ADMIN_PASSWORD without a valid SHELF_SECRET refuses to start (createShelfAuth throws); never auth off.
     authPassword
       ? createShelfAuth({
           db: database,
@@ -187,7 +198,7 @@ const app = createShelfApp({
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
-          fromEmail: env["SMTP_FROM"],
+          fromEmail: smtpFrom,
           onAuthSystemEvent: createAuthSystemHook(),
           logger: shelfLogger,
           // Shared accounts that sign in and read but never write (#1274), comma-separated emails.
@@ -199,9 +210,9 @@ const app = createShelfApp({
   observability,
   config: {
     secret,
-    // Rotation: keep the old SECRET here until stored credentials are re-encrypted.
-    previousSecret: env["SECRET_PREVIOUS"] === "" ? undefined : env["SECRET_PREVIOUS"],
-    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
+    // Rotation: keep the old SHELF_SECRET here until stored credentials are re-encrypted.
+    previousSecret: previousSecret === "" ? undefined : previousSecret,
+    migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
     adminToken,
     publicBaseUrl,
     ...(trustProxy === undefined ? {} : { trustProxy }),
@@ -212,13 +223,7 @@ const app = createShelfApp({
   },
 });
 
-await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
-
-if (authPassword) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
-}
 
 // The demo's one read-only account (#1275). The password is the Fly secret; it is never logged.
 // Retried each minute because `storyshelf-ui` is created by the first upload, which can come
@@ -226,33 +231,42 @@ if (authPassword) {
 async function provisionDemoViewer(): Promise<void> {
   try {
     const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
-    if (done.userCreated || done.memberAdded) logger.info(done, "Demo viewer provisioned");
+    if (done.userCreated || done.memberAdded || done.credentialSet)
+      logger.info(done, "Demo viewer provisioned");
   } catch (err) {
     logger.error({ err }, "Demo viewer provisioning failed");
   }
 }
-if (authPassword && env["SHELF_DEMO_VIEWER_PASSWORD"]) {
-  await provisionDemoViewer();
-  setInterval(() => {
-    provisionDemoViewer().catch(() => {}); // Intentionally empty — it logs its own errors
-  }, 60_000).unref();
+
+/** Boot hooks, once the app is ready and before the port opens: the admin, then the demo viewer. */
+async function bootHooks(): Promise<void> {
+  if (ignoredOldNames.length > 0) {
+    logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+  }
+  if (authPassword) {
+    await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+    logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
+  }
+  if (authPassword && env["SHELF_DEMO_VIEWER_PASSWORD"]) {
+    await provisionDemoViewer();
+    setInterval(() => {
+      provisionDemoViewer().catch(() => {}); // Intentionally empty — it logs its own errors
+    }, 60_000).unref();
+  }
 }
 
-const server = serve({ fetch: app.fetch, port }, () => {
-  logger.info({ port, dataDir }, "StoryShelf fly server listening");
+// Ready (a failed boot check stops the server before it listens), boot hooks, then the port. The
+// host owns SIGINT/SIGTERM: SHELF_SHUTDOWN_GRACE_SECONDS bounds the drain and teardown.
+const server = await startServer({
+  app,
+  port,
+  handleSignals: true,
+  ...(graceMs === undefined ? {} : { shutdownTimeoutMs: graceMs }),
+  beforeListen: bootHooks,
 });
+logger.info({ port: server.port, dataDir }, "StoryShelf fly server listening");
 
-// Teardown is idempotent and logs its own errors; close the listener either way.
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    // A bounded drain may leave a stuck handler to its lease: the process must end it, whatever
-    // the rest of the teardown does, so the exit is armed now, not after it.
-    if (graceMs !== undefined) exitBy(graceMs);
-    app.lifecycle
-      .teardown(graceMs === undefined ? {} : { graceMs })
-      .catch(() => {}) // Intentionally empty — teardown errors are already logged
-      .finally(() => {
-        server.close();
-      });
-  });
-}
+// The process ends with the shutdown, so a handler that ignored its release cannot outlive it.
+await server.closed;
+// oxlint-disable-next-line unicorn/no-process-exit -- the executable owns the final exit
+process.exit(0);

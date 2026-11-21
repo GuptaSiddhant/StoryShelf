@@ -97,8 +97,10 @@ describe("Figma provider OAuth wiring", () => {
 describe("figmaOAuthFromEnv", () => {
   it("needs both the client id and secret", () => {
     expect(figmaOAuthFromEnv({})).toBeUndefined();
-    expect(figmaOAuthFromEnv({ FIGMA_CLIENT_ID: "a" })).toBeUndefined();
-    expect(figmaOAuthFromEnv({ FIGMA_CLIENT_ID: "a", FIGMA_CLIENT_SECRET: "b" })).toEqual({
+    expect(figmaOAuthFromEnv({ SHELF_FIGMA_CLIENT_ID: "a" })).toBeUndefined();
+    expect(
+      figmaOAuthFromEnv({ SHELF_FIGMA_CLIENT_ID: "a", SHELF_FIGMA_CLIENT_SECRET: "b" }),
+    ).toEqual({
       clientId: "a",
       clientSecret: "b",
     });

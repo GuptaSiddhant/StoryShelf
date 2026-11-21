@@ -37,11 +37,11 @@ The public demo at **`https://storyshelf.fly.dev`** is a full StoryShelf server 
 Sign in with the demo account:
 
 - **Email:** `demo@storyshelf.js.org`
-- **Password:** `<set by the owner>`
+- **Password:** `shelf-9ysz-qs25-hhuu`
 
 It is a **read-only** account and a viewer of `storyshelf-ui` only. It can open the project's builds, the comparison and the published Storybook, and browse the story library. It cannot approve or reject, comment, change settings, or edit its own profile: those answer 403. Other projects are not visible to it.
 
-The demo runs env-driven local-account auth (`@storyshelf/auth`) with the account marked read-only through `SHELF_READ_ONLY_ACCOUNTS` (see [Auth](/guides/auth/)). With auth off on a local fork (`AUTH_PASSWORD` unset) the UI is open.
+The demo runs env-driven local-account auth (`@storyshelf/auth`) with the account marked read-only through `SHELF_READ_ONLY_ACCOUNTS` (see [Auth](/guides/auth/)). With auth off on a local fork (`SHELF_ADMIN_PASSWORD` unset) the UI is open.
 
 ## Related
 

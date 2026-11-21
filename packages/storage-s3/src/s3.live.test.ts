@@ -3,7 +3,7 @@
  *
  * Gated on `LIVE_CLOUD=1` so hermetic `turbo test` never touches AWS.
  * Bucket is pre-provisioned (manually or via `terraform apply` from
- * `storyshelf server init --target aws`); this suite only owns keys under
+ * `deploy/terraform/aws`); this suite only owns keys under
  * a unique per-run prefix and deletes them afterwards.
  *
  * Required env when live:

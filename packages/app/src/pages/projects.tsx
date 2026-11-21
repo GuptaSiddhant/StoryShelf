@@ -57,7 +57,7 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
           {open ? (
             <>
               <Meta>1. Create a project (writes .storybook/storyshelf.json for later runs).</Meta>
-              <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $STORYSHELF_ADMIN_TOKEN' />
+              <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $SHELF_ADMIN_TOKEN' />
             </>
           ) : null}
           <Meta>

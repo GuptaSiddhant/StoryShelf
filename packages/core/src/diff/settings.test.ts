@@ -23,7 +23,7 @@ describe("image settings", () => {
     expect([currentImageEngine(), configuredThreadCount()]).toEqual(["sharp", 2]);
   });
 
-  it("lets the option beat STORYSHELF_IMAGE_ENGINE", () => {
+  it("lets the option beat SHELF_IMAGE_ENGINE", () => {
     process.env[IMAGE_ENGINE_ENV] = "sharp";
     setImageSettings({ engine: "pngjs" });
     expect(currentImageEngine()).toBe("pngjs");

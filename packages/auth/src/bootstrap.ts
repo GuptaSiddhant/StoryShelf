@@ -2,7 +2,7 @@
  * Development bootstrap: provision a local admin from environment credentials.
  *
  * Replaces the dropped shared-password tier for `dev-server`/`fly-app`:
- * with `AUTH_PASSWORD` set, the first boot creates an admin identity and
+ * with `SHELF_ADMIN_PASSWORD` set, the first boot creates an admin identity and
  * every boot aligns its engine credential with the env value (same
  * always-from-env semantics the shared tier had). Production deployments
  * use the invite flow instead.
@@ -60,7 +60,9 @@ export async function ensurePasswordAdmin(
   const email = input.email.trim().toLowerCase();
   if (!ENGINE_EMAIL.test(email)) {
     // The engine rejects dotless domains (e.g. admin@local) at sign-in, so the account could never log in.
-    throw new Error(`AUTH_EMAIL "${email}" is not a valid email address (domain needs a dot)`);
+    throw new Error(
+      `SHELF_ADMIN_EMAIL "${email}" is not a valid email address (domain needs a dot)`,
+    );
   }
   if (input.password.length < MIN_PASSWORD_LENGTH) {
     throw new Error("Password must be at least 12 characters");

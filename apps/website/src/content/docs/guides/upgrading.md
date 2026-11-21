@@ -7,21 +7,49 @@ This page lists the changes that need something from you, one section per releas
 
 Before any upgrade, [back up](/guides/backup-restore/) the database and the storage, then follow the steps in [Upgrading and support](/guides/support/#upgrading). Coming from 0.12 or older? Read the changelog for each release in between as well.
 
+## Before 2027
+
+Until 1 January 2027, every 0.x release can break things, and nothing old is kept working: no deprecated re-export packages, no aliases for renamed exports, options or environment variables, and no two-step schema changes.
+
+- Read the `Breaking:` lines of each release in the [changelog](/changelog/) before you upgrade.
+- A release whose notes carry a `Schema:` line with a contract step (a dropped or renamed column, a new `NOT NULL`, a unique index) needs a **stop-the-world upgrade**: stop every instance of the old release, then start the new one. Do not run old and new side by side across it.
+- A rollback across such a release is a restore from your [backup](/guides/backup-restore/).
+
+From 2027-01-01 the compatibility rules apply again: one release of rollback, expand-then-contract schema changes and one minor release of deprecated re-exports.
+
 ## 0.15.0 (in progress)
 
-0.15.0 is not released yet. This section lists what is already decided and will change as the release firms up.
+0.15.0 is not released yet. This section lists what is already decided and will change as the release firms up. Each rename below has no alias: the old name stops working in 0.15.0.
+
+### `@storyshelf/storage-local` is removed
+
+**Who is affected:** a server that imports `createLocalStorage` from `@storyshelf/storage-local`.
+
+Local storage is built into core. Import it from `@storyshelf/core/storage/local` (same factory, same options) and remove `@storyshelf/storage-local` from your `package.json`. The package is not published again and is marked deprecated on npm with the new path.
 
 ### `@storyshelf/runner-puppeteer` is removed
 
-**Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use `@storyshelf/runner-playwright`, nothing changes.
+**Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use the Playwright runner, nothing changes here (see the rename below).
 
 0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright).
+
+### `@storyshelf/runner-playwright` is now `@storyshelf/runner`
+
+**Who is affected:** a server that imports `@storyshelf/runner-playwright` or `@storyshelf/runner-playwright/remote`, or scaffolded one with `server init` before 0.15.0.
+
+With Puppeteer gone there is one runner, so it has the plain name. Nothing else changes: the same options, the same subpaths, the same captures and no new baseline.
+
+1. Replace the dependency: remove `@storyshelf/runner-playwright` and add `@storyshelf/runner`.
+2. Change the imports: `@storyshelf/runner-playwright` becomes `@storyshelf/runner`, and `@storyshelf/runner-playwright/remote` becomes `@storyshelf/runner/remote`.
+3. Rename the factory: `createPlaywrightCaptureRunner` is now `createCaptureRunner`.
+
+There is no alias and no re-export: `@storyshelf/runner-playwright` is not published again, and the owner deprecates the npm package with a message naming the new one.
 
 ### Switching from Puppeteer to Playwright
 
 Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0.15.0.
 
-1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
+1. Install `@storyshelf/runner-playwright` (0.14.x; after 0.15.0 it is `@storyshelf/runner`), run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
 2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
 3. Map the options:
 
@@ -35,9 +63,60 @@ Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0
 
 4. Expect one new baseline. The capture fingerprint (browser build, platform, fonts) changes with the runner, so the first build on the default branch is accepted as an environment migration, and branch builds show differences to review. A CDP remote keeps its `chromium@<name>` target and its own baselines.
 
+### StoryShelf's environment variables use the `SHELF_` prefix
+
+**Who is affected:** everyone who sets StoryShelf's variables (a server, the image, the CLI in CI, an MCP client). **Rename them before you upgrade.**
+
+StoryShelf's own settings are now `SHELF_*`. A name stays unprefixed only when a platform, SDK or specification defines it and StoryShelf reads it with that meaning: `PORT`, `HOST`, `NODE_ENV`, `DATABASE_URL`, `AWS_*`, `AZURE_CLIENT_ID`, `GOOGLE_CLOUD_PROJECT`, `OTEL_*`, `PLAYWRIGHT_SERVICE_*`, `ANTHROPIC_API_KEY`, `TURSO_*`, and platform facts such as `CI_*`, `GITHUB_*`, `VERCEL_*` and `FLY_APP_NAME`.
+
+- The old names are not read any more; there are no aliases.
+- So that an upgrade cannot silently drop a setting, the server (the image, the Fly app and the dev server), the CLI and the MCP server refuse to start while any old name in the table below is set. The refusal lists each old name with its new one and never prints a value. This holds even when the new name is set too: unset the old one.
+- If another service in the same environment sets one of these generic names for itself (`LOG_LEVEL`, `DATA_DIR`, `S3_BUCKET`, `SECRET`, `SMTP_*` in a shared compose `.env`, …), set `SHELF_ALLOW_OLD_NAMES=1`. StoryShelf then starts, logs one warning naming the old variables it found (never their values), and still does not read them.
+- The guard is temporary: it is removed in the first release of 2027. From then on the old names are simply ignored.
+- `BUCKET_NAME` is not renamed: Fly's Tigris attachment (`fly storage create`) injects it beside `AWS_ENDPOINT_URL_S3` and the AWS keys, so StoryShelf still reads it as the S3 bucket when `SHELF_S3_BUCKET` is unset. Leave the secret your storage attachment manages in place.
+- `storyshelf server init` and the Terraform modules write only the new names. A server you generated earlier keeps its own `process.env` reads; change them when you rename the variables.
+
+To move, set every new name with the old value, unset the old names, then deploy the new release. In CI, rename the variable your workflow passes (`SHELF_TOKEN`, `SHELF_URL`); the repository secret behind it can keep its name.
+
+| Old name                                                                                         | New name                                                                           |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `SECRET`                                                                                         | `SHELF_SECRET`                                                                     |
+| `SECRET_PREVIOUS`                                                                                | `SHELF_SECRET_PREVIOUS`                                                            |
+| `SECRET_MIGRATE`                                                                                 | `SHELF_SECRET_MIGRATE`                                                             |
+| `ADMIN_TOKEN`, `STORYSHELF_ADMIN_TOKEN`                                                          | `SHELF_ADMIN_TOKEN`                                                                |
+| `AUTH_PASSWORD`                                                                                  | `SHELF_ADMIN_PASSWORD`                                                             |
+| `AUTH_EMAIL`                                                                                     | `SHELF_ADMIN_EMAIL`                                                                |
+| `PUBLIC_BASE_URL`                                                                                | `SHELF_PUBLIC_BASE_URL`                                                            |
+| `DATA_DIR`                                                                                       | `SHELF_DATA_DIR`                                                                   |
+| `TRUST_PROXY`                                                                                    | `SHELF_TRUST_PROXY`                                                                |
+| `LOG_LEVEL`                                                                                      | `SHELF_LOG_LEVEL`                                                                  |
+| `CAPTURE_CONCURRENCY`, `STORYSHELF_CAPTURE_CONCURRENCY`                                          | `SHELF_CAPTURE_CONCURRENCY`                                                        |
+| `PURGE_TTL_DAYS`                                                                                 | `SHELF_PURGE_TTL_DAYS`                                                             |
+| `SHUTDOWN_GRACE_SECONDS`                                                                         | `SHELF_SHUTDOWN_GRACE_SECONDS`                                                     |
+| `AWS_BUCKET`, `S3_BUCKET`                                                                        | `SHELF_S3_BUCKET`                                                                  |
+| `GCS_BUCKET`                                                                                     | `SHELF_GCS_BUCKET`                                                                 |
+| `AZURE_STORAGE_ACCOUNT`                                                                          | `SHELF_AZURE_ACCOUNT`                                                              |
+| `AZURE_STORAGE_CONTAINER`                                                                        | `SHELF_AZURE_CONTAINER`                                                            |
+| `AZURE_STORAGE_CONNECTION`                                                                       | `SHELF_AZURE_CONNECTION_STRING`                                                    |
+| `DATABASE_CA`, `DATABASE_CA_FILE`                                                                | `SHELF_DATABASE_CA`, `SHELF_DATABASE_CA_FILE`                                      |
+| `DATABASE_POOL_MAX`                                                                              | `SHELF_DATABASE_POOL_MAX`                                                          |
+| `DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`, `_PORT`                                        | `SHELF_DATABASE_IAM_HOST`, `_USER`, `_NAME`, `_REGION`, `_PORT`                    |
+| `SMTP_HOST`, `_PORT`, `_SECURE`, `_USER`, `_PASS`, `_FROM`                                       | `SHELF_SMTP_HOST`, `_PORT`, `_SECURE`, `_USER`, `_PASS`, `_FROM`                   |
+| `SES_REGION`, `SES_SMTP_USER`, `SES_SMTP_PASS`, `SES_FROM`                                       | `SHELF_SES_REGION`, `SHELF_SES_SMTP_USER`, `SHELF_SES_SMTP_PASS`, `SHELF_SES_FROM` |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`                                            | `SHELF_OIDC_ISSUER`, `SHELF_OIDC_CLIENT_ID`, `SHELF_OIDC_CLIENT_SECRET`            |
+| `FIGMA_CLIENT_ID`, `FIGMA_CLIENT_SECRET`                                                         | `SHELF_FIGMA_CLIENT_ID`, `SHELF_FIGMA_CLIENT_SECRET`                               |
+| `STORYSHELF_URL`, `STORYSHELF_HOST`                                                              | `SHELF_URL`                                                                        |
+| `STORYSHELF_TOKEN`                                                                               | `SHELF_TOKEN` (already read before)                                                |
+| `STORYSHELF_SLUG`                                                                                | `SHELF_SLUG`                                                                       |
+| `STORYSHELF_FULL`, `STORYSHELF_ZIP`, `STORYSHELF_SKIP_UNCHANGED`                                 | `SHELF_FULL`, `SHELF_ZIP`, `SHELF_SKIP_UNCHANGED`                                  |
+| `STORYSHELF_ALLOW_SERVERLESS`                                                                    | `SHELF_ALLOW_SERVERLESS`                                                           |
+| `STORYSHELF_DIFF_WORKERS`, `STORYSHELF_IMAGE_ENGINE`                                             | `SHELF_DIFF_WORKERS`, `SHELF_IMAGE_ENGINE`                                         |
+| `STORYSHELF_REUSE_PAGES`, `STORYSHELF_BROWSER_RECYCLE_EVERY`, `STORYSHELF_NAVIGATION_TIMEOUT_MS` | `SHELF_REUSE_PAGES`, `SHELF_BROWSER_RECYCLE_EVERY`, `SHELF_NAVIGATION_TIMEOUT_MS`  |
+| `STORYSHELF_OTEL_ENABLED`, `STORYSHELF_OTEL_METRICS_INTERVAL_MS`                                 | `SHELF_OTEL_ENABLED`, `SHELF_OTEL_METRICS_INTERVAL_MS`                             |
+
 ### Nothing else is pending
 
-Besides the runner, no other breaking or changed entry is waiting in `.changeset/` today.
+Besides the runner, local storage and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
 
 ## 0.14.0 (2026-11-21)
 
@@ -153,7 +232,7 @@ A CI step fails on any non-zero exit, so decide what `2` should mean for your pi
 - **`storyshelf create`** on a server with sign-in on creates the project but no longer mints a token that cannot upload. It prints the project's page, where **Get your first build** creates one.
 - **`SHELF_STORYBOOK_HOSTING=sandboxed`** is available to the image. Unset or `trusted` keeps today's behaviour; any other value stops boot. See [Security](/guides/security/).
 - **Times in the app** render in UTC and English, not in the server's time zone.
-- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. The old package re-exports it for one minor release, then is no longer published.
+- **`@storyshelf/storage-local` is deprecated.** Local storage is built into core: import `createLocalStorage` from `@storyshelf/core/storage/local` and drop the package. (0.15.0 removes the package; see [`@storyshelf/storage-local` is removed](#storyshelfstorage-local-is-removed).)
 
 ## Related
 

@@ -15,7 +15,7 @@ import { getStore, type Store } from "./store.ts";
 
 /** What the System page and the notification settings tell the viewer. */
 export const NOTIFICATIONS_PAUSED_TEXT =
-  "Notifications are paused until a public URL is set; set PUBLIC_BASE_URL or confirm the detected origin.";
+  "Notifications are paused until a public URL is set; set SHELF_PUBLIC_BASE_URL or confirm the detected origin.";
 
 /** What a pause check reads. */
 interface OriginDeps {

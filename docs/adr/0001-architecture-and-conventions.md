@@ -115,11 +115,11 @@ import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 
 const database = createSqliteDatabase("./data/shelf.db");
 const storage = createLocalStorage("./data");
-const runner = createPlaywrightCaptureRunner();
+const runner = createCaptureRunner();
 
 const app = createShelfApp({ database, storage, testing: { runner } });
 serve({ fetch: app.fetch, port: 3000 });
@@ -177,7 +177,7 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
   pipeline". That is not true today. `StorySourceAdapter` exists (`packages/core/src/capture/adapter.ts:126`),
   but `new StorybookAdapter()` is hard-coded at these production sites:
   - `packages/core/src/capture/orchestrator.ts:258` and `packages/core/src/capture/tests.ts:112`;
-  - `packages/runner-playwright/src/pipeline.ts:249` and `:297`, and `packages/runner-playwright/src/tests.ts:137`;
+  - `packages/runner/src/pipeline.ts:249` and `:297`, and `packages/runner/src/tests.ts:137`;
   - `packages/runner-puppeteer/src/pipeline.ts:229` and `packages/runner-puppeteer/src/tests.ts:131`.
 
   The in-page half (settle, play status, parameters, the `#storybook-root` selector) lives in the runners

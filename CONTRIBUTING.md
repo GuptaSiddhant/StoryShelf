@@ -53,7 +53,7 @@ Packages are released from [Changesets](https://github.com/changesets/changesets
 
 ## Handling secrets
 
-Never commit credentials. The server `SECRET` (at least 32 characters, for example `openssl rand -hex 32`) signs sessions and encrypts webhook and git-provider secrets at rest. Use throwaway values in tests, fixtures, and docs. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
+Never commit credentials. The server `SHELF_SECRET` (at least 32 characters, for example `openssl rand -hex 32`) signs sessions and encrypts webhook and git-provider secrets at rest. Use throwaway values in tests, fixtures, and docs. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 ## Code of conduct
 

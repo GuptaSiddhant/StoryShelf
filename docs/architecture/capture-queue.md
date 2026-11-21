@@ -65,9 +65,11 @@ runs, and once the handler stopped (within the reserve) the job is handed back w
 instead (outcome `lost`). Only the current holder hands back: the job-row write is conditional on
 its running attempt, so a superseded holder writes nothing, and a job whose cancel was asked ends
 `cancelled` instead. The stop resolves by `graceMs` even when a hand-back or ack stalls. The app passes the grace through
-`lifecycle.teardown({ graceMs })`; the hosts read `SHUTDOWN_GRACE_SECONDS`, to be set a few seconds
-below the platform's stop timeout (the Fly host defaults to 3 s, under Fly's 5 s); unset waits for
-every job. The runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
+`lifecycle.teardown({ graceMs })`; on Node, `startServer` (`@storyshelf/app/node`) calls it with what
+its `shutdownTimeoutMs` leaves after requests in flight, less a reserve for closing adapters. The hosts
+pass `SHELF_SHUTDOWN_GRACE_SECONDS` as that timeout, to be set a few seconds below the platform's stop
+timeout (the Fly host defaults to 3 s, under Fly's 5 s); unset, `startServer`'s default is 30 s. Called
+without `graceMs`, `teardown()` waits for every job. The runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
 
 **In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries the `capture` jobs (only when `testing` has a `runner`) and the `publish` jobs (only on a long-running host, not a serverless one) and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer over the same `capture_jobs` table (long-running hosts only; a serverless host has none), with their own retry limit (`NOTIFY_MAX_ATTEMPTS`; see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture (`queuesFor` in `jobs-setup.ts`). The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`) while the job is `exhausting`; `onAbandoned` is called once if that hook failed five times. There is no `testing.queue`: `testing` requires a `runner` and the database queue is the only queue.

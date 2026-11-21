@@ -31,9 +31,9 @@ jobs:
           UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           npx storyshelf upload \
-            --url ${{ secrets.STORYSHELF_URL }} \
-            --slug ${{ vars.STORYSHELF_SLUG }} \
-            --token ${{ secrets.STORYSHELF_TOKEN }} \
+            --url ${{ secrets.SHELF_URL }} \
+            --slug ${{ vars.SHELF_SLUG }} \
+            --token ${{ secrets.SHELF_TOKEN }} \
             --sha "$UPLOAD_SHA" \
             --branch "$UPLOAD_BRANCH"
       - name: Link the build
@@ -46,7 +46,7 @@ On GitHub Actions the upload step sets the outputs `build-id` and `build-url` (r
 
 Run `npx storyshelf doctor` after the build to check the setup before uploading. It reports a shallow clone or a missing `preview-stats.json` as a **warning** (the upload still works, rendering every story); fail the step on a warning if you want affected capture to be a requirement.
 
-If you commit `.storybook/storyshelf.json` (url and slug), the `--url` and `--slug` flags can go, and only the token comes from CI (`STORYSHELF_TOKEN`).
+If you commit `.storybook/storyshelf.json` (url and slug), the `--url` and `--slug` flags can go, and only the token comes from CI (`SHELF_TOKEN`).
 
 ## GitLab CI
 
@@ -56,7 +56,7 @@ visual:
     GIT_DEPTH: 0 # affected capture diffs against history; a shallow clone forces full renders
   script:
     - npx storybook build -o storybook-static --stats-json # the stats file is what affected capture reads
-    - npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
+    - npx storyshelf upload --url "$SHELF_URL" --slug "$SHELF_SLUG" --token "$SHELF_TOKEN" --sha "$CI_COMMIT_SHA" --branch "$CI_COMMIT_REF_NAME"
 ```
 
 ## Storybook in a monorepo package
@@ -68,7 +68,7 @@ When Storybook lives in a package of the repository (`packages/app`, a workspace
   working-directory: packages/app
   run: |
     npx build-storybook -o storybook-static --stats-json
-    npx storyshelf upload --url "$STORYSHELF_URL" --slug "$STORYSHELF_SLUG" --token "$STORYSHELF_TOKEN"
+    npx storyshelf upload --url "$SHELF_URL" --slug "$SHELF_SLUG" --token "$SHELF_TOKEN"
 ```
 
 Changes in the package and in sibling workspace packages it imports both trigger the stories that depend on them. See [Affected capture](/concepts/affected-capture/#storybook-in-a-monorepo-package).
@@ -79,7 +79,7 @@ Changes in the package and in sibling workspace packages it imports both trigger
 
 ## Skip commits that change no story
 
-Add `--skip-unchanged` to `storyshelf upload` (or set `STORYSHELF_SKIP_UNCHANGED=1`) and a commit that reaches no story records a skipped build instead of uploading the Storybook, with a status for the commit. It needs the full history (`fetch-depth: 0`) and the build's stats file, like affected capture, and never fails the job: any doubt uploads normally. See [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits).
+Add `--skip-unchanged` to `storyshelf upload` (or set `SHELF_SKIP_UNCHANGED=1`) and a commit that reaches no story records a skipped build instead of uploading the Storybook, with a status for the commit. It needs the full history (`fetch-depth: 0`) and the build's stats file, like affected capture, and never fails the job: any doubt uploads normally. See [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits).
 
 ## Merge gate
 

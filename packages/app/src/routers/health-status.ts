@@ -5,6 +5,7 @@
  * the public `GET /api/v1/health` never includes them.
  */
 import { hostingModeOf, type ShelfConfig, storybookHostingOf } from "@storyshelf/core/config";
+import { readSetting } from "@storyshelf/core/config";
 import { imageEngineState } from "@storyshelf/core/diff";
 import type { PublicOriginResolver } from "@storyshelf/core/models";
 import { redactUrlForLog } from "@storyshelf/core/utils";
@@ -28,10 +29,10 @@ export interface StatusInputs {
   publicOrigin?: PublicOriginResolver | undefined;
 }
 
-/** Same rule as `@storyshelf/observability`: on with an endpoint, or `STORYSHELF_OTEL_ENABLED=true`. */
+/** Same rule as `@storyshelf/observability`: on with an endpoint, or `SHELF_OTEL_ENABLED=true`. */
 export function telemetryRow(env: StatusInputs["env"]): StatusRow {
   const endpoint = env["OTEL_EXPORTER_OTLP_ENDPOINT"];
-  const explicit = env["STORYSHELF_OTEL_ENABLED"];
+  const explicit = readSetting(env, "SHELF_OTEL_ENABLED");
   const enabled =
     env["OTEL_SDK_DISABLED"] !== "true" && (explicit ? explicit === "true" : Boolean(endpoint));
   const base = { id: "telemetry", label: "Telemetry export" } as const;

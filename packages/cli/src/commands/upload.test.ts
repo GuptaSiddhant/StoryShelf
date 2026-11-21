@@ -161,7 +161,7 @@ describe("runUpload success", () => {
         buildDir: "storybook-static",
         url: source === "flag" ? "https://shelf.example.com//" : undefined,
       };
-      if (source === "env") vi.stubEnv("STORYSHELF_URL", "https://shelf.example.com/");
+      if (source === "env") vi.stubEnv("SHELF_URL", "https://shelf.example.com/");
       if (source === "config") {
         mkdirSync(join(dir, ".storybook"), { recursive: true });
         writeFileSync(
@@ -468,8 +468,8 @@ describe("runUpload affected capture", () => {
     expect(calls.some((call) => call.url.endsWith("/builds/skipped"))).toBe(false);
   });
 
-  it("reads STORYSHELF_SKIP_UNCHANGED and skips without creating a build or uploading a zip", async () => {
-    vi.stubEnv("STORYSHELF_SKIP_UNCHANGED", "1");
+  it("reads SHELF_SKIP_UNCHANGED and skips without creating a build or uploading a zip", async () => {
+    vi.stubEnv("SHELF_SKIP_UNCHANGED", "1");
     git(dir, ["-c", "init.defaultBranch=main", "init"]);
     mkdirSync(join(dir, "src"), { recursive: true });
     writeFileSync(join(dir, "src", "a.tsx"), "v1");

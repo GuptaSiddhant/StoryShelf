@@ -46,6 +46,16 @@ describe("json-webhook notifier", () => {
     expect(String(failure)).not.toContain("secret-path");
   });
 
+  it("keeps a response body that echoes the URL out of the thrown message", async () => {
+    fetchSpy.mockResolvedValue(new Response(`bad hook ${url}`, { status: 500 }));
+    const adapter = jsonWebhookNotifier.create({ config: {}, secret: url });
+    const failure = await adapter.send({ channel, formatted }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("HTTP 500");
+    expect((failure as Error).message).not.toContain("bad hook");
+    expect(String(failure)).not.toContain("secret-path");
+  });
+
   it("rejects an invalid config and a missing secret", async () => {
     expect(() => jsonWebhookNotifier.create({ config: { prefix: "" }, secret: url })).toThrow();
     const adapter = jsonWebhookNotifier.create({ config: {} });

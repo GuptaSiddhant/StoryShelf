@@ -63,9 +63,9 @@ A single job (capture, publish or notification) is bounded by `testing.maxJobSec
 
 Add up what you run:
 
-1. **Compute.** One host or container, sized as above. Capture needs a long-running host; a container platform that keeps CPU allocated (for example Cloud Run with CPU always allocated, which the Google Cloud reference stack uses) suits it better than one that throttles idle CPU.
+1. **Compute.** One host or container, sized as above. Capture needs a long-running host; a container platform that keeps CPU allocated (for example Cloud Run with CPU always allocated, which the [GCP module](/guides/deployment/gcp/) sets) suits it better than one that throttles idle CPU.
 2. **Storage.** The gigabytes of changed screenshots and Storybooks you keep, at your provider's rate, plus its request and transfer charges.
-3. **Database.** SQLite costs nothing extra; a managed database is a small instance (the Google Cloud reference stack defaults to a shared-core Cloud SQL `db-f1-micro`).
+3. **Database.** SQLite costs nothing extra; a managed database is a small instance (the GCP module defaults to Cloud SQL `db-custom-1-3840`, 1 vCPU and 3.75 GB).
 4. **Optional services.** A load balancer or DNS and certificates, an email provider, an AI provider if you enable [AI insights](/ai/) (it has its own daily token budget), or remote browsers.
 
 Because nothing scales with snapshot count, the bill follows how much you capture and keep, which you control with the capture settings and retention. For a side-by-side with a billed-per-snapshot service, see the [comparison with Chromatic](/guides/chromatic-comparison/).

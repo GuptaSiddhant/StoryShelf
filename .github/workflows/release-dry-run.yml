@@ -155,7 +155,7 @@ jobs:
 
       - name: Boot both images on one /data volume
         env:
-          SECRET: dry-run-secret-of-at-least-32-characters
+          DRY_RUN_SECRET: dry-run-secret-of-at-least-32-characters
           FILLED: ${{ steps.prev.outputs.ready }}
         run: |
           set -e
@@ -168,13 +168,16 @@ jobs:
           }
           docker volume create demo-data
           if [ "$FILLED" = true ]; then
-            docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SECRET="$SECRET" \
+            # The previous release still reads the names from before #1308.
+            docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SECRET="$DRY_RUN_SECRET" \
               -e PORT=3000 -e DATA_DIR=/data demo-prev
             wait_healthy prev
             docker stop prev && docker rm prev
           fi
-          # SHELF_AUTH=none: the official image refuses to start without AUTH_PASSWORD unless told.
-          docker run -d --name next -p 3000:3000 -v demo-data:/data -e SECRET="$SECRET" \
-            -e PORT=3000 -e DATA_DIR=/data -e SHELF_AUTH=none demo-next
+          # SHELF_AUTH=none: the official image refuses to start without SHELF_ADMIN_PASSWORD unless told.
+          # The new names (#1308): the next image has no aliases and refuses to boot on the old ones,
+          # so an operator renames the variables before upgrading (the upgrading guide's table).
+          docker run -d --name next -p 3000:3000 -v demo-data:/data -e SHELF_SECRET="$DRY_RUN_SECRET" \
+            -e PORT=3000 -e SHELF_DATA_DIR=/data -e SHELF_AUTH=none demo-next
           wait_healthy next
           docker stop next

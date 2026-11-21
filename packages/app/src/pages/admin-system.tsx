@@ -269,8 +269,8 @@ function CredentialsCard(props: {
       {probe.unreadable.length > 0 ? (
         <Alert tone="danger" title="Some credentials cannot be decrypted">
           No configured secret matches {probe.unreadable.length} stored credential(s) (
-          {[...new Set(probe.unreadable.map((row) => row.source))].join(", ")}). Check that SECRET
-          and SECRET_PREVIOUS are correct, or recreate them.
+          {[...new Set(probe.unreadable.map((row) => row.source))].join(", ")}). Check that
+          SHELF_SECRET and SHELF_SECRET_PREVIOUS are correct, or recreate them.
         </Alert>
       ) : null}
       {rotating && probe.previous > 0 ? (
@@ -288,8 +288,8 @@ function CredentialsCard(props: {
       ) : (
         <Meta>
           {rotating
-            ? "All credentials use the current secret. Remove SECRET_PREVIOUS."
-            : "To rotate, set SECRET to the new value and SECRET_PREVIOUS to the old one."}
+            ? "All credentials use the current secret. Remove SHELF_SECRET_PREVIOUS."
+            : "To rotate, set SHELF_SECRET to the new value and SHELF_SECRET_PREVIOUS to the old one."}
         </Meta>
       )}
     </Card>

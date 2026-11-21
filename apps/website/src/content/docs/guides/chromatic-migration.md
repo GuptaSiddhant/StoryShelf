@@ -38,7 +38,7 @@ Follow [Getting started](/guides/getting-started/) to deploy:
 In StoryShelf UI or via CLI:
 
 ```bash
-storyshelf create --url https://shelf.example.com --name "My Design System" --token $ADMIN_TOKEN
+storyshelf create --url https://shelf.example.com --name "My Design System" --token $SHELF_ADMIN_TOKEN
 ```
 
 Match Chromatic settings where applicable:
@@ -73,10 +73,10 @@ Match Chromatic settings where applicable:
   run: npx storybook build -o storybook-static --stats-json # the stats file feeds affected capture
 
 - name: Upload to StoryShelf
-  run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
+  run: npx storyshelf upload --token ${{ secrets.SHELF_TOKEN }} --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
-    STORYSHELF_URL: https://shelf.example.com
-    STORYSHELF_SLUG: my-design-system
+    SHELF_URL: https://shelf.example.com
+    SHELF_SLUG: my-design-system
     UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
@@ -87,7 +87,7 @@ Or with `.storybook/storyshelf.json` committed (on a pull request, still pass th
 - name: Upload to StoryShelf
   run: npx storyshelf upload --sha "$UPLOAD_SHA" --branch "$UPLOAD_BRANCH"
   env:
-    STORYSHELF_TOKEN: ${{ secrets.STORYSHELF_TOKEN }}
+    SHELF_TOKEN: ${{ secrets.SHELF_TOKEN }}
     UPLOAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     UPLOAD_BRANCH: ${{ github.head_ref || github.ref_name }}
 ```
@@ -118,7 +118,9 @@ Dynamic content (a timestamp, an avatar, an ad) can be hidden before the screens
 - for migration, `.chromatic-ignore` and `[data-chromatic="ignore"]`, which need no change.
 
 ```ts
-export const Clock = { parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } } };
+export const Clock = {
+  parameters: { storyshelf: { ignoreSelectors: [".clock", "[data-testid=avatar]"] } },
+};
 ```
 
 Both browser engines inject the same stylesheet, which sets `visibility: hidden` and `opacity: 0` on the element, so its whole subtree disappears while the layout stays put. An invalid selector is skipped with a warning in the build log and never fails the build; at most 50 selectors count per story. Baseline keys and the diff itself are unchanged, so **adding a mask produces a one-time expected diff** on the first build after it lands: approve it to refresh the baseline.
@@ -129,7 +131,7 @@ Both browser engines inject the same stylesheet, which sets `visibility: hidden`
 | ---------------------------------- | ----------------------------------------------------------------------------- |
 | Global baseline + branch baselines | Per-branch baselines with default-branch fallback                             |
 | Branch baselines independent       | Feature branch accepts → branch baseline; merge to main → promotes to default |
-| No GC (manual cleanup)             | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (opt-in)            |
+| No GC (manual cleanup)             | Auto GC: `branchTtlDays` (default 30), `purgeTtlDays` (opt-in)                |
 
 **Implication:** On first run, feature branches will diff against `main` baseline. After accepting changes, they get their own branch baseline. Merging to `main` updates the default baseline automatically.
 
@@ -140,7 +142,7 @@ Both browser engines inject the same stylesheet, which sets `visibility: hidden`
 | **TurboSnap**             | Yes (dependency graph)                    | Yes — affected capture (on by default)     | Similar skip rates on Vite Storybooks; needs `fetch-depth: 0` and `preview-stats.json`              |
 | **Cross-browser**         | Chrome, FF, Safari, Edge (branded, cloud) | Chromium / Firefox / WebKit, one per build | Set in project Settings → General or via API; baselines tracked per browser; no branded Safari/Edge |
 | **Modes/Globals**         | Yes                                       | No                                         | Theme/locale matrices need workarounds                                                              |
-| **A11y testing**          | Yes (aXe)                                 | axe-core checks, on by default (`runA11y`) | Results are shown in review, not a review gate                                             |
+| **A11y testing**          | Yes (aXe)                                 | axe-core checks, on by default (`runA11y`) | Results are shown in review, not a review gate                                                      |
 | **Cloud parallelization** | Automatic                                 | Manual (`testing.concurrency`)             | Limited by your server CPU/memory                                                                   |
 | **Baseline export**       | UI only                                   | API + UI                                   | Cannot bulk-import Chromatic baselines                                                              |
 | **Flake detection**       | Auto-detect                               | Explicit `flakyTest`                       | Manual marking required                                                                             |
@@ -170,7 +172,7 @@ Keep Chromatic running in parallel for 1-2 sprints:
 - ☐ Reviewers know how to approve/reject in StoryShelf UI
 - ☐ GitHub status check renamed from `chromatic` to `storyshelf/testing` (or your channel prefix)
 - ☐ Branch protection rules updated to require StoryShelf status
-- ☐ CI secrets rotated (`CHROMATIC_PROJECT_TOKEN` → `STORYSHELF_TOKEN`)
+- ☐ CI secrets rotated (`CHROMATIC_PROJECT_TOKEN` → `SHELF_TOKEN`)
 - ☐ Documentation updated with StoryShelf workflow
 - ☐ Chromatic subscription canceled (after verification period)
 

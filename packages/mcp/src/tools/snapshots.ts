@@ -24,7 +24,7 @@ export const listSnapshots: ToolDef = {
   readOnly: true,
   routeClass: "testing",
   input: {
-    project: z.string().optional().describe("Project slug (defaults to STORYSHELF_SLUG)"),
+    project: z.string().optional().describe("Project slug (defaults to SHELF_SLUG)"),
     buildId: z.string().describe("Build id (ULID)"),
     includeUnchanged: z.boolean().default(false),
     limit: z.number().int().min(1).max(500).default(100),

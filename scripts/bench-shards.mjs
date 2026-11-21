@@ -11,7 +11,7 @@
  * peak resident memory of this process and the browsers it launched, shard timings and a
  * correctness check: the build must end approved with exactly one snapshot per story, otherwise
  * the row is marked `valid: false`, a warning goes to stderr and the exit code is 1. Needs the
- * built `dist/` of core, db-sqlite and runner-playwright (`nubx turbo build`).
+ * built `dist/` of core, db-sqlite and runner (`nubx turbo build`).
  *
  * A Storybook to point it at can be generated with `scripts/bench-fixture.mjs` (see there).
  *
@@ -35,7 +35,7 @@ const execFileAsync = promisify(execFile);
 
 const { createSqliteDatabase } = await load("packages/db-sqlite/dist/index.mjs");
 const { createLocalStorage } = await load("packages/core/dist/storage/local.mjs");
-const { createPlaywrightCaptureRunner } = await load("packages/runner-playwright/dist/index.mjs");
+const { createCaptureRunner } = await load("packages/runner/dist/index.mjs");
 const { createCaptureConsumer, createDatabaseCaptureQueue } = await load(
   "packages/core/dist/capture.mjs",
 );
@@ -196,7 +196,7 @@ async function runScenario(scenario, runIndex) {
   await db.lifecycle?.setup?.();
   const storage = createLocalStorage(dir);
   const logger = createShelfLogger({ level: "silent" });
-  const runner = createPlaywrightCaptureRunner({ concurrency: scenario.pages });
+  const runner = createCaptureRunner({ concurrency: scenario.pages });
   const project = await new ProjectModel(db, tablesOf(db)).create({ name: "Bench" });
 
   // The database queue and the consumer the app runs, with one attempt per job.

@@ -25,7 +25,7 @@ baselines, then review and approve. `docs/architecture/` is the current-state sp
 export PATH="$HOME/.nub/bin:$PATH"   # once per shell
 nub ci                    # install workspace deps (once per clone/worktree)
 nub run hook:install      # enable .githooks: fmt/lint staged files + conventional commits
-nub run serve             # dev server from TS source, :3000, DATA_DIR=.dev-data, hot restart
+nub run serve             # dev server from TS source, :3000, SHELF_DATA_DIR=.dev-data, hot restart
 nub run fmt | lint | test # turbo across the workspace
 nub run docs:check        # ADR numbering, references, links, line cap
 nub run lint:files        # oxfmt --check + oxlint on every tracked file the commit hook checks (CI runs it)
@@ -53,8 +53,8 @@ Real-browser suite (gated; `turbo test` stays hermetic):
 (cd fixtures/storybook-8 && pnpm install && pnpm run build-storybook)  # default, :6008
 # storybook-9 :6009; storybook-10 :6010 (CSF-Next .test() entries)
 npx -y playwright@1.63.0 install chromium   # one-time browser install
-(cd packages/runner-playwright && nub run test:integration)
-(cd packages/runner-playwright && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
+(cd packages/runner && nub run test:integration)
+(cd packages/runner && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
 ```
 
 CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
@@ -68,7 +68,7 @@ rather than pushing and waiting.
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner-playwright`,
+  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
@@ -95,7 +95,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   404 when a project has review off. Gate by class, never with an ad-hoc `if` in a handler; check
   `testingEnabled()` before linking to a `testing` page. No `testing` option ⇒ no capture, compare or
   baselines; `testing` requires a `runner` (`testing: {}` throws). `assertServerless` refuses a runner
-  on AWS Lambda and warns on Vercel/Netlify (`STORYSHELF_ALLOW_SERVERLESS=1` overrides).
+  on AWS Lambda and warns on Vercel/Netlify (`SHELF_ALLOW_SERVERLESS=1` overrides).
 - **Capture targets.** `browser`/`browsers`, a snapshot's `browser`, and baseline keys hold a
   `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName`. Split with
   `parseTarget`/`engineOf`, validate with `isCaptureTarget`; the render input is `target`, not
@@ -167,7 +167,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
   a finding. Never change a status, failure set or git state because of a11y results.
 - **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
-  `Channel.on` (`packages/runner-playwright/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
+  `Channel.on` (`packages/runner/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
   the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through
   `runProjectTests`/`CaptureRunner.runTests`; results are stored once as JSON in
   `builds.test_results` (`BuildModel.setTestResults`). A failing test is a blocking failure; never
@@ -255,7 +255,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   thing. Rename = add, dual-write, drop over three releases. A new status value or job kind is read
   first and written one release later; backfills are batched, idempotent jobs, never boot work.
   Until the claim filter and payload version land, ship no new job kind or status value. A schema
-  change's changeset carries a `Schema:` line.
+  change's changeset carries a `Schema:` line. Until 2027-01-01 contract steps ship in the release
+  that needs them and the upgrade is stop-the-world (label `schema-break`; ADR 0053 amendment 2026-11-21).
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
@@ -269,8 +270,16 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
   the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
-  tells the CI check so. Task PRs on an epic branch add theirs there.
-- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` (`SHELF_*` variables, "Shelf" in prose and diagrams).
+  tells the CI check so. Task PRs on an epic branch add theirs there. Until 2027-01-01 a breaking
+  change ships without a shim or alias, as `Breaking:` (ADR 0049 and ADR 0053 amendments, 2026-11-21).
+- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` ("Shelf" in prose and
+  diagrams). `SHELF_*` for StoryShelf's own settings; unprefixed only for platform or SDK names. Read
+  them through `readSetting` (`@storyshelf/core/config`; the CLI keeps its rows in
+  `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
+  (`packages/core/src/env-settings/renames.ts`), which every entry point checks at boot
+  (`refuseRenamedSettings`, names only; `SHELF_ALLOW_OLD_NAMES=1` warns instead; removed in the first
+  release of 2027), and `packages/core/src/env-settings/ratchet.test.ts`
+  fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.
@@ -327,7 +336,8 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
 - **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
   or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
   owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
-  `minor`, and a `major` changeset fails the changeset check.
+  `minor`, and a `major` changeset fails the changeset check. Until 2027-01-01 a renamed or folded
+  package is not published again; the owner deprecates it on npm (ADR 0049 amendment 2026-11-21).
 
 ## Agent operating model
 

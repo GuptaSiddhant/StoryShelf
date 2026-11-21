@@ -20,10 +20,10 @@ A remote target is named `<engine>@<name>`, for example `chromium@grid`. The nam
 Remote services are entries of the runner's `browsers` list, imported from the `/remote` subpath of the runner package. Each is plain configuration; no vendor SDK is needed.
 
 ```ts
-import { createPlaywrightCaptureRunner, local } from "@storyshelf/runner-playwright";
-import { azurePlaywright, playwrightServer } from "@storyshelf/runner-playwright/remote";
+import { createCaptureRunner, local } from "@storyshelf/runner";
+import { azurePlaywright, playwrightServer } from "@storyshelf/runner/remote";
 
-const runner = createPlaywrightCaptureRunner({
+const runner = createCaptureRunner({
   browsers: [
     "chromium", // local; the first target is the default for new projects
     playwrightServer({
@@ -45,12 +45,12 @@ createShelfApp({ database, storage, testing: { runner } });
 
 Credentials are operator-level: they are passed in the server's code, from the environment or a secret manager. They are never stored per project, and never logged: the endpoint (it can carry a key) and every header value are removed from the messages the runner surfaces.
 
-| Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
-| ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
-| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
-| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
-| `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
-| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
+| Preset                                      | Package                     | Protocol                       | Reaches the Storybook through                       |
+| ------------------------------------------- | --------------------------- | ------------------------------ | --------------------------------------------------- |
+| `playwrightServer(...)`                     | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)` (experimental)          | `@storyshelf/runner/remote` | Playwright                     | a Storybook URL                                     |
+| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -77,7 +77,7 @@ The presets other than `playwrightServer` follow each vendor's published connect
 The Storybook is extracted on the host and served on `127.0.0.1`, which a remote browser cannot open on its own. There are two ways in (ADR 0007, decision 5):
 
 - **`exposeNetwork`** (Playwright's own protocol, on a self-hosted Playwright server and Azure Playwright Workspaces): the runner connects with `exposeNetwork: "<loopback>"`, and the remote browser's requests for `127.0.0.1` are routed back through the connection to the host, so the static server works unchanged and nothing new is exposed. Every asset crosses the WebSocket, so a remote render is slower per page than a local one.
-- **A Storybook URL** (CDP-only services and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a confirmed [public origin](/guides/config/#public-origin) (a detected, unconfirmed address does not count). Until both exist such a target is `unavailable` on **System → Capture browsers** with the reason ("no secret: set the server secret, it signs the Storybook URL the remote browser opens" or "no public origin: set PUBLIC_BASE_URL, or confirm the detected origin on the System page"), settings saves naming it are refused, and a build that still reaches one (a project saved before the origin went away) fails at once with that reason before anything renders: no story runs on the other targets first, and no partial result is stored. Fix the reason and retry the build.
+- **A Storybook URL** (CDP-only services and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a confirmed [public origin](/guides/config/#public-origin) (a detected, unconfirmed address does not count). Until both exist such a target is `unavailable` on **System → Capture browsers** with the reason ("no secret: set the server secret, it signs the Storybook URL the remote browser opens" or "no public origin: set SHELF_PUBLIC_BASE_URL, or confirm the detected origin on the System page"), settings saves naming it are refused, and a build that still reaches one (a project saved before the origin went away) fails at once with that reason before anything renders: no story runs on the other targets first, and no partial result is stored. Fix the reason and retry the build.
 
 ### Signed Storybook URLs
 
@@ -217,7 +217,7 @@ remote<{ id: string }>({
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
 - `maxConnections` (on `remote()`, `playwrightServer()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Each lease counts separately, including every lease of one `refCounted` pool, because each is a real connection to the provider: size `maxConnections` against the connections a scale-to-zero pool will open, not against its one shared resource. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
-- `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
+- `createCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
 - Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
 **Errors**
@@ -228,7 +228,7 @@ remote<{ id: string }>({
 
 **Sharing one server: `refCounted`**
 
-When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner-playwright/remote` counts the connections for you:
+When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner/remote` counts the connections for you:
 
 ```ts
 const computer = refCounted({
@@ -254,7 +254,7 @@ remote({
 The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards. The Sprite runs `playwright run-server` behind a small proxy that refuses requests without a shared secret. The target is plain configuration: `refCounted` wakes the Sprite by polling its `/healthz`, and the Sprite pauses by itself once the connections close, so `close` has nothing to do.
 
 ```ts
-import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
+import { refCounted, remote } from "@storyshelf/runner/remote";
 
 const secret = process.env.SPRITE_BROWSER_SECRET ?? "";
 const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });

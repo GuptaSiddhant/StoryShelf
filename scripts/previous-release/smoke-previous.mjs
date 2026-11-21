@@ -9,9 +9,12 @@
 //          its migrations), still read the project the first run created, and write another.
 // Env: DATABASE_URL (postgres) or DATA_DIR (sqlite).
 import { createShelfApp } from "@storyshelf/app";
-import { createLocalStorage } from "@storyshelf/storage-local";
 import { mkdirSync } from "node:fs";
 
+// 0.15.0 moved local storage into core; older releases ship it as `@storyshelf/storage-local`.
+const { createLocalStorage } = await import("@storyshelf/core/storage/local").catch(
+  () => import("@storyshelf/storage-local"),
+);
 const [dialect, phase] = process.argv.slice(2);
 const dataDir = process.env["DATA_DIR"] ?? ".data";
 mkdirSync(dataDir, { recursive: true });

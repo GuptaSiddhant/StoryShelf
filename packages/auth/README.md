@@ -17,8 +17,8 @@ import { createShelfAuth, githubPreset } from "@storyshelf/auth";
 
 const shelf = createShelfAuth({
   db: database,
-  secret: process.env.SECRET!, // ≥ 32 chars
-  baseURL: process.env.PUBLIC_BASE_URL!,
+  secret: process.env.SHELF_SECRET!, // ≥ 32 chars
+  baseURL: process.env.SHELF_PUBLIC_BASE_URL!,
   social: [githubPreset({ clientId: "...", clientSecret: "{env:GITHUB_CLIENT_SECRET}" })],
   passkeys: {},
 });

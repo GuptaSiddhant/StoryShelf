@@ -3,7 +3,7 @@
  *
  * Gated on `LIVE_CLOUD=1` so hermetic `turbo test` never touches GCP.
  * The bucket is pre-provisioned (manually or via `terraform apply` from
- * `storyshelf server init --target gcp`); this suite only owns objects under
+ * `deploy/terraform/gcp`); this suite only owns objects under
  * a unique per-run prefix and deletes them afterwards.
  *
  * Required env when live:

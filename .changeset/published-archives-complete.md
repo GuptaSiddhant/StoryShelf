@@ -10,10 +10,9 @@
 "@storyshelf/db-sqlite": patch
 "@storyshelf/mcp": patch
 "@storyshelf/observability": patch
-"@storyshelf/runner-playwright": patch
+"@storyshelf/runner": patch
 "@storyshelf/storage-azure": patch
 "@storyshelf/storage-gcs": patch
-"@storyshelf/storage-local": patch
 "@storyshelf/storage-s3": patch
 "@storyshelf/storybook-addon": patch
 ---

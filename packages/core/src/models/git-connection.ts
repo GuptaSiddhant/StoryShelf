@@ -1,7 +1,7 @@
 /**
  * Server-wide git connections (`git_connections`, ADR 0054, decisions 1 and 9): the ones site admins
  * create, and the ones configuration declares. A configured connection wins over a stored row with
- * the same id, which is then listed as ignored. Secrets are encrypted with `SECRET` and leave only
+ * the same id, which is then listed as ignored. Secrets are encrypted with `SHELF_SECRET` and leave only
  * through {@link GitConnectionModel.secretOf}, for delivery; every other read returns a
  * {@link GitConnection}, which has no secret field.
  */

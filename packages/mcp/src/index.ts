@@ -5,7 +5,7 @@ const HELP = `storyshelf-mcp: StoryShelf MCP server
 
 Usage: storyshelf-mcp [--http] [--port 3333] [--host 127.0.0.1] [--url URL] [--slug SLUG] [--token TOKEN] [--origin ORIGIN]
 
-Env: STORYSHELF_URL, STORYSHELF_TOKEN (or SHELF_TOKEN), STORYSHELF_SLUG
+Env: SHELF_URL, SHELF_TOKEN, SHELF_SLUG
 Default transport is stdio. With --http, a Streamable HTTP endpoint is served at /mcp
 and each client sends its own "Authorization: Bearer <token>".`;
 

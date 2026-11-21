@@ -1,0 +1,847 @@
+import {
+  TargetLaunchError,
+  type RemoteConnectContext,
+  type StoryEntry,
+} from "@storyshelf/core/adapter/capture-runner";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createCaptureRunner } from "./capture-runner.ts";
+import { RemoteBrowserLostError } from "./remote-loss.ts";
+import { remote } from "./remote/remote.ts";
+
+const fake = vi.hoisted(() => {
+  const state = {
+    connects: [] as { kind: string; endpoint: string; options: Record<string, unknown> }[],
+    gotos: [] as string[],
+    failure: null as Error | null,
+    probe: undefined as unknown,
+    probeFails: false,
+    probeHang: false,
+    probeStarted: 0,
+    active: 0,
+    peak: 0,
+    closed: 0,
+    gate: null as Promise<void> | null,
+    activeGate: null as Promise<null> | null,
+    screenshotErrors: [] as Error[],
+    screenshots: 0,
+    pagesOpened: 0,
+    connected: true,
+    dropAfterScreenshots: null as number | null,
+  };
+  const page = {
+    goto: async (url: string): Promise<void> => {
+      state.gotos.push(url);
+      await state.gate;
+      state.active += 1;
+      state.peak = Math.max(state.peak, state.active);
+      await state.activeGate;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      state.active -= 1;
+    },
+    setDefaultTimeout: (): void => {},
+    addInitScript: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+    setViewportSize: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+    waitForSelector: async (): Promise<unknown> => await Promise.resolve(null),
+    waitForTimeout: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+    evaluate: async (fn: unknown): Promise<unknown> => {
+      await Promise.resolve();
+      if (typeof fn === "function" && fn.name === "inPageProbe") {
+        if (state.probeHang) {
+          state.probeStarted += 1;
+          await new Promise<never>(() => {});
+        }
+        if (state.probeFails) throw new Error("page crashed");
+        return state.probe;
+      }
+      return {};
+    },
+    locator: () => ({ boundingBox: async (): Promise<null> => await Promise.resolve(null) }),
+    screenshot: async (): Promise<Buffer> => {
+      state.screenshots += 1;
+      // The connection drops once this many screenshots have been taken: this one fails with it.
+      if (state.dropAfterScreenshots !== null && state.screenshots > state.dropAfterScreenshots) {
+        state.connected = false;
+        throw new Error("Target page, context or browser has been closed");
+      }
+      const failure = state.screenshotErrors.shift();
+      if (failure) throw failure;
+      return await Promise.resolve(Buffer.from([0]));
+    },
+    close: async (): Promise<void> => {
+      await Promise.resolve();
+    },
+  };
+  const browser = () => ({
+    version: (): string => "131.0.1",
+    isConnected: (): boolean => state.connected,
+    newPage: async () => {
+      state.pagesOpened += 1;
+      return await Promise.resolve(page);
+    },
+    // The default page pool opens a context per page and resets it between captures.
+    newContext: async () =>
+      await Promise.resolve({
+        newPage: async () => {
+          state.pagesOpened += 1;
+          return await Promise.resolve(page);
+        },
+        clearCookies: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+        close: async (): Promise<void> => {
+          await Promise.resolve();
+        },
+      }),
+    close: async (): Promise<void> => {
+      state.closed += 1;
+      await Promise.resolve();
+    },
+  });
+  const connecting =
+    (kind: string) => async (endpoint: string, options: Record<string, unknown>) => {
+      state.connects.push({ kind, endpoint, options });
+      if (state.failure !== null) throw state.failure;
+      return browser();
+    };
+  const engine = (name: string) => ({
+    launch: async () => browser(),
+    connect: connecting(name),
+    connectOverCDP: connecting(`${name}-cdp`),
+    executablePath: () => "/nowhere/chromium-1/chrome-linux/chrome",
+  });
+  return { state, engine };
+});
+
+vi.mock("playwright-core", () => ({
+  chromium: fake.engine("chromium"),
+  firefox: fake.engine("firefox"),
+  webkit: fake.engine("webkit"),
+}));
+
+const STORIES: StoryEntry[] = [
+  { id: "a--one", title: "A", name: "One", type: "story" },
+  { id: "a--two", title: "A", name: "Two", type: "story" },
+];
+const VIEWPORTS = [{ name: "desktop", width: 1280, height: 720 }];
+
+let storybookDir = "";
+let tmp = "";
+
+beforeEach(async () => {
+  tmp = await mkdtemp(join(tmpdir(), "storyshelf-remote-"));
+  storybookDir = join(tmp, "storybook");
+  await mkdir(storybookDir, { recursive: true });
+  await writeFile(join(storybookDir, "index.html"), "<html></html>");
+  Object.assign(fake.state, {
+    connects: [],
+    gotos: [],
+    failure: null,
+    probe: { platform: "Linux x86_64", deviceScaleFactor: 2, fonts: ["Arial", "Roboto"] },
+    probeFails: false,
+    probeHang: false,
+    probeStarted: 0,
+    active: 0,
+    peak: 0,
+    closed: 0,
+    gate: null,
+    activeGate: null,
+    screenshotErrors: [],
+    screenshots: 0,
+    pagesOpened: 0,
+    connected: true,
+    dropAfterScreenshots: null,
+  });
+});
+
+afterEach(async () => {
+  await rm(tmp, { recursive: true, force: true });
+});
+
+/** Park every page navigation until `open()`, so a render stays in flight. */
+function holdRenders(): { open: () => void } {
+  const { promise, resolve } = Promise.withResolvers<null>();
+  fake.state.gate = promise.then(() => {});
+  return { open: () => resolve(null) };
+}
+
+const farm = (overrides: Partial<Parameters<typeof remote>[0]> = {}) =>
+  remote({
+    name: "grid",
+    engines: ["chromium", "firefox"],
+    sessions: 2,
+    retry: { backoffMs: 1 },
+    platform: "windows",
+    protocol: "playwright",
+    reach: "loopback",
+    connect: {
+      endpoint: "wss://farm.example/?key=sekret-key",
+      headers: { authorization: "Bearer sekret-token" },
+    },
+    ...overrides,
+  });
+
+const input = (extra: Record<string, unknown> = {}) => ({
+  buildId: "b1",
+  storybookDir,
+  stories: STORIES,
+  viewports: VIEWPORTS,
+  ...extra,
+});
+
+describe("a remote target", () => {
+  it("retries a screenshot timeout before delivering one capture", async () => {
+    fake.state.screenshotErrors.push(
+      Object.assign(new Error("screenshot timed out"), { name: "TimeoutError" }),
+    );
+    const onCapture = vi.fn(async () => {});
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
+    expect(result.failures).toEqual([]);
+    expect(fake.state.screenshots).toBe(2);
+    expect(onCapture).toHaveBeenCalledOnce();
+    // The remote environment probe also uses a page, in addition to the two capture pages.
+    expect(fake.state.pagesOpened).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not repeat capture or delivery when the callback fails", async () => {
+    const onCapture = vi.fn(async () => {
+      throw Object.assign(new Error("storage write failed"), { name: "TimeoutError" });
+    });
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
+    expect(result.failures[0]?.error).toContain("storage write failed");
+    expect(fake.state.screenshots).toBe(1);
+    expect(onCapture).toHaveBeenCalledOnce();
+  });
+
+  it("keeps sibling captures on the existing connection when one screenshot times out", async () => {
+    fake.state.screenshotErrors.push(
+      Object.assign(new Error("screenshot timeout"), { name: "TimeoutError" }),
+    );
+    const runner = createCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 2 })],
+      concurrency: 4,
+    });
+    const result = await runner.render(input());
+    expect(result.failures).toEqual([]);
+    expect(result.captures).toHaveLength(2);
+    expect(fake.state.screenshots).toBe(3);
+    expect(fake.state.connects).toHaveLength(1);
+    expect(fake.state.peak).toBeLessThanOrEqual(2);
+  });
+
+  it("connects with the headers and exposeNetwork, per engine, and renders over loopback", async () => {
+    const runner = createCaptureRunner({ browsers: [farm()] });
+    const result = await runner.render(input({ target: "firefox@grid" }));
+    expect(fake.state.connects).toEqual([
+      {
+        kind: "firefox",
+        endpoint: "wss://farm.example/?key=sekret-key",
+        options: expect.objectContaining({
+          headers: { authorization: "Bearer sekret-token" },
+          exposeNetwork: "<loopback>",
+        }),
+      },
+    ]);
+    expect(result.captures.map((capture) => capture.browser)).toEqual([
+      "firefox@grid",
+      "firefox@grid",
+    ]);
+    expect(fake.state.gotos[0]).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/iframe\.html/u);
+  });
+
+  it("defaults to the first target, and lists the targets with how each is reached", () => {
+    const runner = createCaptureRunner({ browsers: [farm()] });
+    expect(runner.metadata.targets).toEqual([
+      { target: "chromium@grid", reach: "loopback", status: "ready" },
+      { target: "firefox@grid", reach: "loopback", status: "ready" },
+    ]);
+  });
+
+  it("reports the environment measured in the browser, never the host's", async () => {
+    const result = await createCaptureRunner({ browsers: [farm()] }).render(input());
+    expect(result.environment).toEqual({
+      browserVersion: "131.0.1",
+      platform: "linux",
+      deviceScaleFactor: 2,
+      fontsHash: expect.stringMatching(/^[0-9a-f]{16}$/u),
+    });
+  });
+
+  it("logs the remote's limits once at run start, without its endpoint or credentials", async () => {
+    const info = vi.fn();
+    await createCaptureRunner({
+      browsers: [farm({ maxPagesPerConnection: 1, maxConnections: 2, experimental: true })],
+    }).render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({
+      pages: 2,
+      pagesPerConnection: 1,
+      maxConnections: 2,
+      scope: { pages: "target", connections: "process" },
+      experimental: true,
+      verification: "not verified against live infrastructure",
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toMatch(/farm\.example|sekret/u);
+    // Nothing about this host is measured for a remote target.
+    expect(info.mock.calls.some(([, message]) => message === "capture sizing")).toBe(false);
+  });
+
+  it("falls back to the configured OS when the page cannot be probed, and omits what it cannot know", async () => {
+    fake.state.probeFails = true;
+    const warn = vi.fn();
+    const result = await createCaptureRunner({ browsers: [farm()] }).render(
+      input({ logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } }),
+    );
+    expect(result.environment).toEqual({ browserVersion: "131.0.1", platform: "windows" });
+    expect(warn).toHaveBeenCalledWith(
+      { reason: "page crashed" },
+      "could not measure the remote browser",
+    );
+  });
+
+  it("connects over CDP when the service speaks only that, and then needs a URL", async () => {
+    const runner = createCaptureRunner({
+      browsers: [
+        farm({
+          name: "cdp",
+          engines: ["chromium"],
+          protocol: "cdp",
+          reach: "url",
+          connect: { endpoint: "wss://cdp.example/" },
+        }),
+      ],
+    });
+    expect(runner.metadata.targets?.[0]?.reach).toBe("url");
+    await expect(runner.render(input())).rejects.toThrow(/needs a Storybook URL/u);
+    expect(fake.state.connects).toEqual([]);
+
+    const result = await runner.render(
+      input({ storybookUrl: "https://app.example/_s/tok/build/b/" }),
+    );
+    expect(result.captures).toHaveLength(2);
+    expect(fake.state.connects[0]).toMatchObject({ kind: "chromium-cdp" });
+    expect(fake.state.gotos[0]).toMatch(
+      /^https:\/\/app\.example\/_s\/tok\/build\/b\/iframe\.html\?/u,
+    );
+    // The URL is the way in; the host's loopback server was never bound for it.
+    expect(fake.state.gotos.some((url) => url.includes("127.0.0.1"))).toBe(false);
+  });
+
+  it("refuses a Storybook URL that is not the directory root, before any connection", async () => {
+    const runner = createCaptureRunner({ browsers: [farm()] });
+    await expect(
+      runner.render(input({ storybookUrl: "https://app.example/_s/tok/build/b/iframe.html" })),
+    ).rejects.toThrow(/directory root/u);
+    expect(fake.state.connects).toEqual([]);
+  });
+
+  it("reads parameters on a remote target as well", async () => {
+    const runner = createCaptureRunner({ browsers: [farm()] });
+    await runner.extractParameters?.({
+      buildId: "b1",
+      storybookDir,
+      stories: STORIES,
+      target: "chromium@grid",
+    });
+    expect(fake.state.connects).toHaveLength(1);
+    await expect(
+      createCaptureRunner({
+        browsers: [
+          farm({
+            engines: ["chromium"],
+            protocol: "cdp",
+            reach: "url",
+            connect: { endpoint: "wss://x/" },
+          }),
+        ],
+      }).extractParameters?.({ buildId: "b1", storybookDir, stories: STORIES }),
+    ).rejects.toThrow(/needs a Storybook URL/u);
+  });
+
+  it("opens a new session when the browser is recycled", async () => {
+    const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
+    await createCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      recycleBrowserEvery: 2,
+    }).render(input({ stories }));
+    expect(fake.state.connects).toHaveLength(3);
+    expect(fake.state.peak).toBe(1);
+  });
+
+  it("holds every render of the target to its sessions, however many run at once", async () => {
+    const runner = createCaptureRunner({
+      browsers: [farm({ name: "shared", sessions: 2 })],
+      concurrency: 8,
+    });
+    const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
+    await Promise.all([
+      runner.render(input({ buildId: "x", stories })),
+      runner.render(input({ buildId: "y", stories })),
+      runner.render(input({ buildId: "z", stories })),
+    ]);
+    expect(fake.state.peak).toBe(2);
+  });
+
+  it("limits pages on each connection independently of the shared session gate", async () => {
+    const runner = createCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
+      concurrency: 8,
+    });
+    const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
+    await runner.render(input({ stories }));
+    expect(fake.state.peak).toBe(1);
+    fake.state.peak = 0;
+    const barrier = Promise.withResolvers<null>();
+    fake.state.activeGate = barrier.promise;
+    const pending = Promise.all([
+      runner.render(input({ buildId: "x", stories })),
+      runner.render(input({ buildId: "y", stories })),
+    ]);
+    try {
+      await vi.waitFor(() => expect(fake.state.active).toBe(2));
+      expect(fake.state.peak).toBe(2);
+    } finally {
+      barrier.resolve(null);
+      await pending;
+    }
+    expect(fake.state.peak).toBe(2);
+  });
+
+  it("logs the limits even when the connection fails, and reports the shared gate's size", async () => {
+    const info = vi.fn();
+    fake.state.failure = new Error("connect ECONNREFUSED");
+    await createCaptureRunner({
+      browsers: [farm({ retry: { attempts: 0, backoffMs: 1 } })],
+    })
+      .render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
+      .catch(() => {});
+    const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
+    expect(sizing).toHaveLength(1);
+    expect(sizing[0]?.[0]).toMatchObject({ pages: 2 });
+  });
+
+  it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {
+    const runner = createCaptureRunner({
+      browsers: [farm({ retry: { attempts: 1, backoffMs: 1 } })],
+    });
+    fake.state.failure = new Error("connect ECONNREFUSED wss://farm.example/?key=sekret-key");
+    const error: unknown = await runner.render(input()).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(TargetLaunchError);
+    expect((error as TargetLaunchError).transient).toBe(true);
+    expect((error as Error).message).not.toContain("sekret");
+    expect(String((error as Error).cause)).not.toContain("sekret");
+    // Retried once before the render saw it, and the target is still ready.
+    expect(fake.state.connects).toHaveLength(2);
+    expect(runner.metadata.targets?.map((entry) => entry.status)).toEqual(["ready", "ready"]);
+  });
+
+  it("marks a target unavailable when its credentials are refused, and does not retry", async () => {
+    const runner = createCaptureRunner({ browsers: [farm()] });
+    fake.state.failure = new Error(
+      "WebSocket error: wss://farm.example/?key=sekret-key 401 Unauthorized",
+    );
+    await expect(runner.render(input({ target: "firefox@grid" }))).rejects.toThrow(
+      /Cannot launch firefox@grid: WebSocket error: \[redacted\] 401 Unauthorized/u,
+    );
+    expect(fake.state.connects).toHaveLength(1);
+    expect(runner.metadata.targets).toEqual([
+      { target: "chromium@grid", reach: "loopback", status: "ready" },
+      {
+        target: "firefox@grid",
+        reach: "loopback",
+        status: { unavailable: "WebSocket error: [redacted] 401 Unauthorized" },
+      },
+    ]);
+  });
+
+  it("does not probe a remote target when verifying local engines", async () => {
+    const runner = createCaptureRunner({ browsers: ["chromium", farm()] });
+    await runner.lifecycle?.setup({} as never);
+    expect(fake.state.connects).toEqual([]);
+    expect(runner.metadata.targets?.map((entry) => entry.target)).toEqual([
+      "chromium",
+      "chromium@grid",
+      "firefox@grid",
+    ]);
+    expect(runner.metadata.targets?.slice(1).map((entry) => entry.status)).toEqual([
+      "ready",
+      "ready",
+    ]);
+  });
+});
+
+/** A logger whose `warn` records the one-time "waiting for a connection slot" line. */
+const queuedLogger = () => {
+  const warn = vi.fn();
+  return { warn, logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } };
+};
+/** Resolves once a shard has been logged as queued for a slot: the barrier before "has not connected". */
+const untilQueued = async (warn: ReturnType<typeof vi.fn>) => {
+  await vi.waitFor(() => {
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1 }),
+      "waiting for a remote browser connection slot",
+    );
+  });
+};
+
+const leased = (overrides: Partial<Parameters<typeof remote<{ id: string }>>[0]> = {}) => {
+  const seen: RemoteConnectContext[] = [];
+  const released: { lease: unknown; outcome: string; error?: unknown }[] = [];
+  let next = 0;
+  const service = remote<{ id: string }>({
+    name: "grid",
+    engines: ["chromium", "firefox"],
+    sessions: 2,
+    retry: { attempts: 1, backoffMs: 1 },
+    protocol: "playwright",
+    reach: "loopback",
+    connect: async (context) => {
+      seen.push(context);
+      next += 1;
+      const id = next;
+      await Promise.resolve();
+      return {
+        endpoint: `wss://farm-${id}.example/?key=sekret-${id}`,
+        lease: { id: `lease-${id}` },
+      };
+    },
+    release: (lease, info) => {
+      released.push({ lease, ...info });
+    },
+    ...overrides,
+  });
+  return { service, seen, released };
+};
+
+/** Many stories on one page at a time, so a drop after the first leaves the rest unscheduled. */
+const MANY: StoryEntry[] = Array.from({ length: 6 }, (_unused, index) => ({
+  id: `a--s${index}`,
+  title: "A",
+  name: `S${index}`,
+  type: "story",
+}));
+
+describe("a remote browser lost mid-pass", () => {
+  it("ends the pass with one retryable error, schedules nothing more, and records no story failure", async () => {
+    const onCapture = vi.fn(async () => {});
+    const warn = vi.fn();
+    fake.state.dropAfterScreenshots = 1;
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const error: unknown = await runner
+      .render(input({ stories: MANY, onCapture, logger: { warn, info: vi.fn(), error: vi.fn() } }))
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RemoteBrowserLostError);
+    // The first story was delivered before the drop; the second failed on the dead browser and
+    // nothing was scheduled after it.
+    expect(onCapture).toHaveBeenCalledOnce();
+    expect(fake.state.screenshots).toBe(2);
+    // The pool's `about:blank` reset between captures is not a story navigation.
+    expect(fake.state.gotos.filter((url) => url !== "about:blank")).toHaveLength(2);
+    const lostWarnings = warn.mock.calls.filter(([, message]) =>
+      String(message).includes("remote browser lost"),
+    );
+    expect(lostWarnings).toHaveLength(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("sekret");
+    expect(String(error)).not.toContain("sekret");
+  });
+
+  it("releases the lease as failed, once", async () => {
+    const { service, released } = leased();
+    fake.state.dropAfterScreenshots = 1;
+    await expect(
+      createCaptureRunner({ browsers: [service], concurrency: 1 }).render(
+        input({ stories: MANY, target: "chromium@grid" }),
+      ),
+    ).rejects.toBeInstanceOf(RemoteBrowserLostError);
+    expect(released.map((entry) => entry.outcome)).toEqual(["failed"]);
+  });
+
+  it("settles every in-flight sibling into the same single error", async () => {
+    fake.state.dropAfterScreenshots = 0;
+    const runner = createCaptureRunner({
+      browsers: [farm({ sessions: 4, maxPagesPerConnection: 4 })],
+      concurrency: 4,
+    });
+    await expect(runner.render(input({ stories: MANY }))).rejects.toBeInstanceOf(
+      RemoteBrowserLostError,
+    );
+  });
+
+  it("treats a page crash on a connected browser as a story failure, not a lost browser", async () => {
+    fake.state.screenshotErrors.push(new Error("Page crashed"));
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]] }));
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]?.error).toContain("Page crashed");
+  });
+
+  it("keeps a cancel a cancel when it closes the browser under the run", async () => {
+    const { service, released } = leased();
+    const runner = createCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ stories: MANY, target: "chromium@grid", runId: "s1" }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.cancel("b1", "s1");
+    fake.state.connected = false;
+    hold.open();
+    const error: unknown = await rendering.catch((caught: unknown) => caught);
+    expect(error).not.toBeInstanceOf(RemoteBrowserLostError);
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+});
+
+describe("a remote target with a function connect and release", () => {
+  it("connects per shard with its identity, to what it returned, and releases as finished", async () => {
+    const { service, seen, released } = leased();
+    const runner = createCaptureRunner({ browsers: [service] });
+    await Promise.all(
+      [1, 2].map(
+        async (shardIndex) =>
+          await runner.render(
+            input({ shardIndex, runId: `s${shardIndex}`, target: "chromium@grid" }),
+          ),
+      ),
+    );
+    expect(
+      seen.map((context) => context.shardIndex).toSorted((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([1, 2]);
+    expect(seen.map((context) => context.runId).toSorted()).toEqual(["s1", "s2"]);
+    expect(
+      seen.every(
+        (context) =>
+          context.buildId === "b1" &&
+          context.engine === "chromium" &&
+          context.purpose === "render" &&
+          context.attempt === 1 &&
+          !context.signal.aborted,
+      ),
+    ).toBe(true);
+    expect(fake.state.connects.map((connect) => connect.endpoint).toSorted()).toEqual([
+      "wss://farm-1.example/?key=sekret-1",
+      "wss://farm-2.example/?key=sekret-2",
+    ]);
+    expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    expect(new Set(released.map((entry) => JSON.stringify(entry.lease))).size).toBe(2);
+  });
+
+  it("tells an unsharded render apart: no shard index, the build id as its run", async () => {
+    const { service, seen } = leased();
+    await createCaptureRunner({ browsers: [service] }).render(input({ target: "chromium@grid" }));
+    expect(seen[0]?.shardIndex).toBeUndefined();
+    expect(seen[0]?.runId).toBe("b1");
+  });
+
+  it("releases as failed when the handshake fails after connect returned, once", async () => {
+    const { service, released } = leased();
+    fake.state.failure = new Error("401 Unauthorized");
+    await expect(
+      createCaptureRunner({ browsers: [service] }).render(input({ target: "chromium@grid" })),
+    ).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(released).toHaveLength(1);
+    expect(released[0]?.outcome).toBe("failed");
+  });
+
+  it("releases as cancelled when the build is cancelled mid-render", async () => {
+    const { service, released } = leased();
+    const runner = createCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.cancel("b1", "s1");
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("stops waiting for a probe that hangs, warns, renders, and leaves the environment unknown", async () => {
+    fake.state.probeHang = true;
+    const warn = vi.fn();
+    const result = await createCaptureRunner({
+      browsers: [farm({ timeouts: { probeMs: 20 } })],
+    }).render(input({ logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } }));
+    expect(fake.state.probeStarted).toBe(1);
+    expect(result.environment).toEqual({ browserVersion: "131.0.1", platform: "windows" });
+    expect(warn).toHaveBeenCalledWith(
+      { timeoutMs: 20 },
+      "measuring the remote browser timed out; its environment is unknown",
+    );
+    expect(fake.state.gotos.length).toBeGreaterThan(0);
+  });
+
+  it("stops the run when the build is cancelled during the probe, and releases as cancelled", async () => {
+    const { service, released } = leased();
+    fake.state.probeHang = true;
+    const runner = createCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    const outcome = rendering.then(
+      () => "rendered",
+      (error: unknown) => (error as Error).message,
+    );
+    await vi.waitFor(() => {
+      expect(fake.state.probeStarted).toBe(1);
+    });
+    await runner.cancel("b1", "s1");
+    expect(await outcome).toBe("Capture cancelled");
+    expect(fake.state.gotos).toEqual([]);
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("aborts a connect still pending when the build is cancelled, and does not retry it", async () => {
+    const aborted = vi.fn();
+    const started = vi.fn();
+    const { service, released } = leased({
+      retry: { attempts: 3, backoffMs: 1 },
+      connect: async ({ signal }) =>
+        await new Promise((_, reject) => {
+          started();
+          signal.addEventListener("abort", () => {
+            aborted();
+            reject(new Error("aborted"));
+          });
+        }),
+    });
+    const runner = createCaptureRunner({ browsers: [service] });
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
+    await vi.waitFor(() => {
+      expect(started).toHaveBeenCalledTimes(1);
+    });
+    await runner.cancel("b1", "s1");
+    await expect(rendering).rejects.toBeInstanceOf(TargetLaunchError);
+    expect(aborted).toHaveBeenCalledTimes(1);
+    expect(released).toEqual([]);
+  });
+
+  it("fails the render with a clear reason, holding nothing, when connect throws", async () => {
+    const { service, released } = leased({
+      retry: { attempts: 1, backoffMs: 1 },
+      connect: () => Promise.reject(new Error("wake failed")),
+    });
+    const runner = createCaptureRunner({ browsers: [service] });
+    const error = (await runner
+      .render(input({ target: "chromium@grid" }))
+      .catch((caught: unknown) => caught)) as TargetLaunchError;
+    expect(error).toBeInstanceOf(TargetLaunchError);
+    expect(error.reason).toBe("acquire failed: wake failed");
+    expect(error.transient).toBe(true);
+    expect(fake.state.connects).toEqual([]);
+    expect(released).toEqual([]);
+  });
+
+  describe("with maxConnections", () => {
+    it("connects the second shard only after the first connection is released", async () => {
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
+      const runner = createCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const queued = queuedLogger();
+      const second = runner.render(
+        input({ shardIndex: 2, runId: "s2", target: "chromium@grid", logger: queued.logger }),
+      );
+      await untilQueued(queued.warn);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, second]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 2]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+      expect(fake.state.connects).toHaveLength(2);
+    });
+
+    it("ends a shard that is cancelled while waiting, without connecting for it or freeing the first one's slot", async () => {
+      const { service, seen, released } = leased({
+        maxConnections: 1,
+        timeouts: { acquireMs: 50 },
+      });
+      const runner = createCaptureRunner({ browsers: [service] });
+      const hold = holdRenders();
+      const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
+      await vi.waitFor(() => {
+        expect(fake.state.gotos.length).toBeGreaterThan(0);
+      });
+      const queuedSecond = queuedLogger();
+      const waiting = runner.render(
+        input({ shardIndex: 2, runId: "s2", target: "chromium@grid", logger: queuedSecond.logger }),
+      );
+      await untilQueued(queuedSecond.warn);
+      await runner.cancel("b1", "s2");
+      await expect(waiting).rejects.toBeInstanceOf(TargetLaunchError);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      // The cancelled shard took no slot, so the first still holds the only one.
+      const queuedThird = queuedLogger();
+      const third = runner.render(
+        input({ shardIndex: 3, runId: "s3", target: "chromium@grid", logger: queuedThird.logger }),
+      );
+      await untilQueued(queuedThird.warn);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1]);
+      hold.open();
+      await Promise.all([first, third]);
+      expect(seen.map((context) => context.shardIndex)).toEqual([1, 3]);
+      expect(released.map((entry) => entry.outcome)).toEqual(["finished", "finished"]);
+    });
+
+    it("recycles the browser under a cap of one without deadlocking, one connection at a time", async () => {
+      let open = 0;
+      let peak = 0;
+      const { service } = leased({
+        maxConnections: 1,
+        connect: async () => {
+          open += 1;
+          peak = Math.max(peak, open);
+          await Promise.resolve();
+          return { endpoint: `wss://farm-${open}.example/`, lease: { id: String(open) } };
+        },
+        release: () => {
+          open -= 1;
+        },
+      });
+      const stories = Array.from({ length: 6 }, (_, index) => ({
+        ...STORIES[0]!,
+        id: `s-${index}`,
+      }));
+      const result = await createCaptureRunner({
+        browsers: [service],
+        recycleBrowserEvery: 2,
+        concurrency: 1,
+      }).render(input({ stories, target: "chromium@grid", runId: "s1" }));
+      expect(result.failures).toEqual([]);
+      expect(fake.state.connects.length).toBeGreaterThanOrEqual(3);
+      expect(peak).toBe(1);
+      expect(open).toBe(0);
+    });
+  });
+
+  it("releases leases still held when the runner shuts down", async () => {
+    const { service, released } = leased();
+    const runner = createCaptureRunner({ browsers: [service] });
+    const hold = holdRenders();
+    const rendering = runner.render(input({ target: "chromium@grid", runId: "s9" }));
+    await vi.waitFor(() => {
+      expect(fake.state.gotos.length).toBeGreaterThan(0);
+    });
+    await runner.lifecycle?.teardown();
+    hold.open();
+    await rendering.catch(() => {});
+    expect(released.map((entry) => entry.outcome)).toEqual(["cancelled"]);
+  });
+});

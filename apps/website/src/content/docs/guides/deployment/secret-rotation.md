@@ -1,28 +1,28 @@
 ---
 title: Rotating the server secret
-description: Change SECRET without losing stored webhook, git and notification credentials.
+description: Change SHELF_SECRET without losing stored webhook, git and notification credentials.
 ---
 
-`SECRET` encrypts three kinds of stored credentials (AES-256-GCM): webhook signing secrets, design-provider credentials and user connection tokens, and notification-channel secrets (chat webhook URLs and git tokens). Changing it without a plan leaves those rows unreadable, so StoryShelf keeps the old value as a **decrypt-only fallback** while you migrate.
+`SHELF_SECRET` encrypts three kinds of stored credentials (AES-256-GCM): webhook signing secrets, design-provider credentials and user connection tokens, and notification-channel secrets (chat webhook URLs and git tokens). Changing it without a plan leaves those rows unreadable, so StoryShelf keeps the old value as a **decrypt-only fallback** while you migrate.
 
 ## Procedure
 
 1. Set the new value and keep the old one:
 
    ```sh
-   SECRET=<new value>
-   SECRET_PREVIOUS=<old value>
+   SHELF_SECRET=<new value>
+   SHELF_SECRET_PREVIOUS=<old value>
    ```
 
    The scaffolded `src/index.ts`, `dev-server` and `fly-app` read both. In code this is `ShelfConfig.secret` and `ShelfConfig.previousSecret` (a single value, not a list).
 
-2. Restart. The server decrypts with `SECRET` first and falls back to `SECRET_PREVIOUS`, so webhooks, git statuses and notifications keep working.
+2. Restart. The server decrypts with `SHELF_SECRET` first and falls back to `SHELF_SECRET_PREVIOUS`, so webhooks, git statuses and notifications keep working.
 
 3. Re-encrypt the stored credentials under the new secret, in either way:
-   - **Automatically at boot:** also set `SECRET_MIGRATE=true` (`ShelfConfig.migrateCredentialsOnBoot`). It is off by default.
+   - **Automatically at boot:** also set `SHELF_SECRET_MIGRATE=true` (`ShelfConfig.migrateCredentialsOnBoot`). It is off by default.
    - **From the UI:** a site admin opens **System** and presses **Re-encrypt with current secret**. This is available whether or not auto-migration is on. The same action is `POST /api/v1/admin/credentials/reencrypt`.
 
-4. Check the **Stored credentials** card on the System page: every credential should be under the current secret and none unreadable. Then remove `SECRET_PREVIOUS` (and `SECRET_MIGRATE`).
+4. Check the **Stored credentials** card on the System page: every credential should be under the current secret and none unreadable. Then remove `SHELF_SECRET_PREVIOUS` (and `SHELF_SECRET_MIGRATE`).
 
 ## When something is wrong
 
@@ -33,8 +33,8 @@ A credential that neither secret can decrypt is never silent:
 - `POST /api/v1/health` reports a failed `credentials` entry, so the overall status is `degraded`.
 - A channel whose secret cannot be decrypted (including a git channel's token) is skipped at delivery, with a logged warning.
 
-Fix it by setting `SECRET_PREVIOUS` to the secret that row was encrypted with, or recreate the webhook, token or channel.
+Fix it by setting `SHELF_SECRET_PREVIOUS` to the secret that row was encrypted with, or recreate the webhook, token or channel.
 
 ## Sessions
 
-`SECRET` also signs login sessions and CSRF tokens. Rotating it signs everyone out once; sessions are not carried over by `SECRET_PREVIOUS`.
+`SHELF_SECRET` also signs login sessions and CSRF tokens. Rotating it signs everyone out once; sessions are not carried over by `SHELF_SECRET_PREVIOUS`.

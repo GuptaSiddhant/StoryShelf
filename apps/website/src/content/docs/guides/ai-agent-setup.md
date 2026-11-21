@@ -9,14 +9,14 @@ A coding agent (Claude Code, Cursor, Codex and the like) can do the repetitive p
 
 Every page of this site is also available as Markdown at its URL plus `index.md` (each page links to it from its `<head>`, and has a **Copy page as Markdown** button). For whole-docs context:
 
-| File                                                | Contents                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------- |
-| `/llms.txt`                            | An index of every page, one line each                                     |
-| `/llms-start.txt`                | Start here, Concepts and the CLI: enough to set Shelf up in a repository  |
-| `/llms-deploy.txt`              | Deployment and operations                                                 |
-| `/llms-api.txt`                    | The REST API guides, the webhooks guide and the MCP server page           |
-| `/llms-full.txt`                  | Everything above in one file (large; the changelog is left out)           |
-| `/openapi.json`                    | The REST API as an OpenAPI 3 document                                     |
+| File               | Contents                                                                 |
+| ------------------ | ------------------------------------------------------------------------ |
+| `/llms.txt`        | An index of every page, one line each                                    |
+| `/llms-start.txt`  | Start here, Concepts and the CLI: enough to set Shelf up in a repository |
+| `/llms-deploy.txt` | Deployment and operations                                                |
+| `/llms-api.txt`    | The REST API guides, the webhooks guide and the MCP server page          |
+| `/llms-full.txt`   | Everything above in one file (large; the changelog is left out)          |
+| `/openapi.json`    | The REST API as an OpenAPI 3 document                                    |
 
 Each file starts with the StoryShelf version it describes. If the server you run is older or newer, trust the CLI's `--help` over the docs.
 
@@ -35,7 +35,7 @@ Set up StoryShelf visual testing for this repository.
    .storybook/storyshelf.json. Server URL: <your server URL>. Project slug: <your slug>.
 4. Run `storyshelf doctor` and fix what it reports, or tell me what you cannot fix.
 5. Add an upload step to my CI as the docs describe (the CI setup page). Read the token
-   from the CI secret STORYSHELF_TOKEN.
+   from the CI secret SHELF_TOKEN.
 6. Never commit a token or any other secret. Do not put one in storyshelf.json, a workflow
    file, a script or a log. If you need a token, ask me to create one in Project settings.
 7. Do not approve, reject or accept any build. Tell me what you changed and what I need to do.
@@ -51,7 +51,7 @@ Add this to the `AGENTS.md` (or `CLAUDE.md`) of the repository that is tested wi
 ## Visual testing (StoryShelf)
 
 - Visual tests run on a StoryShelf server. The client config is `.storybook/storyshelf.json`;
-  the token is the `STORYSHELF_TOKEN` environment variable. Never write a token to a file,
+  the token is the `SHELF_TOKEN` environment variable. Never write a token to a file,
   commit it or print it.
 - Run `storyshelf doctor` to check the setup and `storyshelf whoami` to see which server and
   project this repository uses. Run `storyshelf build` to build the Storybook without

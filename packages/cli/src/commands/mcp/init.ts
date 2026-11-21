@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import prompts from "prompts";
 import { detectPackageRunner, installCommand } from "../../config.ts";
 import { printError, printLine } from "../../output.ts";
+import { readSetting } from "../../settings.ts";
 import { PROJECT_PROMPTS } from "../server/prompts.ts";
 import {
   SCAFFOLD_DEV_DEPENDENCIES,
@@ -37,13 +38,13 @@ const MCP_PROMPTS = [
     type: "text",
     name: "url",
     message: "StoryShelf server URL?",
-    initial: process.env["STORYSHELF_URL"] ?? "https://shelf.example.com",
+    initial: readSetting(process.env, "SHELF_URL") ?? "https://shelf.example.com",
   },
   {
     type: "text",
     name: "slug",
     message: "Default project slug?",
-    initial: process.env["STORYSHELF_SLUG"] ?? "",
+    initial: readSetting(process.env, "SHELF_SLUG") ?? "",
   },
   {
     type: "confirm",
@@ -92,7 +93,7 @@ function printNextSteps(answers: McpScaffoldAnswers, outDir: string, install: st
   printLine(`\nNext steps:`);
   printLine(`  cd ${answers.dir}`);
   printLine(`  ${install}`);
-  printLine(`  cp .env.example .env   # add STORYSHELF_TOKEN (never commit it)`);
+  printLine(`  cp .env.example .env   # add SHELF_TOKEN (never commit it)`);
   printLine(`  npx storyshelf mcp serve --dir .`);
   printLine(`\n.mcp.json is a ready client config for Claude Code (copy to your repo root).`);
 }

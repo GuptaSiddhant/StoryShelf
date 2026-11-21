@@ -23,10 +23,14 @@ import { PackageManagers } from "starlight-package-managers";
 
 <Readme heading="Provider recipes" />
 
+## RDS and Aurora with IAM authentication
+
+<Readme heading="RDS and Aurora with IAM authentication" />
+
 ## Client injection (IAM and advanced TLS)
 
 <Readme heading="Client injection (IAM and advanced TLS)" />
 
 ## When to use it
 
-Choose Postgres when you need a managed relational database or already run Postgres for your team. It is a drop-in replacement for [SQLite](../db-sqlite/) and its presets; only the database construction changes. Pair it with [local storage](../storage-local/) for single-node deployments or [S3-compatible storage](../storage-s3/) when instances do not share a filesystem.
+Choose Postgres when you need a managed relational database or already run Postgres for your team. It is a drop-in replacement for [SQLite](../db-sqlite/) and its presets; only the database construction changes. Pair it with [local storage](../core/) for single-node deployments or [S3-compatible storage](../storage-s3/) when instances do not share a filesystem.

@@ -107,7 +107,7 @@ describe("resolveConnection url", () => {
   });
 
   it("drops a trailing slash from the environment", async () => {
-    vi.stubEnv("STORYSHELF_URL", `${withSlash}//`);
+    vi.stubEnv("SHELF_URL", `${withSlash}//`);
     const resolved = await resolveConnection({ slug: "demo", token: "t", cwd: dir });
     expect(resolved.url).toBe(clean);
   });

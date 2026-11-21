@@ -10,7 +10,7 @@ designContractSuite("figma", createFigmaDesign, {
 describe("the built-in Figma provider", () => {
   it("has OAuth only when the operator set a client id and secret", () => {
     expect(createFigmaDesign({ oauth: figmaOAuthFromEnv({}) }).oauth).toBeUndefined();
-    const env = { FIGMA_CLIENT_ID: "id", FIGMA_CLIENT_SECRET: "secret" };
+    const env = { SHELF_FIGMA_CLIENT_ID: "id", SHELF_FIGMA_CLIENT_SECRET: "secret" };
     expect(createFigmaDesign({ oauth: figmaOAuthFromEnv(env) }).oauth).toBeDefined();
   });
 
