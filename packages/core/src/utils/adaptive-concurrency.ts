@@ -156,7 +156,7 @@ interface Verdict {
   reason: string;
 }
 
-/** Whether an error is a navigation/action timeout (Playwright and Puppeteer both name it `TimeoutError`). */
+/** Whether an error is a navigation/action timeout (Playwright names it `TimeoutError`). */
 export function isTimeoutError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;

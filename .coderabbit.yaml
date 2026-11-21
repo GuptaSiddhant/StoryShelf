@@ -225,16 +225,6 @@ reviews:
         - Launch failures become `TargetLaunchError` (not a story crash); story errors are isolated to the snapshot.
         - Screenshot bytes are validated (PNG magic, size cap) before storage; remote endpoints, headers, query values and tokens are scrubbed from errors/logs.
         - Remote targets go through `retryConnect` and the process-wide session gate; target availability is reported through metadata, not guessed.
-        - The Playwright and Puppeteer implementations stay behaviorally identical for shared logic (`play`, `settle`, `a11y`).
-
-    - path: "packages/runner-puppeteer/**"
-      instructions: |
-        Browser runner review. Verify:
-        - Browser/page lifecycle is closed in `finally` on success, timeout, navigation failure and cancellation.
-        - `executablePath` is required and validated; launch failures are `TargetLaunchError`, not story failures.
-        - Rendering waits on the Storybook settle signal, never a fixed sleep; fallback delay is bounded.
-        - Screenshot bytes meet the PNG magic/size contract; remote endpoints, headers and tokens are scrubbed from errors.
-        - Shared `play`, `settle` and a11y logic stays identical to Playwright; flag drift.
 
     - path: "packages/app/src/routes/**"
       instructions: |
