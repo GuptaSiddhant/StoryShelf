@@ -201,14 +201,14 @@ Rendering scales on the browser side, not by adding processes: every instance ru
 
 Capture drives Chromium, which dominates memory use. Each open page costs roughly 100–300 MB, so StoryShelf renders a bounded number of pages at once rather than every story together.
 
-| Setting                                                                                  | Default                                                       | What it controls                                                 |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `testing.concurrency`                                                                    | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
-| `createPlaywrightCaptureRunner({ concurrency })` / `SHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
-| `createPlaywrightCaptureRunner({ navigationTimeoutMs })` / `SHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
+| Setting                                                                        | Default                                                       | What it controls                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `testing.concurrency`                                                          | auto: 2 builds on hosts with ≥ 2 CPUs and ≥ 3 GB, otherwise 1 | Builds captured at the same time (each launches its own browser) |
+| `createCaptureRunner({ concurrency })` / `SHELF_CAPTURE_CONCURRENCY`           | auto (see below)                                              | Pages rendering at once within one build                         |
+| `createCaptureRunner({ navigationTimeoutMs })` / `SHELF_NAVIGATION_TIMEOUT_MS` | auto: 30 s, 60 s under 2 CPUs, 90 s under 1 CPU               | Per-page navigation and action timeout                           |
 
-| `createPlaywrightCaptureRunner({ reusePages })` / `SHELF_REUSE_PAGES` | on | Reuse a pool of reset pages instead of opening one per capture; `false` or `0` opens a fresh page each time |
-| `createPlaywrightCaptureRunner({ recycleBrowserEvery })` / `SHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
+| `createCaptureRunner({ reusePages })` / `SHELF_REUSE_PAGES` | on | Reuse a pool of reset pages instead of opening one per capture; `false` or `0` opens a fresh page each time |
+| `createCaptureRunner({ recycleBrowserEvery })` / `SHELF_BROWSER_RECYCLE_EVERY` | `150` (`0` disables) | Captures between browser restarts |
 
 The defaults are sized from the CPU and memory the process can actually use, including container limits (cgroup CPU quota and memory limit), so a 0.5 vCPU / 1 GB container on a big host is treated as 0.5 / 1 GB. Pages at once is the smaller of the CPU count (rounded up), `(memory − 512 MB) / 300 MB`, and 4, with a minimum of 1. In practice:
 

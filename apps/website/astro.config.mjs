@@ -34,6 +34,8 @@ export default defineConfig({
     "/openapi": "/api/",
     "/guides/ai-insights": "/ai/",
     "/guides/ai-testing": "/ai/testing/",
+    "/packages/runner-playwright": "/packages/runner/",
+    "/reference/runner-playwright": "/reference/runner/",
   },
   markdown: { remarkPlugins: [remarkReferenceLinks, remarkReadmeSection] },
   integrations: [
@@ -265,7 +267,7 @@ export default defineConfig({
               "storage-azure",
               "storage-gcs",
             ]),
-            packageGroup("Capture runners", ["runner-playwright"]),
+            packageGroup("Capture runners", ["runner"]),
           ],
         },
       ],

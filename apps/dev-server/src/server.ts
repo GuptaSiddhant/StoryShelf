@@ -14,7 +14,7 @@ import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Local StoryShelf dev server.
  *
@@ -122,7 +122,7 @@ mkdirSync(dataDir, { recursive: true });
 // Adapters — swap these to try other combinations.
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
-const captureRunner = createPlaywrightCaptureRunner();
+const captureRunner = createCaptureRunner();
 
 const ui = buildUi();
 
@@ -132,7 +132,7 @@ const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 
 // Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
-// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// SHELF_SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 

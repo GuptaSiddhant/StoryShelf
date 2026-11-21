@@ -40,7 +40,7 @@ describe("generatePackageJson", () => {
       "@storyshelf/app",
       "@storyshelf/core",
       "@storyshelf/db-sqlite",
-      "@storyshelf/runner-playwright",
+      "@storyshelf/runner",
     ]);
   });
 

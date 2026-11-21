@@ -23,7 +23,7 @@ function buildImports(answers: Answers): string[] {
     `import { createShelfApp } from "@storyshelf/app";`,
     DB_IMPORT[answers.database],
     STORAGE_IMPORT[answers.storage],
-    `import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";`,
+    `import { createCaptureRunner } from "@storyshelf/runner";`,
     ...(wantsObservability(answers) ? OBSERVABILITY_IMPORTS : []),
     ...authImports(answers),
     ...(wantsNotifications(answers) ? notificationImports(answers) : []),
@@ -62,13 +62,13 @@ function buildAdapterLines(answers: Answers): string[] {
     ...dbPrelude(answers.database),
     `const database = ${DB_INIT[answers.database]};`,
     `const storage = ${STORAGE_INIT[answers.storage]};`,
-    `const captureRunner = createPlaywrightCaptureRunner();`,
+    `const captureRunner = createCaptureRunner();`,
     ...(wantsNotifications(answers) ? EMAIL_SENDER_LINES : []),
   ];
 }
 
 const EMAIL_SENDER_LINES = [
-  `// SMTP sender from SMTP_* env (undefined keeps invites out-of-band).`,
+  `// SMTP sender from SHELF_SMTP_* env (undefined keeps invites out-of-band).`,
   `const emailSender = await smtpPresetFromEnv(process.env);`,
 ];
 

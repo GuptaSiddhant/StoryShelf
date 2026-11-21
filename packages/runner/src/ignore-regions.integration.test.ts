@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 
 /**
  * Real-browser check of ignore regions (#456) in the Playwright runner: a value that changes on
@@ -57,7 +57,7 @@ afterAll(async () => {
 });
 
 async function shotOf(input: StoryEntry, buildId: string): Promise<string> {
-  const result = await createPlaywrightCaptureRunner().render({
+  const result = await createCaptureRunner().render({
     buildId,
     storybookDir: dir,
     stories: [input],

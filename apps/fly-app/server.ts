@@ -23,7 +23,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Fly demo server — SQLite on the volume, objects on the volume or in S3-compatible storage.
  *
@@ -34,7 +34,7 @@ import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
  * Mirrors apps/dev-server/src/server.ts wiring:
  *  - @storyshelf/db-sqlite → {SHELF_DATA_DIR}/shelf.db
  *  - @storyshelf/storage-local → SHELF_DATA_DIR, or @storyshelf/storage-s3 (Tigris) when SHELF_S3_BUCKET is set
- *  - @storyshelf/runner-playwright → chrome-headless-shell installed in the image
+ *  - @storyshelf/runner → chrome-headless-shell installed in the image
  *
  * Capture stays in-process: the 1-CPU Fly VM is below the threshold where
  * core would fork a capture child, so a `testing.workerEntry` would never apply.
@@ -134,7 +134,7 @@ const { storage, log: storageLog } = storageFromEnv(env, dataDir);
 // With FLY_SPRITES_TOKEN and SPRITE_BROWSER_SECRET set, `chromium@sprite` (a hibernating Fly Sprite,
 // apps/fly-app/sprite/) is selectable beside the VM's own Chromium; unset, only the latter.
 const sprite = spriteFromEnv(env);
-const captureRunner = createPlaywrightCaptureRunner({
+const captureRunner = createCaptureRunner({
   browsers: browsersFor(sprite),
   // The runner reads SHELF_CAPTURE_CONCURRENCY itself; unset, it sizes from the VM's CPU and memory.
 });
@@ -154,7 +154,7 @@ shelfLogger.info({ spriteBrowser: sprite !== null }, "remote browsers");
 shelfLogger.info(aiLogFields(ai), "ai insights");
 
 // Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
-// SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// SHELF_SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 // SHELF_INTEGRATIONS_DISABLED turns integrations off without code (#1126); an unknown kind stops startup.
@@ -240,7 +240,8 @@ if (authPassword) {
 async function provisionDemoViewer(): Promise<void> {
   try {
     const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
-    if (done.userCreated || done.memberAdded) logger.info(done, "Demo viewer provisioned");
+    if (done.userCreated || done.memberAdded || done.credentialSet)
+      logger.info(done, "Demo viewer provisioned");
   } catch (err) {
     logger.error({ err }, "Demo viewer provisioning failed");
   }

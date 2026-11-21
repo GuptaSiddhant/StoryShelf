@@ -13,15 +13,27 @@ Before any upgrade, [back up](/guides/backup-restore/) the database and the stor
 
 ### `@storyshelf/runner-puppeteer` is removed
 
-**Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use `@storyshelf/runner-playwright`, nothing changes.
+**Who is affected:** a server that builds its capture runner with `createPuppeteerCaptureRunner` from `@storyshelf/runner-puppeteer`. If you use the Playwright runner, nothing changes here (see the rename below).
 
 0.14.0 deprecated the package and 0.15.0 removes it ([ADR 0001](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0001-architecture-and-conventions.md), amendment 2026-11-20). Switch to the Playwright runner while you are still on 0.14.x, then upgrade. The steps, the option mapping and the note about the new baseline are in [Switching from Puppeteer to Playwright](#switching-from-puppeteer-to-playwright).
+
+### `@storyshelf/runner-playwright` is now `@storyshelf/runner`
+
+**Who is affected:** a server that imports `@storyshelf/runner-playwright` or `@storyshelf/runner-playwright/remote`, or scaffolded one with `server init` before 0.15.0.
+
+With Puppeteer gone there is one runner, so it has the plain name. Nothing else changes: the same options, the same subpaths, the same captures and no new baseline.
+
+1. Replace the dependency: remove `@storyshelf/runner-playwright` and add `@storyshelf/runner`.
+2. Change the imports: `@storyshelf/runner-playwright` becomes `@storyshelf/runner`, and `@storyshelf/runner-playwright/remote` becomes `@storyshelf/runner/remote`.
+3. Rename the factory: `createPlaywrightCaptureRunner` is now `createCaptureRunner`.
+
+There is no alias and no re-export: `@storyshelf/runner-playwright` is not published again, and the owner deprecates the npm package with a message naming the new one.
 
 ### Switching from Puppeteer to Playwright
 
 Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0.15.0.
 
-1. Install `@storyshelf/runner-playwright`, run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
+1. Install `@storyshelf/runner-playwright` (0.14.x; after 0.15.0 it is `@storyshelf/runner`), run `playwright install chromium` (or use an image that has it) and remove `@storyshelf/runner-puppeteer`.
 2. Change the import and factory: `createPuppeteerCaptureRunner` becomes `createPlaywrightCaptureRunner` from `@storyshelf/runner-playwright`.
 3. Map the options:
 

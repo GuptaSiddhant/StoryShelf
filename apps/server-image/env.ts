@@ -13,7 +13,7 @@ import { createMysqlDatabase } from "@storyshelf/db-mysql";
 import { createPostgresDatabase } from "@storyshelf/db-postgres";
 import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db-postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { azurePlaywright } from "@storyshelf/runner-playwright/remote";
+import { azurePlaywright } from "@storyshelf/runner/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage-azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage-gcs";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage-s3";
@@ -162,13 +162,13 @@ function rdsIamOptions(env: Env): RdsIamDatabaseOptions {
   };
 }
 
-/** The RDS IAM database the `DATABASE_IAM_*` variables describe; never combined with `DATABASE_URL`, never a fallback. */
+/** The RDS IAM database the `SHELF_DATABASE_IAM_*` variables describe; never combined with `DATABASE_URL`, never a fallback. */
 function rdsIamFromEnv(
   env: Env,
   factories: Factories,
 ): { database: DatabaseAdapter; log: { database: string } } {
   if (nonEmpty(env["DATABASE_URL"]) !== undefined) {
-    throw new Error("Set the DATABASE_IAM_* variables or DATABASE_URL, not both");
+    throw new Error("Set the SHELF_DATABASE_IAM_* variables or DATABASE_URL, not both");
   }
   const options = rdsIamOptions(env);
   const max = poolMaxFromEnv(env);
@@ -199,7 +199,7 @@ function urlDatabase(
 }
 
 /**
- * Which database the environment names. any `DATABASE_IAM_*` variable selects an RDS or Aurora Postgres
+ * Which database the environment names. any `SHELF_DATABASE_IAM_*` variable selects an RDS or Aurora Postgres
  * with short-lived IAM tokens (the `rds-iam` preset); it never falls back to anything else, so an
  * incomplete configuration, or one that also sets `DATABASE_URL`, refuses to boot. Otherwise
  * `DATABASE_URL` names a Postgres or MySQL database, and with neither it is SQLite on the volume.

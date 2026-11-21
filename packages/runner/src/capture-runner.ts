@@ -26,11 +26,11 @@ import type {
 declare const __PKG_VERSION__: string | undefined;
 
 /** Create a CaptureRunner that renders Storybook stories with Playwright. */
-export function createPlaywrightCaptureRunner(
+export function createCaptureRunner(
   options: {
     /**
      * Every target the runner offers, default first (ADR 0007, decision 1): engine names,
-     * `local(engine, options)`, or remote services from `@storyshelf/runner-playwright/remote`
+     * `local(engine, options)`, or remote services from `@storyshelf/runner/remote`
      * (`<engine>@<name>` targets). Default `["chromium"]`; Firefox and WebKit are offered only when
      * listed, and their binaries provisioned (`playwright install`), which `playwright-core` never
      * does. A list with no local entry needs no installed browsers.

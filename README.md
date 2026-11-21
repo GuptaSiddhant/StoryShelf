@@ -81,7 +81,7 @@ packages/
   storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
-  runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
+  runner/         @storyshelf/runner — Playwright capture runner
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK
 apps/

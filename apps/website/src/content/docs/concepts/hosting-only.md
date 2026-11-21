@@ -7,7 +7,7 @@ description: Run StoryShelf without the testing option to publish and share Stor
 
 ```ts
 createShelfApp({ database, storage }); // hosting only
-createShelfApp({ database, storage, testing: { runner: createPlaywrightCaptureRunner() } });
+createShelfApp({ database, storage, testing: { runner: createCaptureRunner() } });
 ```
 
 ## What works without `testing`

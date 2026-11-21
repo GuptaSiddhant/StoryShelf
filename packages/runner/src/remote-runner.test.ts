@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPlaywrightCaptureRunner } from "./capture-runner.ts";
+import { createCaptureRunner } from "./capture-runner.ts";
 import { RemoteBrowserLostError } from "./remote-loss.ts";
 import { remote } from "./remote/remote.ts";
 
@@ -203,7 +203,7 @@ describe("a remote target", () => {
       Object.assign(new Error("screenshot timed out"), { name: "TimeoutError" }),
     );
     const onCapture = vi.fn(async () => {});
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
     const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
     expect(result.failures).toEqual([]);
     expect(fake.state.screenshots).toBe(2);
@@ -216,7 +216,7 @@ describe("a remote target", () => {
     const onCapture = vi.fn(async () => {
       throw Object.assign(new Error("storage write failed"), { name: "TimeoutError" });
     });
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
     const result = await runner.render(input({ stories: [STORIES[0]], onCapture }));
     expect(result.failures[0]?.error).toContain("storage write failed");
     expect(fake.state.screenshots).toBe(1);
@@ -227,7 +227,7 @@ describe("a remote target", () => {
     fake.state.screenshotErrors.push(
       Object.assign(new Error("screenshot timeout"), { name: "TimeoutError" }),
     );
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [farm({ sessions: 4, maxPagesPerConnection: 2 })],
       concurrency: 4,
     });
@@ -240,7 +240,7 @@ describe("a remote target", () => {
   });
 
   it("connects with the headers and exposeNetwork, per engine, and renders over loopback", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    const runner = createCaptureRunner({ browsers: [farm()] });
     const result = await runner.render(input({ target: "firefox@grid" }));
     expect(fake.state.connects).toEqual([
       {
@@ -260,7 +260,7 @@ describe("a remote target", () => {
   });
 
   it("defaults to the first target, and lists the targets with how each is reached", () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    const runner = createCaptureRunner({ browsers: [farm()] });
     expect(runner.metadata.targets).toEqual([
       { target: "chromium@grid", reach: "loopback", status: "ready" },
       { target: "firefox@grid", reach: "loopback", status: "ready" },
@@ -268,7 +268,7 @@ describe("a remote target", () => {
   });
 
   it("reports the environment measured in the browser, never the host's", async () => {
-    const result = await createPlaywrightCaptureRunner({ browsers: [farm()] }).render(input());
+    const result = await createCaptureRunner({ browsers: [farm()] }).render(input());
     expect(result.environment).toEqual({
       browserVersion: "131.0.1",
       platform: "linux",
@@ -279,7 +279,7 @@ describe("a remote target", () => {
 
   it("logs the remote's limits once at run start, without its endpoint or credentials", async () => {
     const info = vi.fn();
-    await createPlaywrightCaptureRunner({
+    await createCaptureRunner({
       browsers: [farm({ maxPagesPerConnection: 1, maxConnections: 2, experimental: true })],
     }).render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
     const sizing = info.mock.calls.filter(([, message]) => message === "remote sizing");
@@ -300,7 +300,7 @@ describe("a remote target", () => {
   it("falls back to the configured OS when the page cannot be probed, and omits what it cannot know", async () => {
     fake.state.probeFails = true;
     const warn = vi.fn();
-    const result = await createPlaywrightCaptureRunner({ browsers: [farm()] }).render(
+    const result = await createCaptureRunner({ browsers: [farm()] }).render(
       input({ logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } }),
     );
     expect(result.environment).toEqual({ browserVersion: "131.0.1", platform: "windows" });
@@ -311,7 +311,7 @@ describe("a remote target", () => {
   });
 
   it("connects over CDP when the service speaks only that, and then needs a URL", async () => {
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [
         farm({
           name: "cdp",
@@ -339,7 +339,7 @@ describe("a remote target", () => {
   });
 
   it("refuses a Storybook URL that is not the directory root, before any connection", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    const runner = createCaptureRunner({ browsers: [farm()] });
     await expect(
       runner.render(input({ storybookUrl: "https://app.example/_s/tok/build/b/iframe.html" })),
     ).rejects.toThrow(/directory root/u);
@@ -347,7 +347,7 @@ describe("a remote target", () => {
   });
 
   it("reads parameters on a remote target as well", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    const runner = createCaptureRunner({ browsers: [farm()] });
     await runner.extractParameters?.({
       buildId: "b1",
       storybookDir,
@@ -356,7 +356,7 @@ describe("a remote target", () => {
     });
     expect(fake.state.connects).toHaveLength(1);
     await expect(
-      createPlaywrightCaptureRunner({
+      createCaptureRunner({
         browsers: [
           farm({
             engines: ["chromium"],
@@ -371,7 +371,7 @@ describe("a remote target", () => {
 
   it("opens a new session when the browser is recycled", async () => {
     const stories = Array.from({ length: 6 }, (_, index) => ({ ...STORIES[0]!, id: `s-${index}` }));
-    await createPlaywrightCaptureRunner({
+    await createCaptureRunner({
       browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
       recycleBrowserEvery: 2,
     }).render(input({ stories }));
@@ -380,7 +380,7 @@ describe("a remote target", () => {
   });
 
   it("holds every render of the target to its sessions, however many run at once", async () => {
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [farm({ name: "shared", sessions: 2 })],
       concurrency: 8,
     });
@@ -394,7 +394,7 @@ describe("a remote target", () => {
   });
 
   it("limits pages on each connection independently of the shared session gate", async () => {
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [farm({ sessions: 4, maxPagesPerConnection: 1 })],
       concurrency: 8,
     });
@@ -421,7 +421,7 @@ describe("a remote target", () => {
   it("logs the limits even when the connection fails, and reports the shared gate's size", async () => {
     const info = vi.fn();
     fake.state.failure = new Error("connect ECONNREFUSED");
-    await createPlaywrightCaptureRunner({
+    await createCaptureRunner({
       browsers: [farm({ retry: { attempts: 0, backoffMs: 1 } })],
     })
       .render(input({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
@@ -432,7 +432,7 @@ describe("a remote target", () => {
   });
 
   it("keeps a target offered when the service is down, but fails the job at once with no endpoint in the message", async () => {
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [farm({ retry: { attempts: 1, backoffMs: 1 } })],
     });
     fake.state.failure = new Error("connect ECONNREFUSED wss://farm.example/?key=sekret-key");
@@ -447,7 +447,7 @@ describe("a remote target", () => {
   });
 
   it("marks a target unavailable when its credentials are refused, and does not retry", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()] });
+    const runner = createCaptureRunner({ browsers: [farm()] });
     fake.state.failure = new Error(
       "WebSocket error: wss://farm.example/?key=sekret-key 401 Unauthorized",
     );
@@ -466,7 +466,7 @@ describe("a remote target", () => {
   });
 
   it("does not probe a remote target when verifying local engines", async () => {
-    const runner = createPlaywrightCaptureRunner({ browsers: ["chromium", farm()] });
+    const runner = createCaptureRunner({ browsers: ["chromium", farm()] });
     await runner.lifecycle?.setup({} as never);
     expect(fake.state.connects).toEqual([]);
     expect(runner.metadata.targets?.map((entry) => entry.target)).toEqual([
@@ -538,7 +538,7 @@ describe("a remote browser lost mid-pass", () => {
     const onCapture = vi.fn(async () => {});
     const warn = vi.fn();
     fake.state.dropAfterScreenshots = 1;
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
     const error: unknown = await runner
       .render(input({ stories: MANY, onCapture, logger: { warn, info: vi.fn(), error: vi.fn() } }))
       .catch((caught: unknown) => caught);
@@ -561,7 +561,7 @@ describe("a remote browser lost mid-pass", () => {
     const { service, released } = leased();
     fake.state.dropAfterScreenshots = 1;
     await expect(
-      createPlaywrightCaptureRunner({ browsers: [service], concurrency: 1 }).render(
+      createCaptureRunner({ browsers: [service], concurrency: 1 }).render(
         input({ stories: MANY, target: "chromium@grid" }),
       ),
     ).rejects.toBeInstanceOf(RemoteBrowserLostError);
@@ -570,7 +570,7 @@ describe("a remote browser lost mid-pass", () => {
 
   it("settles every in-flight sibling into the same single error", async () => {
     fake.state.dropAfterScreenshots = 0;
-    const runner = createPlaywrightCaptureRunner({
+    const runner = createCaptureRunner({
       browsers: [farm({ sessions: 4, maxPagesPerConnection: 4 })],
       concurrency: 4,
     });
@@ -581,7 +581,7 @@ describe("a remote browser lost mid-pass", () => {
 
   it("treats a page crash on a connected browser as a story failure, not a lost browser", async () => {
     fake.state.screenshotErrors.push(new Error("Page crashed"));
-    const runner = createPlaywrightCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
     const result = await runner.render(input({ stories: [STORIES[0]] }));
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0]?.error).toContain("Page crashed");
@@ -589,7 +589,7 @@ describe("a remote browser lost mid-pass", () => {
 
   it("keeps a cancel a cancel when it closes the browser under the run", async () => {
     const { service, released } = leased();
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const hold = holdRenders();
     const rendering = runner.render(input({ stories: MANY, target: "chromium@grid", runId: "s1" }));
     await vi.waitFor(() => {
@@ -607,7 +607,7 @@ describe("a remote browser lost mid-pass", () => {
 describe("a remote target with a function connect and release", () => {
   it("connects per shard with its identity, to what it returned, and releases as finished", async () => {
     const { service, seen, released } = leased();
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     await Promise.all(
       [1, 2].map(
         async (shardIndex) =>
@@ -640,9 +640,7 @@ describe("a remote target with a function connect and release", () => {
 
   it("tells an unsharded render apart: no shard index, the build id as its run", async () => {
     const { service, seen } = leased();
-    await createPlaywrightCaptureRunner({ browsers: [service] }).render(
-      input({ target: "chromium@grid" }),
-    );
+    await createCaptureRunner({ browsers: [service] }).render(input({ target: "chromium@grid" }));
     expect(seen[0]?.shardIndex).toBeUndefined();
     expect(seen[0]?.runId).toBe("b1");
   });
@@ -651,9 +649,7 @@ describe("a remote target with a function connect and release", () => {
     const { service, released } = leased();
     fake.state.failure = new Error("401 Unauthorized");
     await expect(
-      createPlaywrightCaptureRunner({ browsers: [service] }).render(
-        input({ target: "chromium@grid" }),
-      ),
+      createCaptureRunner({ browsers: [service] }).render(input({ target: "chromium@grid" })),
     ).rejects.toBeInstanceOf(TargetLaunchError);
     expect(released).toHaveLength(1);
     expect(released[0]?.outcome).toBe("failed");
@@ -661,7 +657,7 @@ describe("a remote target with a function connect and release", () => {
 
   it("releases as cancelled when the build is cancelled mid-render", async () => {
     const { service, released } = leased();
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const hold = holdRenders();
     const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
     await vi.waitFor(() => {
@@ -676,7 +672,7 @@ describe("a remote target with a function connect and release", () => {
   it("stops waiting for a probe that hangs, warns, renders, and leaves the environment unknown", async () => {
     fake.state.probeHang = true;
     const warn = vi.fn();
-    const result = await createPlaywrightCaptureRunner({
+    const result = await createCaptureRunner({
       browsers: [farm({ timeouts: { probeMs: 20 } })],
     }).render(input({ logger: { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } }));
     expect(fake.state.probeStarted).toBe(1);
@@ -691,7 +687,7 @@ describe("a remote target with a function connect and release", () => {
   it("stops the run when the build is cancelled during the probe, and releases as cancelled", async () => {
     const { service, released } = leased();
     fake.state.probeHang = true;
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
     const outcome = rendering.then(
       () => "rendered",
@@ -720,7 +716,7 @@ describe("a remote target with a function connect and release", () => {
           });
         }),
     });
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const rendering = runner.render(input({ target: "chromium@grid", runId: "s1" }));
     await vi.waitFor(() => {
       expect(started).toHaveBeenCalledTimes(1);
@@ -736,7 +732,7 @@ describe("a remote target with a function connect and release", () => {
       retry: { attempts: 1, backoffMs: 1 },
       connect: () => Promise.reject(new Error("wake failed")),
     });
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const error = (await runner
       .render(input({ target: "chromium@grid" }))
       .catch((caught: unknown) => caught)) as TargetLaunchError;
@@ -753,7 +749,7 @@ describe("a remote target with a function connect and release", () => {
         maxConnections: 1,
         timeouts: { acquireMs: 50 },
       });
-      const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+      const runner = createCaptureRunner({ browsers: [service] });
       const hold = holdRenders();
       const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
       await vi.waitFor(() => {
@@ -777,7 +773,7 @@ describe("a remote target with a function connect and release", () => {
         maxConnections: 1,
         timeouts: { acquireMs: 50 },
       });
-      const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+      const runner = createCaptureRunner({ browsers: [service] });
       const hold = holdRenders();
       const first = runner.render(input({ shardIndex: 1, runId: "s1", target: "chromium@grid" }));
       await vi.waitFor(() => {
@@ -823,7 +819,7 @@ describe("a remote target with a function connect and release", () => {
         ...STORIES[0]!,
         id: `s-${index}`,
       }));
-      const result = await createPlaywrightCaptureRunner({
+      const result = await createCaptureRunner({
         browsers: [service],
         recycleBrowserEvery: 2,
         concurrency: 1,
@@ -837,7 +833,7 @@ describe("a remote target with a function connect and release", () => {
 
   it("releases leases still held when the runner shuts down", async () => {
     const { service, released } = leased();
-    const runner = createPlaywrightCaptureRunner({ browsers: [service] });
+    const runner = createCaptureRunner({ browsers: [service] });
     const hold = holdRenders();
     const rendering = runner.render(input({ target: "chromium@grid", runId: "s9" }));
     await vi.waitFor(() => {
