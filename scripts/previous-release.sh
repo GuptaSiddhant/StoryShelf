@@ -8,7 +8,10 @@
 #   5. mixed queue: this checkout enqueues every job kind (a repository link's `notify` job at
 #      payload version 2 among them); the published release's consumers run alone (a rollback),
 #      then beside this checkout's (a rolling deploy). No job may end `failed` because of its kind
-#      or payload version, and each must run once, on a consumer that understands it.
+#      or payload version, and each must run once, on a consumer that understands it. What the
+#      published release understands is what it declares (`mixed-queue-previous.mjs` logs each
+#      handler's payload version), never a number typed into the test. One synthetic job per queue
+#      at a version no release reads must stay queued and be handed back by both releases.
 # Fails if any step fails. Run from anywhere:
 #   scripts/previous-release.sh <sqlite|postgres>
 # Env: DATABASE_URL (postgres), PREVIOUS_RELEASE (default: newest `v*` tag), RUN_TAG_SUITES=0 to skip
@@ -87,6 +90,7 @@ if [ "${RUN_MIXED_QUEUE:-1}" = 1 ]; then
   mixed enqueue 2
   mixed consume
   wait "$PREVIOUS_PID"
+  mixed refuse # this checkout alone: it refuses a payload newer than it reads, as the previous does
   mixed final
 fi
 echo "== $DIALECT OK"
