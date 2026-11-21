@@ -226,7 +226,8 @@ if (authPassword) {
 async function provisionDemoViewer(): Promise<void> {
   try {
     const done = await ensureDemoViewer(databaseDeps(database), env["SHELF_DEMO_VIEWER_PASSWORD"]);
-    if (done.userCreated || done.memberAdded) logger.info(done, "Demo viewer provisioned");
+    if (done.userCreated || done.memberAdded || done.credentialSet)
+      logger.info(done, "Demo viewer provisioned");
   } catch (err) {
     logger.error({ err }, "Demo viewer provisioning failed");
   }

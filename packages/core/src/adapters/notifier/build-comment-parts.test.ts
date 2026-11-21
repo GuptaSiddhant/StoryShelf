@@ -107,6 +107,10 @@ describe("build-comment-changes", () => {
     const names = Array.from({ length: 12 }, (_, n) => `T${String(n)}`);
     expect(failedTestsSection(names)[0]).toContain("- …and 2 more");
     expect(failedTestsSection(["x"])[0]).toContain("1 failing Storybook test**");
+    // Only a failing test of a non-flaky story blocks (`statusesForBuild` follows the build status).
+    expect(failedTestsSection(["x"])[0]).toContain(
+      "(blocks the merge unless its story is marked flaky)",
+    );
     expect(removedSection(["A"])[0]).toContain("1 removed story");
     expect(removedSection(names)[0]).toContain("12 removed stories");
   });
