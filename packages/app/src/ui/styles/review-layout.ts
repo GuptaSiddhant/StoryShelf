@@ -90,11 +90,18 @@ export const filmstrip = css`
 /** The phone toggle: a visually hidden checkbox plus its label, shown only at 880px and below. */
 export const filmToggleInput = css`
   /* film-toggle-input */
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
+  /* Above 880px the label is hidden, so the checkbox must be too: an unlabelled control fails axe. */
+  display: none;
+  @media (max-width: 880px) {
+    & {
+      display: block;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      opacity: 0;
+    }
+  }
 `;
 
 export const filmToggleLabel = css`
@@ -334,6 +341,7 @@ export const actionBar = css`
   bottom: 0;
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
   justify-content: space-between;

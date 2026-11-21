@@ -130,11 +130,10 @@ A session also ends, and the next story gets a fresh load, when any of these is 
 - The attempt log records, per build: how many captures were switched, how many were confirmed on a
   fresh page, and each session end with its reason. No snapshot column is added.
 
-### 6. Both runners
+### 6. The runner
 
-- The Playwright and Puppeteer runners implement the same session rules with the same in-page
-  functions `[inferred: the Puppeteer files mirror the Playwright ones]`.
-- Each runner passes the gate on its own. A runner that has not passed reports that it cannot
+- The Playwright runner implements the session rules with the in-page functions.
+- The runner passes the gate on its own. A runner that has not passed reports that it cannot
   switch (decision 2).
 
 ### 7. Remote browsers

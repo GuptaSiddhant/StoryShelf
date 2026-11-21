@@ -1,5 +1,5 @@
 /**
- * Functions evaluated inside the story page. Playwright and Puppeteer serialise only a function's
+ * Functions evaluated inside the story page. Playwright serialises only a function's
  * source, so each must stay ONE self-contained function: no imports, helpers or module bindings
  * (`in-page.test.ts` rebuilds them from source in a bare scope to guard that).
  */

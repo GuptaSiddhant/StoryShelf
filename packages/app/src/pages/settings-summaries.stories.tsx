@@ -149,8 +149,11 @@ export const NotificationsList = pageStory(() =>
 /** Review & notifications with no channel yet. */
 export const NotificationsEmpty = pageStory(() => page("review", { notifyProviders: providers }));
 
-/** General: the project as a summary with Edit. */
-export const GeneralSummary = pageStory(() => page("general", {}));
+/** General for a site admin: the project as a summary with Edit, and the danger zone. */
+export const GeneralSummary = pageStory(() => page("general", { canDeleteProject: true }));
+
+/** General for a project admin who is not a site admin: Edit, but no danger zone. */
+export const GeneralProjectAdmin = pageStory(() => page("general", {}));
 
 /** General for a member who is not an admin: the summary alone. */
 export const GeneralNotAdmin = pageStory(() => page("general", { isAdmin: false }));

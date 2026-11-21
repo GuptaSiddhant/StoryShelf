@@ -272,3 +272,17 @@ export const RuntimeNeedsAttention = pageStory(() =>
     }),
   ),
 );
+
+export const TargetUnreachable = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      targets: [
+        { target: "chromium", reach: "loopback", status: "ready" },
+        { target: "chromium@sprite", reach: "url", status: "ready" },
+      ],
+      unreachable: new Map([
+        ["chromium@sprite", { reason: "connection", since: "2026-11-20T15:55:00.000Z" }],
+      ]),
+    }),
+  ),
+);

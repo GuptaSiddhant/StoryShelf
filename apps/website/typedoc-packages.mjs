@@ -25,7 +25,6 @@ const SLUGS = [
   "storage-azure",
   "storage-gcs",
   "runner-playwright",
-  "runner-puppeteer",
 ];
 
 /**
