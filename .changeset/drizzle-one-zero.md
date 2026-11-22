@@ -1,8 +1,6 @@
 ---
 "@storyshelf/core": minor
-"@storyshelf/db-sqlite": minor
-"@storyshelf/db-postgres": minor
-"@storyshelf/db-mysql": minor
+"@storyshelf/db": minor
 ---
 
 Changed: the database adapters run on Drizzle ORM 1.0 (1.0.0-rc.6)

@@ -1,5 +1,5 @@
 ---
-"@storyshelf/db-postgres": patch
+"@storyshelf/db": patch
 ---
 
 Security: rds-iam never connects without verifying the server certificate

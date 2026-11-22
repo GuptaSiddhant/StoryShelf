@@ -5,9 +5,7 @@
 "@storyshelf/app": patch
 "@storyshelf/auth": patch
 "@storyshelf/core": patch
-"@storyshelf/db-mysql": patch
-"@storyshelf/db-postgres": patch
-"@storyshelf/db-sqlite": patch
+"@storyshelf/db": patch
 "@storyshelf/mcp": patch
 "@storyshelf/observability": patch
 "@storyshelf/runner": patch
