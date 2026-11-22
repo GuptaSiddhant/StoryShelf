@@ -1,11 +1,14 @@
 import { getTableColumns, type Table } from "@storyshelf/core/orm";
-import { DDL } from "@storyshelf/db-postgres/ddl";
 import { describe, expect, it } from "vitest";
 import { baseAuthDateFieldsPg, baseAuthTablesPg } from "./auth-tables-pg.ts";
 
+/** `@storyshelf/db` does not publish its `ddl` module, so load it by file: a static import would pull another package's source into this package's type-check and declaration build. */
+const ddlModule = new URL("../../db/src/postgres/ddl.ts", import.meta.url).href;
+const { DDL } = (await import(ddlModule)) as { DDL: string };
+
 /**
  * Pin the pg auth definitions to the Postgres driver DDL: every table and
- * column in `auth-tables-pg.ts` must exist in db-postgres's hand-written
+ * column in `auth-tables-pg.ts` must exist in @storyshelf/db/postgres's hand-written
  * DDL. Quoted identifiers (`"user"`, `"ssoProvider"`) are normalized.
  */
 const PG_TABLE_BLOCK =

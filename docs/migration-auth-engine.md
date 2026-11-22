@@ -41,7 +41,7 @@ keeps users, memberships, invites, and UI. See ADR 0011.
 New engine tables auto-migrate on boot (`IF NOT EXISTS`, no action needed):
 
 - sqlite / Turso: `user`, `session`, `account`, `verification`, `passkey`, `ssoProvider`
-- Postgres: same six tables in `db-postgres` DDL (fresh installs migrate; existing
+- Postgres: same six tables in `@storyshelf/db/postgres` DDL (fresh installs migrate; existing
   installs pick them up on next boot)
 
 Dual-driver verification checklist (run before promoting the deploy):

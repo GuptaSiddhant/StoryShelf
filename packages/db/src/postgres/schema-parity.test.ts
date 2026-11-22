@@ -7,14 +7,14 @@ import {
   type GetTableConfig,
   type ParityAllowance,
 } from "@storyshelf/core/test-helpers";
-import { getTableConfig } from "drizzle-orm/mysql-core";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { DDL } from "./ddl.ts";
 import * as schema from "./schema/index.ts";
 
-const CORE_SCHEMA_DIR = fileURLToPath(new URL("../../core/src/schema", import.meta.url));
+const CORE_SCHEMA_DIR = fileURLToPath(new URL("../../../core/src/schema", import.meta.url));
 const MIGRATE_SOURCE = readFileSync(
   fileURLToPath(new URL("./migrate.ts", import.meta.url)),
   "utf8",
@@ -56,22 +56,22 @@ const DDL_ALLOWANCES: readonly ParityAllowance[] = [
   {
     table: "build_references",
     reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
-    issue: "ADR 0041",
+    issue: "#376",
   },
   {
     table: "build_reference_generations",
     reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
-    issue: "ADR 0041",
+    issue: "#376",
   },
   {
     table: "build_deletions",
     reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
-    issue: "ADR 0041",
+    issue: "#376",
   },
   {
     table: "build_content_releases",
     reason: "ADR 0039 lifecycle table: DDL only, read and written with the capability's own SQL.",
-    issue: "ADR 0041",
+    issue: "#376",
   },
   {
     table: "notification_channels",
@@ -129,7 +129,7 @@ const CORE_ALLOWANCES: readonly ParityAllowance[] = [];
 /** Tables and columns the DDL lacks on purpose. Every entry names the issue that removes it. */
 const REQUIRED_ALLOWANCES: readonly ParityAllowance[] = [];
 
-describe("mysql schema parity (ADR 0041)", () => {
+describe("postgres schema parity (ADR 0041)", () => {
   it("DDL and Drizzle schema agree on tables, columns, types, nullability, defaults and indexes", () => {
     expect(
       compareDdlWithDrizzle({

@@ -67,8 +67,7 @@ rather than pushing and waiting.
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
-- Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner`,
+- Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
 - `packages/cli` — `storyshelf` binary (project commands: upload/init/create/retry/cancel/protect; no Playwright, no server scaffold, no MCP commands).
 - `packages/create-storyshelf` — `create-storyshelf` (`npm create storyshelf`): scaffolds a server project that default-exports `defineShelfInstance`, and `--cloud` writes a Terraform stub. Zero runtime dependencies (`prompts` is bundled into one file); never depends on `@storyshelf/app` or `@storyshelf/core`. `--install` is opt-in and uses the runner from `npm_config_user_agent`. The scaffold's version pins wait on the generated version manifest (#1332).

@@ -112,6 +112,6 @@ jobs:
 
 ## How it fits in
 
-The server is scaffolded via `create-storyshelf`, which assembles `@storyshelf/core`, and `@storyshelf/db-sqlite` (local storage is built into core) and runs Playwright captures. The CLI never imports that stack — client-only by design.
+The server is scaffolded via `create-storyshelf`, which assembles `@storyshelf/core`, and `@storyshelf/db/sqlite` (local storage is built into core) and runs Playwright captures. The CLI never imports that stack — client-only by design.
 
 See `docs/architecture.md` for the capture workflow and `docs/testing.md` for the gated browser integration suite.

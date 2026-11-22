@@ -45,7 +45,7 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 > pass; the vitest worker then dies with `SIGSEGV`, failing the file. This
 > is upstream (`tursodatabase/libsql-client-ts` native instability), not a
 > repo regression: it reproduces on a pristine checkout with one client and
-> no test framework involved. If `db-sqlite` goes red with a worker
+> no test framework involved. If `@storyshelf/db/sqlite` goes red with a worker
 > `SIGSEGV` in `turso.test.ts`, check the native binding first.
 
 #### 2a. Per-adapter testing requirements (mandatory)
@@ -54,7 +54,7 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`db-*`)                                                | Runner / git / auth / notify                               |
+| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                                | Runner / git / auth / notify                               |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
 | `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
 | `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |
@@ -81,30 +81,30 @@ Rules:
   from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
   cross-connection row locking; say so where it is used, and prove locking against a real server
   before enabling the capability on a preset.
-- Postgres (`db-postgres/src/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
+- Postgres (`db/src/postgres/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
   twice. On PGlite it always runs and proves the SQL, the constraints and the rollback of domain
   writes, but both lifecycles share one session, so it does not prove locking (removing the row
   locks leaves it green). On a real server (one connection per lifecycle) it does: removing the same
   locks fails it. That half needs `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1`;
   the last says the database is disposable, because the suite clears `content_uses` and its
   collector pass claims every idle hash. CI runs that half on every pull request that
-  touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
+  touches `packages/db/src/postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.
-- The `pg` and `./neon` presets (`db-postgres/src/retention-pool-presets.test.ts`) run both suites on a
+- The `pg` and `./neon` presets (`db/src/postgres/retention-pool-presets.test.ts`) run both suites on a
   real server with every party on its own pool; `./neon` goes through a `ghcr.io/neondatabase/wsproxy`
   service (`NEON_WSPROXY`), and the file skips without the gates. A single injected connection staying off is hermetic.
-- Postgres activation (`db-postgres/src/retention-activation.test.ts`) runs `retentionActivationContractSuite`
+- Postgres activation (`db/src/postgres/retention-activation.test.ts`) runs `retentionActivationContractSuite`
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
   instances booting). The unit test pins that PGlite never exposes the capability.
-- MySQL (`db-mysql/src/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
+- MySQL (`db/src/mysql/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
   `buildReferenceContractSuite`, `retentionActivationContractSuite` and `retentionSkippedContractSuite`
   only against a real MySQL 8 server, every party on its own pool, plus the mirrored race tests
   (interrupted preparation, a writer in flight, two instances booting, a claim against preparation)
   and a use of a hash racing a collector's claim. Gates: `LIVE_CLOUD=1`, `MYSQL_SCHEMA_MUTATION_TEST=1`
   and `MYSQL_DATABASE_URL` (a user that may `CREATE DATABASE`: the skipped-build cases each get a
-  scratch database). CI runs it on every pull request that touches `packages/db-mysql/`,
+  scratch database). CI runs it on every pull request that touches `packages/db/src/mysql/`,
   `packages/core/src/test-helpers/` or `packages/core/src/adapters/database.ts` (job `mysql-lifecycle`,
   a `mysql:8.0` service container), and the nightly MySQL job runs it with the rest of the live suite.
   Removing the row locks or the named content locks fails it. The hermetic half
@@ -170,7 +170,7 @@ Rules:
 `scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
 
 ```sh
-nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/runner'
+nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db' --filter='@storyshelf/runner'
 (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
 nub run bench                      # warm-up run (dropped), then the median of 3
 nub run bench -- --runs 5 --out .tmp/bench.json
@@ -323,7 +323,7 @@ secrets are set. Local run example:
 ```sh
 export PATH="$HOME/.nub/bin:$PATH"
 LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
-  nubx turbo test --filter='@storyshelf/db-sqlite' --force
+  nubx turbo test --filter='@storyshelf/db' --force
 ```
 
 Database compatibility runs nightly and on demand in
@@ -334,7 +334,7 @@ upgrade test drops columns before rerunning migrations; it is skipped unless
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
 
 The review-schema upgrade (#269) is tested on every dialect from fixture databases built from the
-old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `db-*` package): SQLite and
+old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `@storyshelf/db` dialect directory): SQLite and
 Postgres (PGlite) run hermetically, and MySQL has a hermetic fake-server test plus
 `migrate-review.live.test.ts`, which needs the same flag and a user that may `CREATE DATABASE`
 (it upgrades the fixtures in a scratch database it drops afterwards). Postgres has the same live
@@ -343,7 +343,7 @@ may `CREATE DATABASE`; set the flag for a disposable server only). The MySQL liv
 review lifecycle on a real server: one claimant wins a review cycle, a reopening counts once, a
 build's verdicts go with the build and a user's with the user, and an anonymous verdict stays.
 
-The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
+The MySQL job also runs the shared `databaseContractSuite` (`packages/db/src/mysql/contract.test.ts`),
 as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so
 `nub run test` stays hermetic. To run it yourself, against a disposable database:
 
@@ -351,7 +351,7 @@ as SQLite and Postgres do, in its own database. That file is skipped unless `MYS
 docker run -d --name shelf-mysql -p 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
 # a fresh container needs a while to initialise: wait until it answers, for at most 60 s, and only then run the tests
 timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -ppw --silent; do sleep 1; done' \
-  && MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db-mysql
+  && MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db
 ```
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not

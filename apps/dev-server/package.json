@@ -14,7 +14,7 @@
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner": "workspace:*",
     "nodemailer": "^10.2.1"
