@@ -172,8 +172,10 @@ describe("spike tables", () => {
     expect(names.indexOf("projects")).toBe(0);
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
+    expect(names.indexOf("user")).toBeLessThan(names.indexOf("session"));
+    expect(names.indexOf("user")).toBeLessThan(names.indexOf("ssoProvider"));
     expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
     expect(names.indexOf("snapshots")).toBeLessThan(names.indexOf("comments"));
-    expect(new Set(names).size).toBe(39);
+    expect(new Set(names).size).toBe(45);
   });
 });
