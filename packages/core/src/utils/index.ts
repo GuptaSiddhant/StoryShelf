@@ -61,27 +61,7 @@ export {
   publishedBrotliPath,
   publishedGzipPath,
 } from "./paths.ts";
-export {
-  AdaptiveConcurrency,
-  isTimeoutError,
-  type AdaptiveOptions,
-  type Observation,
-} from "./adaptive-concurrency.ts";
 export { detectCaptureEnvironment, systemFontsHash } from "./environment.ts";
-export {
-  isRetryableConnectError,
-  retryConnect,
-  type RetryConnectOptions,
-} from "./connect-retry.ts";
-export {
-  FONT_PROBE_FAMILIES,
-  boundedProbe,
-  inPageProbe,
-  remoteEnvironment,
-  type BrowserProbe,
-  type ProbeControl,
-  type ProbeOutcome,
-} from "./remote-environment.ts";
 export { storybookBase } from "./storybook-url.ts";
 export {
   DEFAULT_STORYBOOK_URL_TTL,
@@ -113,10 +93,7 @@ export {
   type StorybookTokenPurpose,
   type StorybookTokenResult,
 } from "./storybook-token.ts";
-export { createSessionGate, sessionGateFor, type SessionGate } from "./session-gate.ts";
 export { storeScreenshot } from "./screenshot-store.ts";
-export { createPageLimiter, type PageLimiter, type PageLimiterOptions } from "./page-limiter.ts";
-export { mapAdaptive } from "./map-adaptive.ts";
 export { chunk, mapLimit } from "./map-limit.ts";
 export {
   DEFAULT_RECYCLE_BROWSER_EVERY,

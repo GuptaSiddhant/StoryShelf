@@ -1,5 +1,6 @@
 /** A self-hosted Playwright server (`playwright run-server`), or anything speaking its protocol. */
-import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
+import type { RemoteBrowser } from "./remote-browser.ts";
 import { remote } from "./remote.ts";
 
 /** Options of {@link playwrightServer}. */

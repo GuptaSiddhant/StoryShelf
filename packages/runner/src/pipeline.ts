@@ -3,10 +3,8 @@
 import {
   TargetLaunchError,
   engineOf,
-  logRemoteSizing,
   type CaptureEnvironment,
   type CaptureTarget,
-  type RemoteTarget,
   type RenderResult,
   type RenderedSnapshot,
   type StoryEntry,
@@ -19,20 +17,21 @@ import {
   DEFAULT_RECYCLE_BROWSER_EVERY,
   chunk,
   describeSizing,
-  createPageLimiter,
   detectCaptureEnvironment,
   errorText,
-  isTimeoutError,
-  sessionGateFor,
   storybookBase,
-  type SessionGate,
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { TransientCaptureError } from "./capture-retry.ts";
+import { isTimeoutError } from "./concurrency/adaptive-concurrency.ts";
+import { createPageLimiter } from "./concurrency/page-limiter.ts";
 import { PagePool } from "./pages.ts";
 import { measureRemote } from "./remote-environment.ts";
 import { RemoteBrowserLostError, browserLost } from "./remote-loss.ts";
+import type { RemoteTarget } from "./remote/remote-browser.ts";
+import { logRemoteSizing } from "./remote/remote-sizing.ts";
+import { sessionGateFor, type SessionGate } from "./remote/session-gate.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";

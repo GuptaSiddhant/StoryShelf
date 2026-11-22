@@ -2,9 +2,7 @@
 
 import {
   createTargetOffers,
-  shutdownRemote,
   type CaptureRunner,
-  type RemoteTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
 import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
@@ -13,6 +11,8 @@ import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
 import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
+import type { RemoteTarget } from "./remote/remote-browser.ts";
+import { shutdownRemote } from "./remote/remote-lease.ts";
 import { resolveSettings } from "./settings.ts";
 import { flattenBrowsers, type BrowserEntry, type LocalTarget } from "./targets.ts";
 import { runTestEntries } from "./tests.ts";

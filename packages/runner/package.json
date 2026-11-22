@@ -34,6 +34,10 @@
       "source": "./src/index.ts",
       "default": "./dist/index.mjs"
     },
+    "./a11y": {
+      "source": "./src/a11y/index.ts",
+      "default": "./dist/a11y/index.mjs"
+    },
     "./remote": {
       "source": "./src/remote/index.ts",
       "default": "./dist/remote/index.mjs"
@@ -43,6 +47,7 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.mjs",
+      "./a11y": "./dist/a11y/index.mjs",
       "./remote": "./dist/remote/index.mjs",
       "./package.json": "./package.json"
     },
@@ -56,7 +61,7 @@
     "test": "vitest run",
     "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
     "prepublishOnly": "nub run build",
-    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts src/concurrency/adaptive-concurrency.test.ts src/concurrency/page-limiter.test.ts src/remote/session-gate.test.ts"
   },
   "dependencies": {
     "@storyshelf/core": "workspace:*",

@@ -1,5 +1,5 @@
+import { TargetLaunchError } from "@storyshelf/core/adapter/capture-runner";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TargetLaunchError } from "./capture-target.ts";
 import {
   defineRemote,
   remoteTargetsOf,

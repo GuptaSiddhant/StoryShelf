@@ -1,12 +1,10 @@
 /** Browser lifecycle and active-run tracking for Playwright. */
 
-import {
-  RenderRuns,
-  type HeldConnection,
-  type RemoteLeaseOutcome,
-} from "@storyshelf/core/adapter/capture-runner";
+import { RenderRuns } from "@storyshelf/core/adapter/capture-runner";
 import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
+import type { RemoteLeaseOutcome } from "./remote/remote-browser.ts";
+import type { HeldConnection } from "./remote/remote-lease.ts";
 import type { ActiveRun } from "./types.ts";
 
 /** Tracks in-flight renders, each by its own handle, so `cancel` aborts exactly the runs it names. */
