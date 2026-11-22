@@ -1,4 +1,5 @@
 /** The tables defined once in core (ADR 0041); the rest are still hand-written per dialect. */
+import { tokens, userConnections, userInviteTokens } from "./access.ts";
 import {
   buildContentReleases,
   buildDeletions,
@@ -7,7 +8,9 @@ import {
   builds,
 } from "./build.ts";
 import { buildLabels, labelTypes } from "./label.ts";
+import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
 import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
+import { schemaMeta, siteSettings } from "./settings.ts";
 import { users } from "./user.ts";
 
 export {
@@ -18,11 +21,19 @@ export {
   buildReferences,
   builds,
   labelTypes,
+  notificationChannels,
+  notificationSubscriptions,
   projectGroupMappings,
   projectLinks,
   projectMembers,
   projects,
+  schemaMeta,
+  siteSettings,
+  tokens,
+  userConnections,
+  userInviteTokens,
   users,
+  webhooks,
 };
 
 /** Every neutral table, parents before children, for `buildAll`. */
@@ -39,4 +50,12 @@ export const NEUTRAL_TABLES = [
   buildReferenceGenerations,
   buildDeletions,
   buildContentReleases,
+  siteSettings,
+  schemaMeta,
+  tokens,
+  userInviteTokens,
+  userConnections,
+  webhooks,
+  notificationChannels,
+  notificationSubscriptions,
 ] as const;

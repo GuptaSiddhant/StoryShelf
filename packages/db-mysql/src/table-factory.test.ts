@@ -25,9 +25,14 @@ const resolverOf = (tables: Record<string, unknown>) =>
 const TABLES = ns.NEUTRAL_TABLES.map((table) => table.name);
 
 /** Every remaining difference, `today → generated`, with its classification. */
-/** None: MySQL's generated DDL matches `ddl.ts` plus `migrate.ts`'s indexes exactly. */
-const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] =
-  [];
+const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory" | "schema" }[] = [
+  {
+    // SQLite's ddl.ts indexes the foreign key; Postgres and MySQL never did. The neutral table
+    // indexes it everywhere: a new non-unique index, an ADR 0053 expand step.
+    difference: "index user_invite_tokens_user_id_idx: only generated",
+    kind: "schema",
+  },
+];
 
 /** No DEFAULT on a MySQL TEXT column: the json<T> default is applied on insert. */
 const JSON_DDL = /`body` text NOT NULL,\n\t`extra` text\n/u;
@@ -90,6 +95,30 @@ describe("MySQL table factory (spike #800)", () => {
     >();
     expectTypeOf(mysqlTableOf(ns.projectLinks, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.projectLinks.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.siteSettings, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.siteSettings.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.schemaMeta, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.schemaMeta.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.tokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.tokens.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.userInviteTokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userInviteTokens.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.userConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userConnections.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.webhooks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.webhooks.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.notificationChannels, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationChannels.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.notificationSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationSubscriptions.$inferSelect
     >();
     expect(Object.keys(builds)).toContain("retentionState");
   });

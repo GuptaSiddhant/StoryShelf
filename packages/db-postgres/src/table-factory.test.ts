@@ -56,6 +56,12 @@ const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory"
     difference: `${column}: notNull true → false`,
     kind: "equivalent" as const,
   })),
+  {
+    // SQLite's ddl.ts indexes the foreign key; Postgres and MySQL never did. The neutral table
+    // indexes it everywhere: a new non-unique index, an ADR 0053 expand step.
+    difference: "index user_invite_tokens_user_id_idx: only generated",
+    kind: "schema",
+  },
 ];
 
 /** A json<T> column is TEXT, its default the JSON text. */
@@ -119,6 +125,30 @@ describe("Postgres table factory (spike #800)", () => {
     >();
     expectTypeOf(pgTableOf(ns.projectLinks, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.projectLinks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.siteSettings, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.siteSettings.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.schemaMeta, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.schemaMeta.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.tokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.tokens.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.userInviteTokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userInviteTokens.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.userConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userConnections.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.webhooks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.webhooks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.notificationChannels, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationChannels.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.notificationSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationSubscriptions.$inferSelect
     >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
