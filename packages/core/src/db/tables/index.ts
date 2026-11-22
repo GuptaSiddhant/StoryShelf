@@ -7,6 +7,7 @@ import {
   builds,
 } from "./build.ts";
 import { buildLabels, labelTypes } from "./label.ts";
+import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
 import { users } from "./user.ts";
 
 export {
@@ -17,12 +18,20 @@ export {
   buildReferences,
   builds,
   labelTypes,
+  projectGroupMappings,
+  projectLinks,
+  projectMembers,
+  projects,
   users,
 };
 
 /** Every neutral table, parents before children, for `buildAll`. */
 export const NEUTRAL_TABLES = [
+  projects,
   users,
+  projectMembers,
+  projectGroupMappings,
+  projectLinks,
   builds,
   labelTypes,
   buildLabels,

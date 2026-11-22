@@ -12,6 +12,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -52,6 +53,7 @@ const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuild
   timestamp: plainText,
   int: (spec) => integer(spec.name),
   bigint: (spec) => integer(spec.name),
+  double: (spec) => real(spec.name),
   bool: (spec) => integer(spec.name, { mode: "boolean" }),
   json: (spec) => jsonText(spec.name),
 };

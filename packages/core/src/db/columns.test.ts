@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   bigint,
   bool,
+  double,
   enumOf,
   id,
   int,
@@ -22,10 +23,12 @@ describe("neutral columns", () => {
       values: ["a", "b"],
       length: 32,
     });
-    expect([text, int, bigint, bool, timestamp, json].map((make) => make("c").spec.kind)).toEqual([
+    const makers = [text, int, bigint, double, bool, timestamp, json];
+    expect(makers.map((make) => make("c").spec.kind)).toEqual([
       "text",
       "int",
       "bigint",
+      "double",
       "bool",
       "timestamp",
       "json",

@@ -13,6 +13,7 @@ export type ColumnKind =
   | "key"
   | "int"
   | "bigint"
+  | "double"
   | "bool"
   | "timestamp"
   | "json"
@@ -146,6 +147,11 @@ export function int(name: string): NeutralColumn<number> {
 /** A 64-bit integer read as a JavaScript number (counters such as generations). */
 export function bigint(name: string): NeutralColumn<number> {
   return new NeutralColumn(columnSpec("bigint", name));
+}
+
+/** A double-precision float: `real` in SQLite, `double precision` in Postgres, `double` in MySQL. */
+export function double(name: string): NeutralColumn<number> {
+  return new NeutralColumn(columnSpec("double", name));
 }
 
 /** A boolean (`integer` 0/1 in SQLite, `boolean` in Postgres and MySQL). */

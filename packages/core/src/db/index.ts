@@ -5,6 +5,7 @@
 export {
   bigint,
   bool,
+  double,
   enumOf,
   id,
   int,
@@ -62,5 +63,9 @@ export {
   builds,
   labelTypes,
   NEUTRAL_TABLES,
+  projectGroupMappings,
+  projectLinks,
+  projectMembers,
+  projects,
   users,
 } from "./tables/index.ts";
