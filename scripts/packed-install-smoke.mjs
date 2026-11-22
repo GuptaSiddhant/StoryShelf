@@ -41,6 +41,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { findInstalled } from "./installed-packages.mjs";
 import { getPublishOrder, packagesDir } from "./publish-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -385,10 +386,9 @@ function assertNoServerStack(scratch, tarballs) {
     ["@storyshelf/observability", ["@storyshelf/observability", "@storyshelf/observability/node"]],
   ]) {
     const dir = installAlone(scratch, name, tarballs, `isolated-${name.split("/")[1]}`);
-    for (const absent of ["@storyshelf/core", "drizzle-orm", "pino"]) {
-      if (existsSync(join(dir, "node_modules", absent))) {
-        fail(`installing ${name} pulled in ${absent}`);
-      }
+    const present = findInstalled(dir, ["@storyshelf/core", "drizzle-orm", "pino"]);
+    if (present.length > 0) {
+      fail(`installing ${name} pulled in ${present.join(", ")}`);
     }
     const check = entries.map((entry) => `await import("${entry}");`).join("\n");
     run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });

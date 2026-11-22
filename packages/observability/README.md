@@ -16,6 +16,8 @@ npm install @storyshelf/observability
 
 ## Usage
 
+The database and storage wrappers come from core, so this example also needs `@storyshelf/core` installed (`npm install @storyshelf/core`):
+
 ```ts
 import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/core/telemetry";
 
