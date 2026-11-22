@@ -91,13 +91,13 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "^3.4.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@neondatabase/serverless": "^1.1.0",
+    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
     "@vercel/postgres": "^0.10.0",
     "@vitest/coverage-v8": "catalog:",
@@ -114,6 +114,7 @@
     "@aws-sdk/rds-signer": "^3.0.0",
     "@electric-sql/pglite": "^0.5.8",
     "@neondatabase/serverless": "^1.1.0",
+    "@storyshelf/core": "workspace:*",
     "@vercel/postgres": "^0.10.0",
     "pg": "^8.0.0"
   },
@@ -136,5 +137,25 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "storyshelf": {
+    "peerSubpaths": {
+      "@aws-sdk/rds-signer": [
+        "./rds-iam"
+      ],
+      "@electric-sql/pglite": [
+        "./pglite"
+      ],
+      "@neondatabase/serverless": [
+        "./neon",
+        "./neon-http"
+      ],
+      "@vercel/postgres": [
+        "./vercel"
+      ],
+      "pg": [
+        "./pg"
+      ]
+    }
   }
 }

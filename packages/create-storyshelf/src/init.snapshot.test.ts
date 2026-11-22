@@ -32,6 +32,12 @@ vi.mock("./output.ts", async (importOriginal) => {
 import prompts from "prompts";
 import { runInit } from "./init.ts";
 
+vi.mock("./manifest.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./manifest.ts")>()),
+  // Pin the version so a release does not churn the snapshots; the peer ranges stay the manifest's.
+  ownVersion: () => "0.3.2",
+}));
+
 const BASE = {
   name: "my-server",
   dir: "./my-server",
@@ -103,7 +109,6 @@ let written = "";
 beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), "storyshelf-init-snapshot-"));
   vi.mocked(prompts).mockReset();
-  vi.stubGlobal("__PKG_VERSION__", "0.3.2");
   written = "";
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
     written += String(chunk);

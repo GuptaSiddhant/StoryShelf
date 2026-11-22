@@ -59,13 +59,13 @@
     "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
     "playwright-core": "1.63.0"
   },
   "devDependencies": {
     "@hono/node-server": "catalog:",
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
+    "@storyshelf/core": "workspace:*",
     "@storyshelf/db-sqlite": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -76,6 +76,9 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@storyshelf/core": "workspace:*"
   },
   "engines": {
     "node": ">=24"

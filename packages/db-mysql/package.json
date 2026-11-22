@@ -72,12 +72,12 @@
     "prepublishOnly": "nub run build"
   },
   "dependencies": {
-    "@storyshelf/core": "workspace:*",
     "drizzle-orm": "catalog:",
     "mysql2": "^3.9.0"
   },
   "devDependencies": {
     "@planetscale/database": "^1.19.0",
+    "@storyshelf/core": "workspace:*",
     "@tidbcloud/serverless": "^0.1.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -92,6 +92,7 @@
   },
   "peerDependencies": {
     "@planetscale/database": "^1.19.0",
+    "@storyshelf/core": "workspace:*",
     "@tidbcloud/serverless": "^0.1.0"
   },
   "peerDependenciesMeta": {
@@ -104,5 +105,15 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "storyshelf": {
+    "peerSubpaths": {
+      "@planetscale/database": [
+        "./planetscale"
+      ],
+      "@tidbcloud/serverless": [
+        "./tidb"
+      ]
+    }
   }
 }

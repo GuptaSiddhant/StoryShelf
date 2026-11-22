@@ -14,7 +14,8 @@
  *  3. run `npm create storyshelf` (`npm exec` on the tarball; answers: all defaults, so local accounts),
  *     and `storyshelf-mcp init`,
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
- *     resolved to a tarball instead of the registry,
+ *     resolved to a tarball instead of the registry; the install must hold exactly one
+ *     `@storyshelf/core` (a peer of the adapters),
  *  5. `npm start`, sign in, create a project and a token, and `storyshelf upload` a built Storybook,
  *  6. wait for the build to finish and fail unless it passed.
  *
@@ -322,6 +323,35 @@ async function assertMcpBin(scratch, tarballs) {
   log("storyshelf-mcp init scaffolds a project from the tarball");
 }
 
+/** Every `node_modules/@storyshelf/core` directory under `dir`, at any depth. */
+function installedCores(dir) {
+  const found = [];
+  const walk = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === ".bin") continue;
+      const path = join(current, entry.name);
+      if (entry.name === "core" && current.endsWith(join("node_modules", "@storyshelf"))) {
+        found.push(path);
+      } else {
+        walk(path);
+      }
+    }
+  };
+  walk(join(dir, "node_modules"));
+  return found;
+}
+
+/** Core is a peer of the adapters (#1332): the scaffold's install holds exactly one copy of it. */
+function assertOneCore(project) {
+  const cores = installedCores(project);
+  if (cores.length !== 1 || cores[0] !== join(project, "node_modules/@storyshelf/core")) {
+    fail(
+      `expected exactly one top-level @storyshelf/core, found:\n${cores.join("\n") || "(none)"}`,
+    );
+  }
+  log("the scaffold's install holds exactly one @storyshelf/core");
+}
+
 /** The CLI and `create-storyshelf` installed from their tarballs, and the scaffold installed from the tarballs. */
 async function installFromTarballs(scratch, tarballs) {
   const tool = installAlone(scratch, "storyshelf", tarballs, "tool");
@@ -348,6 +378,7 @@ async function installFromTarballs(scratch, tarballs) {
     run("npm", ["install", "--no-audit", "--no-fund"], { cwd: project, merge: true }),
   );
   assertNodeHost(project);
+  assertOneCore(project);
   return { cli, project };
 }
 

@@ -77,6 +77,7 @@
     "release:prepare": "node scripts/release.mjs",
     "release:dry": "node scripts/release.mjs --dry-run",
     "changeset": "node scripts/changeset-add.mjs",
+    "manifest": "node scripts/version-manifest.mjs",
     "version-packages": "node ./scripts/version-packages.mjs",
     "trust": "node ./scripts/npm-trust-all.mjs"
   },

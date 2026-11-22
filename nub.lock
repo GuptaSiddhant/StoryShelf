@@ -421,9 +421,6 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.10.0
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       ai:
         specifier: 7.0.133
         version: 7.0.133(zod@4.6.7)
@@ -437,6 +434,9 @@ importers:
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -555,19 +555,16 @@ importers:
       '@better-auth/sso':
         specifier: 1.7.14
         version: 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-call@1.4.4(zod@4.6.7))(jose@6.2.13)(kysely@0.29.7)(nanostores@1.5.5))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(drizzle-orm@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)(zod@4.6.7))(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))))(better-call@1.4.4(zod@4.6.7))
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       better-auth:
         specifier: 1.7.14
         version: 1.7.14(drizzle-orm@1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)(zod@4.6.7))(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1)))
-      drizzle-orm:
-        specifier: ^1.0.0-rc.6
-        version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)(zod@4.6.7)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@storyshelf/db-postgres':
         specifier: workspace:*
         version: link:../db-postgres
@@ -777,9 +774,6 @@ importers:
 
   packages/db-mysql:
     dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@planetscale/database@1.20.2)(@tidbcloud/serverless@0.1.1)(@vercel/postgres@0.10.0)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1)(postgres@3.4.9)
@@ -790,6 +784,9 @@ importers:
       '@planetscale/database':
         specifier: ^1.19.0
         version: 1.20.2
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@tidbcloud/serverless':
         specifier: ^0.1.0
         version: 0.1.1
@@ -823,9 +820,6 @@ importers:
 
   packages/db-postgres:
     dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(pg@8.23.1)(postgres@3.4.9)
@@ -839,6 +833,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.2.0
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -875,9 +872,6 @@ importers:
 
   packages/db-sqlite:
     dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(pg@8.23.1)(postgres@3.4.9)
@@ -885,6 +879,9 @@ importers:
       '@libsql/client':
         specifier: ^0.18.0
         version: 0.18.0
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -1022,9 +1019,6 @@ importers:
 
   packages/runner:
     dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
       playwright-core:
         specifier: 1.63.0
         version: 1.63.0
@@ -1038,6 +1032,9 @@ importers:
       '@storyshelf/auth':
         specifier: workspace:*
         version: link:../auth
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@storyshelf/db-sqlite':
         specifier: workspace:*
         version: link:../db-sqlite
@@ -1070,10 +1067,6 @@ importers:
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
   packages/storage:
-    dependencies:
-      '@storyshelf/core':
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.700.0
@@ -1090,6 +1083,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^7.13.0
         version: 7.22.0
+      '@storyshelf/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
