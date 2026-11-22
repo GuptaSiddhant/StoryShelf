@@ -265,6 +265,19 @@ Until #1242 inverts the layering, the package sits **above** core: it imports co
 interfaces, models and test helpers, which is the reverse of the target in rule 2. The inversion, with
 core building on `@storyshelf/db`, stays in #1242 and still waits for ADR 0041 task 5.
 
+## Amendment 2026-11-21: testing-only libraries follow the runner (#1335)
+
+Folding `@storyshelf/image` into core made a hosting-only deployment (no `testing` option) install
+libraries it never loads: `axe-core` (3.1 MB), `pngjs` (0.7 MB) and `pixelmatch`. The image _code_ stays
+in core; its _libraries_ move to the package a testing deployment already needs:
+
+- `axe-core` is a `@storyshelf/runner` dependency. `axeInjectionScript` and `loadAxeSource` live in the
+  runner (`a11y-source.ts`); core keeps the a11y types, the in-page helpers and the stored-result readers.
+- `pngjs` and `pixelmatch` are optional peers of core, used only by `./diff`, and runner `dependencies`,
+  so a testing install gets them. `./diff` imports them lazily on first use, never at module load;
+  `verifyImageEngine` runs only with `testing`, and a missing peer fails readiness with a message naming
+  it and the install line. `sharp` is unchanged (optional peer).
+
 ## Amendment 2026-11-22: `@storyshelf/common` holds the shared light code (#1334)
 
 The owner added one public package to the list: `@storyshelf/common`. It holds the code that

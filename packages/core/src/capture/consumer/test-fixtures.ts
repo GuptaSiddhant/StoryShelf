@@ -1,6 +1,7 @@
 /** Shared set-up of the consumer tests: a manual clock, the database queue on the fake DB, a stub logger. */
 import { vi } from "vitest";
 import type { DatabaseAdapter } from "../../adapters/database.ts";
+import { verifyImageEngine } from "../../diff/index.ts";
 import type { Logger } from "../../logger.ts";
 import type { CaptureJobKind } from "../../schema/capture-job.ts";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
@@ -9,6 +10,10 @@ import { createDatabaseCaptureQueue } from "../db-queue/index.ts";
 import type { DatabaseCaptureQueue, DatabaseJob } from "../db-queue/types.ts";
 import { createCaptureConsumer } from "./index.ts";
 import type { CaptureConsumerOptions, ConsumerJob, JobHandlers } from "./types.ts";
+
+// The consumer verifies the image engine at start, which now imports pngjs and pixelmatch (#1335).
+// Load them once here: a manual clock does not wait for real module loading.
+await verifyImageEngine();
 
 /** A logger whose children are itself, so a test sees every line of every scope. */
 export interface StubLogger {

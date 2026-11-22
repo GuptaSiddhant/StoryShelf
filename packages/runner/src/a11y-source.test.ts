@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { axeInjectionScript, loadAxeSource, resetAxeSourceCache } from "./axe-source.ts";
+import { axeInjectionScript, loadAxeSource, resetAxeSourceCache } from "./a11y-source.ts";
 
 beforeEach(resetAxeSourceCache);
 

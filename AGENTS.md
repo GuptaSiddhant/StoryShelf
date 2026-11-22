@@ -295,7 +295,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   colocated `<module>.test.ts` (indirect coverage only for pure mappers). Load the `adapter-layout`
   skill for templates.
 - **One production owner per third-party dep.** A runtime dependency belongs in exactly one package's
-  `dependencies` (e.g. `pino` and `axe-core` in core); other packages use `devDependencies` and import
+  `dependencies` (e.g. `pino` in core, `axe-core` in the runner); other packages use `devDependencies` and import
   types through the owner (`@storyshelf/core/logger`), never directly. The one deliberate exception
   is `@opentelemetry/api`, declared by `common`, `core`, `app`, `ai` and `observability` alike: it is a
   no-op API whose global registration only works when every package resolves one copy, so each

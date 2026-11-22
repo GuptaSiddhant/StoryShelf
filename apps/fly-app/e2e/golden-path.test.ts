@@ -11,12 +11,8 @@
  *
  * Every wait is on API or log state (`vi.waitFor`) or a DOM state; there are no sleeps and no retries.
  */
-import {
-  axeInjectionScript,
-  inPageRunAxe,
-  loadAxeSource,
-  resolveA11yRun,
-} from "@storyshelf/core/capture";
+import { inPageRunAxe, resolveA11yRun } from "@storyshelf/core/capture";
+import { axeInjectionScript, loadAxeSource } from "@storyshelf/runner";
 import { execFile } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

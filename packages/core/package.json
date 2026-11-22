@@ -220,11 +220,8 @@
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
     "@storyshelf/common": "workspace:*",
-    "axe-core": "4.13.0",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",
-    "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0",
     "unzipper": "0.12.5",
     "zod": "catalog:"
   },
@@ -232,18 +229,18 @@
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
-    "@types/jsdom": "^30.0.0",
     "@types/node": "catalog:",
     "@types/nodemailer": "^8.0.2",
     "@types/pngjs": "catalog:",
     "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "^0.6.1",
-    "jsdom": "^30.0.1",
     "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
     "sharp": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
@@ -251,11 +248,19 @@
   },
   "peerDependencies": {
     "nodemailer": "^10.2.1",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
     "sharp": ">=0.34.0",
     "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "nodemailer": {
+      "optional": true
+    },
+    "pixelmatch": {
+      "optional": true
+    },
+    "pngjs": {
       "optional": true
     },
     "sharp": {
