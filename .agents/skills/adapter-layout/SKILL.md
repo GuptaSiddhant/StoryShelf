@@ -52,7 +52,7 @@ Extract pure stages, keep the factory file as root: `types.ts`, `browser.ts` (la
 
 ## Rules
 
-1. **Public surface frozen.** The package `exports` map does not change; new modules stay internal. The only exportable helpers are pre-existing ones (e.g. `s3Key`-style key joins, the `db-*` preset subpaths). A new subpath needs package-owner approval.
+1. **Public surface frozen.** The package `exports` map does not change; new modules stay internal. The only exportable helpers are pre-existing ones (e.g. `s3Key`-style key joins, the `@storyshelf/db` preset subpaths). A new subpath needs package-owner approval.
 2. **Move tests with the code, and cover the contract.** Each new module gets colocated `<module>.test.ts`; move existing cases (and their fake-client harnesses) into it. Indirect coverage is allowed only for pure mappers (core `integrations/git/github-mapper.ts` precedent). Never leave a suite testing through the old file path. Minimum per module:
    - `client.ts`: construction defaults + injected-vs-owned handles.
    - `lifecycle.ts` (or `index.ts` for single-file adapters): `setup` idempotent x2, `health` ok/fail, `teardown` x2 no-throw (see `docs/testing.md` §2a).

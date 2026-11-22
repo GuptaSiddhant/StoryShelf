@@ -50,7 +50,7 @@ async function scaffold(answers: Record<string, unknown>): Promise<void> {
  * stage writes is tested beside it in `init/` (prompts, codegen, package-json, writers, next-steps).
  */
 describe("runInit", () => {
-  it("scaffolds turso from the db-sqlite subpath with the libsql peer", async () => {
+  it("scaffolds turso from the @storyshelf/db/sqlite subpath with the libsql peer", async () => {
     vi.mocked(prompts).mockResolvedValue({
       name: "my-server",
       dir: "./my-server",
@@ -70,13 +70,13 @@ describe("runInit", () => {
     }
 
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(code).toContain('from "@storyshelf/db-sqlite/turso"');
+    expect(code).toContain('from "@storyshelf/db/sqlite/turso"');
     expect(code).toContain("createTursoDatabase");
     expect(code).not.toContain("@storyshelf/db-turso");
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
     };
-    expect(pkg.dependencies["@storyshelf/db-sqlite"]).toBeDefined();
+    expect(pkg.dependencies["@storyshelf/db"]).toBeDefined();
     expect(pkg.dependencies["@libsql/client"]).toBeDefined();
   });
 
@@ -100,7 +100,7 @@ describe("runInit", () => {
     }
 
     const code = readFileSync(join(dir, "src", "index.ts"), "utf8");
-    expect(code).toContain('from "@storyshelf/db-sqlite/d1"');
+    expect(code).toContain('from "@storyshelf/db/sqlite/d1"');
     expect(code).toContain("getD1Binding");
   });
 

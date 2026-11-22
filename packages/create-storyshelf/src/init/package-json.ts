@@ -12,9 +12,10 @@ import {
   type StorageChoice,
 } from "./answers.ts";
 
-/** DB peer SDK pins (must match db-* peerDependencies). */
+/** DB peer SDK pins (must match `@storyshelf/db` peerDependencies). */
 const LIBSQL_CLIENT_SDK = "^0.15.0";
 const BETTER_SQLITE3_SDK = "^12.0.0";
+const POSTGRES_SDK = "^3.4.0";
 const PG_SDK = "^8.0.0";
 const NEON_SDK = "^1.1.0";
 const VERCEL_POSTGRES_SDK = "^0.10.0";
@@ -25,22 +26,8 @@ const TIDBCLOUD_SDK = "^0.1.0";
 /** Email peer SDK pin, installed only for SMTP (the optional `nodemailer` peer of @storyshelf/core). */
 const NODEMAILER_SDK = "^10.0.12";
 
-const DB_PACKAGE: Record<DatabaseChoice, string> = {
-  sqlite: "@storyshelf/db-sqlite",
-  turso: "@storyshelf/db-sqlite",
-  "better-sqlite3": "@storyshelf/db-sqlite",
-  "bun-sqlite": "@storyshelf/db-sqlite",
-  d1: "@storyshelf/db-sqlite",
-  postgres: "@storyshelf/db-postgres",
-  pg: "@storyshelf/db-postgres",
-  neon: "@storyshelf/db-postgres",
-  "neon-http": "@storyshelf/db-postgres",
-  vercel: "@storyshelf/db-postgres",
-  pglite: "@storyshelf/db-postgres",
-  mysql: "@storyshelf/db-mysql",
-  planetscale: "@storyshelf/db-mysql",
-  tidb: "@storyshelf/db-mysql",
-};
+/** One package holds every database adapter, one subpath each. */
+const DB_PACKAGE = "@storyshelf/db";
 
 /** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
 const STORAGE_PACKAGE = "@storyshelf/storage";
@@ -62,6 +49,7 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
 const DB_SDK: Partial<Record<DatabaseChoice, readonly [string, string]>> = {
   turso: ["@libsql/client", LIBSQL_CLIENT_SDK],
   "better-sqlite3": ["better-sqlite3", BETTER_SQLITE3_SDK],
+  postgres: ["postgres", POSTGRES_SDK],
   pg: ["pg", PG_SDK],
   neon: ["@neondatabase/serverless", NEON_SDK],
   "neon-http": ["@neondatabase/serverless", NEON_SDK],
@@ -81,7 +69,7 @@ function ownPackages(names: readonly string[]): Record<string, string> {
 
 /** The app, the database package and, with observability or SMTP, the packages those add. */
 function coreNames(answers: Answers): string[] {
-  const names = ["@storyshelf/app", DB_PACKAGE[answers.database]];
+  const names = ["@storyshelf/app", DB_PACKAGE];
   const withCore =
     wantsObservability(answers) || wantsNotifications(answers) || answers.storage === "local";
   return [

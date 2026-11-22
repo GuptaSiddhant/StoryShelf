@@ -113,7 +113,7 @@ selection of `server init` only. The scaffold generates only the single-deployab
 // server.ts (generated)
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
 import { createCaptureRunner } from "@storyshelf/runner";
 

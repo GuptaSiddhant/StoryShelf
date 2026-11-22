@@ -29,6 +29,8 @@ vi.mock("../dispatch.ts", async (importOriginal) => {
 });
 
 const { runCaptureChild } = await import("./child.ts");
+// The child verifies the image engine at start, which imports pngjs and pixelmatch (#1335): load them once here.
+await (await import("../../diff/index.ts")).verifyImageEngine();
 type Host = import("./child.ts").ChildHost;
 
 /** A promise the test opens by hand, to hold a run mid-pass. */

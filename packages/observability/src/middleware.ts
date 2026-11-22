@@ -8,8 +8,8 @@
  */
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { context, trace, type Span } from "@opentelemetry/api";
-import type { HttpMiddlewareOptions } from "@storyshelf/core/telemetry";
-import { redactSecrets } from "@storyshelf/core/utils";
+import { redactSecrets } from "@storyshelf/common/redact";
+import type { HttpMiddlewareOptions } from "@storyshelf/common/tracing";
 import type { Context, MiddlewareHandler } from "hono";
 
 /** Copy request/user ids from the Hono context onto the active server span. */

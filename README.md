@@ -75,8 +75,7 @@ Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromati
 packages/
   core/           @storyshelf/core          — Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
   app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
-  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
-  db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
+  db/             @storyshelf/db            — SQLite, Postgres and MySQL database adapters with their driver and cloud presets, one subpath each; each driver is an optional peer
   storage/        @storyshelf/storage       — S3, GCS and Azure Blob storage, plus `/local`; each SDK is an optional peer
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
   cli/            storyshelf              — CLI client (init, create, upload, purge, retry)

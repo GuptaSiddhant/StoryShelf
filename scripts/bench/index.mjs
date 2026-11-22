@@ -7,7 +7,7 @@
  * the fixture with the built CLI three times (first, unchanged, one file changed; every upload is `--full`, so "unchanged" is a full capture of an unchanged build, the row ADR 0052's gate measures) and reports
  * storage, capture, published serving, database work and app pages. One warm-up run is dropped,
  * then the median of `--runs` (default 3) runs is printed as a table and as one JSON line.
- * Needs the built `dist/` of the app, cli, core, db-sqlite and runner
+ * Needs the built `dist/` of the app, cli, core, @storyshelf/db/sqlite and runner
  * (`nubx turbo build`), a built `fixtures/storybook-9` and Chromium; it is not part of `turbo verify`.
  *
  *   nub run bench [-- --runs 3] [--out results.json]

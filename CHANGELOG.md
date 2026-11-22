@@ -14,6 +14,16 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   Schema: none.
 
+- Observability no longer re-exports the database and storage wrappers (#1334)
+
+  `createInstrumentedDatabase` and `createInstrumentedStorage` need core adapter types, so they are exported only from `@storyshelf/core/telemetry`. Everything else (`withSpan`, propagation, instruments, the middleware and the SDK entry) stays, and the package now depends on `@storyshelf/common` instead of core.
+
+  Schema: none.
+
+- @storyshelf/db-sqlite, -postgres and -mysql are now @storyshelf/db/sqlite, /postgres and /mysql
+
+  The three database adapters are one package, `@storyshelf/db`, with the subpaths `/sqlite`, `/postgres` and `/mysql`, and the presets under each: `/sqlite/turso`, `/sqlite/better-sqlite3`, `/sqlite/bun-sqlite`, `/sqlite/d1`, `/postgres/pg`, `/postgres/neon`, `/postgres/neon-http`, `/postgres/vercel`, `/postgres/pglite`, `/postgres/rds-iam`, `/mysql/planetscale` and `/mysql/tidb`. Factories, options and stored data are unchanged. Every driver is now an optional peer that only its own subpath loads (`postgres`, `mysql2`, `pg`, `@neondatabase/serverless`, `@vercel/postgres`, `@electric-sql/pglite`, `@aws-sdk/rds-signer`, `@planetscale/database`, `@tidbcloud/serverless`, `@libsql/client` and `better-sqlite3`), so install the one you use; `node:sqlite` still needs nothing. The `./ddl`, `./schema` and `./drizzle-factory` subpaths are no longer published. Nothing old is kept: `@storyshelf/db-sqlite`, `@storyshelf/db-postgres` and `@storyshelf/db-mysql` are not published again, so change your dependency and imports (see the upgrading guide). `server init` scaffolds `@storyshelf/db` and the driver. Schema: none.
+
 - @storyshelf/storage-s3, -gcs and -azure are now @storyshelf/storage/s3, /gcs and /azure
 
   The three cloud storage adapters are one package, `@storyshelf/storage`, with the subpaths `/s3`, `/gcs`, `/azure` and `/local` (a re-export of `@storyshelf/core/storage/local`). Factories, options and stored objects are unchanged. Each cloud SDK is now an optional peer that only its own subpath loads (`@aws-sdk/client-s3` and `@aws-sdk/lib-storage`, `@google-cloud/storage`, `@azure/storage-blob` and `@azure/identity`), so install the one you use. Nothing old is kept: `@storyshelf/storage-s3`, `@storyshelf/storage-gcs` and `@storyshelf/storage-azure` are not published again, so change your dependency and imports (see the upgrading guide). `server init` scaffolds `@storyshelf/storage` and the SDK. Schema: none.
@@ -83,6 +93,12 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   Schema: none
 
+- @storyshelf/common holds the shared settings, HTTP, redaction and tracing (#1334)
+
+  A new public package with `/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids` and `/logger` subpaths. Its only runtime dependency is `@opentelemetry/api`, so a package that needs only this code no longer has to install `@storyshelf/core`.
+
+  Schema: none.
+
 - An rds-iam Postgres preset for RDS IAM authentication
 
   `@storyshelf/db-postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token from the optional `@aws-sdk/rds-signer` peer, minted for every new connection so the pool never reuses a stale one. TLS is required, and a missing peer fails at startup with an install hint.
@@ -138,6 +154,24 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 - `storyshelf-server serve` honours `SHELF_SHUTDOWN_GRACE_SECONDS` and exits when it has drained
 
   `serve` bounds the SIGTERM drain with `SHELF_SHUTDOWN_GRACE_SECONDS` (3 s on Fly when unset), logs the old setting names once under `SHELF_ALLOW_OLD_NAMES=1`, and the bin ends the process itself, so a handler that ignored its release cannot outlive the shutdown. The published image and the Fly demo now ship the bin as a second bundle input, on `PATH` as `storyshelf-server`, and their `CMD` is `storyshelf-server serve`: the server is a `defineShelfInstance` module (`dist/instance.mjs`, named by `package.json#storyshelf.server`) instead of a script that builds the app, so `docker run <image> storyshelf-server migrate` and `doctor` work against the same environment. A refused start prints `storyshelf-server serve: <reason>` instead of `storyshelf: <reason>`.
+
+  Schema: none.
+
+- Hosting-only installs skip the testing libraries (axe-core, pngjs, pixelmatch)
+
+  `axe-core` moves to `@storyshelf/runner`, with `axeInjectionScript` and `loadAxeSource` (now exported from the runner, no longer from `@storyshelf/core/capture`). `pngjs` and `pixelmatch` become optional peers of `@storyshelf/core`, used only by `./diff`, and `@storyshelf/runner` depends on them, so a testing install gets them and a hosting-only install (about 3.9 MB less) holds none. `./diff` imports them on first comparison; `verifyImageEngine` runs only with `testing`, and a missing peer fails readiness with a message naming the package and the install line. `sharp` is unchanged.
+
+  Schema: none.
+
+- The MCP server installs @storyshelf/common instead of all of core (#1334)
+
+  `@storyshelf/mcp` took only `httpJson`, `HttpError` and `readSetting` from core. It now depends on `@storyshelf/common`, so `npx @storyshelf/mcp` no longer installs core, Drizzle, pino or the image libraries.
+
+  Schema: none.
+
+- Core re-exports the shared settings, HTTP, redaction and tracing from common (#1334)
+
+  `readSetting`, `httpJson`, `HttpError`, `redactSecrets`, `withSpan` and the rest moved to `@storyshelf/common` and are still exported from the same `@storyshelf/core/utils`, `/config`, `/telemetry` and `/logger` subpaths. The Storybook token prefixes live in `common` too; signing and verifying stay in core.
 
   Schema: none.
 
@@ -212,6 +246,14 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 - Sign-in rate limiting is per client, not shared
 
   The auth engine's limiter keyed every request on one value, so three anonymous sign-in attempts every 10 seconds made every user's sign-in answer 429. The app now sets the engine's client address from its own client-IP resolver (`trustProxy` rules, never copied from the request), on forwarded requests and on the `/api/auth/*` mount, and the engine reads only that header. A request the app can name no client for skips the engine's limit (the app's own sign-in bucket still applies) and logs one warning, instead of sharing one key.
+
+  Schema: none.
+
+### Internal
+
+- The CLI checks its renamed-settings copy against @storyshelf/common (#1334)
+
+  The CLI keeps its own seven rows rather than depend on common (it would add `@opentelemetry/api`, about 2 MB, to a client-only install). Its drift test now reads common's table instead of core's, and the dev dependency on core is gone.
 
   Schema: none.
 

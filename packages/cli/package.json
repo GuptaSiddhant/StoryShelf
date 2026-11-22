@@ -57,7 +57,7 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@storyshelf/core": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "catalog:",
     "@types/prompts": "catalog:",

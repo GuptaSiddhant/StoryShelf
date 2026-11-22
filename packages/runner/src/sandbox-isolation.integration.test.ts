@@ -10,7 +10,7 @@ import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import type { Auth } from "@storyshelf/core/auth";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
