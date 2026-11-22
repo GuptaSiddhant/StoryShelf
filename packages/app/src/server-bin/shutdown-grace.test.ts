@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FLY_DEFAULT_GRACE_SECONDS, shutdownGraceMs } from "./shutdown.ts";
+import { FLY_DEFAULT_GRACE_SECONDS, shutdownGraceMs } from "./shutdown-grace.ts";
 
 describe("shutdownGraceMs", () => {
   it("reads SHELF_SHUTDOWN_GRACE_SECONDS as milliseconds", () => {

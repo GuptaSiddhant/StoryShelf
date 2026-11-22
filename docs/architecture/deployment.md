@@ -8,7 +8,7 @@
 
 The server is one container. Capture runs **in-process** with the image's own Chromium: no Docker socket mount, no repository cloning. Its only state is the data directory (`SHELF_DATA_DIR`, `/data` in the image).
 
-The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
+The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/instance.ts` (the module `storyshelf-server serve` loads) and the `storyshelf-server` bin, started with `storyshelf-server serve` (on `PATH` in the image). The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
 The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR. `DOCKERHUB_USERNAME` is optional and defaults to `guptasiddhant`.
 
@@ -53,18 +53,18 @@ volumes:
   storyshelf-data:
 ```
 
-The variables above are read by `apps/fly-app/server.ts`, which also reads `SHELF_DATA_DIR`, `PORT`, `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
+The variables above are read by `apps/fly-app/instance.ts`, which also reads `SHELF_DATA_DIR`, `PORT`, `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
 
 ### Behind a proxy
 
 Rate limits (`/api/v1/*`, sign-in, the signed Storybook routes) count per client IP. By default that is the socket peer, so behind a load balancer every user shares the proxy's buckets, and one client can use up sign-in for all. `ShelfConfig.trustProxy` names the proxies that may report the client; both shipped servers map it from `SHELF_TRUST_PROXY` (`parseTrustProxy` in `core/src/config.ts`):
 
-| `SHELF_TRUST_PROXY`         | Client IP                                                                                       | Use on                                                                                                |
-| --------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| unset, `false`, `0`         | the socket peer (no forwarded header is read)                                                   | a server clients reach directly                                                                       |
-| `1`, `2`, …                 | `X-Forwarded-For`, counting that many hops from the right                                       | one load balancer (`1`): ECS behind an ALB, Cloud Run, Azure Container Apps                           |
-| `10.0.0.0/16,2001:db8::/32` | `X-Forwarded-For`, read only when the peer is in the list; the rightmost entry outside the list | proxies with known addresses                                                                          |
-| `fly`                       | `Fly-Client-IP`                                                                                 | Fly.io (`apps/fly-app/server.ts` uses it when `FLY_APP_NAME` is set and `SHELF_TRUST_PROXY` is unset) |
+| `SHELF_TRUST_PROXY`         | Client IP                                                                                       | Use on                                                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| unset, `false`, `0`         | the socket peer (no forwarded header is read)                                                   | a server clients reach directly                                                                         |
+| `1`, `2`, …                 | `X-Forwarded-For`, counting that many hops from the right                                       | one load balancer (`1`): ECS behind an ALB, Cloud Run, Azure Container Apps                             |
+| `10.0.0.0/16,2001:db8::/32` | `X-Forwarded-For`, read only when the peer is in the list; the rightmost entry outside the list | proxies with known addresses                                                                            |
+| `fly`                       | `Fly-Client-IP`                                                                                 | Fly.io (`apps/fly-app/instance.ts` uses it when `FLY_APP_NAME` is set and `SHELF_TRUST_PROXY` is unset) |
 
 One resolver (`createClientIpResolver`, `app/src/middleware/client-ip.ts`) serves every rate-limit bucket. A forwarded header from a peer that is not trusted is never read, and an entry that is not an IP never names a client. Count only the proxies you run: a count higher than the real chain lets a client pick its own bucket by sending `X-Forwarded-For`. Limits stay per process.
 
