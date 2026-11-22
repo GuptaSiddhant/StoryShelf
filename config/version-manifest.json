@@ -1,0 +1,192 @@
+{
+  "packages": {
+    "@storyshelf/affected": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "@storyshelf/ai": {
+      "version": "0.14.0",
+      "peers": {
+        "@storyshelf/core": {
+          "range": "0.14.0",
+          "optional": false
+        }
+      }
+    },
+    "@storyshelf/app": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "@storyshelf/auth": {
+      "version": "0.14.0",
+      "peers": {
+        "@storyshelf/core": {
+          "range": "0.14.0",
+          "optional": false
+        }
+      }
+    },
+    "@storyshelf/common": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "@storyshelf/core": {
+      "version": "0.14.0",
+      "peers": {
+        "nodemailer": {
+          "range": "^10.2.1",
+          "optional": true,
+          "subpaths": ["./adapter/email-sender"]
+        },
+        "pixelmatch": {
+          "range": "^7.1.0",
+          "optional": true
+        },
+        "pngjs": {
+          "range": "^7.0.0",
+          "optional": true
+        },
+        "sharp": {
+          "range": ">=0.34.0",
+          "optional": true
+        },
+        "vitest": {
+          "range": "^5.0.5",
+          "optional": true
+        }
+      }
+    },
+    "@storyshelf/db": {
+      "version": "0.14.0",
+      "peers": {
+        "@aws-sdk/rds-signer": {
+          "range": "^3.0.0",
+          "optional": true,
+          "subpaths": ["./postgres/rds-iam"]
+        },
+        "@electric-sql/pglite": {
+          "range": "^0.5.8",
+          "optional": true,
+          "subpaths": ["./postgres/pglite"]
+        },
+        "@libsql/client": {
+          "range": "^0.18.0",
+          "optional": true,
+          "subpaths": ["./sqlite/turso"]
+        },
+        "@neondatabase/serverless": {
+          "range": "^1.1.0",
+          "optional": true,
+          "subpaths": ["./postgres/neon", "./postgres/neon-http"]
+        },
+        "@planetscale/database": {
+          "range": "^1.19.0",
+          "optional": true,
+          "subpaths": ["./mysql/planetscale"]
+        },
+        "@storyshelf/core": {
+          "range": "0.14.0",
+          "optional": false
+        },
+        "@tidbcloud/serverless": {
+          "range": "^0.1.0",
+          "optional": true,
+          "subpaths": ["./mysql/tidb"]
+        },
+        "@vercel/postgres": {
+          "range": "^0.10.0",
+          "optional": true,
+          "subpaths": ["./postgres/vercel"]
+        },
+        "better-sqlite3": {
+          "range": "^12.0.0",
+          "optional": true,
+          "subpaths": ["./sqlite/better-sqlite3"]
+        },
+        "mysql2": {
+          "range": "^3.9.0",
+          "optional": true,
+          "subpaths": ["./mysql"]
+        },
+        "pg": {
+          "range": "^8.0.0",
+          "optional": true,
+          "subpaths": ["./postgres/pg"]
+        },
+        "postgres": {
+          "range": "^3.4.0",
+          "optional": true,
+          "subpaths": ["./postgres"]
+        }
+      }
+    },
+    "@storyshelf/mcp": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "@storyshelf/observability": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "@storyshelf/runner": {
+      "version": "0.14.0",
+      "peers": {
+        "@storyshelf/core": {
+          "range": "0.14.0",
+          "optional": false
+        }
+      }
+    },
+    "@storyshelf/storage": {
+      "version": "0.14.0",
+      "peers": {
+        "@aws-sdk/client-s3": {
+          "range": "^3.700.0",
+          "optional": true,
+          "subpaths": ["./s3"]
+        },
+        "@aws-sdk/lib-storage": {
+          "range": "^3.700.0",
+          "optional": true,
+          "subpaths": ["./s3"]
+        },
+        "@azure/identity": {
+          "range": "^4.14.1",
+          "optional": true,
+          "subpaths": ["./azure"]
+        },
+        "@azure/storage-blob": {
+          "range": "^12.26.0",
+          "optional": true,
+          "subpaths": ["./azure"]
+        },
+        "@google-cloud/storage": {
+          "range": "^7.13.0",
+          "optional": true,
+          "subpaths": ["./gcs"]
+        },
+        "@storyshelf/core": {
+          "range": "0.14.0",
+          "optional": false
+        }
+      }
+    },
+    "@storyshelf/storybook-addon": {
+      "version": "0.14.0",
+      "peers": {
+        "storybook": {
+          "range": "^8.6.0 || ^9.0.0 || ^10.0.0",
+          "optional": true
+        }
+      }
+    },
+    "create-storyshelf": {
+      "version": "0.14.0",
+      "peers": {}
+    },
+    "storyshelf": {
+      "version": "0.14.0",
+      "peers": {}
+    }
+  }
+}
