@@ -55,6 +55,7 @@ export {
   type ExtrasInput,
 } from "./table-extras.ts";
 export {
+  baselines,
   buildComponents,
   buildContentReleases,
   buildDeletions,
@@ -68,6 +69,7 @@ export {
   captureJobs,
   captureLogs,
   captureShards,
+  comments,
   contentUses,
   labelTypes,
   NEUTRAL_TABLES,
@@ -79,6 +81,7 @@ export {
   projects,
   schemaMeta,
   siteSettings,
+  snapshots,
   tokens,
   userConnections,
   userInviteTokens,
