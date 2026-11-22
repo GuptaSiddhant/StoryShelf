@@ -156,6 +156,33 @@ describe("MySQL table factory (spike #800)", () => {
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
+  it("infers the hand-written integration row types", () => {
+    expectTypeOf(mysqlTableOf(ns.designLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designLinks.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.designCredentials, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designCredentials.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.designNodes, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designNodes.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.insights, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.insights.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.aiUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiUsage.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.aiBudgetAlerts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiBudgetAlerts.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.gitConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitConnections.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitRepositoryLinks.$inferSelect
+    >();
+  });
+
   it("maps json<T> to TEXT that parses on read", async () => {
     type Doc = { a?: number };
     const docs = ns.defineTable("docs", {
@@ -179,6 +206,19 @@ describe("MySQL table factory (spike #800)", () => {
     const after = await generateDrizzleJson({ docs: built });
     const statements = await generateMigration(await generateDrizzleJson({}), after);
     expect(statements.join("\n")).toMatch(JSON_DDL);
+  });
+
+  it("applies a text default on insert, with no DEFAULT in the DDL", async () => {
+    const notes = ns.defineTable("notes", {
+      id: ns.id("id").primaryKey(),
+      body: ns.text("body").notNull().default("{}"),
+    });
+    const built = mysqlTableOf(notes, resolve);
+    expect(built.body.defaultFn?.()).toBe("{}");
+    expect(built.body.default).toBeUndefined();
+    const after = await generateDrizzleJson({ notes: built });
+    const statements = await generateMigration(await generateDrizzleJson({}), after);
+    expect(statements.join("\n")).toMatch(/`body` text NOT NULL\n/u);
   });
 
   it("cannot express a partial index", () => {

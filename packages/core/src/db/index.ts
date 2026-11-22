@@ -55,6 +55,14 @@ export {
   type ExtrasInput,
 } from "./table-extras.ts";
 export {
+  designLinks,
+  designCredentials,
+  designNodes,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
+  gitConnections,
+  gitRepositoryLinks,
   baselines,
   buildComponents,
   buildContentReleases,

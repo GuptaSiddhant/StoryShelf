@@ -96,11 +96,11 @@ function addTableConstraint(table: ShapeTable, item: string): boolean {
   const keys = KEY_COLUMNS.exec(rest)?.groups?.["columns"];
   if (/^PRIMARY KEY/iu.test(rest)) {
     table.primaryKey = { name, columns: identList(keys ?? ""), detail: "" };
-  } else if (/^UNIQUE/iu.test(rest)) {
+  } else if (/^UNIQUE\b/iu.test(rest)) {
     table.uniques.push({ name, columns: identList(keys ?? ""), detail: "" });
   } else if (/^FOREIGN KEY/iu.test(rest)) {
     table.foreignKeys.push({ name, ...foreignKeyDetail(rest) });
-  } else if (/^CHECK/iu.test(rest)) {
+  } else if (/^CHECK\s*\(/iu.test(rest)) {
     table.checks.push({ name, columns: [], detail: normaliseCheck(rest.replace(/^CHECK/iu, "")) });
   } else {
     return false;

@@ -14,6 +14,9 @@ import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { Comment } from "../../schema/comment.ts";
 import type { UserConnection } from "../../schema/connection.ts";
 import type { ContentUse } from "../../schema/content-use.ts";
+import type { DesignCredential, DesignLink, DesignNode } from "../../schema/design.ts";
+import type { GitConnectionRow, GitRepositoryLinkRow } from "../../schema/git-connection.ts";
+import type { AiBudgetAlertRow, AiUsageRow, InsightRow } from "../../schema/insight.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { ProjectMember } from "../../schema/member.ts";
 import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts";
@@ -27,6 +30,8 @@ import type { User } from "../../schema/user.ts";
 import type { Webhook } from "../../schema/webhook.ts";
 import type { InferRow } from "../define-table.ts";
 import {
+  aiBudgetAlerts,
+  aiUsage,
   baselines,
   buildComponents,
   builds,
@@ -39,6 +44,12 @@ import {
   captureShards,
   comments,
   contentUses,
+  designCredentials,
+  designLinks,
+  designNodes,
+  gitConnections,
+  gitRepositoryLinks,
+  insights,
   labelTypes,
   NEUTRAL_TABLES,
   projectGroupMappings,
@@ -105,6 +116,29 @@ describe("spike tables", () => {
     expectTypeOf<Row["kind"]>().toEqualTypeOf<string>();
   });
 
+  it("match the core design, budget alert and git rows", () => {
+    expectTypeOf<InferRow<typeof designLinks>>().toEqualTypeOf<DesignLink>();
+    expectTypeOf<InferRow<typeof designCredentials>>().toEqualTypeOf<DesignCredential>();
+    expectTypeOf<InferRow<typeof designNodes>>().toEqualTypeOf<DesignNode>();
+    expectTypeOf<InferRow<typeof aiBudgetAlerts>>().toEqualTypeOf<AiBudgetAlertRow>();
+    expectTypeOf<InferRow<typeof gitConnections>>().toEqualTypeOf<GitConnectionRow>();
+    expectTypeOf<InferRow<typeof gitRepositoryLinks>>().toEqualTypeOf<GitRepositoryLinkRow>();
+  });
+
+  it("match the core insight and AI usage rows apart from kind and status", () => {
+    // `InsightRow` narrows `kind` and `status`, and `AiUsageRow` narrows `status`; the Drizzle
+    // schemas read them as `string`.
+    type Insight = InferRow<typeof insights>;
+    type Usage = InferRow<typeof aiUsage>;
+    expectTypeOf<Omit<Insight, "kind" | "status">>().toEqualTypeOf<
+      Omit<InsightRow, "kind" | "status">
+    >();
+    expectTypeOf<Insight["kind"]>().toEqualTypeOf<string>();
+    expectTypeOf<Insight["status"]>().toEqualTypeOf<string>();
+    expectTypeOf<Omit<Usage, "status">>().toEqualTypeOf<Omit<AiUsageRow, "status">>();
+    expectTypeOf<Usage["status"]>().toEqualTypeOf<string>();
+  });
+
   it("match the core project row apart from storybook_meta", () => {
     // `Project` marks fourteen columns optional that every dialect always returns, and reads
     // `storybookMeta` as `string | null | undefined` (the Drizzle schemas' `$type`); the column is
@@ -140,6 +174,6 @@ describe("spike tables", () => {
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
     expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
     expect(names.indexOf("snapshots")).toBeLessThan(names.indexOf("comments"));
-    expect(new Set(names).size).toBe(31);
+    expect(new Set(names).size).toBe(39);
   });
 });

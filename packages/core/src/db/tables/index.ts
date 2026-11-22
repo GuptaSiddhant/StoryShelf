@@ -9,6 +9,16 @@ import {
   builds,
 } from "./build.ts";
 import { captureAttempts, captureJobs, captureLogs, captureShards } from "./capture.ts";
+import {
+  aiBudgetAlerts,
+  aiUsage,
+  designCredentials,
+  designLinks,
+  designNodes,
+  gitConnections,
+  gitRepositoryLinks,
+  insights,
+} from "./integration.ts";
 import { buildLabels, labelTypes } from "./label.ts";
 import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
 import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
@@ -17,6 +27,14 @@ import { baselines, comments, snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";
 
 export {
+  designLinks,
+  designCredentials,
+  designNodes,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
+  gitConnections,
+  gitRepositoryLinks,
   baselines,
   buildComponents,
   buildContentReleases,
@@ -83,4 +101,12 @@ export const NEUTRAL_TABLES = [
   snapshots,
   baselines,
   comments,
+  designLinks,
+  designCredentials,
+  designNodes,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
+  gitConnections,
+  gitRepositoryLinks,
 ] as const;

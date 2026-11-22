@@ -81,6 +81,18 @@ describe("CREATE TABLE body", () => {
     expect(table.checks[0]).toEqual({ name: "c", columns: [], detail: "a <> ''" });
   });
 
+  it("reads a column named like a constraint keyword as a column", () => {
+    const table = applyTableBody(
+      empty(),
+      "t",
+      ["checked_at TEXT", "uniqueness INTEGER NOT NULL"],
+      "sqlite",
+    );
+    expect([...table.columns.keys()]).toEqual(["checked_at", "uniqueness"]);
+    expect(table.checks).toEqual([]);
+    expect(table.uniques).toEqual([]);
+  });
+
   it("normalises references and checks", () => {
     expect(foreignKeyDetail('REFERENCES "public"."builds"("id")')).toEqual({
       columns: [],

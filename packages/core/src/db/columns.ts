@@ -20,7 +20,7 @@ export type ColumnKind =
   | "enum";
 
 /** What a foreign key does when its parent row is deleted. */
-export type OnDelete = "cascade" | "restrict" | "set null";
+export type OnDelete = "cascade" | "restrict" | "set null" | "no action";
 
 /** A literal column default, the only kind the neutral schema allows. */
 export type DefaultValue = string | number | boolean;
