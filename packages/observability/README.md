@@ -47,7 +47,7 @@ await app.lifecycle.setup();
 // on SIGTERM: await app.lifecycle.teardown(); (flushes the SDK)
 ```
 
-`storyshelf server init` scaffolds exactly this preamble. Two entrypoints by design: the root is `@opentelemetry/api`
+`create-storyshelf` scaffolds exactly this preamble. Two entrypoints by design: the root is `@opentelemetry/api`
 only (runtime-agnostic); `./node` holds the Node SDK lifecycle.
 
 ## What it exports

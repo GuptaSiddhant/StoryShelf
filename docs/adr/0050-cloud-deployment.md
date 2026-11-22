@@ -11,9 +11,9 @@ stay until that epic merges.
 StoryShelf runs on AWS, GCP and Azure today through three kinds of cloud-specific code:
 
 - **Presets inside adapters.** Each cloud's database flavour is a subpath of the database adapter:
-  - `db-postgres/neon` and `db-postgres/vercel`;
-  - `db-mysql/planetscale` and `db-mysql/tidb`;
-  - `db-sqlite/d1` and `db-sqlite/turso`.
+  - `@storyshelf/db/postgres/neon` and `@storyshelf/db/postgres/vercel`;
+  - `@storyshelf/db/mysql/planetscale` and `@storyshelf/db/mysql/tidb`;
+  - `@storyshelf/db/sqlite/d1` and `@storyshelf/db/sqlite/turso`.
 
   Storage has one adapter per cloud, and `@storyshelf/storage/s3` also covers R2 and MinIO.
 
@@ -61,7 +61,7 @@ when the preset is used, as the existing database presets do.
 
 ### 2. Runtime presets
 
-- **`db-postgres/rds-iam`:** connects to RDS or Aurora with short-lived IAM authentication tokens,
+- **`@storyshelf/db/postgres/rds-iam`:** connects to RDS or Aurora with short-lived IAM authentication tokens,
   renewed for each new connection. It uses `@aws-sdk/rds-signer` as an optional peer, so the standard
   AWS credential chain (ECS task role, instance role, web identity) applies. With IAM auth there is
   no database password to rotate. It verifies the server certificate by default against bundled
@@ -72,7 +72,7 @@ when the preset is used, as the existing database presets do.
   with credentials from the environment. It is configuration only, with no SDK. An SES API preset
   follows only on demand.
 - **GCP Cloud SQL and Azure Database for PostgreSQL** get the same IAM or Entra ID token presets
-  (`db-postgres/cloud-sql-iam`, `db-postgres/azure-entra`) later, on the same pattern, when a user
+  (`@storyshelf/db/postgres/cloud-sql-iam`, `@storyshelf/db/postgres/azure-entra`) later, on the same pattern, when a user
   asks.
 
 Every preset keeps the adapter's contract tests. No preset changes behaviour for installs that don't

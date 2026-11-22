@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: StoryShelf CLI overview — client and server commands.
+description: StoryShelf CLI overview — client, server and MCP commands.
 ---
 
 import { PackageManagers } from "starlight-package-managers";
@@ -12,22 +12,22 @@ The StoryShelf CLI (`storyshelf`) exposes a `storyshelf` binary for CI pipelines
 <PackageManagers type="dlx" pkg="storyshelf" args="--help" />
 
 :::note
-The CLI is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright. To scaffold a server, use `storyshelf server init` (see [Server CLI](/guides/cli/server/)).
+The CLI is **client-only** — it talks to a running server over `/api/v1` and carries no Playwright. To scaffold a server, use `npm create storyshelf` (see [Server CLI](/guides/cli/server/)).
 :::
 
 This section is now split for readability:
 
 - [Client — init, create, upload, build, doctor, whoami, retry, purge](/guides/cli/client/)
-- [Server — server init, server serve](/guides/cli/server/)
+- [Server — create-storyshelf, storyshelf-server](/guides/cli/server/)
 - [Configuration — .storybook/storyshelf.json, flags, env, monorepo](/guides/config/)
 
 Every command's full flags and examples live on its page; the package reference stays at [@storyshelf/cli](/packages/cli/).
 
 ## Quick links
 
-| Area   | Page                                                                                    |
-| ------ | --------------------------------------------------------------------------------------- |
-| Client | [init / create / upload / build / doctor / whoami / retry / purge](/guides/cli/client/) |
-| Server | [server init / server serve](/guides/cli/server/)                                       |
-| MCP    | `mcp init` / `mcp serve`: scaffold and run the [MCP server](/ai/mcp/) for AI agents     |
-| Config | [config file, env, monorepo](/guides/config/)                                           |
+| Area   | Page                                                                                                      |
+| ------ | --------------------------------------------------------------------------------------------------------- |
+| Client | [init / create / upload / build / doctor / whoami / retry / purge](/guides/cli/client/)                   |
+| Server | [create-storyshelf / storyshelf-server](/guides/cli/server/)                                              |
+| MCP    | `storyshelf-mcp init` / `storyshelf-mcp serve`: scaffold and run the [MCP server](/ai/mcp/) for AI agents |
+| Config | [config file, env, monorepo](/guides/config/)                                                             |

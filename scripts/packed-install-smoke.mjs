@@ -10,8 +10,10 @@
  *     and check each archive holds every export and bin target (#1265),
  *     and that `@storyshelf/app/node` imports from the installed scaffold with no side effects (#394),
  *     and that a hosting-only install of the app holds none of axe-core, pngjs and pixelmatch (#1335),
- *  2. install the CLI from its tarball in an empty directory outside this checkout,
- *  3. run the default `storyshelf server init` (answers: all defaults, so local accounts),
+ *  2. install the CLI, `create-storyshelf` and `@storyshelf/mcp` from their tarballs, each in its own
+ *     empty directory outside this checkout; `create-storyshelf` must install with no dependency at all,
+ *  3. run `npm create storyshelf` (`npm exec` on the tarball; answers: all defaults, so local accounts),
+ *     and `storyshelf-mcp init`,
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
  *     resolved to a tarball instead of the registry,
  *  5. `npm start`, sign in, create a project and a token, and `storyshelf upload` a built Storybook,
@@ -29,6 +31,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -163,21 +166,18 @@ function collect(child, onData) {
 }
 
 /**
- * Answer `storyshelf server init` with its defaults: Enter whenever the prompt has been quiet
+ * Answer an interactive scaffold with its defaults: Enter whenever the prompt has been quiet
  * for a moment (the prompts library redraws with escape codes, so lines cannot be counted).
- * The scaffold lands in `./my-storyshelf` of `cwd`. Resolves when the CLI exits.
+ * The scaffold lands in `./my-storyshelf` of `cwd`. Resolves when the command exits, once `done` shows in
+ * its output (the last line of the next steps: it may linger on stdin).
  */
-function initWithDefaults(cli, cwd) {
-  return new Promise((done) => {
-    const child = spawn(process.execPath, [cli, "server", "init"], {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+function answerWithDefaults(command, argv, cwd, done) {
+  return new Promise((finish) => {
+    const child = spawn(command, argv, { cwd, stdio: ["pipe", "pipe", "pipe"] });
     let idle;
     const output = collect(child, (state) => {
       clearTimeout(idle);
-      if (state.text.includes("npm start")) {
-        // The last line of the next steps: the CLI has finished (it may linger on stdin).
+      if (state.text.includes(done)) {
         child.stdin.end();
         setTimeout(() => child.kill("SIGTERM"), 1000);
         return;
@@ -188,7 +188,7 @@ function initWithDefaults(cli, cwd) {
     child.on("exit", (code) => {
       clearTimeout(idle);
       clearTimeout(timeout);
-      done({ code, output: output.text });
+      finish({ code, output: output.text });
     });
   });
 }
@@ -312,27 +312,74 @@ function assertHostingOnlyInstall(scratch, tarballs) {
   log(`hosting-only install: node_modules is ${size} KB, with none of axe-core, pngjs, pixelmatch`);
 }
 
-/** The CLI installed from its tarball, and the scaffold installed from the tarballs. */
-async function installFromTarballs(scratch, tarballs) {
-  const tool = join(scratch, "tool");
-  mkdirSync(tool);
-  // The CLI's own @storyshelf/* dependencies (affected) must come from tarballs too, not the registry.
-  const toolPackage = {
-    name: "tool",
+/** A clean directory holding only `name` installed from its tarball; returns the directory. */
+function installAlone(scratch, name, tarballs, directory) {
+  const dir = join(scratch, directory);
+  mkdirSync(dir);
+  const manifest = {
+    name: directory,
     private: true,
-    dependencies: { storyshelf: `file:${tarballs["storyshelf"]}` },
+    dependencies: { [name]: `file:${tarballs[name]}` },
+    // The package's own @storyshelf/* dependencies must come from tarballs too, not the registry.
     overrides: tarballOverrides(tarballs),
   };
-  writeFileSync(join(tool, "package.json"), `${JSON.stringify(toolPackage, null, 2)}\n`);
-  log("installing the CLI from its tarball");
-  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: tool });
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  log(`installing ${name} from its tarball`);
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: dir });
+  return dir;
+}
+
+/** `create-storyshelf` ships one file with no dependency: its install adds nothing but itself. */
+function assertNoDependencies(tarballs, dir) {
+  const pack = JSON.parse(
+    run("tar", ["-xOf", tarballs["create-storyshelf"], "package/package.json"]),
+  );
+  if (Object.keys(pack.dependencies ?? {}).length > 0) {
+    fail(`create-storyshelf declares dependencies: ${Object.keys(pack.dependencies).join(", ")}`);
+  }
+  const installed = readdirSync(join(dir, "node_modules")).filter((name) => !name.startsWith("."));
+  if (installed.join() !== "create-storyshelf") {
+    fail(`create-storyshelf installed more than itself: ${installed.join(", ")}`);
+  }
+  log("create-storyshelf installs with no dependency");
+}
+
+/** `storyshelf-mcp` answers `--help` with its subcommands, and `init` scaffolds a project from defaults. */
+async function assertMcpBin(scratch, tarballs) {
+  const dir = installAlone(scratch, "@storyshelf/mcp", tarballs, "mcp-tool");
+  const bin = join(dir, "node_modules/@storyshelf/mcp/dist/index.js");
+  const help = run(process.execPath, [bin, "--help"]);
+  for (const word of ["init", "serve", "--http"]) {
+    if (!help.includes(word)) fail(`storyshelf-mcp --help does not mention ${word}\n${help}`);
+  }
+  const work = join(scratch, "mcp-work");
+  mkdirSync(work);
+  const result = await answerWithDefaults(process.execPath, [bin, "init"], work, "mcp serve");
+  if (!existsSync(join(work, "my-storyshelf", ".mcp.json"))) {
+    fail(`storyshelf-mcp init failed (exit ${result.code})\n${result.output}`);
+  }
+  log("storyshelf-mcp init scaffolds a project from the tarball");
+}
+
+/** The CLI and `create-storyshelf` installed from their tarballs, and the scaffold installed from the tarballs. */
+async function installFromTarballs(scratch, tarballs) {
+  const tool = installAlone(scratch, "storyshelf", tarballs, "tool");
   const cli = join(tool, "node_modules/storyshelf/dist/index.js");
+  const creator = installAlone(scratch, "create-storyshelf", tarballs, "creator");
+  assertNoDependencies(tarballs, creator);
+  await assertMcpBin(scratch, tarballs);
 
   const project = join(scratch, "my-storyshelf");
-  log("storyshelf server init (all defaults)");
-  const init = await initWithDefaults(cli, scratch);
+  log("npm create storyshelf (all defaults)");
+  // What `npm create storyshelf` runs: the `create-storyshelf` bin of the package, here from its tarball.
+  const init = await answerWithDefaults(
+    "npm",
+    ["exec", "--yes", `--package=file:${tarballs["create-storyshelf"]}`, "--", "create-storyshelf"],
+    scratch,
+    "npm start",
+  );
   if (!init.output.includes("Scaffolded") || !existsSync(join(project, "package.json"))) {
-    fail(`server init failed (exit ${init.code})\n${init.output}`);
+    fail(`create-storyshelf failed (exit ${init.code})\n${init.output}`);
   }
   const pkg = useTarballs(project, tarballs);
   log(`scaffold depends on: ${Object.keys(pkg.dependencies).join(", ")}`);

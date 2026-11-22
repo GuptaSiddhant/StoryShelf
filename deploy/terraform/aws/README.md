@@ -103,7 +103,7 @@ App secrets reach the task as ECS `secrets` references from Secrets Manager. No 
 
 ## Database: IAM authentication
 
-The app connects with the `db-postgres/rds-iam` preset: a short-lived token from its task role for
+The app connects with the `@storyshelf/db/postgres/rds-iam` preset: a short-lived token from its task role for
 every new connection, verified against the Amazon RDS root certificates. There is no database
 password for the app to read, and nothing to rotate.
 
@@ -224,7 +224,7 @@ marked _not read_, which the image does not use yet.
 | `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secrets Manager references (optional) | read     |
 | `SHELF_OIDC_CLIENT_SECRET` (with `enable_cognito`)                                               | Secrets Manager                       | not read |
 
-The image reads the `SHELF_DATABASE_IAM_*` variables through the `db-postgres/rds-iam` preset. It refuses
+The image reads the `SHELF_DATABASE_IAM_*` variables through the `@storyshelf/db/postgres/rds-iam` preset. It refuses
 to start when they are set but incomplete, and never falls back to SQLite. Cognito sign-in is not
 wired: the image does not read the OIDC settings yet, so sign in with `SHELF_ADMIN_PASSWORD`.
 

@@ -40,7 +40,7 @@ module "storyshelf" {
 }
 ```
 
-Or let the CLI write this for you: `storyshelf server init --cloud gcp` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub.
+Or let the CLI write this for you: `npx create-storyshelf --cloud gcp` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub.
 
 ### Inputs
 
@@ -113,7 +113,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 
 - **Database.** Turn on Cloud SQL automated backups and point-in-time recovery for the created instance, or use your own policy for an existing database.
 - **Storage.** The bucket is versioned, so an overwritten or deleted blob can be recovered.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 

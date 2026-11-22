@@ -121,14 +121,14 @@ by preset, so it cannot by itself carry this guarantee.
   explanation (`POST /api/v1/admin/purge` answers 503). There is no sequential fallback for the
   reference-sensitive path. Presets are enabled one at a time: SQLite first (#536, done), then
   Postgres (#375, done) and MySQL (#376, done).
-- **Postgres lifecycle** (`db-postgres/src/build-reference-lifecycle.ts`, #375). Where SQLite
+- **Postgres lifecycle** (`db/src/postgres/build-reference-lifecycle.ts`, #375). Where SQLite
   serializes through its write lock, Postgres takes row locks in one fixed order: each owner's
   generation row `FOR UPDATE` (the fence), then the referenced builds `FOR SHARE`, which conflicts
   with the tombstone's `FOR UPDATE` of the same build row, so an admission and a deletion claim of
   one build end in exactly one outcome. A use of shared content and a collector's claim of the same
   hash take a transaction-scoped advisory lock on the hash, in hash order, and re-read after it.
   Activation follows.
-- **Postgres activation** (`createPostgresDatabase`, `db-postgres/src/retention-activation.ts`,
+- **Postgres activation** (`createPostgresDatabase`, `db/src/postgres/retention-activation.ts`,
   `baseline-preparation.ts`). Same sequence as SQLite: after the migration, `prepareBaselineReferences`
   once, then expose the capability, or `retentionPause` on a `BaselineSourceIntegrityError`. One
   transaction visits every baseline owner (those with provenance, plus those a pin still names) in
@@ -146,7 +146,7 @@ by preset, so it cannot by itself carry this guarantee.
   (`transactions: "sequential"`) and stays fail closed. The activation suite
   runs unchanged on PGlite and on a real server; the race tests (interrupted preparation, a writer
   in flight, two instances) need the real server.
-- **MySQL lifecycle and activation** (`db-mysql/src/build-reference-lifecycle.ts`,
+- **MySQL lifecycle and activation** (`db/src/mysql/build-reference-lifecycle.ts`,
   `retention-activation.ts`, #376). The Postgres lock order on InnoDB, every transaction at READ
   COMMITTED on a pooled connection of its own (InnoDB's REPEATABLE READ would answer a domain
   write's plain reads from a snapshot older than the fence). The fence row is created with
@@ -161,7 +161,7 @@ by preset, so it cannot by itself carry this guarantee.
   injected `Connection`, MariaDB, TiDB and Vitess stay fail closed and say why once at boot. Proven
   with both suites, the skipped-build suite and the race tests on MySQL 8.0, every party on its
   own pool (CI job `mysql-lifecycle`).
-- **SQLite activation** (`createSqliteDatabase`, `db-sqlite/src/retention-activation.ts`). When the
+- **SQLite activation** (`createSqliteDatabase`, `db/src/sqlite/retention-activation.ts`). When the
   adapter's setup has migrated the schema, it runs `prepareBaselineReferences` once and only then
   exposes `buildReferenceLifecycle`. A shared file is required, so an in-memory database never has
   it. If preparation stops with a `BaselineSourceIntegrityError` (a recorded source that is
@@ -203,7 +203,7 @@ All writers use the fenced capability when it is present:
 | `BaselineModel.upsert` (`core/src/models/baseline.ts`)    | Explicit promotion and replacement, swapping the source reference atomically                                                                                                                                 |
 | `core/src/models/baseline-transfer.ts` `import`           | Archive replacement or insertion with identity, version and source rechecked                                                                                                                                 |
 | `removeOrphans`, `removeForBranch`, `removeStaleBranches` | Fenced release of the owner's references with the row removal                                                                                                                                                |
-| `prepareBaselineReferences` (`db-sqlite`)                 | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
+| `prepareBaselineReferences` (`@storyshelf/db/sqlite`)     | Restartable, idempotent preparation of pins for existing known sources, under the same write lock as writers and deletion claims; invoked once at every SQLite boot, before the capability is exposed (#536) |
 
 A new baseline write path must use the same authority (this includes #327 and #351); a check
 followed by an independent write is forbidden.
@@ -264,6 +264,6 @@ could leave them, and they would keep an unrelated build protected.
 
 - Batching of the SQLite preparation, only if a deployment outgrows the startup budget. Measured
   on a 10,000-baseline fixture (each with its own source build; `RUN_BENCH=1` in
-  `db-sqlite/src/retention-activation.test.ts`), preparation takes about 3.9 s and a whole boot
+  `db/src/sqlite/retention-activation.test.ts`), preparation takes about 3.9 s and a whole boot
   3.5 to 3.7 s, roughly 0.4 ms per baseline and linear, so it fits the 5 s budget up to about 12,000
   baselines. Batching is not designed; the first deployment past that size designs it.

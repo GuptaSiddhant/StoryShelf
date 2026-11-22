@@ -6,12 +6,12 @@ Storage adapters for StoryShelf, one subpath per backend: S3-compatible stores (
 
 Install the package and **only the SDK of the backend you use**. The cloud SDKs are optional peer dependencies, and a subpath loads only its own, so a server that uses `/s3` never has the Google or Azure SDK in `node_modules`.
 
-| Subpath               | Install next to `@storyshelf/storage`                  |
-| --------------------- | ------------------------------------------------------ |
-| `@storyshelf/storage/s3`    | `@aws-sdk/client-s3` and `@aws-sdk/lib-storage`  |
-| `@storyshelf/storage/gcs`   | `@google-cloud/storage`                          |
-| `@storyshelf/storage/azure` | `@azure/storage-blob` and `@azure/identity`      |
-| `@storyshelf/storage/local` | nothing                                          |
+| Subpath                     | Install next to `@storyshelf/storage`           |
+| --------------------------- | ----------------------------------------------- |
+| `@storyshelf/storage/s3`    | `@aws-sdk/client-s3` and `@aws-sdk/lib-storage` |
+| `@storyshelf/storage/gcs`   | `@google-cloud/storage`                         |
+| `@storyshelf/storage/azure` | `@azure/storage-blob` and `@azure/identity`     |
+| `@storyshelf/storage/local` | nothing                                         |
 
 ```sh
 nub add @storyshelf/storage @aws-sdk/client-s3 @aws-sdk/lib-storage
@@ -23,7 +23,7 @@ or
 npm install @storyshelf/storage @aws-sdk/client-s3 @aws-sdk/lib-storage
 ```
 
-`storyshelf server init` adds the right SDK for the storage you choose. The SDKs supply credentials (environment, IRSA and workload identity, the metadata servers, managed identity), request signing, retries and multipart uploads, which is why StoryShelf uses them instead of calling the REST APIs itself.
+`create-storyshelf` adds the right SDK for the storage you choose. The SDKs supply credentials (environment, IRSA and workload identity, the metadata servers, managed identity), request signing, retries and multipart uploads, which is why StoryShelf uses them instead of calling the REST APIs itself.
 
 ## Quick start
 

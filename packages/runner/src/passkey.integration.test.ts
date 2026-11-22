@@ -9,7 +9,7 @@ import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
 import { createShelfAuth } from "@storyshelf/auth";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";

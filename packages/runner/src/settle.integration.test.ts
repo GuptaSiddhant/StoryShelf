@@ -4,7 +4,7 @@ import { StorybookAdapter } from "@storyshelf/core/capture";
 import { parseTestResults } from "@storyshelf/core/capture";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

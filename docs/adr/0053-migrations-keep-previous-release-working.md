@@ -17,7 +17,7 @@ the old copies working.
 Facts read in the code on 2026-11-13:
 
 - **Migrations run at every boot and are not versioned.** `runMigrations`
-  (`packages/db-postgres/src/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
+  (`packages/db/src/postgres/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
   of idempotent `ALTER` statements. There is no record of which release last migrated
   `[inferred: no version table found]`.
 - **Postgres serialises migrations.** `runMigrationsLocked` holds a session-level advisory lock
@@ -247,7 +247,7 @@ are suspended in this way:
   step. A pull request that makes one carries the `schema-break` label. It skips the
   `previous-release-db` job, which would fail on it by design, and the changeset check enforces the
   `Breaking:` kind and the `Schema:` line (`docs/testing.md`).
-- The `previous-release-db` job stays for every other pull request: it still catches an *accidental*
+- The `previous-release-db` job stays for every other pull request: it still catches an _accidental_
   break.
 
 From 2027-01-01 this ADR applies again as written.

@@ -69,9 +69,9 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 
 | Flag                              | Description                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--url`                           | Server URL (or file / `SHELF_URL`)                                                                                                                                               |
-| `--slug`                          | Project slug (or file / `SHELF_SLUG`)                                                                                                                                            |
-| `--token`                         | Project API token (`Authorization: Bearer`, or `SHELF_TOKEN`)                                                                                                                    |
+| `--url`                           | Server URL (or file / `SHELF_URL`)                                                                                                                                                    |
+| `--slug`                          | Project slug (or file / `SHELF_SLUG`)                                                                                                                                                 |
+| `--token`                         | Project API token (`Authorization: Bearer`, or `SHELF_TOKEN`)                                                                                                                         |
 | `--sha`                           | Revision SHA (flag, CI env, local git HEAD, or synthesized `local-*`)                                                                                                                 |
 | `--branch`                        | Baseline namespace (flag, CI env, local git branch, or `local`)                                                                                                                       |
 | `--build-dir` / `-d`              | Built Storybook directory (default `storybook-static`)                                                                                                                                |
@@ -87,8 +87,8 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--skip-unchanged`                | Record a commit that changed no story as a skipped build instead of uploading (default off; see [Skipping unchanged commits](/concepts/affected-capture/#skipping-unchanged-commits)) |
 | `--untraced <glob>`               | Exclude matching files from affected tracing (repeatable, e.g. `"**/*.generated.ts"`; unions with `untraced` in config)                                                               |
 | `--stats-file <path>`             | Bundler stats file (default `<buildDir>/preview-stats.json`)                                                                                                                          |
-| `--zip`                           | Upload one zip instead of hashing files; for servers without the hash routes (or `SHELF_ZIP=1`)                                                                                  |
-| `--json`                          | Print one JSON object on stdout when the command finishes (see [Machine-readable output](#machine-readable-output)); all human output goes to stderr |
+| `--zip`                           | Upload one zip instead of hashing files; for servers without the hash routes (or `SHELF_ZIP=1`)                                                                                       |
+| `--json`                          | Print one JSON object on stdout when the command finishes (see [Machine-readable output](#machine-readable-output)); all human output goes to stderr                                  |
 | `--wait`                          | After the upload, follow the build until it stops needing the server, and exit by how it ended (see [Gating CI with `--wait`](#gating-ci-with---wait))                                |
 | `--timeout <duration>`            | With `--wait`, stop waiting after this long: `90`, `90s`, `30m`, `2h` (default `30m`). Never cancels the build                                                                        |
 | `--dry-run`                       | Validate/build but send no requests                                                                                                                                                   |
@@ -106,17 +106,22 @@ The CLI does **not** run Playwright. It hashes the static build, sends only the 
 Scripts should not parse the text output, which can change between releases. `storyshelf upload --json` prints exactly one JSON object on stdout when the command finishes; phases, progress and every other message go to stderr, and the exit codes are unchanged.
 
 ```json
-{ "buildId": "01J…", "url": "https://shelf.example.com/projects/demo/builds/01J…", "status": "created", "skipped": false }
+{
+  "buildId": "01J…",
+  "url": "https://shelf.example.com/projects/demo/builds/01J…",
+  "status": "created",
+  "skipped": false
+}
 ```
 
-| Field      | Meaning                                                                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `buildId`  | The build's id; `null` when no build was made (`--dry-run`, or a branch skipped by the config's `skip`)                                    |
-| `url`      | The build page, as the server returned it; `null` for a server that returns none                                                           |
-| `status`   | `created`, `skipped` (a skipped build, or the config skips the branch) or `dry-run`                                                         |
-| `skipped`  | `true` when no Storybook was uploaded because nothing needed it                                                                            |
-| `verdict`  | With `--wait`: `approved`, `needs-review`, `rejected`, `failed`, `cancelled`, `timeout` or `interrupted`                                   |
-| `exitCode` | With `--wait`: the exit code the command ends with                                                                                         |
+| Field      | Meaning                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| `buildId`  | The build's id; `null` when no build was made (`--dry-run`, or a branch skipped by the config's `skip`)  |
+| `url`      | The build page, as the server returned it; `null` for a server that returns none                         |
+| `status`   | `created`, `skipped` (a skipped build, or the config skips the branch) or `dry-run`                      |
+| `skipped`  | `true` when no Storybook was uploaded because nothing needed it                                          |
+| `verdict`  | With `--wait`: `approved`, `needs-review`, `rejected`, `failed`, `cancelled`, `timeout` or `interrupted` |
+| `exitCode` | With `--wait`: the exit code the command ends with                                                       |
 
 The output never contains a token. With `jq`, on any CI system:
 
@@ -190,14 +195,13 @@ storyshelf whoami
 # Project: My Design System (my-design-system)
 ```
 
-## `storyshelf retry` / `purge`
+## `storyshelf retry`
 
 ```bash
 storyshelf retry --url http://localhost:3000 --slug my-design-system --build-id <id> [--token $SHELF_TOKEN]
-storyshelf purge --url http://localhost:3000 --token $SHELF_ADMIN_TOKEN
 ```
 
-`retry` re-runs capture. `purge` runs retention GC. `cancel [--dry-run]` cancels older unfinished builds.
+`retry` re-runs capture. Retention GC is `storyshelf-server purge`, run in the instance project. `cancel [--dry-run]` cancels older unfinished builds.
 
 ## `storyshelf protect`
 

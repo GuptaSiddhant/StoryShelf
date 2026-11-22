@@ -67,10 +67,12 @@ rather than pushing and waiting.
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono.
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
-- Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `affected`, `runner`,
+- Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
-- `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
+- `packages/cli` — `storyshelf` binary (project commands: upload/init/create/retry/cancel/protect; no Playwright, no server scaffold, no MCP commands).
+- `packages/create-storyshelf` — `create-storyshelf` (`npm create storyshelf`): scaffolds a server project that default-exports `defineShelfInstance`, and `--cloud` writes a Terraform stub. Zero runtime dependencies (`prompts` is bundled into one file); never depends on `@storyshelf/app` or `@storyshelf/core`. `--install` is opt-in and uses the runner from `npm_config_user_agent`. The scaffold's version pins wait on the generated version manifest (#1332).
+- `@storyshelf/mcp` also has a `storyshelf-mcp` bin: `init` scaffolds an MCP project, `serve` runs it, no arguments serves stdio/HTTP.
+- `storyshelf-server` — the instance binary, a `bin` of `@storyshelf/app` (`packages/app/src/server-bin/`): `serve` (via `startServer`, `--watch`), `migrate`, `purge`, `check-storage`, `doctor`. The instance module (`--entry`, else `package.json#storyshelf.server`, else `src/index.ts` and the usual names) default-exports `defineShelfInstance(async (env) => options, { afterSetup })`: configuration, never a constructed app (one that is refused, naming `defineShelfInstance`). The bin loads `.env`, refuses renamed settings, calls the factory and creates the one app with `createShelfApp(options, { mode })`: `serve` (everything, today's path), `migrate` (the database's setup only) or `tool` (no setup, consumer, timers, git-link sync or replay; `purge`, `check-storage` and `doctor` run as `tool` and never migrate). Only `serve` runs `afterSetup`. An app built before the bin's own fails the run (`appsConstructed()`). It never reads `.storybook/storyshelf.json` (#367).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
 - `docs/` — `architecture/`, `repo-structure.md`, `testing.md`, `adr/`.

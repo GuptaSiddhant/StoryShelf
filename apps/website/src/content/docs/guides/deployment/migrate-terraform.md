@@ -10,7 +10,7 @@ A stack you already applied keeps working; nothing here is urgent. Move when you
 ## Before you start
 
 1. Back up the Terraform state (`terraform state pull > backup.tfstate`).
-2. Pin the stack to a release: replace the generated files with the stub from `storyshelf server init --cloud <cloud>`, keeping your old `terraform/` directory aside until the plan is clean.
+2. Pin the stack to a release: replace the generated files with the stub from `npx create-storyshelf --cloud <cloud>`, keeping your old `terraform/` directory aside until the plan is clean.
 3. Reuse the old `name`, region, domain and VPC settings, so resource names do not change.
 4. Add the `moved` blocks for your cloud below to `main.tf`, then run `terraform plan`. A clean migration shows only changes you expect, and no resource it would destroy and create that holds data (the database, the bucket, the secrets).
 
@@ -200,7 +200,7 @@ Two changes in the module are deliberate and show in the plan:
 
 ### Switch the database to `rds-iam`
 
-The old stack read the RDS-managed master password from Secrets Manager at startup and built `DATABASE_URL`, so a rotated password broke the connection until a restart. The module connects with short-lived IAM tokens instead (`db-postgres/rds-iam`), so no database password reaches the app.
+The old stack read the RDS-managed master password from Secrets Manager at startup and built `DATABASE_URL`, so a rotated password broke the connection until a restart. The module connects with short-lived IAM tokens instead (`@storyshelf/db/postgres/rds-iam`), so no database password reaches the app.
 
 The module creates the instance with IAM authentication on (`iam_database_authentication_enabled`), and the migration applies that in place, with no restart of the app's data.
 

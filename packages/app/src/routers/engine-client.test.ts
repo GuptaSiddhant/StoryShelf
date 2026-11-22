@@ -2,7 +2,7 @@ import { createShelfAuth, listUserSessions, type ShelfAuth } from "@storyshelf/a
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { TrustProxy } from "@storyshelf/core/config";
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";

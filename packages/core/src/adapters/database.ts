@@ -4,7 +4,7 @@
  * Canonical home of the database contract — {@link DatabaseAdapter},
  * {@link Tables}, {@link TxStore}, {@link ListOptions}, and
  * {@link DrizzleAdapterOptions}. Driver machinery lives in the database
- * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
+ * packages (`@storyshelf/db/sqlite`, `@storyshelf/db/postgres`).
  */
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -28,6 +28,8 @@ export {
   type SchemaLevelQuery,
   type SchemaLevelStore,
 } from "./schema-level.ts";
+
+export { readSchemaRelease } from "./schema-release.ts";
 
 export {
   duplicateGroupsSql,

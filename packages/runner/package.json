@@ -69,7 +69,7 @@
     "@hono/node-server": "catalog:",
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@types/jsdom": "^30.0.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

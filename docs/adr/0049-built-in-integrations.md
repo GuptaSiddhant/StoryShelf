@@ -253,6 +253,18 @@ env vars and properties or columns." This changes rule 3 (Retiring) for every re
 From 2027-01-01 rule 3 applies again: one minor release as a deprecated re-export, then no longer
 published. ADR 0053 has the matching amendment for the schema.
 
+## Amendment 2026-11-21: `@storyshelf/db` lands above core (#1331)
+
+The owner brought the packaging part of #1242 forward, so the rename lands before the no-shim window
+closes on 2027-01-01. `db-{sqlite,postgres,mysql}` are folded into one `@storyshelf/db` with `/sqlite`,
+`/postgres` and `/mysql` subpaths and the existing presets under each, and every driver is an optional
+peer that only its own subpath loads. The move changes no code and no schema. `ddl`, `schema` and
+`drizzle-factory` are no longer published (ADR 0041 replaces them).
+
+Until #1242 inverts the layering, the package sits **above** core: it imports core's adapter
+interfaces, models and test helpers, which is the reverse of the target in rule 2. The inversion, with
+core building on `@storyshelf/db`, stays in #1242 and still waits for ADR 0041 task 5.
+
 ## Amendment 2026-11-21: testing-only libraries follow the runner (#1335)
 
 Folding `@storyshelf/image` into core made a hosting-only deployment (no `testing` option) install
