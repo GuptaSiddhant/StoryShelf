@@ -25,21 +25,28 @@ function boot(mode: "hosting" | "testing", blocked: string[]): Record<string, un
   return JSON.parse(line.slice("REPORT ".length)) as Record<string, unknown>;
 }
 
-describe("testing-only libraries stay out of a hosting-only deployment", () => {
-  it("boots, serves health and publishes a Storybook with pngjs, pixelmatch and axe-core unresolvable", () => {
-    expect(boot("hosting", TESTING_ONLY)).toEqual({ setup: "ok", health: 200, upload: 202 });
-  });
+// Each case boots a whole app in a fresh Node process, which is slow under load.
+const BOOT_TIMEOUT_MS = 60_000;
 
-  it("with testing on and the peers present, readiness passes", () => {
-    expect(boot("testing", [])).toMatchObject({ setup: "ok", health: 200 });
-  });
+describe(
+  "testing-only libraries stay out of a hosting-only deployment",
+  { timeout: BOOT_TIMEOUT_MS },
+  () => {
+    it("boots, serves health and publishes a Storybook with pngjs, pixelmatch and axe-core unresolvable", () => {
+      expect(boot("hosting", TESTING_ONLY)).toEqual({ setup: "ok", health: 200, upload: 202 });
+    });
 
-  it.each(["pngjs", "pixelmatch"])(
-    "with testing on and %s missing, readiness fails naming it and the install line",
-    (peer) => {
-      const report = boot("testing", [peer]);
-      expect(String(report["setup"])).toContain(`\`${peer}\``);
-      expect(String(report["setup"])).toContain("nub add pngjs pixelmatch");
-    },
-  );
-});
+    it("with testing on and the peers present, readiness passes", () => {
+      expect(boot("testing", [])).toMatchObject({ setup: "ok", health: 200 });
+    });
+
+    it.each(["pngjs", "pixelmatch"])(
+      "with testing on and %s missing, readiness fails naming it and the install line",
+      (peer) => {
+        const report = boot("testing", [peer]);
+        expect(String(report["setup"])).toContain(`\`${peer}\``);
+        expect(String(report["setup"])).toContain("nub add pngjs pixelmatch");
+      },
+    );
+  },
+);
