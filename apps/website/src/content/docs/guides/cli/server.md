@@ -67,7 +67,7 @@ storyshelf-server serve [--port 3000] [--watch]   # start the instance; SIGTERM 
 storyshelf-server migrate                         # run the database migrations, then exit
 storyshelf-server purge [--ttl-days 30]           # purge expired builds
 storyshelf-server check-storage [--sample 50]     # read-only consistency check
-storyshelf-server doctor                          # module, settings and the schema level
+storyshelf-server doctor                          # installed packages and peers, module, settings, schema level
 ```
 
 The project's `src/index.ts` default-exports an instance definition: configuration, never a constructed app.
@@ -85,6 +85,6 @@ export default defineShelfInstance(
 );
 ```
 
-`storyshelf-server` loads `.env` (the shell's variables win), refuses renamed settings, calls the factory and creates the app for the command. `serve` runs everything; `migrate` sets only the database up; `purge`, `check-storage` and `doctor` run as tools: they never migrate and start no job consumer, timers or replay, so the database must already be at this release's level (`doctor` reports it). A module that exports a constructed app is refused. `--entry <file>` or `"storyshelf": { "server": "<file>" }` in `package.json` names the module; without either the usual names are searched. `purge` and `check-storage` run in-process with the instance's admin token (`config.adminToken`, `SHELF_ADMIN_TOKEN`). `storyshelf server serve`, `storyshelf server check-storage` and `storyshelf purge` were removed without a replacement alias.
+`storyshelf-server` loads `.env` (the shell's variables win), refuses renamed settings, calls the factory and creates the app for the command. `serve` runs everything; `migrate` sets only the database up; `purge`, `check-storage` and `doctor` run as tools: they never migrate and start no job consumer, timers or replay, so the database must already be at this release's level (`doctor` reports it). A module that exports a constructed app is refused. An optional peer the module imports but you did not install (a database driver, a storage SDK) fails with the package or subpath that needs it, the range and the `npm install` line; `doctor` checks the installed `@storyshelf/*` packages before it imports the module and fails on mixed `@storyshelf/*` versions or a second copy of `@storyshelf/core`. `--entry <file>` or `"storyshelf": { "server": "<file>" }` in `package.json` names the module; without either the usual names are searched. `purge` and `check-storage` run in-process with the instance's admin token (`config.adminToken`, `SHELF_ADMIN_TOKEN`). `storyshelf server serve`, `storyshelf server check-storage` and `storyshelf purge` were removed without a replacement alias.
 
 See [Getting started](/guides/getting-started/) for the full init flow and [Configuration](/guides/config/) for env vars.
