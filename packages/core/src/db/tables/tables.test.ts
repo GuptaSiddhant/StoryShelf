@@ -4,11 +4,14 @@
  * deriving the core types from these tables.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
+import type { BuildComponent } from "../../schema/build-component.ts";
+import type { BuildReview } from "../../schema/build-review.ts";
 import type { Build } from "../../schema/build.ts";
 import type { CaptureAttempt, CaptureLog } from "../../schema/capture-attempt.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { UserConnection } from "../../schema/connection.ts";
+import type { ContentUse } from "../../schema/content-use.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { ProjectMember } from "../../schema/member.ts";
 import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts";
@@ -16,17 +19,21 @@ import type { Project } from "../../schema/project.ts";
 import type { SchemaMeta } from "../../schema/schema-meta.ts";
 import type { SiteSetting } from "../../schema/site-setting.ts";
 import type { Token } from "../../schema/token.ts";
-import type { ProjectLink } from "../../schema/usage.ts";
+import type { BuildPackageUsage, ProjectLink } from "../../schema/usage.ts";
 import type { User } from "../../schema/user.ts";
 import type { Webhook } from "../../schema/webhook.ts";
 import type { InferRow } from "../define-table.ts";
 import {
+  buildComponents,
   builds,
   buildLabels,
+  buildPackageUsage,
+  buildReviews,
   captureAttempts,
   captureJobs,
   captureLogs,
   captureShards,
+  contentUses,
   labelTypes,
   NEUTRAL_TABLES,
   projectGroupMappings,
@@ -71,6 +78,13 @@ describe("spike tables", () => {
     expectTypeOf<Log["level"]>().toEqualTypeOf<string>();
   });
 
+  it("match the core build-content rows exactly", () => {
+    expectTypeOf<InferRow<typeof buildReviews>>().toEqualTypeOf<BuildReview>();
+    expectTypeOf<InferRow<typeof buildComponents>>().toEqualTypeOf<BuildComponent>();
+    expectTypeOf<InferRow<typeof buildPackageUsage>>().toEqualTypeOf<BuildPackageUsage>();
+    expectTypeOf<InferRow<typeof contentUses>>().toEqualTypeOf<ContentUse>();
+  });
+
   it("match the core project row apart from storybook_meta", () => {
     // `Project` marks fourteen columns optional that every dialect always returns, and reads
     // `storybookMeta` as `string | null | undefined` (the Drizzle schemas' `$type`); the column is
@@ -105,6 +119,6 @@ describe("spike tables", () => {
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
     expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
-    expect(new Set(names).size).toBe(24);
+    expect(new Set(names).size).toBe(28);
   });
 });

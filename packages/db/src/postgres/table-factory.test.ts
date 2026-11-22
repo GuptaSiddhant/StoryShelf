@@ -38,6 +38,8 @@ const PRIMARY_KEY_COLUMNS = [
   "build_reference_generations.owner_id",
   "build_content_releases.build_id",
   "build_content_releases.content_hash",
+  "content_uses.build_id",
+  "content_uses.content_hash",
 ];
 
 /** Every remaining difference, `today → generated`, with its classification. */
@@ -161,6 +163,18 @@ describe("Postgres table factory (spike #800)", () => {
     >();
     expectTypeOf(pgTableOf(ns.captureShards, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.captureShards.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildReviews, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildReviews.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildComponents, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildComponents.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildPackageUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildPackageUsage.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.contentUses, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.contentUses.$inferSelect
     >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
