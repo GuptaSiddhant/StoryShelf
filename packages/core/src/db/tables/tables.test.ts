@@ -5,12 +5,17 @@
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Build } from "../../schema/build.ts";
+import type { UserConnection } from "../../schema/connection.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { ProjectMember } from "../../schema/member.ts";
 import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts";
 import type { Project } from "../../schema/project.ts";
+import type { SchemaMeta } from "../../schema/schema-meta.ts";
+import type { SiteSetting } from "../../schema/site-setting.ts";
+import type { Token } from "../../schema/token.ts";
 import type { ProjectLink } from "../../schema/usage.ts";
 import type { User } from "../../schema/user.ts";
+import type { Webhook } from "../../schema/webhook.ts";
 import type { InferRow } from "../define-table.ts";
 import {
   builds,
@@ -21,7 +26,12 @@ import {
   projectLinks,
   projectMembers,
   projects,
+  schemaMeta,
+  siteSettings,
+  tokens,
+  userConnections,
   users,
+  webhooks,
 } from "./index.ts";
 
 describe("spike tables", () => {
@@ -34,6 +44,14 @@ describe("spike tables", () => {
     expectTypeOf<InferRow<typeof projectMembers>>().toEqualTypeOf<ProjectMember>();
     expectTypeOf<InferRow<typeof projectGroupMappings>>().toEqualTypeOf<ProjectGroupMapping>();
     expectTypeOf<InferRow<typeof projectLinks>>().toEqualTypeOf<ProjectLink>();
+  });
+
+  it("match the core settings, token, connection and webhook rows exactly", () => {
+    expectTypeOf<InferRow<typeof siteSettings>>().toEqualTypeOf<SiteSetting>();
+    expectTypeOf<InferRow<typeof schemaMeta>>().toEqualTypeOf<SchemaMeta>();
+    expectTypeOf<InferRow<typeof tokens>>().toEqualTypeOf<Token>();
+    expectTypeOf<InferRow<typeof userConnections>>().toEqualTypeOf<UserConnection>();
+    expectTypeOf<InferRow<typeof webhooks>>().toEqualTypeOf<Webhook>();
   });
 
   it("match the core project row apart from storybook_meta", () => {
@@ -68,6 +86,7 @@ describe("spike tables", () => {
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("builds"));
     expect(names.indexOf("projects")).toBe(0);
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
-    expect(new Set(names).size).toBe(12);
+    expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
+    expect(new Set(names).size).toBe(20);
   });
 });
