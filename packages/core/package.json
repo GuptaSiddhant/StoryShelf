@@ -219,6 +219,7 @@
   "dependencies": {
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",
     "unzipper": "0.12.5",

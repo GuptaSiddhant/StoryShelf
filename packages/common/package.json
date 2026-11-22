@@ -1,0 +1,104 @@
+{
+  "name": "@storyshelf/common",
+  "version": "0.14.0",
+  "description": "Shared building blocks for StoryShelf packages: settings, guarded outbound HTTP, secret redaction, tracing helpers and errors. Depends only on @opentelemetry/api.",
+  "keywords": [
+    "http",
+    "redaction",
+    "self-hosted",
+    "settings",
+    "storybook",
+    "tracing",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/common"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./errors": {
+      "source": "./src/errors/index.ts",
+      "default": "./dist/errors.mjs"
+    },
+    "./http": {
+      "source": "./src/http/index.ts",
+      "default": "./dist/http.mjs"
+    },
+    "./ids": {
+      "source": "./src/ids/index.ts",
+      "default": "./dist/ids.mjs"
+    },
+    "./logger": {
+      "source": "./src/logger.ts",
+      "default": "./dist/logger.mjs"
+    },
+    "./redact": {
+      "source": "./src/redact/index.ts",
+      "default": "./dist/redact.mjs"
+    },
+    "./settings": {
+      "source": "./src/settings/index.ts",
+      "default": "./dist/settings.mjs"
+    },
+    "./tracing": {
+      "source": "./src/tracing/index.ts",
+      "default": "./dist/tracing.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./errors": "./dist/errors.mjs",
+      "./http": "./dist/http.mjs",
+      "./ids": "./dist/ids.mjs",
+      "./logger": "./dist/logger.mjs",
+      "./redact": "./dist/redact.mjs",
+      "./settings": "./dist/settings.mjs",
+      "./tracing": "./dist/tracing.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "catalog:"
+  },
+  "devDependencies": {
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

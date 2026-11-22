@@ -645,6 +645,46 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
 
+  packages/common:
+    dependencies:
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.10.0
+    devDependencies:
+      '@opentelemetry/context-async-hooks':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/core':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-trace-base':
+        specifier: 'catalog:'
+        version: 2.11.0(@opentelemetry/api@1.10.0)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.12(vitest@5.0.5)
+      oxfmt:
+        specifier: 'catalog:'
+        version: 0.65.0
+      oxlint:
+        specifier: 'catalog:'
+        version: 1.90.0(oxlint-tsgolint@7.0.2005)
+      oxlint-tsgolint:
+        specifier: 'catalog:'
+        version: 7.0.2005
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3)(vite@6.4.5(@types/node@26.6.5)(yaml@2.9.1))
+
   packages/core:
     dependencies:
       '@opentelemetry/api':
@@ -653,6 +693,9 @@ importers:
       '@storyshelf/affected':
         specifier: workspace:*
         version: link:../affected
+      '@storyshelf/common':
+        specifier: workspace:*
+        version: link:../common
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.6(@electric-sql/pglite@0.5.12)(@libsql/client@0.18.0)(@neondatabase/serverless@1.2.0)(@opentelemetry/api@1.10.0)(@vercel/postgres@0.10.0)(better-sqlite3@12.11.1)(pg@8.23.1)(postgres@3.4.9)(zod@4.6.7)

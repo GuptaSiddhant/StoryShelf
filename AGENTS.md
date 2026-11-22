@@ -66,6 +66,7 @@ rather than pushing and waiting.
 
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono.
+- `packages/common` — `@storyshelf/common`: the lightweight code packages share (`/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids`, `/logger`). Its only runtime dependency is `@opentelemetry/api`; it never imports `@storyshelf/*`. Core re-exports everything that moved from its existing subpaths; `mcp` and `observability` import it directly and do not install core (#1334).
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
   `observability`, `ai`, `mcp`.
@@ -126,9 +127,10 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   (`packages/app/src/routers/read-grants.ts`, class `hosting`) takes `read` tokens only: one build, at
   most an hour, current secret only (`previousSecret` is never tried), every answer sandboxed,
   `private, no-store`, `no-referrer`. `packages/core/src/utils/storybook-token.ts` is the single owner
-  of both prefixes (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`), the token shape, the derived
-  key per purpose, sign/verify and the lifetimes: never type `/_s/` or `/_r/` or derive a key
-  elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
+  of signing, verifying, the derived key per purpose and the lifetimes; the prefix constants
+  (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`, `STORYBOOK_EXCHANGE_PREFIX`) and the token's regex
+  source live in `@storyshelf/common/redact` so log redaction needs no signing code, and core re-exports
+  them: never type `/_s/` or `/_r/` or derive a key elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
   purpose) and a `read` grant only through `mintReadGrant` (`redirectToReadGrant` for the sandboxed
   redirect, `previewBaseOf` for previews); `renderInSlices` re-mints capture tokens for long passes.
   Every published-file route goes through `publishedAccess` +
@@ -209,9 +211,9 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
 - **Logging and HTTP.** Use pino from core (`createShelfLogger()`): structured objects, never string
   interpolation (`logger.info({ buildId }, "msg")`), errors as an `err` child. Adapters receive scoped
   loggers via `Adapter.setLogger` and never create their own. Outbound HTTP only through
-  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. On every span (core,
-  `observability`, `ai`), record an exception only as a redacted copy (core's `spanException`, or
-  the wrappers' own copy of it), rethrowing the original.
+  `@storyshelf/common/http` (`httpJson`/`HttpError`, re-exported by `@storyshelf/core/utils`); never add `ky`/`ofetch`. On every span (core,
+  `observability`, `ai`), record an exception only as a redacted copy (`spanException` from
+  `@storyshelf/common/tracing`, or the wrappers' own copy of it), rethrowing the original.
   An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
   `redactUrlForLog(url)` (origin only).
 - **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
@@ -276,12 +278,12 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   change ships without a shim or alias, as `Breaking:` (ADR 0049 and ADR 0053 amendments, 2026-11-21).
 - **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` ("Shelf" in prose and
   diagrams). `SHELF_*` for StoryShelf's own settings; unprefixed only for platform or SDK names. Read
-  them through `readSetting` (`@storyshelf/core/config`; the CLI keeps its rows in
+  them through `readSetting` (`@storyshelf/common/settings`, re-exported by `@storyshelf/core/config`; the CLI keeps its rows in
   `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
-  (`packages/core/src/env-settings/renames.ts`), which every entry point checks at boot
+  (`packages/common/src/settings/renames.ts`), which every entry point checks at boot
   (`refuseRenamedSettings`, names only; `SHELF_ALLOW_OLD_NAMES=1` warns instead; removed in the first
   release of 2027), and `packages/core/src/env-settings/ratchet.test.ts`
-  fails on any other unprefixed read.
+  (it scans every package, `common` included) fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.
@@ -294,7 +296,10 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   skill for templates.
 - **One production owner per third-party dep.** A runtime dependency belongs in exactly one package's
   `dependencies` (e.g. `pino` in core, `axe-core` in the runner); other packages use `devDependencies` and import
-  types through the owner (`@storyshelf/core/logger`), never directly.
+  types through the owner (`@storyshelf/core/logger`), never directly. The one deliberate exception
+  is `@opentelemetry/api`, declared by `common`, `core`, `app`, `ai` and `observability` alike: it is a
+  no-op API whose global registration only works when every package resolves one copy, so each
+  declares the same catalog range instead of reaching it through another package (#1334).
 - **Tests.** Every model, router and adapter needs tests (target 100% coverage). `nub run test` must
   stay hermetic; real-browser is gated by `RUN_INTEGRATION=1`; live cloud by `LIVE_CLOUD=1`. See
   `docs/testing.md` for the adapter matrix and determinism rules. Do not paper over flaky timing

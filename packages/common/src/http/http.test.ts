@@ -1,8 +1,9 @@
 import { propagation } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "../logger.ts";
-import { recordSpans, type RecordedSpan } from "../test-helpers/span-recorder.ts";
-import { HttpError, httpBytes, httpJson, httpStatus, httpText, redactUrlForLog } from "./http.ts";
+import { redactUrlForLog } from "../redact/redact.ts";
+import { recordSpans, type RecordedSpan } from "../tracing/span-recorder.ts";
+import { HttpError, httpBytes, httpJson, httpStatus, httpText } from "./http.ts";
 import { overrideGuardedNetwork } from "./outbound-fetch.ts";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
