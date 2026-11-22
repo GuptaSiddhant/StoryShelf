@@ -1,8 +1,6 @@
 ---
 "@storyshelf/core": patch
-"@storyshelf/db-sqlite": patch
-"@storyshelf/db-postgres": patch
-"@storyshelf/db-mysql": patch
+"@storyshelf/db": patch
 ---
 
 Internal: define the settings, token, connection and notification tables as neutral tables

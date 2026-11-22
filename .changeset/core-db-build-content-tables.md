@@ -1,8 +1,6 @@
 ---
 "@storyshelf/core": patch
-"@storyshelf/db-sqlite": patch
-"@storyshelf/db-postgres": patch
-"@storyshelf/db-mysql": patch
+"@storyshelf/db": patch
 ---
 
 Internal: define build reviews, components, package usage and content uses as neutral tables

@@ -1,8 +1,6 @@
 ---
 "@storyshelf/core": minor
-"@storyshelf/db-sqlite": minor
-"@storyshelf/db-postgres": minor
-"@storyshelf/db-mysql": minor
+"@storyshelf/db": minor
 ---
 
 Internal: add the `@storyshelf/core/db` subpath and map `json<T>` columns in every table factory
