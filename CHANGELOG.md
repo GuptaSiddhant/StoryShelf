@@ -131,6 +131,10 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   `storyshelf upload --json` prints one JSON object on stdout (`buildId`, `url`, `status`, `skipped`, plus `verdict` and `exitCode` with `--wait`); all human output goes to stderr and exit codes are unchanged. When `GITHUB_OUTPUT` is set, `build-id` and `build-url` are appended to it, with or without `--json`.
 
+- A generated version and peer manifest replaces the scaffold's hand-copied pins
+
+  `config/version-manifest.json` is built from every workspace `package.json` (versions, and the optional peers of each subpath with their ranges) and a test fails on drift. `create-storyshelf` writes `@storyshelf/*` at its own exact version and each SDK at the range its owner declares, which fixes the `@libsql/client`, `nodemailer` and `@aws-sdk/lib-storage` pins that had drifted. `@storyshelf/core` is now always written explicitly. A test asserts that only `@storyshelf/core/test-helpers` resolves the optional `vitest` peer.
+
 ### Changed
 
 - The image reads GCS and Azure Blob storage; Azure uses a managed identity
@@ -144,6 +148,10 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
   A delivery now reads the facts the comment already knew how to show: who approved or rejected (their display name in a code span, whitespace collapsed, never an email address or an `@` handle), the failing Storybook tests, the accessibility finding count (a count only; it never moves the headline) and, for a failed capture, a fixed phrase chosen by error class ("a browser failed to start", "timed out", "the Storybook could not be published"). No error text ever reaches the comment. Removed stories and earlier builds follow in a separate issue.
 
   Schema: none
+
+- `@storyshelf/core` is an exact peer dependency of the storage, runner, auth, ai and db packages
+
+  An adapter no longer installs its own `@storyshelf/core`: it requires the one you installed, at the same exact version, so a mismatched core is an install warning or error instead of a second copy. Add `@storyshelf/core` to your project's dependencies (`create-storyshelf` already writes it).
 
 - The database adapters run on Drizzle ORM 1.0 (1.0.0-rc.6)
 
@@ -176,6 +184,10 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
   Schema: none.
 
 ### Fixed
+
+- `@storyshelf/auth` no longer requires a `drizzle-orm` peer
+
+  Auth has no direct Drizzle import; it reaches Drizzle through `@storyshelf/core/orm`, so installing it no longer asks for a second Drizzle.
 
 - `server init --cloud` writes only inputs the GCP and Azure modules declare (#1094)
 
