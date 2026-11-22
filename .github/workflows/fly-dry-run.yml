@@ -42,8 +42,10 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Build the workspace CLI
-        run: nubx turbo build --filter=storyshelf
+      # The CLI seeds the demo; the e2e imports `@storyshelf/runner/a11y`, whose `default` export is
+      # its `dist` (Vitest does not use the `source` condition), so build both.
+      - name: Build the workspace CLI and runner
+        run: nubx turbo build --filter=storyshelf --filter=@storyshelf/runner
 
       - name: Build fixture Storybook
         uses: ./.github/actions/build-fixture
