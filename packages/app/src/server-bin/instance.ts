@@ -7,6 +7,7 @@ import { appsConstructed } from "../app-count.ts";
 import type { ShelfApp, ShelfAppMode } from "../app-types.ts";
 import { createShelfApp } from "../index.tsx";
 import { isShelfInstance, type InstanceEnv, type ShelfInstance } from "../instance-definition.ts";
+import { missingPeerHint } from "./missing-peer.ts";
 
 /** Entry filenames tried in order, relative to the instance directory, when nothing names the module. */
 export const INSTANCE_ENTRIES = [
@@ -85,6 +86,17 @@ export interface LoadedInstance {
 const CONTRACT =
   "Export `defineShelfInstance(async (env) => options)` from @storyshelf/app: the instance module exports configuration, and `storyshelf-server` creates the app for the command it runs.";
 
+/** Import `file`; a missing optional peer fails with the guided message (subpath, range, install line). */
+async function importModule(file: string): Promise<{ default?: unknown; app?: unknown }> {
+  try {
+    return (await import(pathToFileURL(file).href)) as { default?: unknown; app?: unknown };
+  } catch (error) {
+    const hint = missingPeerHint(error);
+    if (hint === undefined) throw error;
+    throw new Error(`${file} could not be loaded. ${hint}`, { cause: error });
+  }
+}
+
 /**
  * Import the instance module and take its definition (the default export). A module that exports a
  * constructed app, or built one while importing, is refused: its app would have set up, migrated
@@ -93,7 +105,7 @@ const CONTRACT =
 export async function loadInstance(dir: string, entry?: string): Promise<LoadedInstance> {
   const file = await resolveInstanceEntry(resolve(dir), entry);
   const appsBefore = appsConstructed();
-  const mod = (await import(pathToFileURL(file).href)) as { default?: unknown; app?: unknown };
+  const mod = await importModule(file);
   if (isShelfApp(mod.default) || isShelfApp(mod.app)) {
     throw new Error(`${file} exports a constructed app. ${CONTRACT}`);
   }

@@ -3,6 +3,7 @@ import { readSetting } from "@storyshelf/core/config";
 import { packageVersion } from "../../package-version.ts";
 import { buildInstance, loadInstance, type BuiltInstance } from "../instance.ts";
 import type { CommandContext } from "./context.ts";
+import { peerChecks } from "./peer-checks.ts";
 
 type Status = "pass" | "warn" | "fail";
 
@@ -89,20 +90,24 @@ async function builtChecks(built: BuiltInstance, env: NodeJS.ProcessEnv): Promis
 }
 
 /**
- * `doctor`: the instance module, its factory, the schema level and the settings. A `tool`: it never
+ * `doctor`: the installed `@storyshelf/*` packages and their peers (read before the instance module is
+ * imported, so a missing peer is named rather than a stack trace), the instance module, its factory,
+ * the schema level and the settings. A `tool`: it never
  * migrates, sets an adapter up or starts a consumer, so it is safe on a running instance. Exits 1 on
  * a failed check.
  */
 export async function doctor(ctx: CommandContext): Promise<number> {
+  const installed = peerChecks(ctx.flags.dir ?? process.cwd());
   let checks: Check[];
   try {
     const found = await instanceChecks(ctx);
     const rest = found.built
       ? await builtChecks(found.built, ctx.env)
       : settingChecks(ctx.env, undefined);
-    checks = [...found.checks, ...rest];
+    checks = [...installed, ...found.checks, ...rest];
   } catch (error) {
     checks = [
+      ...installed,
       { status: "fail", message: (error as Error).message },
       ...settingChecks(ctx.env, undefined),
     ];
