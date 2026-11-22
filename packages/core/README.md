@@ -144,7 +144,7 @@ See `docs/architecture.md` and the ADRs in `docs/adr/`.
 
 ## Deployment targets
 
-The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The Node-specific piece is the capture consumer and its optional forked child, which need a long-lived Node server: that is what the `testing` option turns on, and the database is the queue (ADR 0006). Without `testing` an instance only hosts Storybooks and runs on serverless platforms too. You assemble a server for any platform — `storyshelf server init` generates a scaffold with the adapters you choose:
+The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`, `URL`). The Node-specific piece is the capture consumer and its optional forked child, which need a long-lived Node server: that is what the `testing` option turns on, and the database is the queue (ADR 0006). Without `testing` an instance only hosts Storybooks and runs on serverless platforms too. You assemble a server for any platform — `npm create storyshelf` generates a scaffold with the adapters you choose:
 
 | Platform                                                             | Database                              | Storage                                        | `testing` (capture) | Server entry                      |
 | -------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------- | ------------------- | --------------------------------- |

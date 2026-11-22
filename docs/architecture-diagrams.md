@@ -58,7 +58,7 @@ How the monorepo maps to runtime containers. `nub` workspaces are `apps/*` + `pa
 ```mermaid
 flowchart TB
     subgraph CLI_pkg["CLI — packages/cli"]
-        cli["storyshelf\ncommander\nupload / init / create / retry / purge / server init"]
+        cli["storyshelf\ncommander\nupload / init / create / retry / purge"]
     end
 
     subgraph Router["HTTP — packages/app"]

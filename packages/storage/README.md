@@ -23,7 +23,7 @@ or
 npm install @storyshelf/storage @aws-sdk/client-s3 @aws-sdk/lib-storage
 ```
 
-`storyshelf server init` adds the right SDK for the storage you choose. The SDKs supply credentials (environment, IRSA and workload identity, the metadata servers, managed identity), request signing, retries and multipart uploads, which is why StoryShelf uses them instead of calling the REST APIs itself.
+`create-storyshelf` adds the right SDK for the storage you choose. The SDKs supply credentials (environment, IRSA and workload identity, the metadata servers, managed identity), request signing, retries and multipart uploads, which is why StoryShelf uses them instead of calling the REST APIs itself.
 
 ## Quick start
 

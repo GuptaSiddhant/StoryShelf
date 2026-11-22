@@ -203,7 +203,7 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
-- **Terraform modules:** the CLI no longer generates Terraform (`server init --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
+- **Terraform modules:** the CLI no longer generates Terraform (`create-storyshelf --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
@@ -271,7 +271,7 @@ in CI).
 
 ### Manual runbook (follow these steps later)
 
-1. **Provision** (per target, one-time): `storyshelf server init --cloud
+1. **Provision** (per target, one-time): `npx create-storyshelf --cloud
 <aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`). The stub and `examples/minimal`
    output only `url` (and `service_name`). For the storage name in the table below, first add a
    root output that forwards the module's, such as

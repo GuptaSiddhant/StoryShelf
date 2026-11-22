@@ -42,7 +42,7 @@ module "storyshelf" {
 }
 ```
 
-The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `storyshelf server init --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `npx create-storyshelf --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 
