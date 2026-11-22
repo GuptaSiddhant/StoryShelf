@@ -310,7 +310,9 @@ function assertNoDependencies(tarballs, dir) {
  * nothing else, no `@storyshelf/*` package among them, and every subpath imports from that install.
  */
 function assertCommonAlone(scratch, tarballs) {
-  const pack = JSON.parse(run("tar", ["-xOf", tarballs["@storyshelf/common"], "package/package.json"]));
+  const pack = JSON.parse(
+    run("tar", ["-xOf", tarballs["@storyshelf/common"], "package/package.json"]),
+  );
   const declared = Object.keys(pack.dependencies ?? {}).join();
   if (declared !== "@opentelemetry/api") {
     fail(`@storyshelf/common declares dependencies other than @opentelemetry/api: ${declared}`);
@@ -318,7 +320,9 @@ function assertCommonAlone(scratch, tarballs) {
   const dir = installAlone(scratch, "@storyshelf/common", tarballs, "common-alone");
   const installed = readdirSync(join(dir, "node_modules")).filter((name) => !name.startsWith("."));
   if (installed.toSorted().join() !== "@opentelemetry,@storyshelf") {
-    fail(`@storyshelf/common installed more than itself and the OpenTelemetry API: ${installed.join(", ")}`);
+    fail(
+      `@storyshelf/common installed more than itself and the OpenTelemetry API: ${installed.join(", ")}`,
+    );
   }
   const scopes = readdirSync(join(dir, "node_modules/@storyshelf")).join();
   if (scopes !== "common") {
