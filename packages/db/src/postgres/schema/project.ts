@@ -4,7 +4,7 @@ import { boolean, doublePrecision, integer, pgTable, text, timestamp } from "dri
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  slug: text("slug").notNull(),
+  slug: text("slug").notNull().unique(),
   gitRepository: text("git_repository"),
   gitDefaultBranch: text("git_default_branch").notNull().default("main"),
   pixelThreshold: doublePrecision("pixel_threshold").notNull().default(0.1),

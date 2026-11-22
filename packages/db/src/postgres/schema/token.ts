@@ -9,7 +9,7 @@ export const tokens = pgTable("tokens", {
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  hash: text("hash").notNull(),
+  hash: text("hash").notNull().unique(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).notNull(),

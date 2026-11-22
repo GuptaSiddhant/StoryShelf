@@ -8,6 +8,7 @@ import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
 import { compareDdlShapes, ddlShape } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/mysql";
+import { getTableColumns, getTableName, is, Table } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -44,6 +45,20 @@ async function generatedDdl(): Promise<string> {
   return (await generateMigration(before, after)).join(";\n");
 }
 
+/** Neutral columns marked `unique()` whose hand-written Drizzle column is not unique. */
+function uniqueDrift(): string[] {
+  const values: unknown[] = Object.values(schema);
+  const tables = values.filter((value): value is Table => is(value, Table));
+  const byName = new Map(tables.map((table) => [getTableName(table), table]));
+  return ns.NEUTRAL_TABLES.flatMap((neutral) => {
+    const written = byName.get(neutral.name);
+    const columns: Record<string, { isUnique: boolean }> = written ? getTableColumns(written) : {};
+    return Object.entries(neutral.columns)
+      .filter(([key, column]) => column.spec.unique && columns[key]?.isUnique === false)
+      .map(([key]) => `${neutral.name}.${key}`);
+  });
+}
+
 describe("MySQL table factory (spike #800)", () => {
   it("generates the DDL of ddl.ts apart from the classified differences", async () => {
     const today = ddlShape([DDL, ...indexStatementsIn(MIGRATE_SOURCE)].join(";\n"), "mysql");
@@ -51,6 +66,10 @@ describe("MySQL table factory (spike #800)", () => {
     expect(compareDdlShapes(TABLES, today, generated)).toEqual(
       DIFFERENCES.map((entry) => entry.difference),
     );
+  });
+
+  it("marks every unique neutral column unique in the hand-written schema", () => {
+    expect(uniqueDrift()).toEqual([]);
   });
 
   it("infers the hand-written Drizzle row types", () => {
