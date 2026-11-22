@@ -127,7 +127,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 
 - **Database.** RDS automated backups and point-in-time recovery (`database_backup_retention_days`, 7 by default, up to 35), and a manual snapshot before upgrades. `deletion_protection` keeps a final snapshot on destroy.
 - **Storage.** The bucket is versioned, so an overwritten or deleted blob can be recovered.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 

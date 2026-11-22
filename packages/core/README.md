@@ -150,7 +150,7 @@ The core router is runtime-agnostic (Web `Request`/`Response`, `fetch`, `crypto`
 | -------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------- | ------------------- | --------------------------------- |
 | **Vercel, AWS Lambda, Azure Functions**                              | `@storyshelf/db/sqlite/turso`         | `@storyshelf/storage/s3`                       | No (hosting only)   | Hono + platform handler           |
 | **Cloudflare Workers**                                               | `@storyshelf/db/sqlite/d1` or turso   | `@storyshelf/storage/s3` (R2)                  | No (hosting only)   | Hono + Workers entry              |
-| **Bun / Node (VPS, Fly, Railway, Render)**                           | `db-sqlite` (+ `./bun-sqlite` on Bun) | `core/storage/local` / `@storyshelf/storage/s3`            | Yes, database queue | `storyshelf-server serve`         |
-| **Container platforms (ECS, Cloud Run, Container Apps, Kubernetes)** | `db-postgres` / `db-mysql`            | `@storyshelf/storage/s3` / `@storyshelf/storage/gcs` / `@storyshelf/storage/azure` | Yes, database queue | `storyshelf server init` scaffold |
+| **Bun / Node (VPS, Fly, Railway, Render)**                           | `@storyshelf/db/sqlite` (+ `/sqlite/bun-sqlite` on Bun) | `core/storage/local` / `@storyshelf/storage/s3`            | Yes, database queue | `storyshelf-server serve`         |
+| **Container platforms (ECS, Cloud Run, Container Apps, Kubernetes)** | `@storyshelf/db/postgres` / `/mysql`            | `@storyshelf/storage/s3` / `@storyshelf/storage/gcs` / `@storyshelf/storage/azure` | Yes, database queue | `storyshelf server init` scaffold |
 
 All clouds are equal — pick the adapters that match your infrastructure. See the **Deployment** guide for recipes including a minimal Turso + S3 example.

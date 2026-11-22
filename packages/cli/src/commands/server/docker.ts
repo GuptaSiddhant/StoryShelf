@@ -7,7 +7,7 @@ const PLAYWRIGHT_IMAGE = "mcr.microsoft.com/playwright:v1.63.0-noble";
  * CommonJS dependencies ("Dynamic require ... is not supported") and the vendored
  * assets `@storyshelf/app` reads from disk next to its own modules.
  */
-function imageLines(baseImage: string, entry: string): string[] {
+function imageLines(baseImage: string): string[] {
   return [
     `FROM ${baseImage}`,
     "WORKDIR /app",
@@ -17,11 +17,11 @@ function imageLines(baseImage: string, entry: string): string[] {
     "EXPOSE 3000",
     "ENV PORT=3000",
     "ENV SHELF_DATA_DIR=/data",
-    `CMD ["node", "${entry}"]`,
+    `CMD ["node_modules/.bin/storyshelf-server", "serve"]`,
   ];
 }
 
-const DOCKERFILE_LINES = imageLines(PLAYWRIGHT_IMAGE, "src/index.ts");
+const DOCKERFILE_LINES = imageLines(PLAYWRIGHT_IMAGE);
 
 const DOCKERIGNORE_LINES = ["node_modules/", ".git/", "*.md", ".env*", "data/"];
 

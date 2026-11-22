@@ -7,7 +7,6 @@ import {
   captureEnabled,
   databaseCaFromEnv,
   databaseFromEnv,
-  describeBootFailure,
   isLoopback,
   poolMaxFromEnv,
   storageFromEnv,
@@ -398,21 +397,7 @@ describe("authFromEnv", () => {
   });
 });
 
-describe("describeBootFailure", () => {
-  it("prints an unexpected error's reason first, then its stack frames", () => {
-    const text = describeBootFailure(new Error("SHELF_SECRET is unset: set it"));
-    const [first, ...rest] = text.trimEnd().split("\n");
-    expect(first).toBe("storyshelf: SHELF_SECRET is unset: set it");
-    expect(rest.length).toBeGreaterThan(0);
-    expect(rest.every((line) => line.trimStart().startsWith("at "))).toBe(true);
-  });
-
-  it("prints a refusal as one line with no stack frames", () => {
-    expect(describeBootFailure(new BootRefusal("SHELF_SECRET is unset: set it"))).toBe(
-      "storyshelf: SHELF_SECRET is unset: set it\n",
-    );
-  });
-
+describe("boot refusals", () => {
   it("refuses a missing SHELF_SECRET or SHELF_ADMIN_PASSWORD with a BootRefusal", () => {
     for (const env of [{}, { SHELF_ADMIN_PASSWORD: "a-long-password" }]) {
       let caught: unknown;
@@ -423,10 +408,6 @@ describe("describeBootFailure", () => {
       }
       expect(caught).toBeInstanceOf(BootRefusal);
     }
-  });
-
-  it("prints a non-error value on one line", () => {
-    expect(describeBootFailure("boom")).toBe("storyshelf: boom\n");
   });
 });
 
@@ -552,17 +533,17 @@ describe("old variable names (#1308)", () => {
     }
   });
 
-  it("stop boot: the refusal prints each old name with its new one, no stack and no value", () => {
+  it("stop boot: the refusal names each old name with its new one and no value", () => {
     let caught: unknown;
     try {
       refuseRenamedSettings({ SECRET: secret, AUTH_PASSWORD: "a-long-password", SHELF_AUTH: "x" });
     } catch (error) {
       caught = error;
     }
-    expect(describeBootFailure(caught)).toBe(
-      "storyshelf: StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\n  AUTH_PASSWORD -> SHELF_ADMIN_PASSWORD\nIf another service sets one of these names for itself, set SHELF_ALLOW_OLD_NAMES=1: StoryShelf then starts and still ignores them.\n",
+    expect((caught as Error).message).toBe(
+      "StoryShelf's environment variables were renamed and the old names are no longer read. Rename these, then start again:\n  SECRET -> SHELF_SECRET\n  AUTH_PASSWORD -> SHELF_ADMIN_PASSWORD\nIf another service sets one of these names for itself, set SHELF_ALLOW_OLD_NAMES=1: StoryShelf then starts and still ignores them.",
     );
-    expect(describeBootFailure(caught)).not.toContain(secret);
+    expect((caught as Error).message).not.toContain(secret);
   });
 
   it("boot past them with SHELF_ALLOW_OLD_NAMES=1, which returns the names to warn about and reads none", () => {

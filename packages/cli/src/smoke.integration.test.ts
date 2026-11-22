@@ -155,7 +155,7 @@ describe.skipIf(!enabled)("scaffolded server project", () => {
 
   it("boots, serves HTML and vendored assets, and shuts down cleanly", async () => {
     const port = await freePort();
-    server = spawn(nodeBin, ["src/index.ts"], {
+    server = spawn(nodeBin, ["node_modules/@storyshelf/app/dist/bin.mjs", "serve"], {
       cwd: dir,
       env: {
         ...process.env,

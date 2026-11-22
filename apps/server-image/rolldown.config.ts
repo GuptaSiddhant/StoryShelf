@@ -26,7 +26,10 @@ export default defineConfig({
   // and once it is inlined into server.mjs that resolves next to it. Without it the pool would
   // silently fall back to diffing on the main thread.
   input: {
-    server: resolve(root, "apps/server-image/server.ts"),
+    // The instance module `storyshelf-server serve` loads (package.json#storyshelf.server), and
+    // the `storyshelf-server` executable itself: both bundles share one copy of `@storyshelf/app`.
+    instance: resolve(root, "apps/server-image/instance.ts"),
+    bin: resolve(root, "packages/app/src/server-bin/bin.ts"),
     worker: resolve(root, "packages/core/src/diff/worker.ts"),
   },
   output: {

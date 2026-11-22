@@ -91,7 +91,6 @@ function featureNames(answers: Answers): string[] {
 function buildDeps(answers: Answers): Record<string, string> {
   const sdk = DB_SDK[answers.database];
   return {
-    "@hono/node-server": "^2.1.11",
     ...ownPackages(coreNames(answers)),
     ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),
@@ -124,8 +123,8 @@ function dockerScripts(answers: Answers): Record<string, string> {
 function scriptsFor(answers: Answers): Record<string, string> {
   const target = resolveDeployTarget(answers);
   return {
-    start: `node ${SERVER_ENTRY}`,
-    dev: `node --watch ${SERVER_ENTRY}`,
+    start: "storyshelf-server serve",
+    dev: "storyshelf-server serve --watch",
     typecheck: "tsc",
     ...(target === "docker" ? dockerScripts(answers) : {}),
   };
@@ -139,6 +138,8 @@ export function generatePackageJson(answers: Answers): string {
     private: true,
     description: "StoryShelf self-hosted visual testing server.",
     engines: { node: ">=24" },
+    // Where \`storyshelf-server\` finds the instance module.
+    storyshelf: { server: SERVER_ENTRY },
     scripts: scriptsFor(answers),
     dependencies: buildDeps(answers),
     devDependencies: SCAFFOLD_DEV_DEPENDENCIES,

@@ -1,12 +1,7 @@
 import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import {
-  readS3Bucket,
-  readSetting,
-  RenamedSettingError,
-  type SettingName,
-} from "@storyshelf/core/config";
+import { readS3Bucket, readSetting, type SettingName } from "@storyshelf/core/config";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 import { createMysqlDatabase } from "@storyshelf/db/mysql";
@@ -415,22 +410,4 @@ function passwordAuth(env: Env, password: string | undefined): ImageAuth {
 /** Whether a listen address reaches only this machine (so an open server is not exposed). */
 export function isLoopback(hostname: string): boolean {
   return hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.");
-}
-
-/**
- * What a failed start prints. A `BootRefusal` is one line, `storyshelf: <reason>`: the reason names
- * the variable and never its value, so it is safe to show and to grep. Any other error is a real
- * crash: the same first line, then its stack frames, so it is never hidden.
- */
-export function describeBootFailure(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return `storyshelf: ${String(error)}\n`;
-  }
-  if (error instanceof BootRefusal || error instanceof RenamedSettingError) {
-    return `storyshelf: ${error.message}\n`;
-  }
-  const frames = (error.stack ?? "")
-    .split("\n")
-    .filter((line) => line.trimStart().startsWith("at "));
-  return [`storyshelf: ${error.message}`, ...frames, ""].join("\n");
 }
