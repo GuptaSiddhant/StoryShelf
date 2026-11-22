@@ -25,7 +25,14 @@ import {
   STORYBOOK_TOKEN_PREFIX,
 } from "@storyshelf/core/utils";
 import { requestId } from "hono/request-id";
-import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
+import { noteAppConstructed } from "./app-count.ts";
+import type {
+  ShelfApp,
+  ShelfAppMode,
+  ShelfAppOptions,
+  ShelfContext,
+  ShelfRouter,
+} from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
 import { gitConnectionsOf } from "./git-connections.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
@@ -116,8 +123,11 @@ function wireQueues(
   cell: LifecycleCell,
 ): JobsWiring {
   const jobs = setupJobs(scoped, runtime);
-  cell.consumer = jobs.consumer;
-  runBootTasks(cell, scoped, runtime, jobs.buildState);
+  if (cell.mode === "serve") {
+    // Only a serving app polls the queue and runs boot tasks (git-link sync, replay, backfills).
+    cell.consumer = jobs.consumer;
+    runBootTasks(cell, scoped, runtime, jobs.buildState);
+  }
   return jobs;
 }
 
@@ -146,10 +156,15 @@ function assembleApp(
   app: ShelfApp,
   options: ResolvedShelfOptions,
   scoped: ResolvedShelfOptions,
+  mode: ShelfAppMode,
 ): void {
   const runtime = resolveRuntime(options);
   warnOnServerless(options, runtime.logger);
-  const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
+  const cell: LifecycleCell = {
+    mode,
+    ready: Promise.resolve({ ok: true, failures: [] }),
+    settled: null,
+  };
   attachLifecycle(app, options, runtime, cell);
   const queues = wireQueues(scoped, runtime, cell);
   wireMiddleware(app, {
@@ -177,9 +192,14 @@ function assembleApp(
  *
  * Adapter `init` hooks kick off eagerly in the background (the constructor
  * stays synchronous). Await `app.lifecycle.setup()` before serving for
- * fail-fast startup, or let the first request gate on settlement.
+ * fail-fast startup, or let the first request gate on settlement. `mode` (default `serve`) is what
+ * `storyshelf-server` passes: `migrate` sets only the database up, `tool` runs nothing by itself.
  */
-export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
+export function createShelfApp(
+  rawOptions: ShelfOptions,
+  appOptions: ShelfAppOptions = {},
+): ShelfApp {
+  noteAppConstructed();
   const options = resolveShelfOptions(rawOptions);
   configureImages({
     engine: options.testing?.images?.engine,
@@ -190,7 +210,7 @@ export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
   const app = new OpenAPIHono<{ Variables: ShelfContext }>({
     defaultHook: rejectInvalidRequest,
   }) as ShelfApp;
-  assembleApp(app, options, instrumentedOptions(options));
+  assembleApp(app, options, instrumentedOptions(options), appOptions.mode ?? "serve");
 
   return app;
 }
@@ -560,4 +580,21 @@ export {
   type LoggerOptions,
   type PinoTransport,
 } from "@storyshelf/core/logger";
-export type { ShelfApp, ShelfContext, ShelfLifecycle, ShelfRouter } from "./app-types.ts";
+export type {
+  ShelfApp,
+  ShelfAppMode,
+  ShelfAppOptions,
+  ShelfContext,
+  ShelfLifecycle,
+  ShelfRouter,
+} from "./app-types.ts";
+export { appsConstructed } from "./app-count.ts";
+export {
+  defineShelfInstance,
+  isShelfInstance,
+  type InstanceEnv,
+  type ShelfInstance,
+  type ShelfInstanceContext,
+  type ShelfInstanceFactory,
+  type ShelfInstanceHooks,
+} from "./instance-definition.ts";

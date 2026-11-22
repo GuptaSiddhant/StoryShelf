@@ -7,7 +7,7 @@
  * @param serverUrl - Server URL, e.g. `https://shelf.example.com`; trailing slashes are dropped and
  *   a path prefix (`https://host/shelf`) is kept
  * @param token - Optional bearer token (CI or admin token); sent as `Authorization: Bearer <token>`
- * @returns Namespaced client with `projects`, `builds`, `tokens`, and `admin` helpers
+ * @returns Namespaced client with `projects`, `builds` and `tokens` helpers
  */
 export function createClient(serverUrl: string, token?: string): Client {
   const baseUrl = normalizeBaseUrl(serverUrl);
@@ -206,10 +206,6 @@ interface Client {
       skipSource: (slug: string, branch: string, sha: string) => Promise<SkipSource | null>;
       /** Record a commit that changed no story; a `409` (`RequestError`) means upload normally. */
       createSkipped: (slug: string, json: SkippedBuildInput) => Promise<SkippedBuildCreated>;
-    };
-    admin: {
-      purge: (json: { ttlDays?: number }) => Promise<unknown>;
-      checkStorage: (json: { sample?: number }) => Promise<unknown>;
     };
   };
 }
@@ -458,26 +454,6 @@ function createBuildsApi(
   };
 }
 
-function createAdminApi(
-  baseUrl: string,
-  requestHeaders: (contentType?: string) => Record<string, string>,
-): Client["projects"]["admin"] {
-  return {
-    checkStorage: async (json: { sample?: number }) =>
-      await fetchJson(`${baseUrl}/api/v1/admin/check-storage`, {
-        method: "POST",
-        headers: requestHeaders("application/json"),
-        body: JSON.stringify(json),
-      }),
-    purge: async (json: { ttlDays?: number }) =>
-      await fetchJson(`${baseUrl}/api/v1/admin/purge`, {
-        method: "POST",
-        headers: requestHeaders("application/json"),
-        body: JSON.stringify(json),
-      }),
-  };
-}
-
 function createProjectsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -511,7 +487,6 @@ function createProjectsApi(
       }),
     tokens: createTokensApi(baseUrl, requestHeaders),
     builds: createBuildsApi(baseUrl, authHeaders, requestHeaders),
-    admin: createAdminApi(baseUrl, requestHeaders),
   };
 }
 

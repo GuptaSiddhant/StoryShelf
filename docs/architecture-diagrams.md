@@ -58,7 +58,7 @@ How the monorepo maps to runtime containers. `nub` workspaces are `apps/*` + `pa
 ```mermaid
 flowchart TB
     subgraph CLI_pkg["CLI — packages/cli"]
-        cli["storyshelf\ncommander\nupload / init / create / retry / purge / server init"]
+        cli["storyshelf\ncommander\nupload / init / create / retry / purge"]
     end
 
     subgraph Router["HTTP — packages/app"]
@@ -80,7 +80,7 @@ flowchart TB
     end
 
     subgraph DBadapters["Database Adapters"]
-        dbsqlite["@storyshelf/db-sqlite\nnode:sqlite + Drizzle\n(presets: turso / better-sqlite3 / bun-sqlite / d1)"]
+        dbsqlite["@storyshelf/db/sqlite\nnode:sqlite + Drizzle\n(presets: turso / better-sqlite3 / bun-sqlite / d1)"]
     end
 
     subgraph StoreAdapters["Storage Adapters"]
@@ -762,7 +762,7 @@ flowchart TB
     subgraph Docker["Single Container — mcr.microsoft.com/playwright:v1.63.0-noble"]
         Node["Node 24+ — Hono server<br/>node src/index.ts"]
         PW["Chromium (Playwright) — in-process capture"]
-        SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db-sqlite"]
+        SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db/sqlite"]
         FS["Filesystem — @storyshelf/core/storage/local<br/>VOLUME /app/data"]
         Queue2["Database queue<br/>concurrency 2"]
     end
@@ -789,7 +789,7 @@ No Docker socket mount, no repo cloning; capture runs via the image's own browse
 flowchart TB
     subgraph Cloud["Cloud Deployment"]
         Edge["Edge — Vercel / Cloudflare Workers<br/>Hono FetchHandler (Web Request/Response)"]
-        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-sqlite/turso"]
+        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db/sqlite/turso"]
         S3["S3 / R2 — @storyshelf/storage/s3"]
     end
 

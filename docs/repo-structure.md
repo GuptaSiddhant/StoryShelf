@@ -12,12 +12,12 @@ For a visual overview, see [`architecture-diagrams.md`](./architecture-diagrams.
 ## Bundler rule: tsdown for libs, rolldown for apps
 
 - **Publishable packages** (`packages/*`): `tsdown` via `config/tsdown.ts` (`libConfig` for libraries, `cliConfig` for the CLI binary). Entry points derive from each `package.json` `exports` map.
-- **Deployables** (`apps/fly-app`, `apps/server-image`): `rolldown` (`rolldown.config.ts` bundles `server.ts` → `dist/server.mjs`).
+- **Deployables** (`apps/fly-app`, `apps/server-image`): `rolldown` (`rolldown.config.ts` bundles `instance.ts` → `dist/instance.mjs` and the `storyshelf-server` bin → `dist/bin.mjs`).
 - **No-build dev**: `apps/dev-server` runs TS source directly (`nub run serve`, `nub watch`).
 - **Launcher ownership**: `apps/dev-server` and `apps/fly-app` each own their adapter
   wiring so deployments can diverge (locals vs Turso/S3). Shared code goes in
   `packages/`, not `apps/`.
-  The CLI `server init` template is standalone by design (registry installs, no
+  The CLI `create-storyshelf` template is standalone by design (registry installs, no
   workspace), so the template carries its own copy of the wiring.
 
 Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); rolldown targets single-file app bundles. Do not swap them without updating this section.
@@ -62,8 +62,8 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 ## Schema layout (0.2.0 target, R2)
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
-- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
-- `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
+- The DDL is hand-written per dialect in `packages/db/src/{sqlite,postgres,mysql}/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
+- `packages/db` (`@storyshelf/db`) holds the three dialects as subpaths `/sqlite`, `/postgres` and `/mysql` (`src/<dialect>/`, each with its own contract and migration tests) and their presets under each (`/sqlite/turso`, `/sqlite/better-sqlite3`, `/sqlite/bun-sqlite`, `/sqlite/d1`, `/postgres/pg`, `/postgres/neon`, …). Each driver is an optional peer that only its own subpath loads (`src/peer-isolation.test.ts`). Each dialect's `ddl`, `schema` and `drizzle-factory` modules are internal and unpublished (ADR 0041 replaces them); auth's DDL-parity tests load the two `ddl` modules by file. The package sits above core until #1242 inverts the layering (ADR 0049 amendment 2026-11-21).
 
 ## App convention (lives in `packages/app/src/`)
 

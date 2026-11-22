@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
-    "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts env.ts env.test.ts",
+    "start": "node dist/bin.mjs serve",
+    "lint": "oxlint --type-aware --type-check instance.ts env.ts env.test.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -14,9 +14,7 @@
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/db-mysql": "workspace:*",
-    "@storyshelf/db-postgres": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner": "workspace:*",
     "@storyshelf/storage": "workspace:*",
@@ -28,5 +26,8 @@
     "rolldown": "*",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "storyshelf": {
+    "server": "dist/instance.mjs"
   }
 }

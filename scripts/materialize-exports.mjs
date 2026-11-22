@@ -7,7 +7,7 @@
  * editor and tsc resolve workspace imports to TypeScript). The tarball omits `src/`, and npm does
  * not apply `publishConfig.exports`, so the published manifest used to keep those dangling
  * conditions. This writes the dist-only `publishConfig.exports` over `exports` (same keys, only the
- * conditions change) and drops it from `publishConfig`.
+ * conditions change) and drops it from `publishConfig`. A `publishConfig.bin` replaces `bin` the same way.
  *
  * Repo files keep their `source` conditions: run this only on a CI working tree or a scratch copy
  * (the release action and `packed-install-smoke.mjs` do; the latter restores the manifests).
@@ -28,15 +28,20 @@ const keysOf = (map) => Object.keys(map).toSorted().join(",");
  * @returns {Record<string, any> | null} The new manifest, or null when nothing changes.
  */
 export function materializeExports(pkg) {
-  const dist = pkg.publishConfig?.exports;
-  if (!dist) {
+  const { exports: dist, bin: distBin, ...publishConfig } = pkg.publishConfig ?? {};
+  if (!dist && !distBin) {
     return null;
   }
-  const { exports: _unused, ...publishConfig } = pkg.publishConfig;
-  if (keysOf(dist) !== keysOf(pkg.exports ?? {})) {
+  if (dist && keysOf(dist) !== keysOf(pkg.exports ?? {})) {
     throw new Error(`${pkg.name}: publishConfig.exports must have the same keys as exports`);
   }
-  return { ...pkg, exports: dist, publishConfig };
+  // `bin` has a `source` twin too (a .ts bin cannot run from node_modules): the dist one replaces it.
+  return {
+    ...pkg,
+    ...(dist ? { exports: dist } : {}),
+    ...(distBin ? { bin: distBin } : {}),
+    publishConfig,
+  };
 }
 
 if (import.meta.main) {

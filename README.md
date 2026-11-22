@@ -52,7 +52,7 @@ Then get a first build:
 
 4. Open the build, approve it as the baseline, and upload again: the second build is compared with it.
 
-Prefer Node.js over Docker? `npx storyshelf server init` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
+Prefer Node.js over Docker? `npx create-storyshelf` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
 
 SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `SHELF_ADMIN_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
 For AWS, GCP and Azure, and the list of supported targets, see the [deployment guide](https://storyshelf.js.org/guides/deployment/#supported-targets).
@@ -75,11 +75,11 @@ Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromati
 packages/
   core/           @storyshelf/core          — Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
   app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
-  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
-  db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
+  db/             @storyshelf/db            — SQLite, Postgres and MySQL database adapters with their driver and cloud presets, one subpath each; each driver is an optional peer
   storage/        @storyshelf/storage       — S3, GCS and Azure Blob storage, plus `/local`; each SDK is an optional peer
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
-  cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
+  cli/            storyshelf              — CLI client (init, create, upload, purge, retry)
+  create-storyshelf/ create-storyshelf       — `npm create storyshelf`: scaffolds a server project
   runner/         @storyshelf/runner — Playwright capture runner
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK

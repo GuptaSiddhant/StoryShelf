@@ -20,7 +20,7 @@ Configuration, secrets, and login text are covered in [Configuration](/guides/au
 
 ## None (default)
 
-With no auth configured, the web UI is open and project roles are not enforced. Fine for local dev (`npx storyshelf server init` → `Which auth? None`) or a VPN-protected demo.
+With no auth configured, the web UI is open and project roles are not enforced. Fine for local dev (`npx create-storyshelf` → `Which auth? None`) or a VPN-protected demo.
 
 :::caution
 Do not expose an auth-less instance to the public internet — anyone can review, approve, or reject builds.

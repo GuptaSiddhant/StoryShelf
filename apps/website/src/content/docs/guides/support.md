@@ -15,7 +15,7 @@ description: What every release promises about upgrades, rollbacks, breaking cha
 | Area           | Supported                                                     | Preview          |
 | -------------- | ------------------------------------------------------------- | ---------------- |
 | Database       | SQLite, Postgres                                              | MySQL            |
-| How you run it | The Docker image, the npm scaffold (`storyshelf server init`) | The Terraform modules (AWS, GCP, Azure) |
+| How you run it | The Docker image, the npm scaffold (`create-storyshelf`) | The Terraform modules (AWS, GCP, Azure) |
 
 A preview works and is documented, but may change between releases and gets fixes after the supported setups.
 

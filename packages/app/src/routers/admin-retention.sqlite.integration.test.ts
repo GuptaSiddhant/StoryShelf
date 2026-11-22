@@ -1,6 +1,6 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { makeStorage } from "@storyshelf/core/test-helpers";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

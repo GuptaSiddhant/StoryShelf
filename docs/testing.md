@@ -45,7 +45,7 @@ Each adapter against its interface: SQLite via `:memory:` (Turso via a local lib
 > pass; the vitest worker then dies with `SIGSEGV`, failing the file. This
 > is upstream (`tursodatabase/libsql-client-ts` native instability), not a
 > repo regression: it reproduces on a pristine checkout with one client and
-> no test framework involved. If `db-sqlite` goes red with a worker
+> no test framework involved. If `@storyshelf/db/sqlite` goes red with a worker
 > `SIGSEGV` in `turso.test.ts`, check the native binding first.
 
 #### 2a. Per-adapter testing requirements (mandatory)
@@ -54,7 +54,7 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement                                   | Storage (`@storyshelf/storage`)                                                                                    | DB (`db-*`)                                                | Runner / git / auth / notify                               |
+| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                                | Runner / git / auth / notify                               |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
 | `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
 | `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |
@@ -81,30 +81,30 @@ Rules:
   from one session (an in-process Postgres such as PGlite) can run the suite but cannot prove
   cross-connection row locking; say so where it is used, and prove locking against a real server
   before enabling the capability on a preset.
-- Postgres (`db-postgres/src/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
+- Postgres (`db/src/postgres/build-reference-lifecycle.test.ts`) runs `buildReferenceContractSuite`
   twice. On PGlite it always runs and proves the SQL, the constraints and the rollback of domain
   writes, but both lifecycles share one session, so it does not prove locking (removing the row
   locks leaves it green). On a real server (one connection per lifecycle) it does: removing the same
   locks fails it. That half needs `LIVE_CLOUD=1`, `DATABASE_URL` and `POSTGRES_SCHEMA_MUTATION_TEST=1`;
   the last says the database is disposable, because the suite clears `content_uses` and its
   collector pass claims every idle hash. CI runs that half on every pull request that
-  touches `packages/db-postgres/`, `packages/core/src/test-helpers/` or
+  touches `packages/db/src/postgres/`, `packages/core/src/test-helpers/` or
   `packages/core/src/adapters/database.ts` (job `postgres-lifecycle`, a `postgres:16` service
   container), and the nightly database workflow runs it with the rest of the live suite.
-- The `pg` and `./neon` presets (`db-postgres/src/retention-pool-presets.test.ts`) run both suites on a
+- The `pg` and `./neon` presets (`db/src/postgres/retention-pool-presets.test.ts`) run both suites on a
   real server with every party on its own pool; `./neon` goes through a `ghcr.io/neondatabase/wsproxy`
   service (`NEON_WSPROXY`), and the file skips without the gates. A single injected connection staying off is hermetic.
-- Postgres activation (`db-postgres/src/retention-activation.test.ts`) runs `retentionActivationContractSuite`
+- Postgres activation (`db/src/postgres/retention-activation.test.ts`) runs `retentionActivationContractSuite`
   the same way: PGlite always, a real server (same gates, same CI job) for the rest. Only the real server
   runs the mirrored race tests (an interrupted preparation that resumes, a fenced writer in flight, two
   instances booting). The unit test pins that PGlite never exposes the capability.
-- MySQL (`db-mysql/src/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
+- MySQL (`db/src/mysql/build-reference-lifecycle.live.test.ts`) has no in-process stand-in: it runs
   `buildReferenceContractSuite`, `retentionActivationContractSuite` and `retentionSkippedContractSuite`
   only against a real MySQL 8 server, every party on its own pool, plus the mirrored race tests
   (interrupted preparation, a writer in flight, two instances booting, a claim against preparation)
   and a use of a hash racing a collector's claim. Gates: `LIVE_CLOUD=1`, `MYSQL_SCHEMA_MUTATION_TEST=1`
   and `MYSQL_DATABASE_URL` (a user that may `CREATE DATABASE`: the skipped-build cases each get a
-  scratch database). CI runs it on every pull request that touches `packages/db-mysql/`,
+  scratch database). CI runs it on every pull request that touches `packages/db/src/mysql/`,
   `packages/core/src/test-helpers/` or `packages/core/src/adapters/database.ts` (job `mysql-lifecycle`,
   a `mysql:8.0` service container), and the nightly MySQL job runs it with the rest of the live suite.
   Removing the row locks or the named content locks fails it. The hermetic half
@@ -139,7 +139,7 @@ Rules:
 
 - **Settled signalling and `.test()` runs (`settle.integration.test.ts` in the Playwright runner):** on any fixture, a render waits for Storybook's own event (no fallback warning, identical re-captures, the play error of a flaky story is reported), falls back to the fixed wait on a page with no channel (immediately) and on a silent channel (after the 5 s timeout), and `runTests` reports pass or fail per `.test()` entry. Only `fixtures/storybook-10` has test entries (`renders its label` and `clicks without error` pass, `fails on purpose` fails; written as bare `Primary.test(...)` statements, because the indexer ignores an exported call), so the Playwright suite also runs a build with `runTests` on (the failing test fails the build, results are stored, no snapshot is taken for a test) and one with it off (nothing stored). On Storybook 8 and 9 the same tests assert the no-op. The failing test needs no tag: it is inert unless a project turns `runTests` on, which only these tests do.
 
-- **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `SHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook, the read-only demo account) tested in Chromium against the production image the Fly dry run already boots. It adds no server of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SHELF_SECRET`, a confirmed `SHELF_PUBLIC_BASE_URL`, `SHELF_READ_ONLY_ACCOUNTS` and a throwaway `SHELF_DEMO_VIEWER_PASSWORD`; the seed (`seed.sh`) seeds no demo project (#1275), so the spec creates its own with the admin token, uploads a baseline `main` build of the built `storybook-9` fixture and approves it, adds a `git-log` channel and uploads a feature-branch copy with one story repainted by a CSS patch (workspace CLI); waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/server.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in user; signs in as `demo@storyshelf.js.org`, sees `storyshelf-ui` but not the spec's project, and gets 403 on a profile and a comment write; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
+- **Browser golden path on the Fly container (`apps/fly-app/e2e/golden-path.test.ts`, gated: `SHELF_E2E=1`; issue #941):** the seams the `app.request(...)` suites cannot see (the sign-in cookie, CSRF, HTMX swaps, keyboard review, response headers, a private published Storybook, the read-only demo account) tested in Chromium against the production image the Fly dry run already boots. It adds no server of its own. With `e2e: true`, `fly-dry-run.yml` boots the image with password sign-in, `SHELF_SECRET`, a confirmed `SHELF_PUBLIC_BASE_URL`, `SHELF_READ_ONLY_ACCOUNTS` and a throwaway `SHELF_DEMO_VIEWER_PASSWORD`; the seed (`seed.sh`) seeds no demo project (#1275), so the spec creates its own with the admin token, uploads a baseline `main` build of the built `storybook-9` fixture and approves it, adds a `git-log` channel and uploads a feature-branch copy with one story repainted by a CSS patch (workspace CLI); waits on the API until the build settles with one `changed` snapshot; signs in through the login page; opens the build (the changed count) and the comparison, and approves with `a`; asserts the verdict through the API and, from `docker logs`, the structured `git state (log)` record (`state: "success"` for the build's commit on the `/testing` context; the `git-log` provider is the only git provider registered in `apps/fly-app/instance.ts` and writes to the log only, so there is no outbound call); checks the build is private (anonymous request refused) and opens its Storybook as the signed-in user; signs in as `demo@storyshelf.js.org`, sees `storyshelf-ui` but not the spec's project, and gets 403 on a profile and a comment write; and runs axe on each app page it visits, failing only on serious or critical violations. Every wait is on API, log or DOM state: no sleeps and no retries. A failed run leaves a Playwright trace in `E2E_TRACE_DIR`, uploaded as the `e2e-trace` artifact, and the job prints `docker logs`.
 
   | Trigger                         | Fly dry run               | Browser step (`e2e`)                                        |
   | ------------------------------- | ------------------------- | ----------------------------------------------------------- |
@@ -170,7 +170,7 @@ Rules:
 `scripts/bench/` measures the real app on `fixtures/storybook-9` (SQLite, local storage, Playwright at 2 pages, jobs at concurrency 1) and prints a table plus one JSON line. It is not part of `turbo verify` or `turbo test`; it needs Chromium and the built packages. Every Performance task reports its before and after with it (issue #853).
 
 ```sh
-nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db-sqlite' --filter='@storyshelf/runner'
+nubx turbo build --filter='@storyshelf/app' --filter='storyshelf' --filter='@storyshelf/db' --filter='@storyshelf/runner'
 (cd fixtures/storybook-9 && pnpm install && pnpm run build-storybook)
 nub run bench                      # warm-up run (dropped), then the median of 3
 nub run bench -- --runs 5 --out .tmp/bench.json
@@ -191,6 +191,7 @@ The label is read when `ci.yml` runs (opened, new push), so add it before the pu
 has a `Schema: <the contract step>` line (`Schema: none` does not count), so the release notes say
 the upgrade is stop-the-world. Without the label the job runs as before and still catches accidental
 breaks. The rule is tested in `scripts/changeset-lib.test.mjs` (`checkSchemaBreak`).
+
 - **Database:** queries between the build turning `capturing` and the `capture timings` log, by method, with the slowest. `transact` counts as one call; the statements inside it are not counted.
 - **Published serving:** storage calls (`exists`, `read`, `readStream`) and wall time to load `/_/<buildId>/` and one story's `iframe.html` in Chromium until the network is idle.
 - **App pages:** response bytes and time for the project, build and component pages.
@@ -202,7 +203,7 @@ Runs compare when the machine, Node and Playwright versions match; quote them wi
 - **Unit:** colocated `*.test.ts` next to sources (hermetic — tmp dirs, fake adapters, mocked `fetch`; never a browser, network, or Storybook build).
 - **HTTP-level integration:** `*.integration.test.ts` in the same dirs (real router over HTTP with fake capture runner; still hermetic and CI-always).
 - **Real browser:** gated behind `RUN_INTEGRATION=1` (`nub run test:integration`, Playwright + `fixtures/storybook-8` by default).
-- **Terraform modules:** the CLI no longer generates Terraform (`server init --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
+- **Terraform modules:** the CLI no longer generates Terraform (`create-storyshelf --cloud` writes a module stub, tested in `init/cloud.test.ts`). The modules under `deploy/terraform/` are checked by the deploy checks in CI (ADR 0050).
 - **Real cloud:** `*.live.test.ts` next to sources, gated behind `LIVE_CLOUD=1` — strictly real providers, no fakes, no emulators. See "Live cloud tests" below.
 - **Shared doubles** live in `packages/core/src/test-helpers/` (`fake-adapters.ts`, `create-project.ts`) — never in shippable modules. Test files (and `test-helpers/`) are exempt from size lint rules via `.oxlintrc.json` patterns, not per-file paths.
 
@@ -270,7 +271,7 @@ in CI).
 
 ### Manual runbook (follow these steps later)
 
-1. **Provision** (per target, one-time): `storyshelf server init --cloud
+1. **Provision** (per target, one-time): `npx create-storyshelf --cloud
 <aws|azure|gcp>` (or `deploy/terraform/<cloud>/examples/minimal`). The stub and `examples/minimal`
    output only `url` (and `service_name`). For the storage name in the table below, first add a
    root output that forwards the module's, such as
@@ -322,7 +323,7 @@ secrets are set. Local run example:
 ```sh
 export PATH="$HOME/.nub/bin:$PATH"
 LIVE_CLOUD=1 TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... \
-  nubx turbo test --filter='@storyshelf/db-sqlite' --force
+  nubx turbo test --filter='@storyshelf/db' --force
 ```
 
 Database compatibility runs nightly and on demand in
@@ -333,7 +334,7 @@ upgrade test drops columns before rerunning migrations; it is skipped unless
 shared cloud database. The regular live suite still tests setup, CRUD and queue behavior.
 
 The review-schema upgrade (#269) is tested on every dialect from fixture databases built from the
-old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `db-*` package): SQLite and
+old DDL (`src/test-fixtures/pre-review.sql` and `pre-449.sql` in each `@storyshelf/db` dialect directory): SQLite and
 Postgres (PGlite) run hermetically, and MySQL has a hermetic fake-server test plus
 `migrate-review.live.test.ts`, which needs the same flag and a user that may `CREATE DATABASE`
 (it upgrades the fixtures in a scratch database it drops afterwards). Postgres has the same live
@@ -342,7 +343,7 @@ may `CREATE DATABASE`; set the flag for a disposable server only). The MySQL liv
 review lifecycle on a real server: one claimant wins a review cycle, a reopening counts once, a
 build's verdicts go with the build and a user's with the user, and an anonymous verdict stays.
 
-The MySQL job also runs the shared `databaseContractSuite` (`packages/db-mysql/src/contract.test.ts`),
+The MySQL job also runs the shared `databaseContractSuite` (`packages/db/src/mysql/contract.test.ts`),
 as SQLite and Postgres do, in its own database. That file is skipped unless `MYSQL_URL` is set, so
 `nub run test` stays hermetic. To run it yourself, against a disposable database:
 
@@ -350,7 +351,7 @@ as SQLite and Postgres do, in its own database. That file is skipped unless `MYS
 docker run -d --name shelf-mysql -p 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD=pw -e MYSQL_DATABASE=shelf mysql:8.0
 # a fresh container needs a while to initialise: wait until it answers, for at most 60 s, and only then run the tests
 timeout 60 sh -c 'until docker exec shelf-mysql mysqladmin ping -h 127.0.0.1 -ppw --silent; do sleep 1; done' \
-  && MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db-mysql
+  && MYSQL_URL=mysql://root:pw@127.0.0.1:3306/shelf nubx vitest run src/contract.test.ts   # from packages/db
 ```
 
 Run vitest directly, as above. `nub run test` goes through turbo, whose strict environment mode does not

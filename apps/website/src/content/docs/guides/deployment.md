@@ -70,10 +70,10 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ### Recommended assembly (self-hosted default)
 
-Use `storyshelf server init` to scaffold a server with your chosen adapters:
+Use `npm create storyshelf` to scaffold a server with your chosen adapters:
 
 ```sh
-storyshelf server init
+npm create storyshelf
 # ? Which database? SQLite
 # ? Which storage? Local filesystem
 # ? Which auth? None
@@ -84,12 +84,12 @@ This generates `src/index.ts`, `package.json` and `tsconfig.json` with the corre
 
 | Layer         | Package                          | Notes                                        |
 | ------------- | -------------------------------- | -------------------------------------------- |
-| Database      | `@storyshelf/db-sqlite`          | node:sqlite + Drizzle, WAL mode, single file |
+| Database      | `@storyshelf/db/sqlite`          | node:sqlite + Drizzle, WAL mode, single file |
 | Storage       | `@storyshelf/core/storage/local` | Local filesystem, `--data-dir`               |
 | Capture queue | Database queue (built-in)        | `capture_jobs` in your database, leased      |
 | Auth          | `@storyshelf/auth`               | Local accounts, social, SSO/SAML, passkeys   |
 
-Swap the database layer for `@storyshelf/db-postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db-postgres/#provider-recipes)) or `@storyshelf/db-sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
+Swap the database layer for `@storyshelf/db/postgres` (Postgres via `postgres.js` + Drizzle, see [Postgres provider recipes](/packages/db/#provider-recipes)) or `@storyshelf/db/sqlite/turso` (Turso/libSQL) without changing the rest of the stack.
 
 One `npm start` (or `fly deploy`, `railway up`, `render.com`, etc.) and you're running, as long as the host keeps the instance running: see [Keep one instance running](#keep-one-instance-running).
 

@@ -23,6 +23,9 @@
     "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
     "directory": "packages/app"
   },
+  "bin": {
+    "storyshelf-server": "./src/server-bin/bin.ts"
+  },
   "files": [
     "dist"
   ],
@@ -41,6 +44,9 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "storyshelf-server": "./dist/bin.mjs"
+    },
     "exports": {
       ".": "./dist/index.mjs",
       "./node": "./dist/node.mjs",
@@ -80,7 +86,7 @@
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@storybook/html-vite": "10.6.5",
     "@storyshelf/auth": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "catalog:",

@@ -106,13 +106,13 @@ jobs:
             if grep -qE '^(packages/(app|core)/|nub\.lock|\.github/workflows/ci\.yml)' changed.txt; then app=true; else app=false; fi
             # The Postgres retention lifecycle: its package, the shared contract it must pass, and
             # the interface that contract exercises (a locking regression must not merge).
-            if grep -qE '^(packages/db-postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
+            if grep -qE '^(packages/db/src/postgres/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then postgres=true; else postgres=false; fi
             # The MySQL retention lifecycle, on the same terms.
-            if grep -qE '^(packages/db-mysql/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then mysql=true; else mysql=false; fi
+            if grep -qE '^(packages/db/src/mysql/|packages/core/src/test-helpers/|packages/core/src/adapters/database\.ts|\.github/workflows/ci\.yml)' changed.txt; then mysql=true; else mysql=false; fi
             # A schema or migration file (any dialect's DDL, migrations, Drizzle schema, the boot
             # comparison), the job queue, its consumer or an enqueue path (the mixed-queue test), or
             # the previous-release job itself: ADR 0053, decision 8.
-            if grep -qE '^(packages/db-(sqlite|postgres|mysql)/src/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|packages/core/src/capture/(db-queue|consumer|build-state)/|packages/core/src/(models|schema)/capture-job|packages/app/src/(jobs-setup|job-queue|review-request-data)\.ts|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
+            if grep -qE '^(packages/db/src/(sqlite|postgres|mysql)/([^/]*(ddl|migrat)[^/]*|schema/)|packages/core/src/adapters/schema-level|packages/core/src/capture/(db-queue|consumer|build-state)/|packages/core/src/(models|schema)/capture-job|packages/app/src/(jobs-setup|job-queue|review-request-data)\.ts|scripts/previous-release|\.github/workflows/ci\.yml)' changed.txt; then schema=true; else schema=false; fi
             # `schema-break` (owner decision 2026-11-21, ADR 0053 amendment): until 2027-01-01 a
             # contract step may ship, so the job that would fail on it by design is skipped. The
             # changeset check requires a `Breaking:` changeset with a `Schema:` line instead. Labels
@@ -202,14 +202,22 @@ jobs:
         if: ${{ !cancelled() }}
         run: nubx turbo run build --filter='!website'
 
-      - name: Built-artifact smoke (CLI via .bin symlink, scaffolded server boots)
-        # Scaffolds a server, type-checks it, boots it and checks it serves and shuts down.
+      - name: Built-artifact smoke (CLI via .bin symlink)
         if: ${{ !cancelled() }}
         working-directory: packages/cli
         env:
           RUN_SMOKE: "1"
           # Fails if the pipeline's default Node ever drifts off the minimum.
           SMOKE_NODE_MAJOR: "24"
+        run: nubx vitest run src/smoke.integration.test.ts
+
+      - name: Built-artifact smoke (scaffolded server boots)
+        # Scaffolds a server, type-checks it, boots it with `storyshelf-server serve` and checks it
+        # serves and shuts down.
+        if: ${{ !cancelled() }}
+        working-directory: packages/create-storyshelf
+        env:
+          RUN_SMOKE: "1"
         run: nubx vitest run src/smoke.integration.test.ts
 
       # Last, and only here: this job builds every workspace package, so its cache serves
@@ -283,7 +291,7 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Build the packages the adapter imports
-        run: nubx turbo run build --filter='@storyshelf/db-postgres^...'
+        run: nubx turbo run build --filter='@storyshelf/db^...'
 
       # Samples what the server runs for long, so a stall (#1067) names its statement in the dump below.
       - name: Sample slow statements in the background
@@ -300,7 +308,7 @@ jobs:
           nohup setsid bash "$RUNNER_TEMP/sample.sh" >> "$RUNNER_TEMP/slow-statements.log" 2>&1 &
 
       - name: Run the build-reference contract against real Postgres
-        working-directory: packages/db-postgres
+        working-directory: packages/db
         env:
           LIVE_CLOUD: "1"
           # The suite clears and claims shared content rows: this service container is disposable.
@@ -311,9 +319,9 @@ jobs:
         # collide ("duplicate key value violates unique constraint pg_type_typname_nsp_index"); a file
         # that fails must not leave its connections open under the next.
         run: |
-          nubx vitest run src/build-reference-lifecycle.test.ts
-          nubx vitest run src/retention-activation.test.ts
-          nubx vitest run src/retention-pool-presets.test.ts
+          nubx vitest run src/postgres/build-reference-lifecycle.test.ts
+          nubx vitest run src/postgres/retention-activation.test.ts
+          nubx vitest run src/postgres/retention-pool-presets.test.ts
 
       # A stalled WebSocket leaves nothing in the test output (#1067): show what the server and the
       # proxy saw, and whether the server was still running the statement.
@@ -364,16 +372,16 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Build the packages the adapter imports
-        run: nubx turbo run build --filter='@storyshelf/db-mysql^...'
+        run: nubx turbo run build --filter='@storyshelf/db^...'
 
       - name: Run the build-reference contract against real MySQL
-        working-directory: packages/db-mysql
+        working-directory: packages/db
         env:
           LIVE_CLOUD: "1"
           # The suite creates and drops scratch databases: this service container is disposable.
           MYSQL_SCHEMA_MUTATION_TEST: "1"
           MYSQL_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/storyshelf_test
-        run: nubx vitest run src/build-reference-lifecycle.live.test.ts
+        run: nubx vitest run src/mysql/build-reference-lifecycle.live.test.ts
 
       - name: Show the server's lock state after a failure
         if: ${{ failure() }}
@@ -632,7 +640,7 @@ jobs:
 
   # What a user gets (#393 launch slice, #1134 B5): every public package packed with `npm pack`,
   # installed from the tarballs (no workspace links, outside this checkout), then the default
-  # `storyshelf server init` scaffold, `npm start`, `create`, `upload` of fixtures/storybook-9 and
+  # `create-storyshelf` scaffold, `npm start`, `create`, `upload` of fixtures/storybook-9 and
   # one finished build. A dependency missing from a manifest or from the scaffold (#1137) fails here.
   packed-install:
     name: packed-install

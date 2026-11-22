@@ -21,6 +21,21 @@ From 2027-01-01 the compatibility rules apply again: one release of rollback, ex
 
 0.15.0 is not released yet. This section lists what is already decided and will change as the release firms up. Each rename below has no alias: the old name stops working in 0.15.0.
 
+### `storyshelf server init` and `storyshelf mcp …` are removed
+
+**Who is affected:** anyone who scripts or documents `storyshelf server init` (including `--cloud`), `storyshelf mcp init` or `storyshelf mcp serve`. The `storyshelf` client commands (`init`, `create`, `upload`, `retry`, `cancel`, `protect`, …) are unchanged.
+
+The commands have no alias and fail as unknown commands. Use their new homes:
+
+| Before | Now |
+| --- | --- |
+| `npx storyshelf server init` | `npm create storyshelf` (or `npx create-storyshelf`) |
+| `npx storyshelf server init --cloud aws` | `npx create-storyshelf --cloud aws` |
+| `npx storyshelf mcp init` | `npx @storyshelf/mcp init` |
+| `npx storyshelf mcp serve` | `npx @storyshelf/mcp serve` |
+
+`create-storyshelf` has no dependencies and writes the same project as before: a `defineShelfInstance` module that `storyshelf-server` runs. It also takes `--install`, which installs with the package manager that launched it. Servers you generated earlier keep working and need no change.
+
 ### `@storyshelf/storage-local` is removed
 
 **Who is affected:** a server that imports `createLocalStorage` from `@storyshelf/storage-local`.
@@ -126,9 +141,21 @@ The three cloud adapters are one package with a subpath each. The factories and 
 
 `@storyshelf/storage/local` re-exports core's `createLocalStorage`, so switching between local disk and a cloud backend is a one-word import change. There is no alias and no re-export under the old names: the three old packages are not published again, and the owner deprecates them on npm with a message naming the new one.
 
+### `@storyshelf/db-sqlite`, `-postgres` and `-mysql` are now `@storyshelf/db`
+
+**Who is affected:** a server that imports `@storyshelf/db-sqlite`, `@storyshelf/db-postgres` or `@storyshelf/db-mysql`, or scaffolded one with `server init` before 0.15.0.
+
+The three database adapters are one package with a subpath each, and the presets sit under their dialect. The factories and their options are unchanged, and so is the schema: no data moves and the database is not migrated differently.
+
+1. Replace the dependency: remove the old package and add `@storyshelf/db`.
+2. Install the driver of the database you use, because the drivers are now optional peers that only their own subpath loads: `postgres` for `/postgres`, `mysql2` for `/mysql`, and the preset's own client (`@libsql/client`, `better-sqlite3`, `pg`, `@neondatabase/serverless`, `@vercel/postgres`, `@electric-sql/pglite`, `@aws-sdk/rds-signer`, `@planetscale/database` or `@tidbcloud/serverless`). SQLite on `node:sqlite` needs none. (`server init` adds them for you.)
+3. Change the imports: `@storyshelf/db-sqlite` becomes `@storyshelf/db/sqlite`, `@storyshelf/db-postgres` becomes `@storyshelf/db/postgres` and `@storyshelf/db-mysql` becomes `@storyshelf/db/mysql`. A preset keeps its name under the new path, for example `@storyshelf/db-postgres/neon` becomes `@storyshelf/db/postgres/neon` and `@storyshelf/db-sqlite/d1` becomes `@storyshelf/db/sqlite/d1`.
+
+The `ddl`, `schema` and `drizzle-factory` subpaths are no longer published. There is no alias and no re-export under the old names: the three old packages are not published again, and the owner deprecates them on npm with a message naming the new one.
+
 ### Nothing else is pending
 
-Besides the runner, local storage, the storage packages and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
+Besides the runner, local storage, the storage and database packages and the variable names, no other breaking or changed entry is waiting in `.changeset/` today.
 
 ## 0.14.0 (2026-11-21)
 

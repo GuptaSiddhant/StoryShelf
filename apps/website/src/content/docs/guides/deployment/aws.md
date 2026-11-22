@@ -44,7 +44,7 @@ module "storyshelf" {
 }
 ```
 
-Or run `storyshelf server init --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+Or run `npx create-storyshelf --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 
@@ -94,7 +94,7 @@ The separate execution role (ECS itself, before the app starts) has `AmazonECSTa
 
 ## Database and sign-in
 
-- **IAM authentication.** The app connects through the `db-postgres/rds-iam` preset with a short-lived token from its task role, so there is no database password for the app to read or rotate. The server certificate is **always verified**, against the Amazon RDS root certificates the image bundles (set `SHELF_DATABASE_CA` or `SHELF_DATABASE_CA_FILE` for an RDS Proxy or a custom domain). There is no setting that encrypts without verifying. See [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
+- **IAM authentication.** The app connects through the `@storyshelf/db/postgres/rds-iam` preset with a short-lived token from its task role, so there is no database password for the app to read or rotate. The server certificate is **always verified**, against the Amazon RDS root certificates the image bundles (set `SHELF_DATABASE_CA` or `SHELF_DATABASE_CA_FILE` for an RDS Proxy or a custom domain). There is no setting that encrypts without verifying. See [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
 - **No first-boot operator step.** RDS cannot grant `rds_iam`, so each task first runs a `db-init` container. It logs in as the master user with the RDS-managed secret, then idempotently creates the app user `shelf`, grants it `rds_iam` and gives it rights on the database. The app container starts only after `db-init` succeeds; its output is in the log group under the `db-init` stream prefix. Only `shelf` is IAM-only: the master user keeps its password in `db_master_secret_arn` for administration from inside the VPC.
 - **Unverified.** The `db-init` step is checked by `terraform validate` only and has not yet run against a real RDS (tracked in #1096). The nightly `module-apply` live run is off until the owner enables it.
 - **Sign-in.** The module always sets `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET`, so the app never starts open. Read the password with `aws secretsmanager get-secret-value --secret-id "$(terraform output -raw auth_password_secret_arn)"` and sign in as `admin@example.com` (or `auth_email`). Cognito is off by default (`enable_cognito = false`) because the image does not read OIDC settings yet; with it on, `SHELF_OIDC_CLIENT_SECRET` is an operator step (Terraform writes `change-me` once, never overwrites it).
@@ -127,7 +127,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 
 - **Database.** RDS automated backups and point-in-time recovery (`database_backup_retention_days`, 7 by default, up to 35), and a manual snapshot before upgrades. `deletion_protection` keeps a final snapshot on destroy.
 - **Storage.** The bucket is versioned, so an overwritten or deleted blob can be recovered.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 

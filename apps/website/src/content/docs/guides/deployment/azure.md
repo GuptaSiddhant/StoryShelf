@@ -42,7 +42,7 @@ module "storyshelf" {
 }
 ```
 
-The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `storyshelf server init --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access](#blob-access)) and a subscription (`ARM_SUBSCRIPTION_ID`). Or let the CLI write this for you: `npx create-storyshelf --cloud azure` writes a module stub, a `main.tf` that uses the module at the CLI's own version, a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init`, `terraform plan` and review it before `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 
@@ -129,7 +129,7 @@ For a small team (a few projects, a few builds a day) the defaults are the start
 - **Database.** Flexible Server keeps automated backups; set the retention (up to 35 days) and use geo-redundant backup if you need it.
 - **Storage.** Turn on blob versioning and soft delete on the storage account, so an overwritten or deleted blob can be recovered.
 - **Key Vault.** `deletion_protection` keeps purge protection on; a destroyed vault stays soft-deleted for 7 days.
-- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf server check-storage` after a restore.
+- **Order and restore.** Back up the database first, then storage, and restore both together. See [Back up and restore](/guides/backup-restore/), and run `storyshelf-server check-storage` after a restore.
 
 ## Adapt it to your own platform
 

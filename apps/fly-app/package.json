@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
-    "start": "node dist/server.mjs",
-    "lint": "oxlint --type-aware --type-check server.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts e2e/golden-path.test.ts demo-viewer.ts demo-viewer-db.ts demo-viewer.test.ts && oxlint sprite",
+    "start": "node dist/bin.mjs serve",
+    "lint": "oxlint --type-aware --type-check instance.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts e2e/golden-path.test.ts demo-viewer.ts demo-viewer-db.ts demo-viewer.test.ts && oxlint sprite",
     "test": "vitest run",
     "test:e2e": "SHELF_E2E=1 vitest run e2e/golden-path.test.ts",
-    "dev": "node --conditions=source --experimental-transform-types server.ts"
+    "dev": "node --conditions=source --experimental-transform-types ../../packages/app/src/server-bin/bin.ts serve --entry instance.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.76",
@@ -17,7 +17,7 @@
     "@storyshelf/app": "workspace:*",
     "@storyshelf/auth": "workspace:*",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@storyshelf/observability": "workspace:*",
     "@storyshelf/runner": "workspace:*",
     "@storyshelf/storage": "workspace:*",
@@ -30,5 +30,8 @@
     "rolldown": "*",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "storyshelf": {
+    "server": "dist/instance.mjs"
   }
 }

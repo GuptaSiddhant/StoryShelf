@@ -1,0 +1,51 @@
+---
+title: "@storyshelf/db"
+description: SQLite, Postgres and MySQL database adapters for StoryShelf, with their driver and cloud presets, one subpath each.
+---
+
+import { PackageManagers } from "starlight-package-managers";
+
+`@storyshelf/db` holds every database adapter StoryShelf ships, one subpath each: `/sqlite`, `/postgres` and `/mysql`, plus a subpath per driver or cloud preset. Each driver is an optional peer that only its own subpath loads, so a SQLite server never installs a Postgres or MySQL client. All of them implement the same `DatabaseAdapter` contract, so the rest of the application does not change when you switch databases.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/db" />
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/db) — install tarballs and version history.
+- [Public API reference](/reference/db/) — generated docs for every export; start here to learn the API.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/db) — package directory on `main`.
+
+<Readme heading="Install" />
+
+## SQLite
+
+<Readme heading="SQLite (/sqlite)" />
+
+### Durability
+
+The adapter runs SQLite in WAL mode with `synchronous = NORMAL`. A commit does not wait for the disk to flush, so writes are faster, and the trade-off is:
+
+- **An application crash loses nothing.** Every committed transaction is in the write-ahead log.
+- **An operating-system crash or power loss can lose the last committed transactions**, but never corrupts the database.
+
+For a host that must keep every committed transaction through a power cut, opt out to a sync on every commit:
+
+```ts
+createSqliteDatabase("/var/lib/storyshelf/shelf.db", { synchronous: "full" });
+```
+
+The `better-sqlite3` and `bun:sqlite` presets take the same `synchronous` option. D1 and Turso manage durability themselves and are unaffected.
+
+The former `@storyshelf/db-turso` package is retired — see `docs/deprecated.md` in the repo.
+
+## Postgres
+
+<Readme heading="Postgres (/postgres)" />
+
+## MySQL
+
+<Readme heading="MySQL (/mysql)" />
+
+## When to use it
+
+Use SQLite for a single-node deployment or local development, and pair it with [local storage](../core/) for the simplest self-hosted setup. Choose Postgres when you need a managed relational database or already run Postgres for your team; choose MySQL or MariaDB when that is what your team already runs or your platform provides. For multi-node deployments pair a server database with [S3-compatible storage](../storage/) when instances do not share a filesystem.

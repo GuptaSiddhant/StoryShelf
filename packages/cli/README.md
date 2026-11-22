@@ -33,7 +33,7 @@ storyshelf create --url https://shelf.example.com --name my-app --token $SHELF_A
 Scaffold a server:
 
 ```sh
-storyshelf server init --dir ./my-shelf
+npx create-storyshelf --dir ./my-shelf
 ```
 
 ## API
@@ -53,10 +53,10 @@ storyshelf create --url <url> --name <name> --token <admin-token>
 # or env SHELF_ADMIN_TOKEN
 ```
 
-`storyshelf server init` — scaffold a new StoryShelf server project.
+`create-storyshelf` — scaffold a new StoryShelf server project.
 
 ```sh
-storyshelf server init --dir <dir>
+npx create-storyshelf --dir <dir>
 ```
 
 `storyshelf upload` — upload a built Storybook as a build. `--url/--slug` optional when `.storybook/storyshelf.json` exists (flags > env > file). `--token/--sha/--branch` fallback to `SHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME`. Running `storyshelf` with no args defaults to `upload` if config exists, else shows help to run `init`.
@@ -70,11 +70,7 @@ storyshelf upload --url <url> --slug <slug> --token <token> \
 
 The default `--build-dir` is `storybook-static` or `buildDir` from `.storybook/storyshelf.json` (see [Configuration](../../apps/website/src/content/docs/guides/config.md)). If `buildDir` is missing/empty, `upload` runs `buildCommand` or `npm run <buildScriptName>`.
 
-`storyshelf purge` — purge expired builds (requires admin token when auth enabled).
-
-```sh
-storyshelf purge --url <url> [--token <admin-token>]
-```
+Instance commands (`serve`, `migrate`, `purge`, `check-storage`, `doctor`) are in `storyshelf-server`, a bin of `@storyshelf/app`; `storyshelf purge`, `storyshelf server …` and `storyshelf mcp …` no longer exist: scaffold with `create-storyshelf` and `@storyshelf/mcp` (`storyshelf-mcp init|serve`).
 
 `storyshelf retry` — retry a failed build.
 
@@ -116,6 +112,6 @@ jobs:
 
 ## How it fits in
 
-The server is scaffolded via `storyshelf server init`, which assembles `@storyshelf/core`, and `@storyshelf/db-sqlite` (local storage is built into core) and runs Playwright captures. The CLI never imports that stack — client-only by design.
+The server is scaffolded via `create-storyshelf`, which assembles `@storyshelf/core`, and `@storyshelf/db/sqlite` (local storage is built into core) and runs Playwright captures. The CLI never imports that stack — client-only by design.
 
 See `docs/architecture.md` for the capture workflow and `docs/testing.md` for the gated browser integration suite.
