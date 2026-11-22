@@ -74,13 +74,13 @@ run("nub publish -r --dry-run --no-git-checks");
 
 if (dryRun) {
   log(`dry run: ${previous} → ${version} in the working tree, nothing committed`);
-  log("undo with: git checkout -- . && git clean -fd .changeset packages");
+  log("undo with: git checkout -- . && git clean -fd .changeset packages config");
   process.exit(0);
 }
 
 const branch = `release/v${version}`;
 run(`git switch -c ${branch}`);
-run("git add packages .changeset CHANGELOG.md");
+run("git add packages .changeset CHANGELOG.md config/version-manifest.json");
 run(`git commit -m "chore(release): v${version}"`);
 log(`${previous} → ${version} committed on ${branch}`);
 console.log(`
