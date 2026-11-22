@@ -18,10 +18,8 @@ describe("createProgram", () => {
       "create",
       "doctor",
       "init",
-      "mcp",
       "protect",
       "retry",
-      "server",
       "upload",
       "whoami",
     ]);

@@ -1,0 +1,832 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`create-storyshelf output > is unchanged for auth oauth 1`] = `
+{
+  "files": [
+    ".env.example 511 1123dbbe1b01cceeb8e78900f3e5e6e9682533e9ac80f1a75b477f7f6b96659c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 730 35a40449b4518cbbbc8c71c2ea051a49db1f91b136ec04a0a9f3f3c282151e36",
+    "package.json 652 9acffda363d07d87ec95d198a5b7df41cb34823f6f456bfcd4834ef4d91d76e0",
+    "src/index.ts 1803 1729db6dc74d94f53734c4515eb0d2d7ad2d999016328bc32c05614ce6a753a4",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for auth password 1`] = `
+{
+  "files": [
+    ".env.example 585 9a4b3e69a87f4819cd091fdbe6d6e0f87eabd518766009dfe750182a673b7e6e",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 890 22bbdc9f914f6267f636fa6f4871f747de2e9e1b5bbf8793cc176f148bd2296d",
+    "package.json 652 9acffda363d07d87ec95d198a5b7df41cb34823f6f456bfcd4834ef4d91d76e0",
+    "src/index.ts 1940 12b33ec299cb2d51720889cc60d9b92133881bd3a5c867c71080541340f62581",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
+  npm install
+  npm start
+  # then sign in as admin@example.com
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database better-sqlite3 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 652 1c2eeeceda76c7078a5218a4ced499eb182a60e26b26afa7c90f70988553444d",
+    "src/index.ts 1147 83788066542f2001ffedc2efc0e426acc4229c1ffaa6a311f92b322e0064a733",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database bun-sqlite 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 619 117fe831fa931ae968d7b7c271ac7b91c2e46ce2ab2fd912dff96c8f91f6bcdb",
+    "src/index.ts 1135 d4ec26a4d4425a5d6e9fc9f592b703b6a9d57aeaed6d6ecab276e5ae7261515f",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database d1 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 619 117fe831fa931ae968d7b7c271ac7b91c2e46ce2ab2fd912dff96c8f91f6bcdb",
+    "src/index.ts 1287 015a8b21a07808c3b7a164e09424d149f4b80f19d3f53c6c2cf538518cfb5600",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database mysql 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 642 b9cf19533c6bc0bd57c12c22aabb74d39b9e177d28ebfd7c31364ac3dd66b72c",
+    "src/index.ts 1332 024ce5fe422907cba04d164485ab7a67353ce334b37dee17318cc017162372fd",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database neon 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 663 628a084581691e37e19deecf4360641908c68d4c74f404d779d7e15ff3b5a0d3",
+    "src/index.ts 1338 b26baf7248f10b35b9105da2d2cfa4101e22073b8fa4666161e6b0f70089bd66",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database neon-http 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 663 628a084581691e37e19deecf4360641908c68d4c74f404d779d7e15ff3b5a0d3",
+    "src/index.ts 1351 748bac49a65c17a72f2b61b63b95828f5bc23ca8a7ed6e6f93e8644f91e0820b",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database pg 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 641 3e1b73852564621b327765507cc98bcbd76d6bd54609f2483d6b4295e4fc065e",
+    "src/index.ts 1332 0af0d7b431117b59977f520201b7883b5159257c97357f6365fa98f8e1ee4a5b",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database pglite 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 659 b1ec460c67ea009fafbb326ce7e5aa5056edfa734cb37cb74c84f2ea87d52407",
+    "src/index.ts 1096 af3d1634f3129f2e44efd2cb70500237fce378a049e1c9983b77715cf128550c",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database planetscale 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 658 6ce010538dc7f6c7c99cca635572f875f19e8cf5c7b048a550b328f8f33ce0a2",
+    "src/index.ts 1356 c299a05e18cb82f26f1003ba52208e63592eee2c790f7a1f1b4855092dc1d034",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database postgres 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 621 ee0cf939a688b69b84d11a88c347ce630bfbc5c5b1badd9bb58d4053c4549ee3",
+    "src/index.ts 1341 fbf26cbd12cc166376d070382b551b51f5beca9ae78c1df800ccfbc4bf3e4489",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database sqlite 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 619 117fe831fa931ae968d7b7c271ac7b91c2e46ce2ab2fd912dff96c8f91f6bcdb",
+    "src/index.ts 1108 cc8fb7da290a73d4de0434e94b024053785bd95aa1a010f8aed07b4749d95929",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database tidb 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 657 9d9e577d9c5dc63ba4f1db0e9aaae28ae11f9cf4bed8b1f0f095bae94f0de78b",
+    "src/index.ts 1335 071fed5422fd60961e2bb2bb24e53d696c9eab6f80a157ea30186a91ff91c14a",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database turso 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 652 576794a83c354ad352f10a6997e04d04ecaae6b9654d5b772e721a8e0746b9c9",
+    "src/index.ts 1172 cc3ac4ae3d9db22811f2e9b68de45191f950c887456f3f804ef99161c27d8df9",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for database vercel 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 656 a01c111380b9be1519776c4319c78a833666fe93657910ffcd64a9d111fb778c",
+    "src/index.ts 1096 0e47f5b7ab170d2a2daf0b95f836964dd03d0b5bb66d2b655e7e8c3f987b1298",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for design 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 619 117fe831fa931ae968d7b7c271ac7b91c2e46ce2ab2fd912dff96c8f91f6bcdb",
+    "src/index.ts 1108 cc8fb7da290a73d4de0434e94b024053785bd95aa1a010f8aed07b4749d95929",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for docker advanced adapters 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 793 2928ce51f7f184c2c618e9b62694fb9c47576eb4ba3176d511a33dee83b5aa08",
+    "src/index.ts 1332 024ce5fe422907cba04d164485ab7a67353ce334b37dee17318cc017162372fd",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for docker single container 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 770 e1c4b8346ceab8b5ed4c93609155aa1d62d62fad706eadf329d9bbce6c2698c1",
+    "src/index.ts 1108 cc8fb7da290a73d4de0434e94b024053785bd95aa1a010f8aed07b4749d95929",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for docker with postgres compose 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "compose.yaml 900 4675c1ee9d583dba51e01568ec61a137851db3c9f0dfb2decc8bab2c0955a36c",
+    "package.json 798 d405e9f53959702e3cbeeae74c0aa20fecf0266197e53ab540f269f14d203609",
+    "src/index.ts 1341 fbf26cbd12cc166376d070382b551b51f5beca9ae78c1df800ccfbc4bf3e4489",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created Dockerfile, .dockerignore, compose.yaml
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
+  npm run docker:up      # builds + starts the app
+  npm run docker:logs    # follow logs
+  npm run docker:down    # tear down
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for everything on 1`] = `
+{
+  "files": [
+    ".env.example 632 721865831c46b68e31badf88551e668adfadcf35e12a199f59c22b780c49ddba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 939 03c277708ed0ba1ad62e1c8659e6d7337376bc81afc15bb8563a1d7734dd52c4",
+    "package.json 839 dc4f1359829d8b03cbb5be54a04e3d82655406c6d6b0fc32b1d2b64e0ef07459",
+    "src/index.ts 3263 72625a5893cee4ef2114ce40ec2ca431d8531c1024ff638ccb9bf69f3d610401",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD, DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
+  export DATABASE_URL=...
+  npm install
+  npm start
+  # then sign in as admin@example.com
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for git on 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 619 117fe831fa931ae968d7b7c271ac7b91c2e46ce2ab2fd912dff96c8f91f6bcdb",
+    "src/index.ts 1108 cc8fb7da290a73d4de0434e94b024053785bd95aa1a010f8aed07b4749d95929",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for legacy docker flag 1`] = `
+{
+  "files": [
+    ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 770 e1c4b8346ceab8b5ed4c93609155aa1d62d62fad706eadf329d9bbce6c2698c1",
+    "src/index.ts 1108 cc8fb7da290a73d4de0434e94b024053785bd95aa1a010f8aed07b4749d95929",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+Created Dockerfile, .dockerignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  export SHELF_SECRET=...      # at least 32 random characters; keep and reuse it
+  npm run docker:build   # builds the image
+  npm run docker:run     # runs it on :3000 (data in a named volume)
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for local with advanced adapters 1`] = `
+{
+  "files": [
+    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 591 f5b7463eea022741e747dc672e43d287e50f660b9f3b9e52d34a2660c4266bae",
+    "package.json 657 9d9e577d9c5dc63ba4f1db0e9aaae28ae11f9cf4bed8b1f0f095bae94f0de78b",
+    "src/index.ts 1335 071fed5422fd60961e2bb2bb24e53d696c9eab6f80a157ea30186a91ff91c14a",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export DATABASE_URL=...
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for notifications 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 649 027bbaa751c79acde2dac51f2142bd3341e8eb4a517a03a1de79417d047aac50",
+    "src/index.ts 1777 903f7255573996bb21e59ec163841e6f2d21172e8717d37826c05e131614aba1",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for notifications with oauth 1`] = `
+{
+  "files": [
+    ".env.example 511 1123dbbe1b01cceeb8e78900f3e5e6e9682533e9ac80f1a75b477f7f6b96659c",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 730 35a40449b4518cbbbc8c71c2ea051a49db1f91b136ec04a0a9f3f3c282151e36",
+    "package.json 682 a02947bb969297ce9d94831c1ae89166bc8101f3c01be91ee8148cb70bf63e21",
+    "src/index.ts 2614 e0fa049f8c97c1479e27b065b236658b0bef0ddc1e767d7279004b64dc8ad3a2",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for notifications with password auth 1`] = `
+{
+  "files": [
+    ".env.example 585 9a4b3e69a87f4819cd091fdbe6d6e0f87eabd518766009dfe750182a673b7e6e",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 890 22bbdc9f914f6267f636fa6f4871f747de2e9e1b5bbf8793cc176f148bd2296d",
+    "package.json 682 a02947bb969297ce9d94831c1ae89166bc8101f3c01be91ee8148cb70bf63e21",
+    "src/index.ts 2751 9559fc9f57866cf4ebd166999de286a7c90c5f1bea807bbfe6d684094fc39955",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  # Required: SHELF_SECRET, SHELF_PUBLIC_BASE_URL, SHELF_ADMIN_PASSWORD. Set them in the shell, or in .env (copy .env.example):
+  export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
+  export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+  export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
+  npm install
+  npm start
+  # then sign in as admin@example.com
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for observability 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 661 b9b381eb76e2c3f0c9f03ed59db91c344e2f31aea2aacb6603f37c2b60ecf906",
+    "src/index.ts 1534 2a15af1ecfffb2f7fccab464598266974b1b3e2d8e04c355af3c99f0982d4e55",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for storage azure 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 695 cd33f92e49421fca1600a3f8a16369a0aeb7a9c647da2c7a46c9e2dec8166b3b",
+    "src/index.ts 1184 b1d73323d752e7dbb6dd1b0bd23daa473f255e301e68ed9cb1451443abca3873",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for storage gcs 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 662 d69826b9cc1d2e6f4c4a87848c00e5b28ec9eca04f8d8cc460c9c6aeda544180",
+    "src/index.ts 1131 98a1e34c791ad4627089bfa5bea149f843f0976ae62f84a16b9a4e841e9cb358",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;
+
+exports[`create-storyshelf output > is unchanged for storage s3 1`] = `
+{
+  "files": [
+    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
+    "README.md 478 6a9eb80709fb7ff629b83dd66102e4fd326d498cc507f810e7d93c28fd7e1fff",
+    "package.json 699 82c66cf7163c478260c29cbd4f622466715623f4e0cf3c0b984ccd0e449ece1d",
+    "src/index.ts 1159 13449ac179077a99e76244c03da2fec0dcbcab16dcd0de253c6ac8b8a105fe99",
+    "tsconfig.json 321 703b48ef727f0790e4e0df2c31893db54e2404600c3e78a48420a763b0050fcc",
+  ],
+  "output": "[stderr] ==> Writing server project
+Created src/index.ts
+Created package.json, tsconfig.json, .env.example, README.md, .gitignore
+[stderr] --> Wrote server project (0.0s)
+
+Scaffolded my-server in <tmp>/my-server
+
+Next steps:
+  cd ./my-server
+  npm install
+  npm start
+",
+}
+`;

@@ -1,9 +1,14 @@
 import { parseArgs } from "node:util";
+import { runSubcommand, subcommandOf } from "./cli/main.ts";
 import { resolveConfig, type McpConfig } from "./config.ts";
 
 const HELP = `storyshelf-mcp: StoryShelf MCP server
 
 Usage: storyshelf-mcp [--http] [--port 3333] [--host 127.0.0.1] [--url URL] [--slug SLUG] [--token TOKEN] [--origin ORIGIN]
+
+       storyshelf-mcp init [--dir DIR]                     scaffold an MCP server project
+       storyshelf-mcp serve [--dir DIR] [--url URL] [--slug SLUG] [--token TOKEN] [--port PORT]
+                                                           run a scaffolded project
 
 Env: SHELF_URL, SHELF_TOKEN, SHELF_SLUG
 Default transport is stdio. With --http, a Streamable HTTP endpoint is served at /mcp
@@ -57,7 +62,7 @@ async function runHttp(values: CliValues, config: McpConfig): Promise<void> {
   process.stderr.write(`storyshelf-mcp listening on http://${host}:${port}/mcp\n`);
 }
 
-async function main(): Promise<void> {
+async function serveMcp(): Promise<void> {
   const values = parseCli();
   if (values.help) {
     process.stdout.write(`${HELP}\n`);
@@ -70,6 +75,12 @@ async function main(): Promise<void> {
   }
   const { runStdio } = await import("./stdio.ts");
   await runStdio(config);
+}
+
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  const subcommand = subcommandOf(argv);
+  await (subcommand === undefined ? serveMcp() : runSubcommand(subcommand, argv.slice(1)));
 }
 
 try {

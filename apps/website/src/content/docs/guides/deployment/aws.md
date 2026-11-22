@@ -44,7 +44,7 @@ module "storyshelf" {
 }
 ```
 
-Or run `storyshelf server init --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
+Or run `npx create-storyshelf --cloud aws`, which writes a `main.tf` that uses the module at the CLI's own version a `terraform.tfvars` with your answers, and a `.gitignore` for the state and plan, which hold the generated secrets (keep the state in an encrypted remote backend). Terraform is never applied for you: run `terraform init` and `terraform plan`, review it, then `terraform apply`. Each release also attaches `storyshelf-terraform-<version>.tar.gz` for installs that cannot fetch from GitHub. To upgrade, change both versions together and read the release notes.
 
 ### Inputs
 

@@ -17,7 +17,7 @@ For a visual overview, see [`architecture-diagrams.md`](./architecture-diagrams.
 - **Launcher ownership**: `apps/dev-server` and `apps/fly-app` each own their adapter
   wiring so deployments can diverge (locals vs Turso/S3). Shared code goes in
   `packages/`, not `apps/`.
-  The CLI `server init` template is standalone by design (registry installs, no
+  The CLI `create-storyshelf` template is standalone by design (registry installs, no
   workspace), so the template carries its own copy of the wiring.
 
 Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); rolldown targets single-file app bundles. Do not swap them without updating this section.
