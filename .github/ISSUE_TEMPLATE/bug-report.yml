@@ -27,7 +27,7 @@ body:
     attributes:
       label: Install path
       options:
-        - npm scaffold (storyshelf server init)
+        - npm scaffold (create-storyshelf)
         - Docker image
         - Fly
         - Terraform

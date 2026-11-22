@@ -10,7 +10,7 @@ Each entry here is the shortest route to one goal, with a link to the full guide
 Scaffold a server, start it, and create a project from your Storybook folder. The default is SQLite and local disk, with no authentication, so there is nothing else to run.
 
 ```sh
-npx storyshelf server init
+npx create-storyshelf
 ```
 
 Then follow [Getting started](/guides/getting-started/): start the server, run `storyshelf init` in your Storybook, and upload a build. To see a finished instance first, open the [live demo](/guides/demo/).

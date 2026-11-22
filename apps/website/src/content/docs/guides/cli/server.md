@@ -1,16 +1,16 @@
 ---
 title: CLI — Server
-description: storyshelf server init and storyshelf-server — scaffold and operate a self-hosted server.
+description: create-storyshelf and storyshelf-server — scaffold and operate a self-hosted server.
 ---
 
 Scaffold and operate a self-hosted StoryShelf server. For the cloud Terraform modules see [Deployment](/guides/deployment/).
 
-## `storyshelf server init`
+## `create-storyshelf`
 
-Scaffold a new server project:
+Scaffold a new server project (`npm create storyshelf`, or `npx create-storyshelf`; `pnpm create storyshelf`, `yarn create storyshelf` and `bun create storyshelf` work too). The `create-storyshelf` package has no dependencies and is separate from the `storyshelf` client CLI:
 
 ```bash
-storyshelf server init
+npm create storyshelf
 # ? Project name? my-storyshelf
 # ? Directory? ./my-storyshelf
 # ? Which database? SQLite
@@ -29,9 +29,11 @@ Dockerfile        # only if you choose Docker
 compose.yaml      # only when the Docker stack has more than one service
 ```
 
-Entry code lives in `src/` so you can split logic into more files (use `.ts` in relative imports). The Docker image installs production dependencies and runs `src/index.ts` directly with Node, the same as `npm start`; there is no build step. A single-container setup (for example SQLite + local storage) gets `docker:build` / `docker:run` scripts and no compose file; compose is generated when the stack adds Postgres.
+The entry is a `defineShelfInstance` module that `storyshelf-server` loads. Entry code lives in `src/` so you can split logic into more files (use `.ts` in relative imports). The Docker image installs production dependencies and runs `src/index.ts` directly with Node, the same as `npm start`; there is no build step. A single-container setup (for example SQLite + local storage) gets `docker:build` / `docker:run` scripts and no compose file; compose is generated when the stack adds Postgres.
 
 Notifications and OpenTelemetry wiring are opt-in: the generated server only imports what you selected, so the default output stays short.
+
+`--install` runs the install with the package manager that launched it (read from `npm_config_user_agent`); without it nothing is installed and the next steps say what to run. `--dir <path>` picks the output directory.
 
 **Deploy targets** (when prompted, `local` or `docker`):
 
@@ -41,7 +43,7 @@ Notifications and OpenTelemetry wiring are opt-in: the generated server only imp
 ### `--cloud`: a Terraform module stub
 
 ```bash
-storyshelf server init --cloud aws    # or gcp, azure
+npx create-storyshelf --cloud aws    # or gcp, azure
 # ? Deployment name? storyshelf
 # ? AWS region? us-east-1
 # ? CIDR ranges allowed to reach the load balancer? 10.0.0.0/8

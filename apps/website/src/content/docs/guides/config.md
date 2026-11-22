@@ -169,7 +169,7 @@ File is validated by the CLI's config parser (`cli/src/config.ts`): unknown keys
 
 ```bash
 # 1. Scaffold server
-storyshelf server init --dir ./my-shelf
+npx create-storyshelf --dir ./my-shelf
 
 # 2. Init client config (fails if .storybook/main.* missing, prompts if flags missing)
 storyshelf init --url https://shelf.example.com --slug my-app

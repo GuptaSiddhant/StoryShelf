@@ -5,11 +5,8 @@ import type { ConnectionOptions } from "./commands/connection.ts";
 import type { CreateOptions } from "./commands/create.ts";
 import type { DoctorOptions } from "./commands/doctor.ts";
 import type { InitOptions } from "./commands/init.ts";
-import type { McpInitOptions } from "./commands/mcp/init.ts";
-import type { McpServeOptions } from "./commands/mcp/serve.ts";
 import type { ProtectOptions } from "./commands/protect.ts";
 import type { RetryOptions } from "./commands/retry.ts";
-import type { ServerInitOptions } from "./commands/server/init.ts";
 import type { UploadOptions } from "./commands/upload.ts";
 import { WAIT_EXIT_HELP } from "./commands/wait-help.ts";
 import { cliVersion } from "./config.ts";
@@ -31,8 +28,6 @@ export function createProgram(): Command {
   const commands = [
     buildInitCommand(),
     buildCreateCommand(),
-    buildServerCommand(),
-    buildMcpCommand(),
     buildUploadCommand(),
     buildBuildCommand(),
     buildDoctorCommand(),
@@ -87,40 +82,6 @@ function buildCreateCommand(): Command {
     .option("--name <name>", "project name")
     .option("--token <token>", "admin token (or SHELF_ADMIN_TOKEN env)")
     .action(run<CreateOptions>(async () => (await import("./commands/create.ts")).runCreate));
-}
-
-function buildServerCommand(): Command {
-  const server = new Command("server").description("Server operations");
-  server
-    .command("init")
-    .description("Scaffold a new StoryShelf server project")
-    .option("--dir <dir>", "output directory")
-    .option("--cloud <cloud>", "write a Terraform module stub for aws, gcp or azure")
-    .action(
-      run<ServerInitOptions>(async () => (await import("./commands/server/init.ts")).runServerInit),
-    );
-  return server;
-}
-
-function buildMcpCommand(): Command {
-  const mcp = new Command("mcp").description("MCP server operations (let AI agents read builds)");
-  mcp
-    .command("init")
-    .description("Scaffold a StoryShelf MCP server project")
-    .option("--dir <dir>", "output directory")
-    .action(run<McpInitOptions>(async () => (await import("./commands/mcp/init.ts")).runMcpInit));
-  const serve = new Command("serve")
-    .description("Run a scaffolded StoryShelf MCP server project")
-    .option("--dir <dir>", "MCP project directory (default cwd)")
-    .option("--url <url>", "StoryShelf server URL (sets SHELF_URL)")
-    .option("--slug <slug>", "default project slug (sets SHELF_SLUG)")
-    .option("--token <token>", "API token for stdio (sets SHELF_TOKEN)")
-    .option("--port <port>", "HTTP port (sets PORT)")
-    .action(
-      run<McpServeOptions>(async () => (await import("./commands/mcp/serve.ts")).runMcpServe),
-    );
-  mcp.addCommand(serve, { isDefault: true });
-  return mcp;
 }
 
 function buildUploadCommand(): Command {
