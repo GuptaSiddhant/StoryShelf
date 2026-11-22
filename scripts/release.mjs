@@ -74,7 +74,7 @@ run("nub publish -r --dry-run --no-git-checks");
 
 if (dryRun) {
   log(`dry run: ${previous} → ${version} in the working tree, nothing committed`);
-  log("undo with: git checkout -- . && git clean -fd .changeset packages config");
+  log("undo with: git checkout -- . && git clean -fd .changeset packages");
   process.exit(0);
 }
 
