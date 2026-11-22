@@ -16,23 +16,23 @@ npm install @storyshelf/db
 
 Then install only the driver your subpath needs (SQLite on `node:sqlite` needs none):
 
-| Subpath                                | Driver peer                       |
-| -------------------------------------- | --------------------------------- |
-| `@storyshelf/db/sqlite`                | — (`node:sqlite` builtin)         |
-| `@storyshelf/db/sqlite/turso`          | `@libsql/client`                  |
-| `@storyshelf/db/sqlite/better-sqlite3` | `better-sqlite3`                  |
-| `@storyshelf/db/sqlite/bun-sqlite`     | — (Bun only)                      |
-| `@storyshelf/db/sqlite/d1`             | — (Cloudflare Workers only)       |
-| `@storyshelf/db/postgres`              | `postgres`                        |
-| `@storyshelf/db/postgres/pg`           | `pg`                              |
-| `@storyshelf/db/postgres/neon`         | `@neondatabase/serverless`        |
-| `@storyshelf/db/postgres/neon-http`    | `@neondatabase/serverless`        |
-| `@storyshelf/db/postgres/vercel`       | `@vercel/postgres`                |
-| `@storyshelf/db/postgres/pglite`       | `@electric-sql/pglite`            |
-| `@storyshelf/db/postgres/rds-iam`      | `pg`, `@aws-sdk/rds-signer`       |
-| `@storyshelf/db/mysql`                 | `mysql2`                          |
-| `@storyshelf/db/mysql/planetscale`     | `mysql2`, `@planetscale/database` |
-| `@storyshelf/db/mysql/tidb`            | `mysql2`, `@tidbcloud/serverless` |
+| Subpath                                | Driver peer                                                |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `@storyshelf/db/sqlite`                | — (`node:sqlite` builtin)                                  |
+| `@storyshelf/db/sqlite/turso`          | `@libsql/client`                                           |
+| `@storyshelf/db/sqlite/better-sqlite3` | `better-sqlite3`                                           |
+| `@storyshelf/db/sqlite/bun-sqlite`     | — (Bun only)                                               |
+| `@storyshelf/db/sqlite/d1`             | — (Cloudflare Workers only)                                |
+| `@storyshelf/db/postgres`              | `postgres`                                                 |
+| `@storyshelf/db/postgres/pg`           | `pg`                                                       |
+| `@storyshelf/db/postgres/neon`         | `@neondatabase/serverless`                                 |
+| `@storyshelf/db/postgres/neon-http`    | `@neondatabase/serverless`                                 |
+| `@storyshelf/db/postgres/vercel`       | `@vercel/postgres`                                         |
+| `@storyshelf/db/postgres/pglite`       | `@electric-sql/pglite`                                     |
+| `@storyshelf/db/postgres/rds-iam`      | `pg`, `@aws-sdk/rds-signer`                                |
+| `@storyshelf/db/mysql`                 | `mysql2`                                                   |
+| `@storyshelf/db/mysql/planetscale`     | `mysql2`, `@planetscale/database`                          |
+| `@storyshelf/db/mysql/tidb`            | `mysql2`, `@tidbcloud/serverless`                          |
 
 ## SQLite (/sqlite)
 
@@ -64,7 +64,7 @@ The returned adapter implements every method of the `DatabaseAdapter` interface 
 
 | Subpath                                | Driver                | Install                      | When                                                                                   |
 | -------------------------------------- | --------------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
-| `@storyshelf/db/sqlite`                | `node:sqlite` builtin | —                            | Default. Single-node VPS/Docker. Zero config.                                          |
+| `@storyshelf/db/sqlite`         | `node:sqlite` builtin | —                            | Default. Single-node VPS/Docker. Zero config.                                          |
 | `@storyshelf/db/sqlite/turso`          | `@libsql/client`      | `npm install @libsql/client` | Serverless (Turso cloud, Vercel, Lambda); `file:` URLs and embedded replicas work too. |
 | `@storyshelf/db/sqlite/better-sqlite3` | `better-sqlite3`      | `npm install better-sqlite3` | Native sync driver (needs `allowBuilds` for the postinstall).                          |
 | `@storyshelf/db/sqlite/bun-sqlite`     | `bun:sqlite` builtin  | — (Bun only)                 | Bun runtime.                                                                           |

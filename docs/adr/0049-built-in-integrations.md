@@ -204,7 +204,7 @@ The amendment also records the test for every later "fold into core or keep as a
    - it is shared by core and the CLI, which must not depend on core: `affected`;
    - it is **a layer core is built on**, with its own test infrastructure and no imports from core:
      `db` (persistence: tables, dialects, migrations, drivers). This mirrors `app` and needs both
-     halves; code that only _could_ be a lower layer stays in core.
+     halves; code that only *could* be a lower layer stays in core.
 3. **Retiring.** A package folded into core is published as a deprecated re-export for **one minor
    release**, then no longer published. The owner runs `npm deprecate` on it. Until 2027-01-01 the
    amendment "No shims until 2027" below applies instead: no re-export is published at all.

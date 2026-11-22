@@ -54,7 +54,7 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                      | Runner / git / auth / notify                               |
+| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                                | Runner / git / auth / notify                               |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
 | `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
 | `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |

@@ -247,7 +247,7 @@ are suspended in this way:
   step. A pull request that makes one carries the `schema-break` label. It skips the
   `previous-release-db` job, which would fail on it by design, and the changeset check enforces the
   `Breaking:` kind and the `Schema:` line (`docs/testing.md`).
-- The `previous-release-db` job stays for every other pull request: it still catches an _accidental_
+- The `previous-release-db` job stays for every other pull request: it still catches an *accidental*
   break.
 
 From 2027-01-01 this ADR applies again as written.

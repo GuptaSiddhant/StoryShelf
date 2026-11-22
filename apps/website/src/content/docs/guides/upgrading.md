@@ -27,12 +27,12 @@ From 2027-01-01 the compatibility rules apply again: one release of rollback, ex
 
 The commands have no alias and fail as unknown commands. Use their new homes:
 
-| Before                                   | Now                                                  |
-| ---------------------------------------- | ---------------------------------------------------- |
-| `npx storyshelf server init`             | `npm create storyshelf` (or `npx create-storyshelf`) |
-| `npx storyshelf server init --cloud aws` | `npx create-storyshelf --cloud aws`                  |
-| `npx storyshelf mcp init`                | `npx @storyshelf/mcp init`                           |
-| `npx storyshelf mcp serve`               | `npx @storyshelf/mcp serve`                          |
+| Before | Now |
+| --- | --- |
+| `npx storyshelf server init` | `npm create storyshelf` (or `npx create-storyshelf`) |
+| `npx storyshelf server init --cloud aws` | `npx create-storyshelf --cloud aws` |
+| `npx storyshelf mcp init` | `npx @storyshelf/mcp init` |
+| `npx storyshelf mcp serve` | `npx @storyshelf/mcp serve` |
 
 `create-storyshelf` has no dependencies and writes the same project as before: a `defineShelfInstance` module that `storyshelf-server` runs. It also takes `--install`, which installs with the package manager that launched it. Servers you generated earlier keep working and need no change.
 
