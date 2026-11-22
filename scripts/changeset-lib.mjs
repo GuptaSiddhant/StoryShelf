@@ -477,6 +477,9 @@ function manifestProblem(path, version, base, head) {
     : `${path} changes more than its version`;
 }
 
+/** The generated version and peer manifest a release rewrites (`scripts/version-manifest.mjs`). */
+const VERSION_MANIFEST = "config/version-manifest.json";
+
 /**
  * What a release pull request (branch `release/v<version>`) may change: the `version` of package
  * manifests, `CHANGELOG.md`, and the changesets it consumes (deleted). Anything else is a problem,
@@ -515,7 +518,8 @@ function staleManifestProblem(path, version, head) {
 
 /** Why one changed path is not part of a release, or null when it is. */
 function entryProblem({ status, path, version, readBase, readHead }) {
-  if (path === "CHANGELOG.md") {
+  // The version manifest (#1332) is regenerated with the bump; verify checks it is current.
+  if (path === "CHANGELOG.md" || (path === VERSION_MANIFEST && status === "M")) {
     return null;
   }
   if (CHANGESET_FILE.test(path)) {
