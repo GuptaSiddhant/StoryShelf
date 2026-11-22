@@ -1,5 +1,6 @@
 /** The tables defined once in core (ADR 0041); the rest are still hand-written per dialect. */
 import { tokens, userConnections, userInviteTokens } from "./access.ts";
+import { buildComponents, buildPackageUsage, buildReviews, contentUses } from "./build-content.ts";
 import {
   buildContentReleases,
   buildDeletions,
@@ -15,16 +16,20 @@ import { schemaMeta, siteSettings } from "./settings.ts";
 import { users } from "./user.ts";
 
 export {
+  buildComponents,
   buildContentReleases,
   buildDeletions,
   buildLabels,
+  buildPackageUsage,
   buildReferenceGenerations,
   buildReferences,
+  buildReviews,
   builds,
   captureAttempts,
   captureJobs,
   captureLogs,
   captureShards,
+  contentUses,
   labelTypes,
   notificationChannels,
   notificationSubscriptions,
@@ -67,4 +72,8 @@ export const NEUTRAL_TABLES = [
   captureAttempts,
   captureLogs,
   captureShards,
+  buildReviews,
+  buildComponents,
+  buildPackageUsage,
+  contentUses,
 ] as const;
