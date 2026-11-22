@@ -1,5 +1,5 @@
+import { createLatch, deferred } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
-import { createLatch, deferred } from "../test-helpers/index.ts";
 import { AdaptiveConcurrency, isTimeoutError } from "./adaptive-concurrency.ts";
 import { mapAdaptive } from "./map-adaptive.ts";
 

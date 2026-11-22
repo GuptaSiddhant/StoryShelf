@@ -36,6 +36,12 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   `@storyshelf/runner-playwright` is renamed `@storyshelf/runner` now that Playwright is the only runner. Every subpath (`@storyshelf/runner/remote`) and option is unchanged, and so are captures: no behaviour change and no new baseline. Nothing old is kept: `@storyshelf/runner-playwright` is not published again and `createPlaywrightCaptureRunner` is gone, so change your dependency and imports (see the upgrading guide). `server init` scaffolds `@storyshelf/runner`. Schema: none.
 
+- All browser code moves from `@storyshelf/core` into `@storyshelf/runner`
+
+  Core no longer exports `defineRemote`, `isRemoteBrowser`, `hasSchemeFor`, `remoteTargetsOf`, `scrubConnection`, `connectLeased`, `shutdownRemote`, `onRemoteShutdown`, `RemoteConnectError`, `refCounted`, `logRemoteSizing`, `remoteSizingOf`, the `Remote*` types, `boundedProbe`, `inPageProbe`, `remoteEnvironment`, `FONT_PROBE_FAMILIES`, `retryConnect`, the session gate, the page limiter, `AdaptiveConcurrency`/`mapAdaptive`, or the a11y in-page functions, `resolveA11yRun` and `mapAxeViolations`. Import them from `@storyshelf/runner/remote` or `@storyshelf/runner/a11y`. `axeInjectionScript` and `loadAxeSource` move from the runner's root to `@storyshelf/runner/a11y`. Core keeps `CaptureRunner`, the capture-target parsers, `TargetLaunchError`, `CaptureEnvironment` and the a11y note readers. A test fails if core imports Playwright or launches a browser.
+
+  Schema: none
+
 - StoryShelf's own environment variables use the SHELF_ prefix (no aliases)
 
   Every setting StoryShelf defines is now `SHELF_*`: `SECRET` is `SHELF_SECRET`, `ADMIN_TOKEN` and

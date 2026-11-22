@@ -1,17 +1,12 @@
 /** axe-core accessibility checks for captured pages (ADR 0004 §6). */
 
-import {
-  axeUnavailableNote,
-  inPageReadA11yParameters,
-  inPageRunAxe,
-  mapAxeViolations,
-  parametersNote,
-  resolveA11yRun,
-  type A11yParametersRead,
-} from "@storyshelf/core/capture";
+import { axeUnavailableNote, parametersNote } from "@storyshelf/core/capture";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Page } from "playwright-core";
 import { axeInjectionScript, loadAxeSource } from "./a11y-source.ts";
+import { inPageReadA11yParameters, inPageRunAxe, type A11yParametersRead } from "./in-page.ts";
+import { mapAxeViolations } from "./map.ts";
+import { resolveA11yRun } from "./options.ts";
 
 /**
  * Run axe over the story root and return one annotation string per violation (worst first).

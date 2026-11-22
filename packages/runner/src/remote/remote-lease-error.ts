@@ -1,8 +1,6 @@
 /** How a connect failure is classified (ADR 0007, decision 4): retried or not, and what it does to the target. */
-import { isRetryableConnectError } from "../utils/connect-retry.ts";
-import { errorText } from "../utils/error-text.ts";
-import { redactUrlForLog } from "../utils/http.ts";
-import { redactSecrets } from "../utils/redact.ts";
+import { errorText, redactSecrets, redactUrlForLog } from "@storyshelf/core/utils";
+import { isRetryableConnectError } from "./connect-retry.ts";
 
 /** What a connect failure means for the retry loop and for the target. */
 export interface RemoteConnectErrorOptions {

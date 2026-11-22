@@ -1,5 +1,5 @@
 /** What a remote target may open, for the run's log (ADR 0007, decision 4): limits only, no endpoints. */
-import type { CaptureTarget } from "./capture-target.ts";
+import type { CaptureTarget } from "@storyshelf/core/adapter/capture-runner";
 import type { RemoteBrowser } from "./remote-browser.ts";
 
 /** Said of every experimental preset until someone verifies it against the provider. */

@@ -28,7 +28,7 @@ The built-in notifiers and the Figma provider are registered by `createShelfApp`
 
 Two things are not adapters:
 
-- **A remote browser** is configuration. Use `defineRemote` and a preset, as described in [Remote browsers](/guides/remote-browsers/) (ADR 0007).
+- **A remote browser** is configuration. Use a preset from `@storyshelf/runner/remote` (or `defineRemote`), as described in [Remote browsers](/guides/remote-browsers/) (ADR 0007).
 - **Authentication** is one engine, configured in code, not a family of adapters.
 
 ### Databases

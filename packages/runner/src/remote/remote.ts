@@ -1,12 +1,12 @@
 /** The generic remote browser entry: every preset is sugar over it (ADR 0007, decision 1). */
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
 import {
   defineRemote,
-  type BrowserName,
   type RemoteBrowser,
   type RemoteConnection,
   type RemoteOptions,
   type RemoteSupport,
-} from "@storyshelf/core/adapter/capture-runner";
+} from "./remote-browser.ts";
 
 /** What the Playwright runner can drive: every engine, over its own protocol or CDP (Chromium only). */
 const SUPPORT: RemoteSupport = {

@@ -1,6 +1,7 @@
 /** BrowserStack Automate over Playwright's protocol. */
-import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
 import { playwrightVersion } from "../version.ts";
+import type { RemoteBrowser } from "./remote-browser.ts";
 import { remote } from "./remote.ts";
 
 /** Options of {@link browserstack}. */
