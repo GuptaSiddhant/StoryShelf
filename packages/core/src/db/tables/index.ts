@@ -7,6 +7,7 @@ import {
   buildReferences,
   builds,
 } from "./build.ts";
+import { captureAttempts, captureJobs, captureLogs, captureShards } from "./capture.ts";
 import { buildLabels, labelTypes } from "./label.ts";
 import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
 import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
@@ -20,6 +21,10 @@ export {
   buildReferenceGenerations,
   buildReferences,
   builds,
+  captureAttempts,
+  captureJobs,
+  captureLogs,
+  captureShards,
   labelTypes,
   notificationChannels,
   notificationSubscriptions,
@@ -58,4 +63,8 @@ export const NEUTRAL_TABLES = [
   webhooks,
   notificationChannels,
   notificationSubscriptions,
+  captureJobs,
+  captureAttempts,
+  captureLogs,
+  captureShards,
 ] as const;
