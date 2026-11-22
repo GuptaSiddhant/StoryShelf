@@ -41,6 +41,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { findInstalled } from "./installed-packages.mjs";
 import { getPublishOrder, packagesDir } from "./publish-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -375,6 +376,27 @@ function assertCommonAlone(scratch, tarballs) {
   log(`@storyshelf/common installs alone and ${subpaths.length} subpaths import`);
 }
 
+/**
+ * `@storyshelf/mcp` and `@storyshelf/observability` depend on `@storyshelf/common`, not core (#1334): their
+ * installs hold no core, Drizzle or pino, and each entry that needs no server stack imports from that install.
+ */
+function assertNoServerStack(scratch, tarballs) {
+  for (const [name, entries] of [
+    ["@storyshelf/mcp", ["@storyshelf/mcp/http"]],
+    ["@storyshelf/observability", ["@storyshelf/observability", "@storyshelf/observability/node"]],
+  ]) {
+    const dir = installAlone(scratch, name, tarballs, `isolated-${name.split("/")[1]}`);
+    const present = findInstalled(dir, ["@storyshelf/core", "drizzle-orm", "pino"]);
+    if (present.length > 0) {
+      fail(`installing ${name} pulled in ${present.join(", ")}`);
+    }
+    const check = entries.map((entry) => `await import("${entry}");`).join("\n");
+    run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+    const size = run("du", ["-sk", join(dir, "node_modules")]).split("\t")[0];
+    log(`${name} installs with no core, drizzle-orm or pino (node_modules ${size} KB)`);
+  }
+}
+
 /** `storyshelf-mcp` answers `--help` with its subcommands, and `init` scaffolds a project from defaults. */
 async function assertMcpBin(scratch, tarballs) {
   const dir = installAlone(scratch, "@storyshelf/mcp", tarballs, "mcp-tool");
@@ -567,6 +589,7 @@ async function main() {
     assertArchives(tarballs);
     assertS3OnlyInstall(scratch, tarballs);
     assertCommonAlone(scratch, tarballs);
+    assertNoServerStack(scratch, tarballs);
     assertHostingOnlyInstall(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);

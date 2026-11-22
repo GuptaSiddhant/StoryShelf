@@ -1,4 +1,4 @@
-import { readSetting } from "@storyshelf/core/config";
+import { readSetting } from "@storyshelf/common/settings";
 /**
  * Environment-driven observability configuration.
  *

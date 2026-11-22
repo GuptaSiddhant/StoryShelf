@@ -1,31 +1,30 @@
 /**
  * StoryShelf observability: OTEL SDK lifecycle plus the runtime-agnostic helpers.
  *
- * The helpers (`createInstrumentedDatabase`, `createInstrumentedStorage`,
- * `withSpan`, the propagation helpers and the memoized instruments) live in
- * `@storyshelf/core/telemetry` and are re-exported here; `createHttpMiddleware` (Hono) stays here, so this entrypoint's API is unchanged. The
+ * The helpers (`withSpan`, the propagation helpers and the memoized instruments) live in
+ * `@storyshelf/common/tracing` and are re-exported here; `createHttpMiddleware` (Hono) stays here. The
+ * database and storage wrappers (`createInstrumentedDatabase`, `createInstrumentedStorage`) need core's
+ * adapter types and stay in `@storyshelf/core/telemetry`; this package imports no core. The
  * Node SDK lifecycle (`initObservabilityFromEnv`) lives under `@storyshelf/observability/node`
  * and must never be imported here.
  */
 export {
   captureMetrics,
-  createInstrumentedDatabase,
-  createInstrumentedStorage,
   currentTraceparent,
   dbMetrics,
   injectTraceContext,
   parentContext,
   storageMetrics,
   TRACEPARENT_HEADER,
-  withSpan,
-} from "@storyshelf/core/telemetry";
+  withObservabilitySpan as withSpan,
+} from "@storyshelf/common/tracing";
 export type {
   CaptureInstruments,
   DbInstruments,
   HttpMiddlewareOptions,
   SpanAttributes,
   StorageInstruments,
-} from "@storyshelf/core/telemetry";
+} from "@storyshelf/common/tracing";
 export { createHttpMiddleware } from "./middleware.ts";
 export { otelLogMixin } from "./logs.ts";
 export { resolveObservabilityConfig } from "./config.ts";

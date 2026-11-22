@@ -50,15 +50,17 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 - `@storyshelf/ai` exports only `createAi` and its option types; the `Ai` contract
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
-- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
+- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB; it depends on `@storyshelf/common`, not core). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
 - `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; the `@storyshelf/storage-local` package is removed (ADR 0049 amendment 2026-11-21).
 - `packages/storage` (`@storyshelf/storage`) holds the cloud storage adapters as subpaths `/s3`, `/gcs` and `/azure` (`src/<backend>/`, each with its own contract and live tests) and `/local`, a re-export of core's `storage/local`. The SDKs are optional peers that only their own subpath loads (`src/peer-isolation.test.ts`).
 - `packages/common` (`@storyshelf/common`) holds the dependency-light code shared across packages: `settings` (`readSetting`, the renamed table), `http` (`httpJson`, the outbound guard), `redact`, `tracing` (spans, propagation, memoized instruments), `errors`, `ids` and the `Logger` type. Its only runtime dependency is `@opentelemetry/api`. Core re-exports every moved name from its existing subpaths (`utils`, `config`, `telemetry`).
 - `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
   `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
   storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from
-  there and does not depend on `@storyshelf/observability`. `@storyshelf/observability` re-exports them from its
-  root barrel and owns the Node SDK lifecycle under `observability/node`. `core` never imports `observability`.
+  there and does not depend on `@storyshelf/observability`. The otel-only part (`withSpan`, propagation, instruments) lives in `@storyshelf/common/tracing`,
+  which `@storyshelf/observability` re-exports from its root barrel; the database and storage wrappers need core's adapter
+  types and stay in core. Observability owns the Node SDK lifecycle under `observability/node`, depends on `common`
+  and never installs core. `core` never imports `observability` (#1334).
 
 ## Schema layout (0.2.0 target, R2)
 
