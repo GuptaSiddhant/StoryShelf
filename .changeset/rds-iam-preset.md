@@ -1,5 +1,5 @@
 ---
-"@storyshelf/db-postgres": minor
+"@storyshelf/db": minor
 ---
 
 Added: an rds-iam Postgres preset for RDS IAM authentication

@@ -272,5 +272,12 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "storyshelf": {
+    "peerSubpaths": {
+      "nodemailer": [
+        "./adapter/email-sender"
+      ]
+    }
   }
 }
