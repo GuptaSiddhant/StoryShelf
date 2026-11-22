@@ -10,7 +10,7 @@ export const tokens = mysqlTable("tokens", {
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  hash: text("hash").notNull(),
+  hash: text("hash").notNull().unique(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   lastUsedAt: datetime("last_used_at", { mode: "string", fsp: 3 }),
   createdAt: datetime("created_at", { mode: "string", fsp: 3 }).notNull(),

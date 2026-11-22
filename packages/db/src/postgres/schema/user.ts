@@ -4,7 +4,7 @@ import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 /** Narrow `users` table definition. */
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
   role: text("role").$type<SiteRole>().notNull().default("member"),

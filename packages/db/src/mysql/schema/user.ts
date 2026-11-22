@@ -5,7 +5,7 @@ import { datetime } from "./datetime.ts";
 /** Narrow `users` table definition. */
 export const users = mysqlTable("users", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
   role: text("role").$type<SiteRole>().notNull().default("member"),

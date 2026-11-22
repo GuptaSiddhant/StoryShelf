@@ -5,7 +5,7 @@ import { datetime } from "./datetime.ts";
 export const projects = mysqlTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  slug: text("slug").notNull(),
+  slug: text("slug").notNull().unique(),
   gitRepository: text("git_repository"),
   gitDefaultBranch: text("git_default_branch").notNull().default("main"),
   pixelThreshold: double("pixel_threshold").notNull().default(0.1),

@@ -4,6 +4,7 @@
  * neutral tables generate the auth DDL of `ddl.ts`.
  */
 import * as ns from "@storyshelf/core/db";
+import { getTableName } from "@storyshelf/core/orm";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   authAccountPg,
@@ -60,7 +61,7 @@ describe("auth tables", () => {
       ns.authPasskey,
       ns.authSsoProvider,
     ].map((table) => table.name);
-    expect(Object.keys(baseAuthTables)).toEqual(neutral);
-    expect(Object.keys(baseAuthTablesPg)).toEqual(neutral);
+    expect(Object.values(baseAuthTables).map((table) => getTableName(table))).toEqual(neutral);
+    expect(Object.values(baseAuthTablesPg).map((table) => getTableName(table))).toEqual(neutral);
   });
 });

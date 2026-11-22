@@ -4,7 +4,7 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 /** Narrow `users` table definition. */
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
   role: text("role").$type<SiteRole>().notNull().default("member"),
