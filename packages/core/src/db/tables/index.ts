@@ -1,5 +1,13 @@
-/** The tables defined once in core (ADR 0041); the rest are still hand-written per dialect. */
+/** Every table, defined once in core (ADR 0041); the dialects still read their hand-written schemas. */
 import { tokens, userConnections, userInviteTokens } from "./access.ts";
+import {
+  authAccount,
+  authPasskey,
+  authSession,
+  authSsoProvider,
+  authUser,
+  authVerification,
+} from "./auth.ts";
 import { buildComponents, buildPackageUsage, buildReviews, contentUses } from "./build-content.ts";
 import {
   buildContentReleases,
@@ -27,6 +35,12 @@ import { baselines, comments, snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";
 
 export {
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  authPasskey,
+  authSsoProvider,
   designLinks,
   designCredentials,
   designNodes,
@@ -109,4 +123,10 @@ export const NEUTRAL_TABLES = [
   aiBudgetAlerts,
   gitConnections,
   gitRepositoryLinks,
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  authPasskey,
+  authSsoProvider,
 ] as const;
