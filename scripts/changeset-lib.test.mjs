@@ -388,6 +388,7 @@ describe("releaseProblems, a valid release", () => {
         { status: "M", path: "packages/core/package.json" },
         { status: "M", path: "packages/app/package.json" },
         { status: "M", path: "CHANGELOG.md" },
+        { status: "M", path: "config/version-manifest.json" },
         { status: "D", path: ".changeset/brave-apples-dance.md" },
         { status: "D", path: ".changeset/calm-bears-glow.md" },
       ]),
@@ -399,6 +400,9 @@ describe("releaseProblems, a valid release", () => {
     assert.deepEqual(runRelease([{ status: "M", path: "CHANGELOG.md" }]), []);
     assert.deepEqual(runRelease([{ status: "M", path: ".changeset/README.md" }]), [
       ".changeset/README.md is not part of a release",
+    ]);
+    assert.deepEqual(runRelease([{ status: "D", path: "config/version-manifest.json" }]), [
+      "config/version-manifest.json is not part of a release",
     ]);
   });
 });
