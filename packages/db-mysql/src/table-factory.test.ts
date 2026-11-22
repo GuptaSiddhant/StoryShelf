@@ -120,6 +120,18 @@ describe("MySQL table factory (spike #800)", () => {
     expectTypeOf(mysqlTableOf(ns.notificationSubscriptions, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.notificationSubscriptions.$inferSelect
     >();
+    expectTypeOf(mysqlTableOf(ns.captureJobs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureJobs.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.captureAttempts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureAttempts.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.captureLogs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureLogs.$inferSelect
+    >();
+    expectTypeOf(mysqlTableOf(ns.captureShards, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureShards.$inferSelect
+    >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
 

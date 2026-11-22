@@ -5,6 +5,9 @@
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { Build } from "../../schema/build.ts";
+import type { CaptureAttempt, CaptureLog } from "../../schema/capture-attempt.ts";
+import type { CaptureJobRow } from "../../schema/capture-job.ts";
+import type { CaptureShard } from "../../schema/capture-shard.ts";
 import type { UserConnection } from "../../schema/connection.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { ProjectMember } from "../../schema/member.ts";
@@ -20,6 +23,10 @@ import type { InferRow } from "../define-table.ts";
 import {
   builds,
   buildLabels,
+  captureAttempts,
+  captureJobs,
+  captureLogs,
+  captureShards,
   labelTypes,
   NEUTRAL_TABLES,
   projectGroupMappings,
@@ -52,6 +59,16 @@ describe("spike tables", () => {
     expectTypeOf<InferRow<typeof tokens>>().toEqualTypeOf<Token>();
     expectTypeOf<InferRow<typeof userConnections>>().toEqualTypeOf<UserConnection>();
     expectTypeOf<InferRow<typeof webhooks>>().toEqualTypeOf<Webhook>();
+  });
+
+  it("match the core capture rows, the log level apart", () => {
+    expectTypeOf<InferRow<typeof captureJobs>>().toEqualTypeOf<CaptureJobRow>();
+    expectTypeOf<InferRow<typeof captureAttempts>>().toEqualTypeOf<CaptureAttempt>();
+    expectTypeOf<InferRow<typeof captureShards>>().toEqualTypeOf<CaptureShard>();
+    // `CaptureLog` narrows `level` to `CaptureLogLevel`; the Drizzle schemas read it as `string`.
+    type Log = InferRow<typeof captureLogs>;
+    expectTypeOf<Omit<Log, "level">>().toEqualTypeOf<Omit<CaptureLog, "level">>();
+    expectTypeOf<Log["level"]>().toEqualTypeOf<string>();
   });
 
   it("match the core project row apart from storybook_meta", () => {
@@ -87,6 +104,7 @@ describe("spike tables", () => {
     expect(names.indexOf("projects")).toBe(0);
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
-    expect(new Set(names).size).toBe(20);
+    expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
+    expect(new Set(names).size).toBe(24);
   });
 });

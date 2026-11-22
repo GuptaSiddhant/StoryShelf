@@ -150,6 +150,18 @@ describe("Postgres table factory (spike #800)", () => {
     expectTypeOf(pgTableOf(ns.notificationSubscriptions, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.notificationSubscriptions.$inferSelect
     >();
+    expectTypeOf(pgTableOf(ns.captureJobs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureJobs.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureAttempts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureAttempts.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureLogs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureLogs.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureShards, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureShards.$inferSelect
+    >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
