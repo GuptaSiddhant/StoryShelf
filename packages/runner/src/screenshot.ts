@@ -7,7 +7,7 @@ import {
   ignoreStylesheet,
 } from "@storyshelf/core/capture";
 import type { Page } from "playwright-core";
-import { checkA11y } from "./a11y.ts";
+import { checkA11y } from "./a11y/a11y.ts";
 import { capturePhase, TransientCaptureError } from "./capture-retry.ts";
 import { acquirePage, type PageLease } from "./pages.ts";
 import { runPlay } from "./play.ts";

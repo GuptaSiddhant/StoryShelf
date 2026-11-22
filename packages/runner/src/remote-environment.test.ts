@@ -1,8 +1,8 @@
-import type { RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Browser } from "playwright-core";
 import { describe, expect, it, vi } from "vitest";
 import { measureRemote } from "./remote-environment.ts";
+import type { RemoteBrowser } from "./remote/remote-browser.ts";
 
 const PROBE = { platform: "Linux x86_64", deviceScaleFactor: 2, fonts: ["Arial", "DejaVu Sans"] };
 

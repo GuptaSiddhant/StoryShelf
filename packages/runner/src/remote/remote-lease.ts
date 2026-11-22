@@ -1,12 +1,12 @@
+import { TargetLaunchError } from "@storyshelf/core/adapter/capture-runner";
 /**
  * Connecting to a remote browser over a lease (ADR 0007, decision 4): a function `connect` is
  * called per connection, and `release` once the render that used it has ended. The runners own the
  * handshake itself; this owns the pairing, so a lease is released exactly once on every path
  * (finish, failure, cancel, shutdown) and never logged.
  */
-import type { Logger } from "../logger.ts";
-import { retryConnect } from "../utils/connect-retry.ts";
-import { TargetLaunchError } from "./capture-target.ts";
+import type { Logger } from "@storyshelf/core/logger";
+import { retryConnect } from "./connect-retry.ts";
 import {
   hasSchemeFor,
   schemesOf,

@@ -1,6 +1,6 @@
+import type { Logger } from "@storyshelf/core/logger";
 /** Adaptive page concurrency: raise while capture stays healthy, back off when it does not. */
 import { monitorEventLoopDelay } from "node:perf_hooks";
-import type { Logger } from "../logger.ts";
 
 /** Tuning for {@link AdaptiveConcurrency}. */
 export interface AdaptiveOptions {

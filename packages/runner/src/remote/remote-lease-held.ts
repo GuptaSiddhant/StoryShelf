@@ -1,5 +1,5 @@
 /** A connection held until its render ends, and the one release it owes (ADR 0007, decision 4). */
-import type { Logger } from "../logger.ts";
+import type { Logger } from "@storyshelf/core/logger";
 import type { RemoteConnection, RemoteLeaseOutcome, RemoteTarget } from "./remote-browser.ts";
 
 /** A connection held until its render ends. */

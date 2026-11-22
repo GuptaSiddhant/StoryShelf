@@ -1,5 +1,5 @@
+import { createLatch, deferred } from "@storyshelf/core/test-helpers";
 import { describe, expect, it, vi } from "vitest";
-import { createLatch, deferred } from "../test-helpers/index.ts";
 import { createSessionGate, sessionGateFor } from "./session-gate.ts";
 
 async function peakOf(

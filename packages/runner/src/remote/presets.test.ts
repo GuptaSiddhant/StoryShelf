@@ -1,9 +1,10 @@
-import { remoteTargetsOf, type BrowserName } from "@storyshelf/core/adapter/capture-runner";
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
 import { describe, expect, it } from "vitest";
 import { playwrightVersion } from "../version.ts";
 import { azurePlaywright } from "./azure.ts";
 import { browserstack } from "./browserstack.ts";
 import { playwrightServer } from "./playwright-server.ts";
+import { remoteTargetsOf } from "./remote-browser.ts";
 import { remote } from "./remote.ts";
 
 const summary = (service: ReturnType<typeof remote>) =>

@@ -9,7 +9,7 @@ import {
   type BrowserName,
   type CaptureTarget,
   type TargetReach,
-} from "./capture-target.ts";
+} from "@storyshelf/core/adapter/capture-runner";
 
 /** Default bound on measuring a connected remote browser's environment (`timeouts.probeMs`). */
 export const DEFAULT_PROBE_MS = 15_000;

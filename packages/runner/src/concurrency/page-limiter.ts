@@ -1,10 +1,14 @@
 /** How many pages a capture run renders at once: fixed when configured, adaptive otherwise. */
-import type { Logger } from "../logger.ts";
+import type { Logger } from "@storyshelf/core/logger";
+import {
+  detectResources,
+  mapLimit,
+  maxPageConcurrency,
+  recommendedPageConcurrency,
+} from "@storyshelf/core/utils";
+import type { SessionGate } from "../remote/session-gate.ts";
 import { AdaptiveConcurrency } from "./adaptive-concurrency.ts";
 import { mapAdaptive } from "./map-adaptive.ts";
-import { mapLimit } from "./map-limit.ts";
-import { detectResources, maxPageConcurrency, recommendedPageConcurrency } from "./resources.ts";
-import type { SessionGate } from "./session-gate.ts";
 
 /** Options for {@link createPageLimiter}. */
 export interface PageLimiterOptions {
