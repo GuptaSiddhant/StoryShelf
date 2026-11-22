@@ -17,7 +17,7 @@ the old copies working.
 Facts read in the code on 2026-11-13:
 
 - **Migrations run at every boot and are not versioned.** `runMigrations`
-  (`packages/db-postgres/src/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
+  (`packages/db/src/postgres/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
   of idempotent `ALTER` statements. There is no record of which release last migrated
   `[inferred: no version table found]`.
 - **Postgres serialises migrations.** `runMigrationsLocked` holds a session-level advisory lock

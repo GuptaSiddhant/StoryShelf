@@ -60,10 +60,12 @@ function readDependencyNames(dir: string): Set<string> | undefined {
 /** The generated sources, read only when a dependency alone does not settle the flavor. */
 type ReadSources = () => string;
 
-/** How one `@storyshelf/db-*` package is told apart: marker dependencies first, then subpath imports. */
+/** How one dialect of `@storyshelf/db` is told apart: marker dependencies first, then subpath imports. */
 interface FlavorRules {
   /** The subpath prefix generated sources import presets from. */
   prefix: string;
+  /** Dependencies that mark this dialect when no generated source imports its subpath. */
+  markers: readonly string[];
   /** Marker dependencies, in order; a function decides from the sources. */
   deps: readonly (readonly [string, Database | ((sources: ReadSources) => Database)])[];
   /** Subpath imports found in the generated sources, in order. */
@@ -72,11 +74,12 @@ interface FlavorRules {
 }
 
 /**
- * The `@storyshelf/db-sqlite` presets. Peer deps disambiguate turso/better-sqlite3; `bun:sqlite` is
+ * The `@storyshelf/db/sqlite` presets. Peer deps disambiguate turso/better-sqlite3; `bun:sqlite` is
  * a builtin and D1 has no marker dep, so fall back to scanning generated sources for subpath imports.
  */
 const SQLITE_RULES: FlavorRules = {
-  prefix: "@storyshelf/db-sqlite",
+  prefix: "@storyshelf/db/sqlite",
+  markers: [],
   deps: [
     ["better-sqlite3", "better-sqlite3"],
     ["@libsql/client", "turso"],
@@ -91,12 +94,19 @@ const SQLITE_RULES: FlavorRules = {
 };
 
 const POSTGRES_RULES: FlavorRules = {
-  prefix: "@storyshelf/db-postgres",
+  prefix: "@storyshelf/db/postgres",
+  markers: [
+    "postgres",
+    "pg",
+    "@neondatabase/serverless",
+    "@vercel/postgres",
+    "@electric-sql/pglite",
+  ],
   deps: [
     ["pg", "pg"],
     [
       "@neondatabase/serverless",
-      (sources) => (sources().includes("@storyshelf/db-postgres/neon-http") ? "neon-http" : "neon"),
+      (sources) => (sources().includes("@storyshelf/db/postgres/neon-http") ? "neon-http" : "neon"),
     ],
     ["@vercel/postgres", "vercel"],
     ["@electric-sql/pglite", "pglite"],
@@ -112,7 +122,8 @@ const POSTGRES_RULES: FlavorRules = {
 };
 
 const MYSQL_RULES: FlavorRules = {
-  prefix: "@storyshelf/db-mysql",
+  prefix: "@storyshelf/db/mysql",
+  markers: ["mysql2", "@planetscale/database", "@tidbcloud/serverless"],
   deps: [
     ["@planetscale/database", "planetscale"],
     ["@tidbcloud/serverless", "tidb"],
@@ -124,25 +135,32 @@ const MYSQL_RULES: FlavorRules = {
   fallback: "mysql",
 };
 
-/** The database package that is installed, in precedence order, and its flavor. */
-const DATABASE_PACKAGES: readonly (readonly [string, Database | FlavorRules])[] = [
-  ["@storyshelf/db-mysql", MYSQL_RULES],
-  ["@storyshelf/db-postgres", POSTGRES_RULES],
-  // Legacy package (see docs/deprecated.md) — upgrades to the turso preset.
-  ["@storyshelf/db-turso", "turso"],
-  ["@storyshelf/db-sqlite", SQLITE_RULES],
-];
+/** The dialects of `@storyshelf/db`, in precedence order, and how each is told apart. */
+const DIALECTS: readonly FlavorRules[] = [MYSQL_RULES, POSTGRES_RULES, SQLITE_RULES];
 
-function detectDatabase(dir: string, deps: Set<string>): Pick<DetectedAdapters, "database"> {
-  const found = DATABASE_PACKAGES.find(([name]) => deps.has(name))?.[1];
-  if (found === undefined) {
-    return {};
-  }
-  return { database: typeof found === "string" ? found : detectFlavor(dir, deps, found) };
+/** The dialect a project uses: its imports first, then its driver dependencies, else SQLite. */
+function detectDialect(deps: Set<string>, sources: ReadSources): FlavorRules {
+  const text = sources();
+  return (
+    DIALECTS.find((rules) => text.includes(rules.prefix)) ??
+    DIALECTS.find((rules) => rules.markers.some((name) => deps.has(name))) ??
+    SQLITE_RULES
+  );
 }
 
-function detectFlavor(dir: string, deps: Set<string>, rules: FlavorRules): Database {
+function detectDatabase(dir: string, deps: Set<string>): Pick<DetectedAdapters, "database"> {
+  // Legacy package (see docs/deprecated.md) — upgrades to the turso preset.
+  if (deps.has("@storyshelf/db-turso")) {
+    return { database: "turso" };
+  }
+  if (!deps.has("@storyshelf/db")) {
+    return {};
+  }
   const sources: ReadSources = () => readGeneratedSources(dir);
+  return { database: detectFlavor(deps, sources, detectDialect(deps, sources)) };
+}
+
+function detectFlavor(deps: Set<string>, sources: ReadSources, rules: FlavorRules): Database {
   const marker = rules.deps.find(([name]) => deps.has(name))?.[1];
   if (marker !== undefined) {
     return typeof marker === "function" ? marker(sources) : marker;

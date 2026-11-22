@@ -137,7 +137,7 @@ reviews:
     - path: "packages/core/src/schema/**"
       instructions: |
         Schema changes are cross-database changes. Verify:
-        - Every table/column/index change is mirrored in `packages/db-sqlite`, `packages/db-postgres` and `packages/db-mysql` Drizzle schemas, DDL and migration paths, including driver presets.
+        - Every table/column/index change is mirrored in `packages/db/src/sqlite`, `packages/db/src/postgres` and `packages/db/src/mysql` Drizzle schemas, DDL and migration paths, including driver presets.
         - Migrations are upgrade-safe from the previous released schema, idempotent where the adapter promises it, and have a rollback or backfill story for destructive changes.
         - Indexes cover the predicates and ordering of real queries; flag missing indexes on foreign keys and high-cardinality filters, and redundant indexes.
         - Nullability, defaults, FK actions, unique constraints, timestamp precision/timezone and JSON encoding are consistent across dialects.
@@ -181,7 +181,7 @@ reviews:
         - Contract tests use a fake transport, not a fake adapter, and exercise the published suite (`storageContractSuite`, `databaseContractSuite`, queue suite).
         - A new optional capability is reflected in `metadata` rather than probed ad hoc at call sites.
 
-    - path: "packages/db-sqlite/**"
+    - path: "packages/db/src/sqlite/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only, no string interpolation of values or identifiers. Check:
         - Schema/DDL/migration parity with Postgres and MySQL; presets (`turso`, `better-sqlite3`, `bun-sqlite`, `d1`) keep the same behavior or explicitly document a capability gap in `metadata`.
@@ -190,7 +190,7 @@ reviews:
         - Indexes support the actual query predicates; flag N+1 loops and unbounded `SELECT`s.
         Require upgrade tests against a populated pre-change database.
 
-    - path: "packages/db-postgres/**"
+    - path: "packages/db/src/postgres/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only, no string interpolation. Check:
         - Schema/DDL/migration parity with SQLite and MySQL, including enum/JSON/timestamp/boolean differences and preset drivers (`pg`, `neon`, `neon-http`, `vercel`, `pglite`).
@@ -199,7 +199,7 @@ reviews:
         - Indexes match query predicates and ordering; flag unindexed scans, N+1 queries and unbounded results.
         Do not accept driver-specific types in core contracts.
 
-    - path: "packages/db-mysql/**"
+    - path: "packages/db/src/mysql/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only. Check:
         - MySQL/MariaDB-specific semantics are handled deliberately: identifier quoting, case sensitivity, `utf8mb4`, timestamp precision, JSON columns, `ON DUPLICATE KEY`, transaction isolation.

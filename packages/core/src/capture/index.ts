@@ -78,7 +78,6 @@ export {
   type Fingerprint,
 } from "./fingerprint.ts";
 export {
-  axeInjectionScript,
   axeUnavailableNote,
   axeUnavailableReason,
   A11Y_ROOT_SELECTOR,
@@ -88,7 +87,6 @@ export {
   inPageReadA11yParameters,
   isA11yNote,
   inPageRunAxe,
-  loadAxeSource,
   mapAxeViolations,
   MAX_REPORTED_VIOLATIONS,
   parametersNote,

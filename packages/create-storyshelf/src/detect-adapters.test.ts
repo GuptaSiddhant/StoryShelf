@@ -32,7 +32,7 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/db": "0.3.2" } }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("sqlite");
     rmSync(dir, { recursive: true, force: true });
@@ -43,7 +43,7 @@ describe("detectInstalledAdapters", () => {
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({
-        dependencies: { "@storyshelf/db-sqlite": "0.3.2", "@storyshelf/db-turso": "0.3.2" },
+        dependencies: { "@storyshelf/db": "0.3.2", "@storyshelf/db-turso": "0.3.2" },
       }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("turso");
@@ -55,7 +55,7 @@ describe("detectInstalledAdapters", () => {
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({
-        dependencies: { "@storyshelf/db-sqlite": "0.3.2", "@libsql/client": "^0.15.0" },
+        dependencies: { "@storyshelf/db": "0.3.2", "@libsql/client": "^0.15.0" },
       }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("turso");
@@ -67,7 +67,7 @@ describe("detectInstalledAdapters", () => {
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({
-        dependencies: { "@storyshelf/db-sqlite": "0.3.2", "better-sqlite3": "^12.0.0" },
+        dependencies: { "@storyshelf/db": "0.3.2", "better-sqlite3": "^12.0.0" },
       }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("better-sqlite3");
@@ -78,11 +78,11 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/db": "0.3.2" } }),
     );
     writeFileSync(
       join(dir, "server.ts"),
-      'import { createD1Database } from "@storyshelf/db-sqlite/d1";',
+      'import { createD1Database } from "@storyshelf/db/sqlite/d1";',
     );
     expect(detectInstalledAdapters(dir).database).toBe("d1");
     rmSync(dir, { recursive: true, force: true });
@@ -92,12 +92,12 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/db": "0.3.2" } }),
     );
     mkdirSync(join(dir, "src"));
     writeFileSync(
       join(dir, "src", "index.ts"),
-      'import { createD1Database } from "@storyshelf/db-sqlite/d1";',
+      'import { createD1Database } from "@storyshelf/db/sqlite/d1";',
     );
     expect(detectInstalledAdapters(dir).database).toBe("d1");
     rmSync(dir, { recursive: true, force: true });
@@ -107,11 +107,11 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ dependencies: { "@storyshelf/db-sqlite": "0.3.2" } }),
+      JSON.stringify({ dependencies: { "@storyshelf/db": "0.3.2" } }),
     );
     writeFileSync(
       join(dir, "server.ts"),
-      'import { createBunSqliteDatabase } from "@storyshelf/db-sqlite/bun-sqlite";',
+      'import { createBunSqliteDatabase } from "@storyshelf/db/sqlite/bun-sqlite";',
     );
     expect(detectInstalledAdapters(dir).database).toBe("bun-sqlite");
     rmSync(dir, { recursive: true, force: true });
@@ -191,7 +191,7 @@ describe("detectInstalledAdapters", () => {
     const dir = makeTmp();
     writeFileSync(
       join(dir, "package.json"),
-      JSON.stringify({ devDependencies: { "@storyshelf/db-postgres": "0.3.2" } }),
+      JSON.stringify({ devDependencies: { "@storyshelf/db": "0.3.2", postgres: "^3.4.0" } }),
     );
     expect(detectInstalledAdapters(dir).database).toBe("postgres");
     rmSync(dir, { recursive: true, force: true });

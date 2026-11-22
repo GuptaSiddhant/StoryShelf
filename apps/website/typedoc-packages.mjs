@@ -17,9 +17,7 @@ const SLUGS = [
   "auth",
   "ai",
   "mcp",
-  "db-sqlite",
-  "db-postgres",
-  "db-mysql",
+  "db",
   "storage",
   "runner",
 ];

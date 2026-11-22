@@ -5,7 +5,7 @@
     "server.ts",
     "env.ts",
     "env.test.ts",
-    "../../packages/db-postgres/src/pg-ambient.d.ts",
-    "../../packages/db-postgres/src/rds-signer-ambient.d.ts"
+    "../../packages/db/src/postgres/pg-ambient.d.ts",
+    "../../packages/db/src/postgres/rds-signer-ambient.d.ts"
   ]
 }

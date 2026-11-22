@@ -11,22 +11,8 @@ import {
   type StorageChoice,
 } from "./answers.ts";
 
-const DB_PACKAGE: Record<DatabaseChoice, string> = {
-  sqlite: "@storyshelf/db-sqlite",
-  turso: "@storyshelf/db-sqlite",
-  "better-sqlite3": "@storyshelf/db-sqlite",
-  "bun-sqlite": "@storyshelf/db-sqlite",
-  d1: "@storyshelf/db-sqlite",
-  postgres: "@storyshelf/db-postgres",
-  pg: "@storyshelf/db-postgres",
-  neon: "@storyshelf/db-postgres",
-  "neon-http": "@storyshelf/db-postgres",
-  vercel: "@storyshelf/db-postgres",
-  pglite: "@storyshelf/db-postgres",
-  mysql: "@storyshelf/db-mysql",
-  planetscale: "@storyshelf/db-mysql",
-  tidb: "@storyshelf/db-mysql",
-};
+/** One package holds every database adapter, one subpath each. */
+const DB_PACKAGE = "@storyshelf/db";
 
 /** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
 const STORAGE_PACKAGE = "@storyshelf/storage";
@@ -44,18 +30,17 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
   oauth: "@storyshelf/auth",
 };
 
-/**
- * The optional peer SDK a database preset needs. `mysql2` is a dependency of `@storyshelf/db-mysql`,
- * so the mysql presets name none.
- */
+/** The optional peer SDK a database preset needs, from the peers of `@storyshelf/db`. */
 const DB_SDK: Partial<Record<DatabaseChoice, string>> = {
   turso: "@libsql/client",
   "better-sqlite3": "better-sqlite3",
+  postgres: "postgres",
   pg: "pg",
   neon: "@neondatabase/serverless",
   "neon-http": "@neondatabase/serverless",
   vercel: "@vercel/postgres",
   pglite: "@electric-sql/pglite",
+  mysql: "mysql2",
   planetscale: "@planetscale/database",
   tidb: "@tidbcloud/serverless",
 };
@@ -71,7 +56,7 @@ function coreNames(answers: Answers): string[] {
   return [
     "@storyshelf/app",
     "@storyshelf/core",
-    DB_PACKAGE[answers.database],
+    DB_PACKAGE,
     ...(wantsObservability(answers) ? ["@storyshelf/observability"] : []),
   ];
 }
@@ -90,7 +75,7 @@ function featureNames(answers: Answers): string[] {
 function sdkPins(answers: Answers): Record<string, string> {
   const db = DB_SDK[answers.database];
   const pins: [string, string][] = [];
-  if (db !== undefined) pins.push([db, peerRange(DB_PACKAGE[answers.database], db)]);
+  if (db !== undefined) pins.push([db, peerRange(DB_PACKAGE, db)]);
   if (answers.storage !== "local") {
     for (const sdk of STORAGE_SDKS[answers.storage])
       pins.push([sdk, peerRange(STORAGE_PACKAGE, sdk)]);

@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { describe, expect, it } from "vitest";
 import { createShelfAuth, type ShelfAuth } from "./engine.ts";
 import { listUserSessions } from "./sessions.ts";

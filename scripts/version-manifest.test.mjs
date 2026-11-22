@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { buildVersionManifest, MANIFEST_PATH, renderVersionManifest } from "./version-manifest.mjs";
 
 const root = join(import.meta.dirname, "..");
-const ADAPTERS = ["storage", "runner", "auth", "ai", "db-sqlite", "db-postgres", "db-mysql"];
+const ADAPTERS = ["storage", "runner", "auth", "ai", "db"];
 
 function manifestOf(dir) {
   return JSON.parse(readFileSync(join(root, "packages", dir, "package.json"), "utf8"));

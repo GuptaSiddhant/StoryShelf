@@ -6,12 +6,12 @@
  *   node scripts/bench-shards.mjs --storybook <built storybook dir> [--scenario <name>]...
  *                                 [--repeat 2] [--out results.json]
  *
- * Runs a real capture (db-sqlite, local storage, Playwright, the database queue and its consumer) of one built
+ * Runs a real capture (@storyshelf/db/sqlite, local storage, Playwright, the database queue and its consumer) of one built
  * Storybook under several configurations and reports wall-clock from enqueue to a finished build,
  * peak resident memory of this process and the browsers it launched, shard timings and a
  * correctness check: the build must end approved with exactly one snapshot per story, otherwise
  * the row is marked `valid: false`, a warning goes to stderr and the exit code is 1. Needs the
- * built `dist/` of core, db-sqlite and runner (`nubx turbo build`).
+ * built `dist/` of core, @storyshelf/db/sqlite and runner (`nubx turbo build`).
  *
  * A Storybook to point it at can be generated with `scripts/bench-fixture.mjs` (see there).
  *
@@ -33,7 +33,7 @@ const core = createRequire(join(root, "packages/core/package.json"));
 const AdmZip = core("adm-zip");
 const execFileAsync = promisify(execFile);
 
-const { createSqliteDatabase } = await load("packages/db-sqlite/dist/index.mjs");
+const { createSqliteDatabase } = await load("packages/db/dist/sqlite/index.mjs");
 const { createLocalStorage } = await load("packages/core/dist/storage/local.mjs");
 const { createCaptureRunner } = await load("packages/runner/dist/index.mjs");
 const { createCaptureConsumer, createDatabaseCaptureQueue } = await load(

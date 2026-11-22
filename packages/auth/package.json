@@ -59,8 +59,7 @@
   },
   "devDependencies": {
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/db-postgres": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",

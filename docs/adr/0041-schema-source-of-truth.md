@@ -13,10 +13,10 @@ Each table is described by hand in up to seven places:
 
 | Description                     | Location                                              | Size (2026-11-02)            |
 | ------------------------------- | ----------------------------------------------------- | ---------------------------- |
-| SQLite DDL                      | `packages/db-sqlite/src/ddl.ts`                       | 575 lines, 42 `CREATE TABLE` |
-| Postgres DDL                    | `packages/db-postgres/src/ddl.ts`                     | 513 lines, 38 `CREATE TABLE` |
-| MySQL DDL                       | `packages/db-mysql/src/ddl.ts`                        | 560 lines, 38 `CREATE TABLE` |
-| Drizzle schema, one per dialect | `packages/db-{sqlite,postgres,mysql}/src/schema/*.ts` | 32 tables each               |
+| SQLite DDL                      | `packages/db/src/sqlite/ddl.ts`                       | 575 lines, 42 `CREATE TABLE` |
+| Postgres DDL                    | `packages/db/src/postgres/ddl.ts`                     | 513 lines, 38 `CREATE TABLE` |
+| MySQL DDL                       | `packages/db/src/mysql/ddl.ts`                        | 560 lines, 38 `CREATE TABLE` |
+| Drizzle schema, one per dialect | `packages/db/src/{sqlite,postgres,mysql}/schema/*.ts` | 32 tables each               |
 | Core row types                  | `packages/core/src/schema/*.ts`                       | 23 modules                   |
 
 Additive migrations live in each adapter's `migrate.ts` (for example

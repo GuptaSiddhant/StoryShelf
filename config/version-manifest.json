@@ -26,6 +26,10 @@
         }
       }
     },
+    "@storyshelf/common": {
+      "version": "0.14.0",
+      "peers": {}
+    },
     "@storyshelf/core": {
       "version": "0.14.0",
       "peers": {
@@ -33,6 +37,14 @@
           "range": "^10.2.1",
           "optional": true,
           "subpaths": ["./adapter/email-sender"]
+        },
+        "pixelmatch": {
+          "range": "^7.1.0",
+          "optional": true
+        },
+        "pngjs": {
+          "range": "^7.0.0",
+          "optional": true
         },
         "sharp": {
           "range": ">=0.34.0",
@@ -44,13 +56,33 @@
         }
       }
     },
-    "@storyshelf/db-mysql": {
+    "@storyshelf/db": {
       "version": "0.14.0",
       "peers": {
+        "@aws-sdk/rds-signer": {
+          "range": "^3.0.0",
+          "optional": true,
+          "subpaths": ["./postgres/rds-iam"]
+        },
+        "@electric-sql/pglite": {
+          "range": "^0.5.8",
+          "optional": true,
+          "subpaths": ["./postgres/pglite"]
+        },
+        "@libsql/client": {
+          "range": "^0.18.0",
+          "optional": true,
+          "subpaths": ["./sqlite/turso"]
+        },
+        "@neondatabase/serverless": {
+          "range": "^1.1.0",
+          "optional": true,
+          "subpaths": ["./postgres/neon", "./postgres/neon-http"]
+        },
         "@planetscale/database": {
           "range": "^1.19.0",
           "optional": true,
-          "subpaths": ["./planetscale"]
+          "subpaths": ["./mysql/planetscale"]
         },
         "@storyshelf/core": {
           "range": "0.14.0",
@@ -59,60 +91,32 @@
         "@tidbcloud/serverless": {
           "range": "^0.1.0",
           "optional": true,
-          "subpaths": ["./tidb"]
-        }
-      }
-    },
-    "@storyshelf/db-postgres": {
-      "version": "0.14.0",
-      "peers": {
-        "@aws-sdk/rds-signer": {
-          "range": "^3.0.0",
-          "optional": true,
-          "subpaths": ["./rds-iam"]
-        },
-        "@electric-sql/pglite": {
-          "range": "^0.5.8",
-          "optional": true,
-          "subpaths": ["./pglite"]
-        },
-        "@neondatabase/serverless": {
-          "range": "^1.1.0",
-          "optional": true,
-          "subpaths": ["./neon", "./neon-http"]
-        },
-        "@storyshelf/core": {
-          "range": "0.14.0",
-          "optional": false
+          "subpaths": ["./mysql/tidb"]
         },
         "@vercel/postgres": {
           "range": "^0.10.0",
           "optional": true,
-          "subpaths": ["./vercel"]
-        },
-        "pg": {
-          "range": "^8.0.0",
-          "optional": true,
-          "subpaths": ["./pg"]
-        }
-      }
-    },
-    "@storyshelf/db-sqlite": {
-      "version": "0.14.0",
-      "peers": {
-        "@libsql/client": {
-          "range": "^0.18.0",
-          "optional": true,
-          "subpaths": ["./turso"]
-        },
-        "@storyshelf/core": {
-          "range": "0.14.0",
-          "optional": false
+          "subpaths": ["./postgres/vercel"]
         },
         "better-sqlite3": {
           "range": "^12.0.0",
           "optional": true,
-          "subpaths": ["./better-sqlite3"]
+          "subpaths": ["./sqlite/better-sqlite3"]
+        },
+        "mysql2": {
+          "range": "^3.9.0",
+          "optional": true,
+          "subpaths": ["./mysql"]
+        },
+        "pg": {
+          "range": "^8.0.0",
+          "optional": true,
+          "subpaths": ["./postgres/pg"]
+        },
+        "postgres": {
+          "range": "^3.4.0",
+          "optional": true,
+          "subpaths": ["./postgres"]
         }
       }
     },

@@ -3,20 +3,20 @@ import type { DatabaseChoice, StorageChoice } from "./answers.ts";
 /** The import, constructor call and prelude each database and storage choice generates into `src/index.ts`. */
 
 export const DB_IMPORT: Record<DatabaseChoice, string> = {
-  sqlite: `import { createSqliteDatabase } from "@storyshelf/db-sqlite";`,
-  turso: `import { createTursoDatabase } from "@storyshelf/db-sqlite/turso";`,
-  "better-sqlite3": `import { createBetterSqlite3Database } from "@storyshelf/db-sqlite/better-sqlite3";`,
-  "bun-sqlite": `import { createBunSqliteDatabase } from "@storyshelf/db-sqlite/bun-sqlite";`,
-  d1: `import { createD1Database } from "@storyshelf/db-sqlite/d1";`,
-  postgres: `import { createPostgresDatabase } from "@storyshelf/db-postgres";`,
-  pg: `import { createPgDatabase } from "@storyshelf/db-postgres/pg";`,
-  neon: `import { createNeonDatabase } from "@storyshelf/db-postgres/neon";`,
-  "neon-http": `import { createNeonHttpDatabase } from "@storyshelf/db-postgres/neon-http";`,
-  vercel: `import { createVercelDatabase } from "@storyshelf/db-postgres/vercel";`,
-  pglite: `import { createPgliteDatabase } from "@storyshelf/db-postgres/pglite";`,
-  mysql: `import { createMysqlDatabase } from "@storyshelf/db-mysql";`,
-  planetscale: `import { createPlanetscaleDatabase } from "@storyshelf/db-mysql/planetscale";`,
-  tidb: `import { createTidbDatabase } from "@storyshelf/db-mysql/tidb";`,
+  sqlite: `import { createSqliteDatabase } from "@storyshelf/db/sqlite";`,
+  turso: `import { createTursoDatabase } from "@storyshelf/db/sqlite/turso";`,
+  "better-sqlite3": `import { createBetterSqlite3Database } from "@storyshelf/db/sqlite/better-sqlite3";`,
+  "bun-sqlite": `import { createBunSqliteDatabase } from "@storyshelf/db/sqlite/bun-sqlite";`,
+  d1: `import { createD1Database } from "@storyshelf/db/sqlite/d1";`,
+  postgres: `import { createPostgresDatabase } from "@storyshelf/db/postgres";`,
+  pg: `import { createPgDatabase } from "@storyshelf/db/postgres/pg";`,
+  neon: `import { createNeonDatabase } from "@storyshelf/db/postgres/neon";`,
+  "neon-http": `import { createNeonHttpDatabase } from "@storyshelf/db/postgres/neon-http";`,
+  vercel: `import { createVercelDatabase } from "@storyshelf/db/postgres/vercel";`,
+  pglite: `import { createPgliteDatabase } from "@storyshelf/db/postgres/pglite";`,
+  mysql: `import { createMysqlDatabase } from "@storyshelf/db/mysql";`,
+  planetscale: `import { createPlanetscaleDatabase } from "@storyshelf/db/mysql/planetscale";`,
+  tidb: `import { createTidbDatabase } from "@storyshelf/db/mysql/tidb";`,
 };
 
 export const STORAGE_IMPORT: Record<StorageChoice, string> = {

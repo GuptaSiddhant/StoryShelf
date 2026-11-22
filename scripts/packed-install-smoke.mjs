@@ -9,6 +9,7 @@
  *  1. pack every public package (manifests rewritten as the release does, then restored),
  *     and check each archive holds every export and bin target (#1265),
  *     and that `@storyshelf/app/node` imports from the installed scaffold with no side effects (#394),
+ *     and that a hosting-only install of the app holds none of axe-core, pngjs and pixelmatch (#1335),
  *  2. install the CLI, `create-storyshelf` and `@storyshelf/mcp` from their tarballs, each in its own
  *     empty directory outside this checkout; `create-storyshelf` must install with no dependency at all,
  *  3. run `npm create storyshelf` (`npm exec` on the tarball; answers: all defaults, so local accounts),
@@ -41,6 +42,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { findInstalled } from "./installed-packages.mjs";
 import { getPublishOrder, packagesDir } from "./publish-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -274,6 +276,44 @@ function assertS3OnlyInstall(scratch, tarballs) {
   run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
 }
 
+/**
+ * `@storyshelf/app` installed from its tarball with no runner (#1335): a hosting-only install must hold no
+ * `axe-core`, `pngjs` or `pixelmatch` (the runner brings them), yet import the app and `./diff`. Logs the install size.
+ */
+function assertHostingOnlyInstall(scratch, tarballs) {
+  const dir = join(scratch, "hosting-only");
+  mkdirSync(dir);
+  const manifest = {
+    name: "hosting-only",
+    private: true,
+    type: "module",
+    dependencies: { "@storyshelf/app": `file:${tarballs["@storyshelf/app"]}` },
+    overrides: tarballOverrides(tarballs),
+  };
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  log("installing @storyshelf/app without the runner (hosting only)");
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: dir });
+  for (const absent of [
+    "axe-core",
+    "pngjs",
+    "pixelmatch",
+    "@storyshelf/runner",
+    "playwright-core",
+  ]) {
+    if (existsSync(join(dir, "node_modules", absent))) {
+      fail(`a hosting-only install of @storyshelf/app pulled in ${absent}`);
+    }
+  }
+  const check = [
+    'await import("@storyshelf/app");',
+    'const diff = await import("@storyshelf/core/diff");',
+    'if (typeof diff.diffImagesAsync !== "function") throw new Error("bad exports");',
+  ].join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+  const size = run("du", ["-sk", join(dir, "node_modules")]).split("\t")[0];
+  log(`hosting-only install: node_modules is ${size} KB, with none of axe-core, pngjs, pixelmatch`);
+}
+
 /** A clean directory holding only `name` installed from its tarball; returns the directory. */
 function installAlone(scratch, name, tarballs, directory) {
   const dir = join(scratch, directory);
@@ -304,6 +344,58 @@ function assertNoDependencies(tarballs, dir) {
     fail(`create-storyshelf installed more than itself: ${installed.join(", ")}`);
   }
   log("create-storyshelf installs with no dependency");
+}
+
+/**
+ * `@storyshelf/common` installed alone (#1334): its manifest and its install hold `@opentelemetry/api` and
+ * nothing else, no `@storyshelf/*` package among them, and every subpath imports from that install.
+ */
+function assertCommonAlone(scratch, tarballs) {
+  const pack = JSON.parse(
+    run("tar", ["-xOf", tarballs["@storyshelf/common"], "package/package.json"]),
+  );
+  const declared = Object.keys(pack.dependencies ?? {}).join();
+  if (declared !== "@opentelemetry/api") {
+    fail(`@storyshelf/common declares dependencies other than @opentelemetry/api: ${declared}`);
+  }
+  const dir = installAlone(scratch, "@storyshelf/common", tarballs, "common-alone");
+  const installed = readdirSync(join(dir, "node_modules")).filter((name) => !name.startsWith("."));
+  if (installed.toSorted().join() !== "@opentelemetry,@storyshelf") {
+    fail(
+      `@storyshelf/common installed more than itself and the OpenTelemetry API: ${installed.join(", ")}`,
+    );
+  }
+  const scopes = readdirSync(join(dir, "node_modules/@storyshelf")).join();
+  if (scopes !== "common") {
+    fail(`@storyshelf/common pulled in another @storyshelf package: ${scopes}`);
+  }
+  const subpaths = Object.keys(pack.exports ?? {}).filter((key) => key !== "./package.json");
+  const check = subpaths
+    .map((key) => `await import("@storyshelf/common/${key.slice(2)}");`)
+    .join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+  log(`@storyshelf/common installs alone and ${subpaths.length} subpaths import`);
+}
+
+/**
+ * `@storyshelf/mcp` and `@storyshelf/observability` depend on `@storyshelf/common`, not core (#1334): their
+ * installs hold no core, Drizzle or pino, and each entry that needs no server stack imports from that install.
+ */
+function assertNoServerStack(scratch, tarballs) {
+  for (const [name, entries] of [
+    ["@storyshelf/mcp", ["@storyshelf/mcp/http"]],
+    ["@storyshelf/observability", ["@storyshelf/observability", "@storyshelf/observability/node"]],
+  ]) {
+    const dir = installAlone(scratch, name, tarballs, `isolated-${name.split("/")[1]}`);
+    const present = findInstalled(dir, ["@storyshelf/core", "drizzle-orm", "pino"]);
+    if (present.length > 0) {
+      fail(`installing ${name} pulled in ${present.join(", ")}`);
+    }
+    const check = entries.map((entry) => `await import("${entry}");`).join("\n");
+    run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+    const size = run("du", ["-sk", join(dir, "node_modules")]).split("\t")[0];
+    log(`${name} installs with no core, drizzle-orm or pino (node_modules ${size} KB)`);
+  }
 }
 
 /** `storyshelf-mcp` answers `--help` with its subcommands, and `init` scaffolds a project from defaults. */
@@ -527,6 +619,9 @@ async function main() {
     log(`packed ${Object.keys(tarballs).length} packages`);
     assertArchives(tarballs);
     assertS3OnlyInstall(scratch, tarballs);
+    assertCommonAlone(scratch, tarballs);
+    assertNoServerStack(scratch, tarballs);
+    assertHostingOnlyInstall(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

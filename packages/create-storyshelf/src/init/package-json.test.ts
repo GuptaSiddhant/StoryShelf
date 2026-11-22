@@ -37,7 +37,7 @@ describe("generatePackageJson", () => {
     expect(Object.keys(pkg().dependencies).toSorted()).toEqual([
       "@storyshelf/app",
       "@storyshelf/core",
-      "@storyshelf/db-sqlite",
+      "@storyshelf/db",
       "@storyshelf/runner",
     ]);
   });
@@ -76,20 +76,20 @@ describe("generatePackageJson", () => {
 
   it("maps every database to its adapter package and its SDK peer", () => {
     const adapters: Record<Answers["database"], [string, string?]> = {
-      sqlite: ["@storyshelf/db-sqlite"],
-      turso: ["@storyshelf/db-sqlite", "@libsql/client"],
-      "better-sqlite3": ["@storyshelf/db-sqlite", "better-sqlite3"],
-      "bun-sqlite": ["@storyshelf/db-sqlite"],
-      d1: ["@storyshelf/db-sqlite"],
-      postgres: ["@storyshelf/db-postgres"],
-      pg: ["@storyshelf/db-postgres", "pg"],
-      neon: ["@storyshelf/db-postgres", "@neondatabase/serverless"],
-      "neon-http": ["@storyshelf/db-postgres", "@neondatabase/serverless"],
-      vercel: ["@storyshelf/db-postgres", "@vercel/postgres"],
-      pglite: ["@storyshelf/db-postgres", "@electric-sql/pglite"],
-      mysql: ["@storyshelf/db-mysql"],
-      planetscale: ["@storyshelf/db-mysql", "@planetscale/database"],
-      tidb: ["@storyshelf/db-mysql", "@tidbcloud/serverless"],
+      sqlite: ["@storyshelf/db"],
+      turso: ["@storyshelf/db", "@libsql/client"],
+      "better-sqlite3": ["@storyshelf/db", "better-sqlite3"],
+      "bun-sqlite": ["@storyshelf/db"],
+      d1: ["@storyshelf/db"],
+      postgres: ["@storyshelf/db", "postgres"],
+      pg: ["@storyshelf/db", "pg"],
+      neon: ["@storyshelf/db", "@neondatabase/serverless"],
+      "neon-http": ["@storyshelf/db", "@neondatabase/serverless"],
+      vercel: ["@storyshelf/db", "@vercel/postgres"],
+      pglite: ["@storyshelf/db", "@electric-sql/pglite"],
+      mysql: ["@storyshelf/db", "mysql2"],
+      planetscale: ["@storyshelf/db", "@planetscale/database"],
+      tidb: ["@storyshelf/db", "@tidbcloud/serverless"],
     };
     for (const [database, [adapter, peer]] of Object.entries(adapters) as [
       Answers["database"],
@@ -134,7 +134,7 @@ describe("generatePackageJson", () => {
 
   it("writes every SDK at the range its owner declares in the version manifest", () => {
     const deps = pkg({ database: "turso", storage: "s3", notifications: true }).dependencies;
-    expect(deps["@libsql/client"]).toBe(peerRange("@storyshelf/db-sqlite", "@libsql/client"));
+    expect(deps["@libsql/client"]).toBe(peerRange("@storyshelf/db", "@libsql/client"));
     expect(deps["@aws-sdk/lib-storage"]).toBe(
       peerRange("@storyshelf/storage", "@aws-sdk/lib-storage"),
     );

@@ -23,6 +23,10 @@ Routes for capture, compare and baselines answer `404` with `Testing is not enab
 
 Every route carries a class (`hosting`, `testing`, `review` or `both`) in one table, and a test boots the app without `testing` to check that each `testing` route answers `404` and no `hosting` route does. The navigation hides what is off: the **Jobs** entry and the capture, tests and AI settings tabs.
 
+## What it installs
+
+Hosting only installs no browser or image libraries. `axe-core` ships with `@storyshelf/runner`, and `pngjs` and `pixelmatch` are optional peers of `@storyshelf/core` that the runner brings, so a hosting-only install (core without the runner) holds none of them (about 3.9 MB less). With `testing` on and a peer missing, readiness fails with a message that names the package and the install line.
+
 ## Seeing the mode
 
 - **System page.** A notice says testing is off, with the number of stored snapshots it hides.

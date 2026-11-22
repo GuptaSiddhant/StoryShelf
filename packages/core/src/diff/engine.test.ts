@@ -1,7 +1,7 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
 import { loadCodec } from "./codecs.ts";
-import { diffImages } from "./engine.ts";
+import { diffImages, loadPixelmatch } from "./engine.ts";
 import { DEFAULT_DIFF_OPTIONS } from "./options.ts";
 
 function png(
@@ -194,5 +194,13 @@ describe("diffImages: malformed input fails on both engines", () => {
     await expect(
       diffImages(Buffer.from("junk"), good, DEFAULT_DIFF_OPTIONS, codec),
     ).rejects.toThrow();
+  });
+});
+
+describe("loadPixelmatch", () => {
+  it("loads pixelmatch once and returns the same function", async () => {
+    const first = await loadPixelmatch();
+    expect(typeof first).toBe("function");
+    expect(await loadPixelmatch()).toBe(first);
   });
 });
