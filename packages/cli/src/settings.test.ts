@@ -1,4 +1,4 @@
-import { RENAMED_SETTINGS } from "@storyshelf/core/config";
+import { RENAMED_SETTINGS } from "@storyshelf/common/settings";
 import { describe, expect, it } from "vitest";
 import {
   CLI_RENAMED_SETTINGS,
@@ -10,7 +10,7 @@ import {
 const TOKEN_VALUE = "t".repeat(40);
 
 describe("CLI settings", () => {
-  it("keeps the same rows as core's renamed table", () => {
+  it("keeps the same rows as common's renamed table", () => {
     for (const [name, olds] of Object.entries(CLI_RENAMED_SETTINGS)) {
       expect(RENAMED_SETTINGS[name as keyof typeof RENAMED_SETTINGS]).toEqual(olds);
     }

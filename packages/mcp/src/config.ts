@@ -3,7 +3,7 @@ import {
   oldNamesAllowedFields,
   readSetting,
   refuseRenamedSettings,
-} from "@storyshelf/core/config";
+} from "@storyshelf/common/settings";
 
 /** Resolved connection settings for the MCP server. */
 export interface McpConfig {
