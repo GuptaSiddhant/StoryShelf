@@ -36,7 +36,7 @@ the same trace via the job row.
 | `SHELF_OTEL_ENABLED`                              | auto             | Explicit `false` kill-switch.                     |
 | `SHELF_OTEL_METRICS_INTERVAL_MS`                  | `60000`          | Metric export interval.                           |
 
-Scaffolded servers (`storyshelf server init`) already include the
+Scaffolded servers (`create-storyshelf`) already include the
 initialization preamble and log correlation — you only add the endpoint.
 
 ## What is exported

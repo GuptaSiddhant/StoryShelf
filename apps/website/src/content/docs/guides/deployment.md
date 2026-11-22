@@ -70,10 +70,10 @@ StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only We
 
 ### Recommended assembly (self-hosted default)
 
-Use `storyshelf server init` to scaffold a server with your chosen adapters:
+Use `npm create storyshelf` to scaffold a server with your chosen adapters:
 
 ```sh
-storyshelf server init
+npm create storyshelf
 # ? Which database? SQLite
 # ? Which storage? Local filesystem
 # ? Which auth? None

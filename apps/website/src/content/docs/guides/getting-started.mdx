@@ -48,7 +48,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
   <TabItem label="npm">
     Scaffold a server project and run it with Node.js 24 or later:
 
-    <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
+    <PackageManagers type="create" pkg="storyshelf" />
 
     Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example`, a README and Docker files, then prints the next steps:
 
@@ -59,13 +59,13 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     # Choose a private admin password (12 or more characters); it is not echoed.
     printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
     export SHELF_ADMIN_PASSWORD
-    npm install
+    npm install   # or pass --install to create-storyshelf
     npm start
     ```
 
     The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
 
-    `server init` needs a terminal; `--dir <path>` picks the output directory.
+    `create-storyshelf` needs a terminal; `--dir <path>` picks the output directory and `--install` installs the dependencies with the package manager that ran it.
 
   </TabItem>
 </Tabs>

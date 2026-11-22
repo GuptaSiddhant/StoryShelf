@@ -22,7 +22,7 @@ keeps users, memberships, invites, and UI. See ADR 0011.
   to `member` otherwise), project memberships from the Members-tab group
   mappings (highest rank wins, recorded as `sso:<group>`; manual grants
   survive). No `viewerGroups` equivalent — site roles are `admin`/`member`.
-- **`storyshelf server init` output changed** — `password` scaffolds email/pass
+- **`create-storyshelf` output changed** — `password` scaffolds email/pass
   - `ensurePasswordAdmin` bootstrap; `oauth` on AWS scaffolds the `cognitoPreset`
     social (new `COGNITO_DOMAIN` env); otherwise the `keycloakPreset` recipe.
 
