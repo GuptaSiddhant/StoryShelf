@@ -54,6 +54,11 @@ RUN apt-get update \
 COPY --from=builder /app/apps/server-image/dist ./dist
 COPY --from=builder /app/apps/server-image/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+# `storyshelf-server` on PATH: `docker run <image> storyshelf-server migrate` (or `doctor`, `purge`,
+# `check-storage`) runs it against the same environment as the server. It loads dist/instance.mjs
+# (package.json#storyshelf.server) from /app.
+RUN printf '#!/bin/sh\nexec node /app/dist/bin.mjs "$@"\n' > /usr/local/bin/storyshelf-server \
+    && chmod +x /usr/local/bin/storyshelf-server
 # `node` (uid 1000) owns the data volume: SQLite, local storage and scratch space.
 RUN mkdir -p /data && chown node:node /data
 ENV NODE_ENV=production \
@@ -63,7 +68,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "dist/server.mjs"]
+CMD ["storyshelf-server", "serve"]
 
 # Hosting only: no browser, so capture is off (`SHELF_CAPTURE=off`). Hosting and review still work.
 FROM base AS hosting

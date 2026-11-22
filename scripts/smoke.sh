@@ -75,7 +75,7 @@ refuse_short_secret() {
   local port=$((PORT + 1)) dir="${SHELF_DATA_DIR}-refuse" log=".tmp/smoke-${RUN_ID}-refuse.log"
   local short="smoke-short-secret-value" refused code=0 first
   env -u SHELF_AUTH SHELF_ADMIN_PASSWORD="smoke-admin-password" SHELF_SECRET="$short" PORT="$port" \
-    SHELF_DATA_DIR="$dir" nub ./apps/server-image/server.ts >"$log" 2>&1 &
+    SHELF_DATA_DIR="$dir" nub ./packages/app/src/server-bin/bin.ts serve --entry apps/server-image/instance.ts >"$log" 2>&1 &
   refused=$!
   fail() {
     echo "Smoke FAILED (short SHELF_SECRET): $1"
@@ -95,10 +95,10 @@ refuse_short_secret() {
   kill -0 "$refused" 2>/dev/null && fail "the image was still running after 60 s"
   wait "$refused" || code=$?
   [ "$code" -ne 0 ] || fail "the image exited 0"
-  # nub's own notices come first; the image's first line follows them.
+  # nub's own notices come first; the bin's first line follows them.
   first="$(awk '!/^nub: /{ print; exit }' "$log")"
   case "$first" in
-    "storyshelf: SHELF_SECRET "*) ;;
+    "storyshelf-server serve: SHELF_SECRET "*) ;;
     *) fail "the first line does not name SHELF_SECRET: $first" ;;
   esac
   # A refusal is one line: a stack frame (`    at fn (file:line)`) would be a leaked crash report.
