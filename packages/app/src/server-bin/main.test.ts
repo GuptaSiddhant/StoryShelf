@@ -20,6 +20,12 @@ describe("runServerBin", () => {
     expect(io.stdout).toEqual([SERVER_HELP]);
   });
 
+  it("answers --help with exit 0 and loads no adapter or instance", async () => {
+    const io = recordingIo();
+    expect(await runServerBin(["--help"], io, {})).toBe(0);
+    expect(io.stdout).toEqual([SERVER_HELP]);
+  });
+
   it("prints the version", async () => {
     const io = recordingIo();
     expect(await runServerBin(["--version"], io)).toBe(0);

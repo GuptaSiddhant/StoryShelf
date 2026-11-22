@@ -17,6 +17,8 @@
  *  4. `npm install` the scaffold, with every @storyshelf/* dependency (direct or transitive)
  *     resolved to a tarball instead of the registry; the install must hold exactly one
  *     `@storyshelf/core` (a peer of the adapters),
+ *     and `storyshelf-server doctor` must name a peer the scaffold lacks and its install line; an install
+ *     of `@storyshelf/app` alone answers `storyshelf-server --help` with exit 0 (#1332),
  *  5. `npm start`, sign in, create a project and a token, and `storyshelf upload` a built Storybook,
  *  6. wait for the build to finish and fail unless it passed.
  *
@@ -444,6 +446,59 @@ function assertOneCore(project) {
   log("the scaffold's install holds exactly one @storyshelf/core");
 }
 
+/** `storyshelf-server --help` exits 0 from an install of `@storyshelf/app` alone: no adapter is needed to read the help (#1332). */
+function assertServerHelpAlone(scratch, tarballs) {
+  const dir = installAlone(scratch, "@storyshelf/app", tarballs, "server-help");
+  const adapters = findInstalled(dir, [
+    "@storyshelf/db",
+    "@storyshelf/storage",
+    "@storyshelf/runner",
+  ]);
+  if (adapters.length > 0) {
+    fail(`installing @storyshelf/app alone pulled in adapters: ${adapters.join(", ")}`);
+  }
+  const help = run(join(dir, "node_modules/.bin/storyshelf-server"), ["--help"], { cwd: dir });
+  if (!help.includes("doctor")) {
+    fail(`storyshelf-server --help printed no command list:\n${help}`);
+  }
+  log("storyshelf-server --help exits 0 with no adapter installed");
+}
+
+/**
+ * `storyshelf-server doctor` names a missing peer and its install line (#1332). The instance module here
+ * imports `better-sqlite3`, an optional peer of `@storyshelf/db` the scaffold did not install, which is
+ * the state of a scaffold whose preset peer was removed. The installed-package checks also run for real
+ * against the scaffold's tree: one version, one core.
+ */
+function assertDoctorNamesMissingPeer(project) {
+  writeFileSync(
+    join(project, "src/missing-peer.ts"),
+    [
+      'import { defineShelfInstance } from "@storyshelf/app";',
+      'import "better-sqlite3";',
+      "export default defineShelfInstance(async () => ({}));",
+      "",
+    ].join("\n"),
+  );
+  const result = spawnSync(
+    join(project, "node_modules/.bin/storyshelf-server"),
+    ["doctor", "--entry", "src/missing-peer.ts"],
+    { cwd: project, encoding: "utf8", timeout: 60_000 },
+  );
+  const out = `${result.stdout}\n${result.stderr}`;
+  const expected = [
+    "better-sqlite3",
+    'npm install better-sqlite3@"',
+    "One copy of @storyshelf/core",
+  ];
+  const missing = expected.filter((text) => !out.includes(text));
+  if (result.status !== 1 || missing.length > 0) {
+    fail(`doctor exited ${result.status}, missing ${JSON.stringify(missing)}:\n${out}`);
+  }
+  rmSync(join(project, "src/missing-peer.ts"));
+  log("storyshelf-server doctor exits 1 naming the missing peer and its install line");
+}
+
 /** The CLI and `create-storyshelf` installed from their tarballs, and the scaffold installed from the tarballs. */
 async function installFromTarballs(scratch, tarballs) {
   const tool = installAlone(scratch, "storyshelf", tarballs, "tool");
@@ -471,6 +526,7 @@ async function installFromTarballs(scratch, tarballs) {
   );
   assertNodeHost(project);
   assertOneCore(project);
+  assertDoctorNamesMissingPeer(project);
   return { cli, project };
 }
 
@@ -619,6 +675,7 @@ async function main() {
     log(`packed ${Object.keys(tarballs).length} packages`);
     assertArchives(tarballs);
     assertS3OnlyInstall(scratch, tarballs);
+    assertServerHelpAlone(scratch, tarballs);
     assertCommonAlone(scratch, tarballs);
     assertNoServerStack(scratch, tarballs);
     assertHostingOnlyInstall(scratch, tarballs);

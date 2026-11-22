@@ -99,6 +99,10 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
 
   Schema: none
 
+- `storyshelf-server` names a missing peer, and `doctor` checks the installed packages first
+
+  When the instance module imports an optional peer that is not installed (a database driver, a storage SDK), `storyshelf-server` now says which package or subpath needs it, the range, and the `npm install` line, from the generated version and peer manifest. `storyshelf-server doctor` reads the installed `@storyshelf/*` packages before it imports the instance: it reports each peer as installed, out of range or missing, and fails on mixed `@storyshelf/*` versions or a second copy of `@storyshelf/core`.
+
 - @storyshelf/common holds the shared settings, HTTP, redaction and tracing (#1334)
 
   A new public package with `/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids` and `/logger` subpaths. Its only runtime dependency is `@opentelemetry/api`, so a package that needs only this code no longer has to install `@storyshelf/core`.
