@@ -3,7 +3,7 @@
  * last one has been idle for a while: a computer woken for the builds' shards and suspended after
  * (ADR 0007, decision 4). One pool per service; its connections share the resource.
  */
-import type { Logger } from "../logger.ts";
+import type { Logger } from "@storyshelf/core/logger";
 import type {
   RemoteConnectContext,
   RemoteConnection,

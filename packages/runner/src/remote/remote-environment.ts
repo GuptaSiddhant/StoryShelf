@@ -2,8 +2,8 @@
  * The environment of a remote browser, measured inside it (ADR 0007, decision 2). `fc-list` and
  * `process.platform` describe the machine running the runner, not the one that rendered.
  */
-import type { CaptureEnvironment } from "../adapters/capture-runner.ts";
-import { sha256 } from "./hash.ts";
+import type { CaptureEnvironment } from "@storyshelf/core/adapter/capture-runner";
+import { sha256 } from "@storyshelf/core/utils";
 
 /** What the probe page reports. */
 export interface BrowserProbe {

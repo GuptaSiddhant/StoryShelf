@@ -1,7 +1,8 @@
-import { inPageRunAxe, resolveA11yRun } from "@storyshelf/core/capture";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { loadAxeSource } from "./a11y-source.ts";
+import { inPageRunAxe } from "./in-page.ts";
+import { resolveA11yRun } from "./options.ts";
 
 async function run(html: string, params?: unknown) {
   const dom = new JSDOM(

@@ -4,7 +4,7 @@
  * exactly once, so a connection counts from the moment it is requested until its render has ended.
  * Waiting for a slot ends on the run's cancel and at shutdown, and frees nothing it did not take.
  */
-import type { Logger } from "../logger.ts";
+import type { Logger } from "@storyshelf/core/logger";
 import type { RemoteBrowser, RemoteTarget } from "./remote-browser.ts";
 import { stoppedError } from "./remote-lease-error.ts";
 

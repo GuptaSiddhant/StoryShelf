@@ -1,5 +1,5 @@
+import { deferred } from "@storyshelf/core/test-helpers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { deferred } from "../test-helpers/index.ts";
 import type { RemoteConnectContext } from "./remote-browser.ts";
 import { shutdownRemote } from "./remote-lease.ts";
 import { refCounted, type PoolLease, type RefCounted } from "./remote-pool.ts";

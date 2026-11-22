@@ -1,15 +1,16 @@
 /** Measuring a remote browser's environment from inside it (ADR 0007, decision 2). */
-import type { CaptureEnvironment, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
+import type { CaptureEnvironment } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
+import type { Browser, Page } from "playwright-core";
+import { messageOf } from "./browser.ts";
+import type { RemoteBrowser } from "./remote/remote-browser.ts";
 import {
   FONT_PROBE_FAMILIES,
   boundedProbe,
   inPageProbe,
   remoteEnvironment,
   type BrowserProbe,
-} from "@storyshelf/core/utils";
-import type { Browser, Page } from "playwright-core";
-import { messageOf } from "./browser.ts";
+} from "./remote/remote-environment.ts";
 
 /** What stops a measurement: the run's cancel signal, and where warnings go. */
 export interface MeasureOptions {

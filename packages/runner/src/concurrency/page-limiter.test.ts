@@ -1,7 +1,7 @@
+import { createLatch, deferred } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
-import { createLatch, deferred } from "../test-helpers/index.ts";
+import { createSessionGate } from "../remote/session-gate.ts";
 import { createPageLimiter } from "./page-limiter.ts";
-import { createSessionGate } from "./session-gate.ts";
 
 async function peakOf(
   limiter: ReturnType<typeof createPageLimiter>,

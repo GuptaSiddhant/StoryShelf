@@ -1,16 +1,15 @@
-import {
-  connectLeased,
-  scrubConnection,
-  type ConnectLeasedContext,
-  type RemoteConnection,
-  type RemoteTarget,
-} from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
 /** Connecting to a remote browser: retried when the service is unreachable or full, a clear error when it is not. */
 import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import { holdLease } from "./browser.ts";
 import { loadPlaywright } from "./launch.ts";
+import {
+  scrubConnection,
+  type RemoteConnection,
+  type RemoteTarget,
+} from "./remote/remote-browser.ts";
+import { connectLeased, type ConnectLeasedContext } from "./remote/remote-lease.ts";
 import { playwrightVersion } from "./version.ts";
 
 /**

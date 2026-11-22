@@ -1,5 +1,5 @@
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
 import { describe, expect, it } from "vitest";
-import type { BrowserName } from "./capture-target.ts";
 import {
   defineRemote,
   hasSchemeFor,

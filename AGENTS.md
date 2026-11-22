@@ -100,7 +100,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   baselines; `testing` requires a `runner` (`testing: {}` throws). `assertServerless` refuses a runner
   on AWS Lambda and warns on Vercel/Netlify (`SHELF_ALLOW_SERVERLESS=1` overrides).
 - **Capture targets.** `browser`/`browsers`, a snapshot's `browser`, and baseline keys hold a
-  `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName`. Split with
+  `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName` (core owns the type and parsers; `RemoteBrowser`/`RemoteTarget` are the runner's). Split with
   `parseTarget`/`engineOf`, validate with `isCaptureTarget`; the render input is `target`, not
   `browser`. Save a project's browsers only through `runnerTargets()`/`assertTargetsSelectable()`.
   A launch failure is a `TargetLaunchError`, not a story crash.
@@ -169,7 +169,9 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
 - **Accessibility is informational.** `run_a11y` is on by default. Runners put axe lines on
   `RenderedSnapshot.a11y`; they are stored in `snapshots.a11y_violations` and read only through
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
-  a finding. Never change a status, failure set or git state because of a11y results.
+  a finding. Never change a status, failure set or git state because of a11y results. The axe source,
+  injection, in-page functions, `parameters.a11y` plan and violation mapper are the runner's
+  (`@storyshelf/runner/a11y`); core keeps the note strings (`capture/a11y/notes.ts`) and the readers.
 - **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
   `Channel.on` (`packages/runner/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
   the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through
@@ -216,7 +218,10 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `@storyshelf/common/tracing`, or the wrappers' own copy of it), rethrowing the original.
   An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
   `redactUrlForLog(url)` (origin only).
-- **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
+- **Remote browsers.** All browser code lives in `@storyshelf/runner`, never in core (a ratchet test in
+  core fails on `playwright-core`, `launch` or `connect`): `src/remote/` (`@storyshelf/runner/remote`:
+  `remote-browser.ts`, `remote-lease*.ts`, `remote-limiter.ts`, `remote-pool.ts`, `remote-sizing.ts`,
+  `remote-environment.ts`, the presets) and `src/concurrency/` (page limiter). `defineRemote` expands to `<engine>@<name>` targets; presets are plain
   configuration, no vendor SDKs. Measure the environment in-browser (`inPageProbe`), never from the
   host. `protocol`/`reach` are declared, not inferred. Use `connectLeased`/`shutdownRemote` so a lease
   is released exactly once; scrub endpoints, headers and leases (`scrubConnection`) and never log

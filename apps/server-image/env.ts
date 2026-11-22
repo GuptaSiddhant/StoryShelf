@@ -1,4 +1,4 @@
-import type { BrowserName, RemoteBrowser } from "@storyshelf/core/adapter/capture-runner";
+import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { readS3Bucket, readSetting, type SettingName } from "@storyshelf/core/config";
@@ -8,6 +8,7 @@ import { createMysqlDatabase } from "@storyshelf/db/mysql";
 import { createPostgresDatabase } from "@storyshelf/db/postgres";
 import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db/postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db/sqlite";
+import type { RemoteBrowser } from "@storyshelf/runner/remote";
 import { azurePlaywright } from "@storyshelf/runner/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage/azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage/gcs";

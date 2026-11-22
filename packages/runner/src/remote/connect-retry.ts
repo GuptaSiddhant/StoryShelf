@@ -1,5 +1,5 @@
 /** Retrying a connection to a remote browser service (ADR 0007, decision 4). */
-import { errorMessage } from "./error-text.ts";
+import { errorMessage } from "@storyshelf/core/utils";
 
 /** Options of {@link retryConnect}. */
 export interface RetryConnectOptions {
