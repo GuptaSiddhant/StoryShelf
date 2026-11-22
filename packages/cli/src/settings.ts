@@ -1,12 +1,13 @@
 /**
  * The CLI's reader of StoryShelf's environment variables (#1308). The CLI ships without
- * `@storyshelf/core` (it is a dev dependency), so it keeps the rows of core's `RENAMED_SETTINGS` it
- * reads; `settings.test.ts` fails when a row here differs from core's. Old names are never read
+ * `@storyshelf/common` (a dev dependency: it would add `@opentelemetry/api`, about 2 MB, to a client-only
+ * install), so it keeps the rows of common's `RENAMED_SETTINGS` it reads; `settings.test.ts` fails when
+ * a row here differs from common's. Old names are never read
  * (owner policy #1309): the CLI refuses to run while one is set, naming each with its new name and
- * never a value, unless `SHELF_ALLOW_OLD_NAMES=1`. Removed with core's table in the first release of 2027.
+ * never a value, unless `SHELF_ALLOW_OLD_NAMES=1`. Removed with common's table in the first release of 2027.
  */
 
-/** The CLI's settings with the old names they replaced: the same rows as core's `RENAMED_SETTINGS`. */
+/** The CLI's settings with the old names they replaced: the same rows as common's `RENAMED_SETTINGS`. */
 export const CLI_RENAMED_SETTINGS = {
   SHELF_URL: ["STORYSHELF_URL", "STORYSHELF_HOST"],
   SHELF_TOKEN: ["STORYSHELF_TOKEN"],

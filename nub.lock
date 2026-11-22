@@ -608,9 +608,9 @@ importers:
         specifier: ^2.4.2
         version: 2.4.2
     devDependencies:
-      '@storyshelf/core':
+      '@storyshelf/common':
         specifier: workspace:*
-        version: link:../core
+        version: link:../common
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -872,9 +872,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.20.0
         version: 1.32.2(zod@4.6.7)
-      '@storyshelf/core':
+      '@storyshelf/common':
         specifier: workspace:*
-        version: link:../core
+        version: link:../common
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -930,9 +930,9 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: 'catalog:'
         version: 1.43.0
-      '@storyshelf/core':
+      '@storyshelf/common':
         specifier: workspace:*
-        version: link:../core
+        version: link:../common
       hono:
         specifier: 'catalog:'
         version: 4.13.14

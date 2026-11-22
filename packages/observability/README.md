@@ -17,7 +17,7 @@ npm install @storyshelf/observability
 ## Usage
 
 ```ts
-import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/observability";
+import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/core/telemetry";
 
 const database = createInstrumentedDatabase(baseDatabase);
 const storage = createInstrumentedStorage(baseStorage);
@@ -54,12 +54,12 @@ only (runtime-agnostic); `./node` holds the Node SDK lifecycle.
 
 - `initObservabilityFromEnv`, `resolveObservabilityConfig` (`./node` / config) — env-driven SDK lifecycle.
 - `createHttpMiddleware` — `@hono/otel` server spans plus `storyshelf.req_id` / `enduser.id` (mounted by `createShelfApp`).
-- `createInstrumentedDatabase` / `createInstrumentedStorage` — transparent `db.*` / `storage.*` span + metric wrappers (identity, lifecycle, and tables delegate through).
+- `createInstrumentedDatabase` / `createInstrumentedStorage` — transparent `db.*` / `storage.*` span + metric wrappers (identity, lifecycle, and tables delegate through). They need core's adapter types, so they live in `@storyshelf/core/telemetry`, not here: this package depends on `@storyshelf/common` and never installs core.
 - `withSpan`, `currentTraceparent`, `injectTraceContext`, `parentContext` — span and W3C propagation helpers.
 - `captureMetrics`, `dbMetrics`, `storageMetrics` — memoized instruments (`capture.job.duration`, `capture.jobs.completed/failed`, operation durations).
 - `otelLogMixin` — pino mixin injecting `trace_id`/`span_id` (logs stay on stdout; no OTLP log exporter by design).
 
-Core (`@storyshelf/core`) uses `@opentelemetry/api` directly for pipeline
+Core (`@storyshelf/core`) uses `@opentelemetry/api` (through `@storyshelf/common/tracing`) for pipeline
 spans (`capture.job`, phase spans, `http.client`) and never imports this
 package — that one-way boundary is load-bearing (see ADR 0015 §5).
 
