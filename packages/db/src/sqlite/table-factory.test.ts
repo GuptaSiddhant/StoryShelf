@@ -139,6 +139,15 @@ describe("SQLite table factory (spike #800)", () => {
     expectTypeOf(sqliteTableOf(ns.contentUses, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.contentUses.$inferSelect
     >();
+    expectTypeOf(sqliteTableOf(ns.snapshots, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.snapshots.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.baselines, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.baselines.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.comments, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.comments.$inferSelect
+    >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
 

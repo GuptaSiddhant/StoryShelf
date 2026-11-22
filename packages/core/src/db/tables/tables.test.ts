@@ -4,12 +4,14 @@
  * deriving the core types from these tables.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
+import type { Baseline } from "../../schema/baseline.ts";
 import type { BuildComponent } from "../../schema/build-component.ts";
 import type { BuildReview } from "../../schema/build-review.ts";
 import type { Build } from "../../schema/build.ts";
 import type { CaptureAttempt, CaptureLog } from "../../schema/capture-attempt.ts";
 import type { CaptureJobRow } from "../../schema/capture-job.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
+import type { Comment } from "../../schema/comment.ts";
 import type { UserConnection } from "../../schema/connection.ts";
 import type { ContentUse } from "../../schema/content-use.ts";
 import type { BuildLabel, LabelType } from "../../schema/label.ts";
@@ -18,12 +20,14 @@ import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts"
 import type { Project } from "../../schema/project.ts";
 import type { SchemaMeta } from "../../schema/schema-meta.ts";
 import type { SiteSetting } from "../../schema/site-setting.ts";
+import type { Snapshot } from "../../schema/snapshot.ts";
 import type { Token } from "../../schema/token.ts";
 import type { BuildPackageUsage, ProjectLink } from "../../schema/usage.ts";
 import type { User } from "../../schema/user.ts";
 import type { Webhook } from "../../schema/webhook.ts";
 import type { InferRow } from "../define-table.ts";
 import {
+  baselines,
   buildComponents,
   builds,
   buildLabels,
@@ -33,6 +37,7 @@ import {
   captureJobs,
   captureLogs,
   captureShards,
+  comments,
   contentUses,
   labelTypes,
   NEUTRAL_TABLES,
@@ -42,6 +47,7 @@ import {
   projects,
   schemaMeta,
   siteSettings,
+  snapshots,
   tokens,
   userConnections,
   users,
@@ -85,6 +91,20 @@ describe("spike tables", () => {
     expectTypeOf<InferRow<typeof contentUses>>().toEqualTypeOf<ContentUse>();
   });
 
+  it("match the core snapshot rows once their optional fields are required", () => {
+    // `Snapshot` and `Baseline` mark columns optional that every dialect always returns.
+    expectTypeOf<InferRow<typeof snapshots>>().toEqualTypeOf<Required<Snapshot>>();
+    expectTypeOf<InferRow<typeof baselines>>().toEqualTypeOf<Required<Baseline>>();
+  });
+
+  it("match the core comment row apart from mentions and kind", () => {
+    // `Comment` marks `mentions` optional and narrows `kind` to `CommentKind`; the Drizzle
+    // schemas read it as `string`.
+    type Row = InferRow<typeof comments>;
+    expectTypeOf<Omit<Row, "kind">>().toEqualTypeOf<Required<Omit<Comment, "kind">>>();
+    expectTypeOf<Row["kind"]>().toEqualTypeOf<string>();
+  });
+
   it("match the core project row apart from storybook_meta", () => {
     // `Project` marks fourteen columns optional that every dialect always returns, and reads
     // `storybookMeta` as `string | null | undefined` (the Drizzle schemas' `$type`); the column is
@@ -119,6 +139,7 @@ describe("spike tables", () => {
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("project_members"));
     expect(names.indexOf("users")).toBeLessThan(names.indexOf("user_invite_tokens"));
     expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
-    expect(new Set(names).size).toBe(28);
+    expect(names.indexOf("snapshots")).toBeLessThan(names.indexOf("comments"));
+    expect(new Set(names).size).toBe(31);
   });
 });

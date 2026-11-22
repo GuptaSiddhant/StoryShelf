@@ -13,9 +13,11 @@ import { buildLabels, labelTypes } from "./label.ts";
 import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
 import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
 import { schemaMeta, siteSettings } from "./settings.ts";
+import { baselines, comments, snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";
 
 export {
+  baselines,
   buildComponents,
   buildContentReleases,
   buildDeletions,
@@ -29,6 +31,7 @@ export {
   captureJobs,
   captureLogs,
   captureShards,
+  comments,
   contentUses,
   labelTypes,
   notificationChannels,
@@ -39,6 +42,7 @@ export {
   projects,
   schemaMeta,
   siteSettings,
+  snapshots,
   tokens,
   userConnections,
   userInviteTokens,
@@ -76,4 +80,7 @@ export const NEUTRAL_TABLES = [
   buildComponents,
   buildPackageUsage,
   contentUses,
+  snapshots,
+  baselines,
+  comments,
 ] as const;
