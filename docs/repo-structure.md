@@ -53,6 +53,7 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 - `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
 - `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; the `@storyshelf/storage-local` package is removed (ADR 0049 amendment 2026-11-21).
 - `packages/storage` (`@storyshelf/storage`) holds the cloud storage adapters as subpaths `/s3`, `/gcs` and `/azure` (`src/<backend>/`, each with its own contract and live tests) and `/local`, a re-export of core's `storage/local`. The SDKs are optional peers that only their own subpath loads (`src/peer-isolation.test.ts`).
+- `packages/common` (`@storyshelf/common`) holds the dependency-light code shared across packages: `settings` (`readSetting`, the renamed table), `http` (`httpJson`, the outbound guard), `redact`, `tracing` (spans, propagation, memoized instruments), `errors`, `ids` and the `Logger` type. Its only runtime dependency is `@opentelemetry/api`. Core re-exports every moved name from its existing subpaths (`utils`, `config`, `telemetry`).
 - `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
   `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
   storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from

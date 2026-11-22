@@ -33,7 +33,12 @@ export function recordSpans(): { spans: RecordedSpan[]; stop: () => void } {
   } as unknown as Tracer;
   trace.disable();
   trace.setGlobalTracerProvider({ getTracer: () => tracer });
-  return { spans, stop: () => trace.disable() };
+  return {
+    spans,
+    stop: (): void => {
+      trace.disable();
+    },
+  };
 }
 
 function spanOf(record: RecordedSpan): Span {
@@ -57,7 +62,7 @@ function spanOf(record: RecordedSpan): Span {
       record.ended = true;
     },
     isRecording: (): boolean => true,
-    spanContext: () => ({ traceId: "0".repeat(32), spanId: "0".repeat(16), traceFlags: 0 }),
+    spanContext: (): object => ({ traceId: "0".repeat(32), spanId: "0".repeat(16), traceFlags: 0 }),
   };
   return span as unknown as Span;
 }

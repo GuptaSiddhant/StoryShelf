@@ -219,6 +219,7 @@
   "dependencies": {
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "axe-core": "4.13.0",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",

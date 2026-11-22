@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { recordSpans } from "./test-helpers/span-recorder.ts";
+import { recordSpans } from "./span-recorder.ts";
 import {
   currentTraceparent,
   injectTraceContext,

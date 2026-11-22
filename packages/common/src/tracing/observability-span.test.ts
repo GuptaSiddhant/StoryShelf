@@ -1,10 +1,10 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import { afterEach, describe, expect, it } from "vitest";
-import { HttpError } from "../utils/index.ts";
-import { withSpan } from "./span.ts";
+import { HttpError } from "../http/http.ts";
+import { withObservabilitySpan } from "./observability-span.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 
-describe("withSpan", () => {
+describe("withObservabilitySpan", () => {
   let telemetry: TestTelemetry | undefined;
 
   afterEach(async () => {
@@ -14,7 +14,7 @@ describe("withSpan", () => {
 
   async function recorded(thrown: unknown) {
     telemetry = installTestTelemetry();
-    const caught = await withSpan("test.secret", async () => {
+    const caught = await withObservabilitySpan("test.secret", async () => {
       await Promise.resolve();
       throw thrown;
     }).catch((error: unknown) => error);
@@ -25,7 +25,7 @@ describe("withSpan", () => {
 
   it("returns the callback value with attributes", async () => {
     telemetry = installTestTelemetry();
-    const result = await withSpan(
+    const result = await withObservabilitySpan(
       "test.operation",
       async (span) => {
         span.setAttribute("extra", "yes");
@@ -44,7 +44,7 @@ describe("withSpan", () => {
   it("marks ERROR and rethrows", async () => {
     telemetry = installTestTelemetry();
     await expect(
-      withSpan("test.failing", async () => {
+      withObservabilitySpan("test.failing", async () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
@@ -55,7 +55,7 @@ describe("withSpan", () => {
   });
 
   it("is a noop-safe passthrough without a provider", async () => {
-    const result = await withSpan("test.noop", async () => "ok");
+    const result = await withObservabilitySpan("test.noop", async () => "ok");
     expect(result).toBe("ok");
   });
   describe("recorded exceptions", () => {

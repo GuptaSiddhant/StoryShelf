@@ -305,6 +305,33 @@ function assertNoDependencies(tarballs, dir) {
   log("create-storyshelf installs with no dependency");
 }
 
+/**
+ * `@storyshelf/common` installed alone (#1334): its manifest and its install hold `@opentelemetry/api` and
+ * nothing else, no `@storyshelf/*` package among them, and every subpath imports from that install.
+ */
+function assertCommonAlone(scratch, tarballs) {
+  const pack = JSON.parse(run("tar", ["-xOf", tarballs["@storyshelf/common"], "package/package.json"]));
+  const declared = Object.keys(pack.dependencies ?? {}).join();
+  if (declared !== "@opentelemetry/api") {
+    fail(`@storyshelf/common declares dependencies other than @opentelemetry/api: ${declared}`);
+  }
+  const dir = installAlone(scratch, "@storyshelf/common", tarballs, "common-alone");
+  const installed = readdirSync(join(dir, "node_modules")).filter((name) => !name.startsWith("."));
+  if (installed.toSorted().join() !== "@opentelemetry,@storyshelf") {
+    fail(`@storyshelf/common installed more than itself and the OpenTelemetry API: ${installed.join(", ")}`);
+  }
+  const scopes = readdirSync(join(dir, "node_modules/@storyshelf")).join();
+  if (scopes !== "common") {
+    fail(`@storyshelf/common pulled in another @storyshelf package: ${scopes}`);
+  }
+  const subpaths = Object.keys(pack.exports ?? {}).filter((key) => key !== "./package.json");
+  const check = subpaths
+    .map((key) => `await import("@storyshelf/common/${key.slice(2)}");`)
+    .join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+  log(`@storyshelf/common installs alone and ${subpaths.length} subpaths import`);
+}
+
 /** `storyshelf-mcp` answers `--help` with its subcommands, and `init` scaffolds a project from defaults. */
 async function assertMcpBin(scratch, tarballs) {
   const dir = installAlone(scratch, "@storyshelf/mcp", tarballs, "mcp-tool");
@@ -496,6 +523,7 @@ async function main() {
     log(`packed ${Object.keys(tarballs).length} packages`);
     assertArchives(tarballs);
     assertS3OnlyInstall(scratch, tarballs);
+    assertCommonAlone(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

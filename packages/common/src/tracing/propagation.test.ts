@@ -1,13 +1,13 @@
 import { trace } from "@opentelemetry/api";
 import { afterEach, describe, expect, it } from "vitest";
+import { withObservabilitySpan as withSpan } from "./observability-span.ts";
+import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
 import {
   currentTraceparent,
   injectTraceContext,
   parentContext,
   TRACEPARENT_HEADER,
-} from "./propagate.ts";
-import { withSpan } from "./span.ts";
-import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";
+} from "./tracing.ts";
 
 describe("trace propagation", () => {
   let telemetry: TestTelemetry | undefined;
