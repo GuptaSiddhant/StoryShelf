@@ -83,16 +83,21 @@ const names: ns.ConstraintNames = {
 
 /**
  * A column with its flags. MySQL 8 (and TiDB, PlanetScale) gives a `TEXT` column no literal
- * default, so a `json<T>` default is applied by Drizzle on insert (`$defaultFn`) and the DDL has
- * none, as `ddl.ts` writes it.
+ * default, so the default of a `text` or `json<T>` column is applied by Drizzle on insert
+ * (`$defaultFn`) and the DDL has none, as `ddl.ts` writes it.
  */
 function mysqlColumn(spec: ns.ColumnSpec): ns.ModifiableBuilder {
   const builder = COLUMNS[spec.kind](spec) as ns.InsertDefaultBuilder;
-  if (spec.kind !== "json") {
+  if ((spec.kind !== "json" && spec.kind !== "text") || spec.defaultValue === undefined) {
     return ns.applyFlags(builder, spec, spec.name);
   }
-  const { defaultValue: _textDefault, ...withoutDdlDefault } = spec;
-  return ns.withJsonInsertDefault(ns.applyFlags(builder, withoutDdlDefault, spec.name), spec);
+  const { defaultValue, ...withoutDdlDefault } = spec;
+  const flagged = ns.applyFlags(builder, withoutDdlDefault, spec.name);
+  if (spec.kind === "json") {
+    return ns.withJsonInsertDefault(flagged, spec);
+  }
+  flagged.$defaultFn(() => defaultValue);
+  return flagged;
 }
 
 /** Build the MySQL table of a neutral table. `resolve` finds referenced tables by SQL name. */

@@ -188,6 +188,33 @@ describe("Postgres table factory (spike #800)", () => {
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
+  it("infers the hand-written integration row types", () => {
+    expectTypeOf(pgTableOf(ns.designLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designLinks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.designCredentials, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designCredentials.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.designNodes, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designNodes.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.insights, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.insights.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.aiUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiUsage.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.aiBudgetAlerts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiBudgetAlerts.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.gitConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitConnections.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitRepositoryLinks.$inferSelect
+    >();
+  });
+
   it("maps json<T> to TEXT that parses on read", async () => {
     type Doc = { a?: number };
     const docs = ns.defineTable("docs", {

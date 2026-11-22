@@ -151,6 +151,33 @@ describe("SQLite table factory (spike #800)", () => {
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
+  it("infers the hand-written integration row types", () => {
+    expectTypeOf(sqliteTableOf(ns.designLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designLinks.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.designCredentials, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designCredentials.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.designNodes, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designNodes.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.insights, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.insights.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.aiUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiUsage.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.aiBudgetAlerts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiBudgetAlerts.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.gitConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitConnections.$inferSelect
+    >();
+    expectTypeOf(sqliteTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitRepositoryLinks.$inferSelect
+    >();
+  });
+
   it("maps json<T> to TEXT that parses on read", async () => {
     type Doc = { a?: number };
     const docs = ns.defineTable("docs", {
