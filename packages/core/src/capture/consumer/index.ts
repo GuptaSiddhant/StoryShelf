@@ -94,12 +94,14 @@ interface Consuming {
   isStopped: () => boolean;
 }
 
-/** One start-to-drain session: sweep, check the engine, poll until stopped, drain. */
+/** One start-to-drain session: sweep, check the engine (only with a `capture` handler), poll until stopped, drain. */
 async function consume(c: Consuming): Promise<void> {
   const { options, rt } = c;
   const sweep = sweepScratch(options.scratchDir ?? options.capture?.scratchDir, rt.logger);
   try {
-    await ensureImageEngine(rt.logger);
+    if (rt.handlers.has("capture")) {
+      await ensureImageEngine(rt.logger);
+    }
     if (!c.isStopped()) {
       await pollUntilStopped(c);
     }
