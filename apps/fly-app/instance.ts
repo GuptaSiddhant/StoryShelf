@@ -41,6 +41,7 @@ import { aiFromEnv, aiLogFields } from "./ai.ts";
 import { databaseDeps } from "./demo-viewer-db.ts";
 import { ensureDemoViewer } from "./demo-viewer.ts";
 import { refuseLegacyVariables } from "./legacy-env.ts";
+import { requireAuthOnFly } from "./require-auth.ts";
 import { browsersFor, spriteFromEnv } from "./sprite.ts";
 import { storageFromEnv } from "./storage.ts";
 
@@ -175,7 +176,7 @@ function openParts(
   };
 }
 
-/** SHELF_ADMIN_PASSWORD without a valid SHELF_SECRET refuses to start (createShelfAuth throws); never auth off. */
+/** SHELF_ADMIN_PASSWORD without a valid SHELF_SECRET refuses to start (createShelfAuth throws). On Fly, `requireAuthOnFly` already refused a missing password (#1360). */
 function authOf(
   env: Env,
   database: ShelfOptions["database"],
@@ -256,6 +257,7 @@ function openGit(env: Env, logger: Logger): ReturnType<typeof gitFromEnv> {
 /** The demo's options: everything comes from `env` (the bin's `process.env`, `.env` already loaded). */
 async function demoOptions(env: Env): Promise<ShelfOptions> {
   refuseLegacyVariables(env);
+  requireAuthOnFly(env);
   const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? "/data";
   const config = configOf(env, dataDir);
   // Observability first (noop unless OTEL_EXPORTER_OTLP_ENDPOINT is set).
