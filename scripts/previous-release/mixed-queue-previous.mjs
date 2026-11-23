@@ -27,13 +27,22 @@ const [dialect, seconds, log] = process.argv.slice(2);
 const dataDir = process.env["DATA_DIR"] ?? ".data";
 const RELEASE = "previous";
 
+/** 0.15.0 folded the database packages into `@storyshelf/db/<dialect>`; older releases ship `@storyshelf/db-<dialect>`. */
+function importDatabase(dialectName) {
+  return import(`@storyshelf/db/${dialectName}`).catch((error) =>
+    error?.code === "ERR_MODULE_NOT_FOUND"
+      ? import(`@storyshelf/db-${dialectName}`)
+      : Promise.reject(error),
+  );
+}
+
 async function openDatabase() {
   if (dialect === "sqlite") {
-    const { createSqliteDatabase } = await import("@storyshelf/db-sqlite");
+    const { createSqliteDatabase } = await importDatabase("sqlite");
     return createSqliteDatabase(`${dataDir}/shelf.db`);
   }
   if (dialect === "postgres") {
-    const { createPostgresDatabase } = await import("@storyshelf/db-postgres");
+    const { createPostgresDatabase } = await importDatabase("postgres");
     return createPostgresDatabase({ url: process.env["DATABASE_URL"] });
   }
   throw new Error(`unknown dialect: ${dialect}`);

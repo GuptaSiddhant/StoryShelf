@@ -47,11 +47,26 @@ if [ "$DIALECT" = postgres ]; then
   psql "$DATABASE_URL" -qc "DROP SCHEMA public CASCADE; CREATE SCHEMA public"
 fi
 
-# The published release, exactly as an operator installs it.
-# Before 0.15.0 local storage was its own package; from 0.15.0 it is `@storyshelf/core/storage/local`.
-PKGS=("@storyshelf/app@$PREV" "@storyshelf/core@$PREV" "@storyshelf/db-$DIALECT@$PREV")
+# The published release, exactly as an operator installs it. 0.15.0 folded the database packages
+# into `@storyshelf/db` (subpath per dialect) and local storage into `@storyshelf/core/storage/local`.
+# 0.15.0's job consumers also check the image engine whatever their handlers (#1362), so its install
+# needs `pngjs` and `pixelmatch` (the core peer ranges), as a testing install has through the runner.
+PKGS=("@storyshelf/app@$PREV" "@storyshelf/core@$PREV")
 if [ "$(echo "$PREV" | awk -F. '{ print ($1 == 0 && $2 < 15) }')" = 1 ]; then
-  PKGS+=("@storyshelf/storage-local@$PREV")
+  PKGS+=("@storyshelf/db-$DIALECT@$PREV" "@storyshelf/storage-local@$PREV")
+  TAG_DB_DIR="packages/db-postgres" TAG_DB_FILTER="@storyshelf/db-postgres"
+  TAG_LIVE_TEST="src/postgres.live.test.ts"
+else
+  PKGS+=("@storyshelf/db@$PREV")
+  for peer in pngjs pixelmatch; do
+    PKGS+=("$peer@$(node -p "require('./packages/core/package.json').peerDependencies['$peer']")")
+  done
+  # The drivers are optional peers of `@storyshelf/db`; sqlite uses `node:sqlite`, postgres needs `postgres`.
+  if [ "$DIALECT" = postgres ]; then
+    PKGS+=("postgres@$(node -p "require('./packages/db/package.json').peerDependencies['postgres']")")
+  fi
+  TAG_DB_DIR="packages/db" TAG_DB_FILTER="@storyshelf/db"
+  TAG_LIVE_TEST="src/postgres/postgres.live.test.ts"
 fi
 (cd "$WORK/consumer" && npm init -y >/dev/null && npm install --no-audit --no-fund --silent "${PKGS[@]}")
 cp scripts/previous-release/smoke-previous.mjs scripts/previous-release/mixed-queue-previous.mjs \
@@ -74,10 +89,10 @@ if [ "$DIALECT" = postgres ] && [ "${RUN_TAG_SUITES:-1}" = 1 ]; then
   git worktree remove --force "$WORK/tag" 2>/dev/null || true
   git worktree add --detach "$WORK/tag" "v$PREV" >/dev/null
   trap 'git worktree remove --force "$WORK/tag" 2>/dev/null || true' EXIT
-  (cd "$WORK/tag" && nub ci >/dev/null && nubx turbo run build --filter="@storyshelf/db-postgres^..." >/dev/null)
+  (cd "$WORK/tag" && nub ci >/dev/null && nubx turbo run build --filter="$TAG_DB_FILTER^..." >/dev/null)
   # Disposable service database: the suites clear and claim shared rows.
-  (cd "$WORK/tag/packages/db-postgres" && LIVE_CLOUD=1 POSTGRES_SCHEMA_MUTATION_TEST=0 \
-    nubx vitest run src/postgres.live.test.ts)
+  (cd "$WORK/tag/$TAG_DB_DIR" && LIVE_CLOUD=1 POSTGRES_SCHEMA_MUTATION_TEST=0 \
+    nubx vitest run "$TAG_LIVE_TEST")
 fi
 if [ "${RUN_MIXED_QUEUE:-1}" = 1 ]; then
   echo "== step 5: mixed queue, $PREV's consumers beside this checkout's"
