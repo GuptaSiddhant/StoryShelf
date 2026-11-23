@@ -8,7 +8,11 @@ import {
   readSetting,
   refuseRenamedSettings,
 } from "@storyshelf/core/config";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+import {
+  createEmailNotifier,
+  smtpPresetFromEnv,
+  vapidConfigFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db/sqlite";
@@ -136,11 +140,16 @@ const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 // (undefined keeps invites out-of-band).
 const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
+// Web push (ADR 0048): off without SHELF_VAPID_PUBLIC_KEY and SHELF_VAPID_PRIVATE_KEY; the subject
+// (SHELF_VAPID_SUBJECT) is then required.
+const vapid = vapidConfigFromEnv(env);
+
 const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
   notifications: {
+    ...(vapid ? { vapid } : {}),
     notifiers: (builtIn) =>
       emailSender
         ? builtIn.map((provider) =>

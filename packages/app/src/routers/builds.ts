@@ -115,6 +115,7 @@ import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
+import { registerOffline } from "./offline.ts";
 import {
   badRequest,
   buildSchema,
@@ -302,6 +303,7 @@ export function registerBuilds(app: ShelfRouter): void {
 
   registerSnapshots(app);
   registerStoryStatus(app);
+  registerOffline(app);
   registerComments(app);
   registerBuildReviews(app);
   registerBuildChangeset(app);

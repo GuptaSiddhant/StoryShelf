@@ -18,6 +18,7 @@ import {
   gitFromEnv,
   integrationsFromEnv,
   smtpPresetFromEnv,
+  vapidConfigFromEnv,
 } from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { otelLogMixin } from "@storyshelf/observability";
@@ -32,7 +33,7 @@ import { createCaptureRunner } from "@storyshelf/runner";
  * `SHELF_DATABASE_POOL_MAX`, `SHELF_DATABASE_CA` / `SHELF_DATABASE_CA_FILE`, `SHELF_S3_BUCKET`, `SHELF_GCS_BUCKET` or Azure Blob (`SHELF_AZURE_CONTAINER` is required, with either
  * `SHELF_AZURE_ACCOUNT` [+ `AZURE_CLIENT_ID`] or `SHELF_AZURE_CONNECTION_STRING`) for one object store (local storage on `/data` when none is set),
  * `SHELF_SECRET` (`SHELF_SECRET_PREVIOUS` and `SHELF_SECRET_MIGRATE` to rotate it), `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD`,
- * `SHELF_ADMIN_EMAIL`, `SHELF_SMTP_*`, the server's git connections (`SHELF_GITHUB_APP_ID` +
+ * `SHELF_ADMIN_EMAIL`, `SHELF_SMTP_*`, `SHELF_VAPID_*` (web push, ADR 0048), the server's git connections (`SHELF_GITHUB_APP_ID` +
  * `SHELF_GITHUB_APP_PRIVATE_KEY[_FILE]`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`,
  * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
  * `SHELF_SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
@@ -140,7 +141,11 @@ function notificationsOf(
   integrations: ReturnType<typeof integrationsFromEnv>,
   emailSender: AuthParts["emailSender"],
 ): ShelfOptions["notifications"] {
+  // Web push (ADR 0048): off without SHELF_VAPID_PUBLIC_KEY and SHELF_VAPID_PRIVATE_KEY; the subject
+  // (SHELF_VAPID_SUBJECT) is then required.
+  const vapid = vapidConfigFromEnv(env);
   return {
+    ...(vapid ? { vapid } : {}),
     notifiers: (builtIn) =>
       integrations.notifiers(
         emailSender

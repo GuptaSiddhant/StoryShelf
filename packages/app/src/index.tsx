@@ -82,6 +82,7 @@ import { registerNotificationSubscriptions } from "./routers/notification-subscr
 import { registerPreviewToken } from "./routers/preview-token.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerPush } from "./routers/push.ts";
 import { registerReadGrants } from "./routers/read-grants.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerSignedStorybook } from "./routers/signed-storybook.ts";
@@ -369,6 +370,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     design,
     notifiers,
     publicOrigin,
+    push,
   } = wiring;
   app.use(
     "*",
@@ -392,6 +394,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       publicOrigin,
       design,
       notifiers,
+      push,
       integrations: options.integrations,
       gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
@@ -429,6 +432,7 @@ function registerNotificationRoutes(app: ShelfRouter): void {
   registerNotificationChannels(app);
   registerNotificationSubscriptions(app);
   registerSystemChannels(app);
+  registerPush(app);
 }
 
 /** Register the auth flow: engine mount, relying-party documents, profile. */

@@ -189,6 +189,23 @@ describe("httpJson", () => {
     expect(calledInit.body).toBe(JSON.stringify({ name: "demo" }));
   });
 
+  it("sends a raw byte body as given, without a content type of its own", async () => {
+    const fetchMock = vi.fn(async () => {
+      await Promise.resolve();
+      return new Response("");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const bytes = new Uint8Array([1, 2, 3]);
+    await httpText("https://example.com/push", {
+      method: "POST",
+      headers: { "content-encoding": "aes128gcm" },
+      body: bytes,
+    });
+    const [, calledInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(calledInit.body).toBe(bytes);
+    expect(calledInit.headers).toEqual({ "content-encoding": "aes128gcm" });
+  });
+
   it("throws HttpError with status and body without retrying 4xx", async () => {
     const fetchMock = vi.fn(async () => {
       await Promise.resolve();
