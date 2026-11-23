@@ -7,6 +7,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { REMEASURED_IN, type EnvironmentChange } from "./fingerprint.ts";
 import { persistCapture, type CaptureContext } from "./pipeline.ts";
 
@@ -119,6 +120,7 @@ function world() {
         baselines: db.tables.baselines,
       },
       storage,
+      images: pngImageEngine(),
       project,
       build,
       viewports: [VIEWPORT],

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BuildReferenceLifecycle, DatabaseAdapter } from "../adapters/database.ts";
-import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
+import { createDatabaseCaptureQueue } from "../jobs/db-queue/index.ts";
 import { BuildComponentModel } from "../models/build-component.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import { LabelModel } from "../models/label.ts";

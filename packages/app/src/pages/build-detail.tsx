@@ -1,4 +1,5 @@
-import { groupComponents, parseTestResults } from "@storyshelf/core/capture";
+import { groupComponents } from "@storyshelf/core/catalog";
+import { parseTestResults } from "@storyshelf/core/models";
 import { CaptureAttemptModel, CaptureLogModel, LabelModel } from "@storyshelf/core/models";
 import type { Build, CaptureAttempt, CaptureLog, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";

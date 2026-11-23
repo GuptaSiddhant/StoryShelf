@@ -5,11 +5,11 @@ import type { DatabaseAdapter } from "../../packages/core/src/adapters/database.
 import {
   createNotifyEnqueuer,
   createNotifyHandler,
-} from "../../packages/core/src/capture/build-state/notify-job.ts";
-import { createCaptureConsumer } from "../../packages/core/src/capture/consumer/index.ts";
-import type { ConsumerJob, KindHandler } from "../../packages/core/src/capture/consumer/types.ts";
-import { createDatabaseCaptureQueue } from "../../packages/core/src/capture/db-queue/index.ts";
-import type { DatabaseCaptureQueue } from "../../packages/core/src/capture/db-queue/types.ts";
+} from "../../packages/core/src/build-state/notify-job.ts";
+import { createCaptureConsumer } from "../../packages/core/src/jobs/consumer/index.ts";
+import type { ConsumerJob, KindHandler } from "../../packages/core/src/jobs/consumer/types.ts";
+import { createDatabaseCaptureQueue } from "../../packages/core/src/jobs/db-queue/index.ts";
+import type { DatabaseCaptureQueue } from "../../packages/core/src/jobs/db-queue/types.ts";
 import { createShelfLogger } from "../../packages/core/src/logger.ts";
 import { CaptureJobModel } from "../../packages/core/src/models/capture-job.ts";
 import type { CaptureJobKind, CaptureJobRow } from "../../packages/core/src/schema/capture-job.ts";

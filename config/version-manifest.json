@@ -38,18 +38,6 @@
           "optional": true,
           "subpaths": ["./adapter/email-sender"]
         },
-        "pixelmatch": {
-          "range": "^7.1.0",
-          "optional": true
-        },
-        "pngjs": {
-          "range": "^7.0.0",
-          "optional": true
-        },
-        "sharp": {
-          "range": ">=0.34.0",
-          "optional": true
-        },
         "vitest": {
           "range": "^5.0.5",
           "optional": true
@@ -134,6 +122,10 @@
         "@storyshelf/core": {
           "range": "0.15.1",
           "optional": false
+        },
+        "sharp": {
+          "range": ">=0.34.0",
+          "optional": true
         }
       }
     },

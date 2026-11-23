@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ConsumerJob, JobRunContext, KindHandler } from "../../jobs/consumer/types.ts";
 import { FakeChild } from "../../test-helpers/fake-child.ts";
-import type { ConsumerJob, JobRunContext, KindHandler } from "../consumer/types.ts";
 import { createForkedCaptureHandler, type ForkedCaptureOptions } from "./forked-capture.ts";
 
 const tick = async (ms = 0): Promise<void> => {

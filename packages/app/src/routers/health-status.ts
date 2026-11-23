@@ -1,3 +1,4 @@
+import type { ImageEngine } from "@storyshelf/core/adapter/capture-runner";
 /**
  * Status rows for the admin health report: facts an operator depends on that need no probe
  * (telemetry export, image engine, public origin, Storybook hosting). They never change the report
@@ -6,7 +7,6 @@
  */
 import { hostingModeOf, type ShelfConfig, storybookHostingOf } from "@storyshelf/core/config";
 import { readSetting } from "@storyshelf/core/config";
-import { imageEngineState } from "@storyshelf/core/diff";
 import type { PublicOriginResolver } from "@storyshelf/core/models";
 import { redactUrlForLog } from "@storyshelf/core/utils";
 
@@ -27,6 +27,8 @@ export interface StatusInputs {
   env: Readonly<Record<string, string | undefined>>;
   config: ShelfConfig;
   publicOrigin?: PublicOriginResolver | undefined;
+  /** The runner's image engine; absent without `testing`. */
+  images?: Pick<ImageEngine, "state"> | undefined;
 }
 
 /** Same rule as `@storyshelf/observability`: on with an endpoint, or `SHELF_OTEL_ENABLED=true`. */
@@ -48,9 +50,21 @@ export function telemetryRow(env: StatusInputs["env"]): StatusRow {
   };
 }
 
-/** The diff engine and its worker pool; in-thread diffs are noted, never a failure. */
-export function imageEngineRow(): StatusRow {
-  const state = imageEngineState();
+/**
+ * The diff engine and its worker pool; in-thread diffs are noted, never a failure. Without
+ * `testing` there is no engine: a hosting-only instance loads no image library (#1365).
+ */
+export function imageEngineRow(images?: Pick<ImageEngine, "state">): StatusRow {
+  if (images === undefined) {
+    return {
+      id: "image-engine",
+      label: "Image engine",
+      value: "off",
+      tone: "off",
+      detail: "no testing",
+    };
+  }
+  const state = images.state();
   const where = state.inThread
     ? "diffs run on the main thread"
     : `${state.workers} diff worker${state.workers === 1 ? "" : "s"}`;
@@ -109,7 +123,7 @@ export function hostingRow(config: ShelfConfig): StatusRow {
 export async function collectStatusRows(inputs: StatusInputs): Promise<StatusRow[]> {
   return [
     telemetryRow(inputs.env),
-    imageEngineRow(),
+    imageEngineRow(inputs.images),
     await publicOriginRow(inputs.publicOrigin),
     hostingRow(inputs.config),
   ];

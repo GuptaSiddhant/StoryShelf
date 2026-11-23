@@ -18,10 +18,12 @@ SHELF_DATA_DIR=.dev-data node --conditions=source --experimental-transform-types
 fly apps create storyshelf
 fly volumes create storyshelf_data --region iad --size 1
 fly secrets set SHELF_SECRET=$(openssl rand -hex 32) --app storyshelf
-# optional: fly secrets set SHELF_ADMIN_PASSWORD=... --app storyshelf
+fly secrets set SHELF_ADMIN_PASSWORD=... --app storyshelf   # required on Fly (see below)
 fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile --remote-only
 fly status -a storyshelf
 ```
+
+**Sign-in is required on Fly (#1360).** With `FLY_APP_NAME` set (Fly does), `instance.ts` throws at boot, naming the missing setting, unless both `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` are set, so the health check fails and Fly keeps the previous machine instead of serving an open app. `SHELF_ALLOW_NO_AUTH=1` opts out for a deliberately open demo. Without `FLY_APP_NAME` (local runs) no password still means auth off. `fly-dry-run.yml` boots the image with sign-in on and asserts `auth: true` from `/api/v1/health`.
 
 `.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. The demo shows one project, `storyshelf-ui` (the app's own Storybook, uploaded by `app-storybook.yml`). The `seed` job runs `seed.sh` after each deploy: it deletes the old seeded `demo-design-system` project through the admin API (a no-op once it is gone) and creates `storyshelf-ui` when missing. The one published read-only account `demo@storyshelf.js.org` (`SHELF_READ_ONLY_ACCOUNTS`, #1274) is created by the server at boot from the `SHELF_DEMO_VIEWER_PASSWORD` Fly secret (`demo-viewer.ts`) and made a viewer of `storyshelf-ui` only; set the secret with `fly secrets set SHELF_DEMO_VIEWER_PASSWORD=...` (never in `fly.toml`). It needs the `SHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 

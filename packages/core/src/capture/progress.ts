@@ -1,5 +1,5 @@
 /** Progress reporting for a running capture job, kept apart from its logging. */
-import type { JobLease } from "./job-lease.ts";
+import type { JobLease } from "../jobs/job-lease.ts";
 
 /**
  * Called by a capture as it moves: a screenshot taken, a snapshot persisted, a stage done. Cheap

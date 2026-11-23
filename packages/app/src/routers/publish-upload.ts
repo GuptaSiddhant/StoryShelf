@@ -1,3 +1,5 @@
+import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
+import { BuildModel } from "@storyshelf/core/models";
 /**
  * What the zip upload route does once the zip is stored (ADR 0006, decision 10): extract it
  * inline when it is small, hand it to a `publish` job when it is larger, or refuse it with a
@@ -11,9 +13,7 @@ import {
   resolvePublishLimits,
   ZipInvalidError,
   ZipLimitError,
-} from "@storyshelf/core/capture";
-import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
-import { BuildModel } from "@storyshelf/core/models";
+} from "@storyshelf/core/publish";
 import type { Build } from "@storyshelf/core/schema";
 import { sanitizeErrorText, storybookZipPath } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";

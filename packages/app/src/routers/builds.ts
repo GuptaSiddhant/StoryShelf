@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
 import { contentHostSuffix, DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
+import { ContentCollectingError, recordContentUses } from "@storyshelf/core/publish";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   CONTENT_HASH_PATTERN,

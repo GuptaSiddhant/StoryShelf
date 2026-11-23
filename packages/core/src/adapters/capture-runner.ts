@@ -2,14 +2,10 @@
  * Capture-runner adapter interface: render story screenshots for a build.
  */
 import type { Logger } from "pino";
-import type {
-  StoryEntry,
-  StoryParameters,
-  StorySourceAdapter,
-  Viewport,
-} from "../capture/adapter.ts";
 import type { CaptureTarget, RunnerTarget } from "./capture-target.ts";
+import type { ImageEngine } from "./image-engine.ts";
 import type { Adapter } from "./metadata.ts";
+import type { StoryEntry, StoryParameters, StorySourceAdapter, Viewport } from "./story-source.ts";
 
 export { createTargetOffers, type TargetOffers } from "./capture-target-offers.ts";
 export {
@@ -34,8 +30,19 @@ export type {
 } from "./capture-target.ts";
 
 export type { JobStatus } from "./capture-queue.ts";
+export {
+  DEFAULT_DIFF_OPTIONS,
+  DIFF_WORKERS_ENV,
+  IMAGE_ENGINE_ENV,
+  type DiffOptions,
+  type DiffResult,
+  type ImageEngine,
+  type ImageEngineName,
+  type ImageEngineState,
+  type ImageSettings,
+} from "./image-engine.ts";
 export { RenderRuns } from "./render-runs.ts";
-export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
+export type { StoryEntry, StorySourceAdapter, Viewport } from "./story-source.ts";
 
 /**
  * The rendering environment a runner captured in. Two captures with the same environment (and
@@ -138,6 +145,11 @@ export interface CaptureRunner extends Adapter<{
    */
   readonly targets?: readonly RunnerTarget[];
 }> {
+  /**
+   * The image engine for this runner's captures (#1365): comparison, overlays and thumbnails. Core
+   * and the app reach images only through it; `@storyshelf/runner` supplies `@storyshelf/runner/images`.
+   */
+  readonly images: ImageEngine;
   /**
    * Render configured viewports for the given stories of an extracted
    * Storybook and return the screenshot buffers.

@@ -17,6 +17,7 @@ export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";
 export { FAKE_PNG, fakeUrl, makeFakeDesign, type FakeDesign } from "./fake-design.ts";
 export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
+export { compareBytes, fakeImageEngine } from "./fake-image-engine.ts";
 export { notifierContractSuite, stateNotifierContractSuite } from "./notifier-contract.ts";
 export {
   queueContractSuite,

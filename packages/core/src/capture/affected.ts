@@ -1,10 +1,10 @@
 import { selectAffectedStories } from "@storyshelf/affected";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { StoryEntry, Viewport } from "../adapters/story-source.ts";
 import { BaselineModel, type BaselineTables } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
-import type { StoryEntry, Viewport } from "./adapter.ts";
 import { resolveStoryViewports } from "./storybook.ts";
 
 /**

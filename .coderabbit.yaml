@@ -286,7 +286,7 @@ reviews:
         - Retries come from `testing.retries`; lease renewal is active for the handler lifetime; an exhausted job fails its build.
         - Cancellation cancels every job kind for the build; no in-memory queue, boot sweep or stall handler is reintroduced.
 
-    - path: "packages/core/src/capture/db-queue/**"
+    - path: "packages/core/src/jobs/db-queue/**"
       instructions: |
         Verify queue correctness under concurrency:
         - Claiming is atomic and conditional; two consumers cannot claim one job.

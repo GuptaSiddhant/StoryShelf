@@ -1,5 +1,5 @@
-import type { ConsumerJob } from "@storyshelf/core/capture";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import type { ConsumerJob } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

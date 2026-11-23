@@ -5,7 +5,7 @@ import {
   type CatalogEntry,
   type ComponentBuildRow,
   type EntryChanges,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/catalog";
 import { BuildComponentModel, BuildModel } from "@storyshelf/core/models";
 import type { BuildSummary, ComponentPresence } from "@storyshelf/core/models";
 import type { Build, BuildComponent, Project } from "@storyshelf/core/schema";

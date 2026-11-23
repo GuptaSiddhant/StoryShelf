@@ -1,6 +1,10 @@
-import type { StorageAdapter } from "../adapters/storage.ts";
 /** Diff a stored screenshot against a baseline and persist the overlay; shared by capture and re-diff. */
-import { DEFAULT_DIFF_OPTIONS, diffImagesAsync, type DiffResult } from "../diff/index.ts";
+import {
+  DEFAULT_DIFF_OPTIONS,
+  type DiffResult,
+  type ImageEngine,
+} from "../adapters/image-engine.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
 
 /** Project thresholds that drive a diff. */
 export interface DiffThresholds {
@@ -31,9 +35,12 @@ function samePathResult(): DiffResult {
   };
 }
 
-/** Read two stored PNGs and diff them with the project's thresholds (optionally a per-story pixel threshold). */
+/**
+ * Read two stored PNGs and diff them on the runner's image engine with the project's thresholds
+ * (optionally a per-story pixel threshold).
+ */
 export async function diffStoredScreenshots(
-  storage: StorageAdapter,
+  stores: { storage: StorageAdapter; images: ImageEngine },
   project: DiffThresholds,
   baselinePath: string,
   currentPath: string,
@@ -42,9 +49,9 @@ export async function diffStoredScreenshots(
   if (baselinePath === currentPath) {
     return samePathResult();
   }
-  const current = await storage.read(currentPath);
-  const previous = await storage.read(baselinePath);
-  return await diffImagesAsync(previous, current, {
+  const current = await stores.storage.read(currentPath);
+  const previous = await stores.storage.read(baselinePath);
+  return await stores.images.compare(previous, current, {
     ...DEFAULT_DIFF_OPTIONS,
     pixelThreshold: resolvePixelThreshold(project.pixelThreshold, diffThreshold),
     maxDiffRatio: project.maxDiffRatio,

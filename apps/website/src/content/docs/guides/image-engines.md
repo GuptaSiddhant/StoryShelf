@@ -21,7 +21,7 @@ createShelfApp({
 });
 ```
 
-or set `SHELF_IMAGE_ENGINE=sharp` (the option wins over the variable). Install `sharp` next to StoryShelf; it is an optional peer dependency.
+or set `SHELF_IMAGE_ENGINE=sharp` (the option wins over the variable). Install `sharp` next to StoryShelf; it is an optional peer dependency of `@storyshelf/runner`, which owns the image engine.
 
 If the name is unknown, or `sharp` is not installed or has no binary for the platform, StoryShelf refuses to start (readiness fails under `images`) instead of quietly falling back, so a typo never changes your diffs without anyone noticing. The engine in use is logged on each capture attempt's `render pass finished` line.
 
@@ -68,7 +68,7 @@ Where the gain comes from: decoding and encoding PNGs is what `sharp` accelerate
 The numbers depend on your hardware and screenshots. Reproduce them on yours:
 
 ```sh
-cd packages/core
+cd packages/runner
 nub run bench                  # the StoryShelf UI screenshots
 nub run bench -- ./my-shots    # a folder of NAME-light.png / NAME-dark.png pairs
 ```

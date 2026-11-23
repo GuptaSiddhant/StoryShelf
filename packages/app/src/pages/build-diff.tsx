@@ -1,4 +1,4 @@
-import { parseTestResults } from "@storyshelf/core/capture";
+import { parseTestResults } from "@storyshelf/core/models";
 import type { Build } from "@storyshelf/core/schema";
 import type { Comment } from "@storyshelf/core/schema";
 import type { Project } from "@storyshelf/core/schema";

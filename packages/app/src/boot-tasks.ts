@@ -1,10 +1,7 @@
-import {
-  requestOpenBuildStates,
-  sweepOrphanedScratch,
-  type BuildStatePublisher,
-} from "@storyshelf/core/capture";
+import { requestOpenBuildStates, type BuildStatePublisher } from "@storyshelf/core/build-state";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { sweepOrphanedScratch } from "@storyshelf/core/publish";
 import { backfillContentUses } from "@storyshelf/core/retention";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { syncGitLinks } from "./git-connections.ts";

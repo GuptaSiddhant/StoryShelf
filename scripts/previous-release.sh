@@ -50,7 +50,8 @@ fi
 # The published release, exactly as an operator installs it. 0.15.0 folded the database packages
 # into `@storyshelf/db` (subpath per dialect) and local storage into `@storyshelf/core/storage/local`.
 # 0.15.0's job consumers also check the image engine whatever their handlers (#1362), so its install
-# needs `pngjs` and `pixelmatch` (the core peer ranges), as a testing install has through the runner.
+# needs `pngjs` and `pixelmatch`, as a testing install has through the runner. Their ranges come from
+# the runner's own dependencies: core declares no image library since #1365.
 PKGS=("@storyshelf/app@$PREV" "@storyshelf/core@$PREV")
 if [ "$(echo "$PREV" | awk -F. '{ print ($1 == 0 && $2 < 15) }')" = 1 ]; then
   PKGS+=("@storyshelf/db-$DIALECT@$PREV" "@storyshelf/storage-local@$PREV")
@@ -59,7 +60,7 @@ if [ "$(echo "$PREV" | awk -F. '{ print ($1 == 0 && $2 < 15) }')" = 1 ]; then
 else
   PKGS+=("@storyshelf/db@$PREV")
   for peer in pngjs pixelmatch; do
-    PKGS+=("$peer@$(node -p "require('./packages/core/package.json').peerDependencies['$peer']")")
+    PKGS+=("$peer@$(node -p "require('./packages/runner/package.json').dependencies['$peer']")")
   done
   # The drivers are optional peers of `@storyshelf/db`; sqlite uses `node:sqlite`, postgres needs `postgres`.
   if [ "$DIALECT" = postgres ]; then

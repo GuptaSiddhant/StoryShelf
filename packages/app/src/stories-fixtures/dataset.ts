@@ -1,4 +1,4 @@
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import type {
   Baseline,
   Build,
