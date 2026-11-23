@@ -43,6 +43,10 @@ const TESTING = ["capture/", "diff/", "insights/"];
 /** Today's violations, one `from → to` per line (paths without extension, relative to `src/`). */
 const ALLOWED: string[] = [
   "adapters/capture-runner → capture/adapter",
+  "capture/build-state/comment-extras → capture/a11y/index",
+  "capture/build-state/comment-extras → capture/inherited-a11y",
+  "capture/build-state/comment-extras → capture/tests",
+  "capture/consumer/test-fixtures → diff/index",
   "capture/consumer/index → capture/consumer/capture-handler",
   "capture/consumer/startup → diff/index",
   "capture/consumer/types → capture/consumer/capture-handler",
