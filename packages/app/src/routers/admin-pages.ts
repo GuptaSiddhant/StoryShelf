@@ -1,18 +1,28 @@
+import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/adapter/setup";
 import type { Auth } from "@storyshelf/core/auth";
+import {
+  type CredentialProbe,
+  NotificationChannelModel,
+  ProjectModel,
+} from "@storyshelf/core/models";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
-import { notificationsPaused } from "../notifications-pause.ts";
+import { offeredKinds, unofferedIntegrations, unofferedReason } from "../integrations.ts";
+import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderAdminAiPage } from "../pages/admin-ai.tsx";
+import type { IntegrationsView } from "../pages/admin-system-integrations.tsx";
 import { renderAdminSystemPage, type AdminSystemData } from "../pages/admin-system.tsx";
 import { getStore } from "../store.ts";
-import { runnerTargets } from "../targets.ts";
+import { runnerTargets, unreachableTargets } from "../targets.ts";
 import { flash } from "./flash.ts";
 import { collectHealthReport } from "./health-report.ts";
+import { collectStatusRows } from "./health-status.ts";
 import { requireSiteAdmin } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 
@@ -24,19 +34,29 @@ export interface AdminPageDeps {
   version: string;
 }
 
+/** The full report with the admin-only status rows. */
+async function adminReport(
+  deps: AdminPageDeps,
+  credentials: CredentialProbe | null,
+): ReturnType<typeof collectHealthReport> {
+  const { config, publicOrigin, runner } = getStore();
+  return await collectHealthReport(
+    deps.sources,
+    deps.getSettled(),
+    deps.bootTimeMs,
+    deps.version,
+    credentials,
+    await collectStatusRows({ env: process.env, config, publicOrigin, images: runner?.images }),
+  );
+}
+
 /** Register the site-admin System page (adapter inventory + in-depth health). */
 export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?: Auth): void {
   app.get("/admin", async (c) => {
     requireSiteAdmin(c);
     const { authEnabled, config, db, capturesHere, captureConcurrency, testing } = getStore();
     const credentials = await loadCredentialProbe(db, config);
-    const report = await collectHealthReport(
-      deps.sources,
-      deps.getSettled(),
-      deps.bootTimeMs,
-      deps.version,
-      credentials,
-    );
+    const report = await adminReport(deps, credentials);
     const authMethods = auth?.loginMethods().map((method) => method.label);
     c.header("Cache-Control", "no-store");
     return c.html(
@@ -48,7 +68,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         credentials,
         aiEnabled: getStore().ai !== undefined,
         testing,
-        hiddenSnapshots: testing ? 0 : await countHiddenSnapshots(db),
+        ...(await projectFacts(db, testing)),
         ...(await captureView()),
         // Only a host that runs capture jobs (one with `testing`) is sized here.
         capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
@@ -84,21 +104,52 @@ function reencryptMessage(result: { reencrypted: number; failed: number }): stri
   return result.failed > 0 ? `${base}; ${result.failed} failed — see server logs` : base;
 }
 
-/** Whether the System page warns that notifications are paused. */
-async function pausedView(): Promise<boolean> {
-  const store = getStore();
-  return store.notifiers.length > 0 && (await notificationsPaused(store));
+/**
+ * Every integration's standing, and the stored channels of a kind the server does not offer: kept,
+ * hidden from their project and not delivered to (issue #1126).
+ */
+async function integrationsView(db: DatabaseAdapter): Promise<IntegrationsView> {
+  const names = new Map(
+    unofferedIntegrations("notifiers").map((entry) => [entry.kind, entry.name]),
+  );
+  const rows = await new NotificationChannelModel(db).listOutsideProviders(offeredKinds());
+  const projects = rows.length > 0 ? await new ProjectModel(db).list() : [];
+  const byId = new Map(projects.map((project) => [project.id, project]));
+  const urls = createUrlBuilder("/", getStore().config.publishedBaseDomain);
+  const channels = rows.map((row) => {
+    const project = row.projectId === null ? undefined : byId.get(row.projectId);
+    return {
+      id: row.id,
+      provider: row.provider,
+      providerName: names.get(row.provider) ?? row.provider,
+      project: project
+        ? { name: project.name, href: urls.settingsTab(project.slug, "review") }
+        : null,
+      reason: unofferedReason(row.provider) ?? "",
+    };
+  });
+  return { statuses: getStore().integrations ?? [], channels };
 }
 
-/** The System page's capture browsers and public origin (ADR 0007). */
+/** The System page's capture browsers, public origin (ADR 0007) and integrations (#1126). */
 async function captureView(): Promise<
-  Pick<AdminSystemData, "targets" | "publicOrigin" | "notificationsPaused" | "retentionPause">
+  Pick<
+    AdminSystemData,
+    | "targets"
+    | "unreachable"
+    | "publicOrigin"
+    | "notificationsPaused"
+    | "retentionPause"
+    | "integrations"
+  >
 > {
   return {
+    integrations: await integrationsView(getStore().db),
     retentionPause: getStore().db.retentionPause,
     targets: await runnerTargets(),
+    unreachable: unreachableTargets(),
     publicOrigin: await publicOriginView(),
-    notificationsPaused: await pausedView(),
+    notificationsPaused: await pausedBannerShown(getStore()),
   };
 }
 
@@ -114,4 +165,24 @@ async function publicOriginView(): Promise<AdminSystemData["publicOrigin"]> {
     // Only a deployment with admins can learn an origin from one.
     learns: authEnabled,
   };
+}
+
+/** Snapshots hidden by hosting-only mode, or the projects that count default-branch claims unverified. */
+async function projectFacts(
+  db: DatabaseAdapter,
+  testing: boolean | undefined,
+): Promise<Pick<AdminSystemData, "hiddenSnapshots" | "unverifiedDefault">> {
+  return testing
+    ? { hiddenSnapshots: 0, unverifiedDefault: await unverifiedDefaultProjects(db) }
+    : { hiddenSnapshots: await countHiddenSnapshots(db), unverifiedDefault: [] };
+}
+
+/** Projects that turned default-branch verification off (shown on the System page). */
+async function unverifiedDefaultProjects(
+  db: DatabaseAdapter,
+): Promise<{ name: string; slug: string }[]> {
+  const projects = await new ProjectModel(db).list();
+  return projects
+    .filter((project) => project.requireVerifiedDefault === false)
+    .map((project) => ({ name: project.name, slug: project.slug }));
 }

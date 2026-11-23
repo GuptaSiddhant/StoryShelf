@@ -1,4 +1,4 @@
-<img src="apps/website/public/favicon.svg" alt="" width="72" height="72" />
+<img src="apps/website/src/assets/brand/storyshelf-logo-purple-white-rounded.svg" alt="" width="72" height="72" />
 
 # StoryShelf
 
@@ -19,31 +19,53 @@ An open-source, self-hosted alternative to Chromatic. Run visual regression test
 - **Unlimited snapshots.** MIT-licensed; you pay for your own infrastructure, not per snapshot.
 - **Per-branch baselines** with fallback to the default branch, auto-approved on `main`.
 - **Published Storybook.** Share the latest build of each project at a stable URL.
-- **One `docker run` to self-host**, or Terraform stacks for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
-- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) or Puppeteer renders it, including `play` functions.
+- **One `docker run` to self-host**, or versioned Terraform modules for AWS, Azure, and GCP. Bring your own database and storage; the database is also the capture queue.
+- **Server-side capture.** Upload your built Storybook; Playwright (Chromium, Firefox, WebKit) renders it, including `play` functions.
 - **Review workflow.** Approve or reject, threaded comments, and GitHub/GitLab merge-gate status checks.
 - **Optional AI triage and project health.** Bring your own model: a verdict and per-snapshot notes on every build, plus a 30-day health digest. Advisory only, off by default. [Learn more](https://storyshelf.js.org/ai/).
 
 ## Quick start
 
+Start a server (Docker; sign-in is on, and these three values are required):
+
 ```sh
-docker run -p 3000:3000 -v storyshelf:/data ghcr.io/guptasiddhant/storyshelf
+# Generate SHELF_SECRET once and keep it: the data volume needs the same value on every run.
+export SHELF_SECRET="$(openssl rand -hex 32)"
+export SHELF_PUBLIC_BASE_URL=http://localhost:3000
+# Choose a private admin password (at least 12 characters); it is not echoed.
+printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
+export SHELF_ADMIN_PASSWORD
+docker run -p 127.0.0.1:3000:3000 -v storyshelf:/data \
+  -e SHELF_SECRET -e SHELF_PUBLIC_BASE_URL -e SHELF_ADMIN_PASSWORD \
+  ghcr.io/guptasiddhant/storyshelf
 ```
 
-Open <http://localhost:3000>. SQLite and local storage live on the `/data` volume, and capture uses the
-image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64`
-(`:<version>`, `:latest`, and `-hosting` variants without a browser); see the
-[Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose.
+Then get a first build:
+
+1. Open <http://localhost:3000> and sign in as `admin@example.com` with your `SHELF_ADMIN_PASSWORD`.
+2. Choose **New project**. The project's **Get your first build** card creates a token and shows the upload command.
+3. From your Storybook project, run it (it builds Storybook first if `storybook-static` is missing):
+
+   ```sh
+   SHELF_TOKEN=shelf_… npx storyshelf upload --url http://localhost:3000 --slug my-design-system
+   ```
+
+4. Open the build, approve it as the baseline, and upload again: the second build is compared with it.
+
+Prefer Node.js over Docker? `npx create-storyshelf` scaffolds a server (local accounts by default) with a `.env.example` and a README; it needs the same three values. The full walkthrough, for both paths, is the [getting-started guide](https://storyshelf.js.org/guides/getting-started/).
+
+SQLite and local storage live on the `/data` volume, and capture uses the image's bundled Chromium. Each stable release publishes the image for `amd64` and `arm64` (`:<version>`, `:latest`, and `-hosting` variants without a browser); see the [Docker guide](https://storyshelf.js.org/guides/deployment/docker-compose/) for Postgres, S3 and Compose. `SHELF_AUTH=none` (instead of `SHELF_ADMIN_PASSWORD`) runs without sign-in; the image never turns sign-in off because a variable is missing.
+For AWS, GCP and Azure, and the list of supported targets, see the [deployment guide](https://storyshelf.js.org/guides/deployment/#supported-targets).
 
 ## StoryShelf vs Chromatic
 
-| | Chromatic (SaaS) | StoryShelf (self-hosted) |
-|---|---|---|
-| **Pricing** | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
-| **Hosting** | Chromatic cloud only | Your infrastructure |
-| **Data residency** | US / EU regions | Your database and storage |
-| **Interaction tests** | `play` functions | `play` functions |
-| **Lock-in** | Proprietary | Open source, standard `/api/v1` |
+|                       | Chromatic (SaaS)                        | StoryShelf (self-hosted)                 |
+| --------------------- | --------------------------------------- | ---------------------------------------- |
+| **Pricing**           | 5k snapshots free, then $179/mo per 35k | MIT, unlimited; infrastructure cost only |
+| **Hosting**           | Chromatic cloud only                    | Your infrastructure                      |
+| **Data residency**    | US / EU regions                         | Your database and storage                |
+| **Interaction tests** | `play` functions                        | `play` functions                         |
+| **Lock-in**           | Proprietary                             | Open source, standard `/api/v1`          |
 
 Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromatic-comparison/) · [Migration guide](https://storyshelf.js.org/guides/chromatic-migration/).
 
@@ -53,16 +75,12 @@ Full breakdown: [Chromatic comparison](https://storyshelf.js.org/guides/chromati
 packages/
   core/           @storyshelf/core          — Adapter interfaces, models, capture pipeline, diff, retention (no HTTP)
   app/            @storyshelf/app           — Hono app, API routes, server-rendered UI over core
-  db-sqlite/      @storyshelf/db-sqlite      — SQLite database adapters (node:sqlite default + turso/better-sqlite3/bun-sqlite/d1 presets)
-  db-postgres/    @storyshelf/db-postgres    — Postgres database adapter (postgres.js + Drizzle)
-  storage-local/  @storyshelf/storage-local — local filesystem storage
-  storage-s3/     @storyshelf/storage-s3    — S3-compatible storage
+  db/             @storyshelf/db            — SQLite, Postgres and MySQL database adapters with their driver and cloud presets, one subpath each; each driver is an optional peer
+  storage/        @storyshelf/storage       — S3, GCS and Azure Blob storage, plus `/local`; each SDK is an optional peer
   auth/         @storyshelf/auth        — Better Auth engine (local / social / SSO / passkeys)
-  notify-git/     @storyshelf/notify-git    — GitHub/GitLab commit statuses and PR/MR comments as git notification channels
-  design-figma/   @storyshelf/design-figma  — Figma design links, metadata and rendered previews
-  cli/            storyshelf              — CLI client (server init, init, create, upload, purge, retry)
-  runner-playwright/ @storyshelf/runner-playwright — Playwright capture runner
-  runner-puppeteer/ @storyshelf/runner-puppeteer — Puppeteer capture runner
+  cli/            storyshelf              — CLI client (init, create, upload, purge, retry)
+  create-storyshelf/ create-storyshelf       — `npm create storyshelf`: scaffolds a server project
+  runner/         @storyshelf/runner — Playwright capture runner
   observability/  @storyshelf/observability — OpenTelemetry tracing/metrics/log-correlation
   ai/             @storyshelf/ai — AI insights (build triage, project health) on the Vercel AI SDK
 apps/
@@ -87,22 +105,15 @@ nub run test                     # turbo test
 nub run verify                   # build + lint + test
 ```
 
-## Getting started
-
-Requires Node.js 24 or later.
-
-```sh
-npx storyshelf server init  # scaffold a server project
-cd my-storyshelf
-npm install
-npm start                        # start the server
-```
-
 ## Documentation
 
 - Each package ships a `README.md` covering its use case, install, API, and an example.
 - `apps/website/` hosts the public docs site (Astro Starlight): getting-started, CI, deployment, auth, and concept guides.
 - `docs/architecture/` is the full architecture spec; `docs/adr/` records design decisions (older ADRs and plans are under `docs/adr/archive/` and `docs/archive/`).
+
+## Help and support
+
+Ask questions and share ideas in [GitHub Discussions](https://github.com/GuptaSiddhant/StoryShelf/discussions). File a bug with the [bug form](https://github.com/GuptaSiddhant/StoryShelf/issues/new?template=bug-report.yml). What the project promises about upgrades and support is on the [Upgrading and support](https://storyshelf.js.org/guides/support/) page.
 
 ## Contributing
 

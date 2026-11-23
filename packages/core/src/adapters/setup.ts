@@ -5,6 +5,8 @@
  * gates the first request on the shared result. All hooks must be
  * idempotent.
  */
+import type { Ai } from "../ai.ts";
+import type { AuthProviderCheck } from "../auth.ts";
 import type { CaptureRunner } from "./capture-runner.ts";
 import type { DatabaseAdapter } from "./database.ts";
 import type { DesignProvider } from "./design.ts";
@@ -21,6 +23,10 @@ export interface AdapterSetupSources {
   design?: DesignProvider[];
   notifiers?: NotifierProvider[];
   emailSender?: EmailSender;
+  /** The AI surface; the health report calls its free `health()` only (never inference). */
+  ai?: Ai;
+  /** Free reachability checks of the OIDC login providers (health report only). */
+  authProviders?: AuthProviderCheck[];
 }
 
 /** One collected hook bound to its adapter identity. */

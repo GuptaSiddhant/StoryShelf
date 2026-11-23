@@ -7,13 +7,9 @@
  * Serverless hosts poll no queue and keep the direct, best-effort delivery (`notify.ts`).
  */
 import type { NotificationChannel } from "@storyshelf/core/adapter/notifier";
-import {
-  isFinalAttempt,
-  NOTIFY_BACKOFF,
-  type ConsumerJob,
-  type KindHandler,
-} from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import { NOTIFY_BACKOFF } from "@storyshelf/core/build-state";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import { isFinalAttempt, type ConsumerJob, type KindHandler } from "@storyshelf/core/jobs";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { sanitizeErrorText } from "@storyshelf/core/utils";
@@ -193,7 +189,7 @@ export function reviewRequestExhausted(
 
 /** Wire review requests: the enqueuer and handler on the `notify` queue, none when there is no queue. */
 export function setupReviewRequests(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue | null,
 ): ReviewRequestWiring {

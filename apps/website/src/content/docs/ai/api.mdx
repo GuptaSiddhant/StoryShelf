@@ -22,10 +22,10 @@ Generation is asynchronous. A `POST` returns `200` with the cached result when t
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/builds/$BUILD/insights \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" -H "Content-Type: application/json" -d '{}'
+  -H "Authorization: Bearer $SHELF_TOKEN" -H "Content-Type: application/json" -d '{}'
 
 curl $SHELF/api/v1/projects/my-app/builds/$BUILD/insights/latest \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN"
+  -H "Authorization: Bearer $SHELF_TOKEN"
 ```
 
 An insight looks like:

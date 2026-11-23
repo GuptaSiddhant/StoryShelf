@@ -21,7 +21,7 @@ and per-project table creation.
    factory, not in schema or queries. The `DatabaseAdapter` interface does not change between them,
    and exposes typed table handles through `tables` so that code outside the database packages never
    imports a dialect-specific table type.
-2. **SQLite is the default**, in `@storyshelf/db-sqlite`: the `node:sqlite` builtin
+2. **SQLite is the default**, in `@storyshelf/db/sqlite`: the `node:sqlite` builtin
    (`DatabaseSync`) through `drizzle-orm/sqlite-proxy`, so there are no native dependencies. It runs
    in WAL mode with a busy timeout and needs zero configuration (`createSqliteDatabase(path)`).
    The proxy shim is replaced by the native Drizzle `node:sqlite` driver when it is generally
@@ -29,9 +29,9 @@ and per-project table creation.
 3. **SQLite presets** are subpaths of the same package: `./turso` (libSQL over the network, for
    serverless hosts, optional `@libsql/client` peer), `./better-sqlite3` (native, optional peer),
    `./bun-sqlite` (Bun only) and `./d1` (Cloudflare D1 binding, no peer).
-4. **Postgres** lives in `@storyshelf/db-postgres`: `postgres.js` by default, with subpaths `./pg`
+4. **Postgres** lives in `@storyshelf/db/postgres`: `postgres.js` by default, with subpaths `./pg`
    (node-postgres, pooler-safe), `./neon`, `./neon-http`, `./vercel` and `./pglite` (embedded WASM).
-5. **MySQL and MariaDB** live in `@storyshelf/db-mysql`: `mysql2` by default, with subpaths
+5. **MySQL and MariaDB** live in `@storyshelf/db/mysql`: `mysql2` by default, with subpaths
    `./planetscale` and `./tidb` for serverless MySQL.
 6. **Each package ships DDL** (`CREATE TABLE IF NOT EXISTS`) and migrations for its dialect, so a new
    table is added in all three packages together.
@@ -73,5 +73,5 @@ and per-project table creation.
 
 ## Open questions
 
-- Whether `db-sqlite` should adopt Drizzle's native `node:sqlite` driver as soon as it reaches a
+- Whether `@storyshelf/db/sqlite` should adopt Drizzle's native `node:sqlite` driver as soon as it reaches a
   stable release, or wait for the next major.

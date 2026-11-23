@@ -1,11 +1,11 @@
 /** The plan stage: decide what to render, record it as shards, and hand the shards to the queue. */
 import type { Logger } from "pino";
 import type { CaptureTarget } from "../../adapters/capture-runner.ts";
+import type { Viewport } from "../../adapters/story-source.ts";
 import { CaptureAttemptModel, emitAttemptLog } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
-import type { Viewport } from "../adapter.ts";
 import { affectedPathsFor, type InheritedStory } from "../affected.ts";
 import { partitionBrowsers, type MatrixInput } from "../matrix.ts";
 import type { CaptureJobInput, CaptureSummary } from "../orchestrator.ts";

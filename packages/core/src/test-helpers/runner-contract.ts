@@ -1,7 +1,7 @@
 /**
  * Published runner contract suite for first- and third-party adapters.
  *
- * Structural conformance (identity, render/cancel presence). Behavioral
+ * Structural conformance (identity, render/cancel presence, an image engine). Behavioral
  * rendering stays per-package behind real or mocked browsers — the
  * orchestrator owns timeouts, byte guards, and failure caps, so runners
  * only promise to return PNG buffers and honor `cancel`.
@@ -39,6 +39,13 @@ export function runnerContractSuite(label: string, make: RunnerFactory): void {
       const runner = await make();
       expect(typeof runner.render).toBe("function");
       expect(typeof runner.cancel).toBe("function");
+    });
+
+    it("supplies an image engine (#1365)", async () => {
+      const { images } = await make();
+      for (const method of ["configure", "verify", "compare", "downscale", "state", "shutdown"]) {
+        expect(typeof images[method as keyof typeof images], method).toBe("function");
+      }
     });
   });
 }

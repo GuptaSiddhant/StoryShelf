@@ -33,7 +33,7 @@ import Screenshot from "../../components/Screenshot.astro";
 
 1. **Scaffold a server**
 
-   <PackageManagers type="dlx" pkg="storyshelf" args="server init" />
+   <PackageManagers type="create" pkg="storyshelf" />
 
 2. **Upload a Storybook build from CI**
 
@@ -58,7 +58,7 @@ Full walkthrough: [Getting started](./guides/getting-started/).
   </Card>
   <Card title="Server-side capture" icon="rocket">
     Upload your built Storybook; the server renders every story with Playwright (Chromium, Firefox,
-    WebKit) or lightweight Puppeteer. Affected-only capture keeps CI fast.
+    WebKit). Affected-only capture keeps CI fast.
   </Card>
   <Card title="Published Storybook" icon="open-book">
     Share the latest build at `/storybook` or a per-project subdomain, gated to public branches.
@@ -77,7 +77,7 @@ Full walkthrough: [Getting started](./guides/getting-started/).
     never approves for you.
   </Card>
   <Card title="Self-host anywhere" icon="cloud">
-    Docker Compose locally, or Terraform stacks for AWS, Azure and GCP. Bring your own database and
+    Docker Compose locally, or versioned Terraform modules for AWS, Azure and GCP. Bring your own database and
     storage; the database is also the capture queue.
   </Card>
 </CardGrid>
@@ -132,12 +132,12 @@ Agents can read all of it too: the [MCP server](./ai/mcp/) exposes builds, diffs
 
 ## Chromatic comparison at a glance
 
-| Aspect       | Chromatic (SaaS)                        | StoryShelf (self-hosted)                                    |
-| ------------ | --------------------------------------- | ----------------------------------------------------------- |
-| **Pricing**  | 5k snapshots free, then $179/mo per 35k | MIT, unlimited — infra cost only                            |
-| **Browsers** | Chrome, Firefox, Safari, Edge (cloud)   | Chromium/Firefox/WebKit per project + lightweight Puppeteer |
-| **Hosting**  | Chromatic cloud only                    | Your infra — Docker, Fly, Vercel, Lambda, Azure, GCP        |
-| **Data**     | US/EU regions                           | Your DB/storage — full residency                            |
-| **Lock-in**  | Proprietary                             | Open source, standard `/api/v1`                             |
+| Aspect       | Chromatic (SaaS)                        | StoryShelf (self-hosted)                             |
+| ------------ | --------------------------------------- | ---------------------------------------------------- |
+| **Pricing**  | 5k snapshots free, then $179/mo per 35k | MIT, unlimited — infra cost only                     |
+| **Browsers** | Chrome, Firefox, Safari, Edge (cloud)   | Chromium/Firefox/WebKit per project                  |
+| **Hosting**  | Chromatic cloud only                    | Your infra — Docker, Fly, Vercel, Lambda, Azure, GCP |
+| **Data**     | US/EU regions                           | Your DB/storage — full residency                     |
+| **Lock-in**  | Proprietary                             | Open source, standard `/api/v1`                      |
 
 Full breakdown and migration guide: [Comparison](./guides/chromatic-comparison/) · [Migration](./guides/chromatic-migration/).

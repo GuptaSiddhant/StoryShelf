@@ -2,15 +2,12 @@ import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
 const tableWrap = css`
   /* table */
+  position: relative;
   overflow: auto;
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  &:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
   & table {
     width: 100%;
     border-collapse: separate;
@@ -20,7 +17,7 @@ const tableWrap = css`
   & th,
   & td {
     text-align: left;
-    padding: 0.7rem 0.9rem;
+    padding: var(--space-3) var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
   }
@@ -31,7 +28,7 @@ const tableWrap = css`
     background: var(--surface-subtle);
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
@@ -55,8 +52,15 @@ const tableDense = css`
   ${tableWrap}
   & th,
   & td {
-    padding: 0.4rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
   }
+`;
+
+const tableEmptyCell = css`
+  /* table-empty */
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-secondary);
 `;
 
 /**
@@ -67,14 +71,26 @@ const tableDense = css`
  * give each table on a page its own name (two regions with the same name fail
  * axe's `landmark-unique`).
  */
-export const Table: FC<{ dense?: boolean; label: string; children?: unknown }> = ({
-  dense = false,
-  label,
-  children,
-}) => {
+export const Table: FC<{
+  dense?: boolean;
+  label: string;
+  /** "Nothing here" message: one full-width row, no header, and `children` are not rendered. */
+  empty?: unknown;
+  children?: unknown;
+}> = ({ dense = false, label, empty, children }) => {
   return (
     <div class={dense ? tableDense : tableWrap} role="region" aria-label={label} tabindex={0}>
-      {children}
+      {empty === undefined ? (
+        children
+      ) : (
+        <table>
+          <tbody>
+            <tr>
+              <td class={tableEmptyCell}>{empty}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
     </div>
   );
 };

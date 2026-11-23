@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { buildPath, projectSlug, type ToolDef } from "./types.ts";
 
-const project = z.string().optional().describe("Project slug (defaults to STORYSHELF_SLUG)");
+const project = z.string().optional().describe("Project slug (defaults to SHELF_SLUG)");
 
 export const getBuildInsight: ToolDef = {
   name: "get_build_insight",

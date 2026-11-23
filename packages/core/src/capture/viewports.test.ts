@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { StoryEntry, Viewport } from "./adapter.ts";
-import { DEFAULT_VIEWPORTS } from "./adapter.ts";
+import type { StoryEntry, Viewport } from "../adapters/story-source.ts";
+import { DEFAULT_VIEWPORTS } from "../adapters/story-source.ts";
 import { STORYBOOK_BUILTIN_VIEWPORTS, resolveStoryViewports } from "./storybook.ts";
 
 const GLOBAL: Viewport[] = [{ name: "desktop", width: 1280, height: 720 }];

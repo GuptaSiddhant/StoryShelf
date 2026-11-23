@@ -11,11 +11,11 @@ stay until that epic merges.
 StoryShelf runs on AWS, GCP and Azure today through three kinds of cloud-specific code:
 
 - **Presets inside adapters.** Each cloud's database flavour is a subpath of the database adapter:
-  - `db-postgres/neon` and `db-postgres/vercel`;
-  - `db-mysql/planetscale` and `db-mysql/tidb`;
-  - `db-sqlite/d1` and `db-sqlite/turso`.
+  - `@storyshelf/db/postgres/neon` and `@storyshelf/db/postgres/vercel`;
+  - `@storyshelf/db/mysql/planetscale` and `@storyshelf/db/mysql/tidb`;
+  - `@storyshelf/db/sqlite/d1` and `@storyshelf/db/sqlite/turso`.
 
-  Storage has one adapter per cloud, and `storage-s3` also covers R2 and MinIO.
+  Storage has one adapter per cloud, and `@storyshelf/storage/s3` also covers R2 and MinIO.
 
 - **Terraform generators in the developer CLI.** `storyshelf server terraform-{aws,gcp,azure}` is
   about 3,150 lines of TypeScript that print Terraform:
@@ -61,16 +61,18 @@ when the preset is used, as the existing database presets do.
 
 ### 2. Runtime presets
 
-- **`db-postgres/rds-iam`:** connects to RDS or Aurora with short-lived IAM authentication tokens,
+- **`@storyshelf/db/postgres/rds-iam`:** connects to RDS or Aurora with short-lived IAM authentication tokens,
   renewed for each new connection. It uses `@aws-sdk/rds-signer` as an optional peer, so the standard
   AWS credential chain (ECS task role, instance role, web identity) applies. With IAM auth there is
-  no database password to rotate. The AWS module (decision 3) uses it and drops the RDS-managed secret
+  no database password to rotate. It verifies the server certificate by default against bundled
+  Amazon RDS root certificates (`ca` overrides them); skipping verification is an explicit,
+  warned opt-out, because the token is a credential. The AWS module (decision 3) uses it and drops the RDS-managed secret
   from the app.
 - **An `ses` email preset** in core's email integration (ADR 0049): SMTP settings for SES per region,
   with credentials from the environment. It is configuration only, with no SDK. An SES API preset
   follows only on demand.
 - **GCP Cloud SQL and Azure Database for PostgreSQL** get the same IAM or Entra ID token presets
-  (`db-postgres/cloud-sql-iam`, `db-postgres/azure-entra`) later, on the same pattern, when a user
+  (`@storyshelf/db/postgres/cloud-sql-iam`, `@storyshelf/db/postgres/azure-entra`) later, on the same pattern, when a user
   asks.
 
 Every preset keeps the adapter's contract tests. No preset changes behaviour for installs that don't
@@ -136,7 +138,7 @@ Amended by the owner on 2026-11-10.
   - Azure Database for PostgreSQL, Flexible Server.
 
   Postgres has the fenced retention lifecycle (ADR 0039) and runs in the nightly cloud jobs. MySQL
-  is not offered by the modules; an operator can still wire it up by hand. Each module also accepts
+  (which has it on MySQL 8, #376) is not offered by the modules; an operator can still wire it up by hand. Each module also accepts
   an existing database URL instead of creating one.
 
 - **Capture runs in the app's container.** The image includes Playwright's Chromium, and the default
@@ -144,7 +146,8 @@ Amended by the owner on 2026-11-10.
   - Remote browsers (`defineRemote` presets, ADR 0006) are optional, configured from environment
     variables, with endpoints and tokens kept in the cloud's secret store.
   - The Azure module can attach an Azure Playwright Workspace through the existing `azurePlaywright`
-    preset. The nightly Azure run verifies it, because the preset is still marked experimental.
+    preset. A live Azure run will verify it, because the preset is still marked experimental; the
+    module ships without that check (architect, 2026-11-21).
   - No module builds a browser farm.
 - **Scaling is more identical copies.** Every copy serves the app and consumes the database queue, as
   ADR 0006 decision 5 settled when the separate worker package was retired. The modules take

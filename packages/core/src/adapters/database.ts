@@ -4,8 +4,9 @@
  * Canonical home of the database contract — {@link DatabaseAdapter},
  * {@link Tables}, {@link TxStore}, {@link ListOptions}, and
  * {@link DrizzleAdapterOptions}. Driver machinery lives in the database
- * packages (`@storyshelf/db-sqlite`, `@storyshelf/db-postgres`).
+ * packages (`@storyshelf/db/sqlite`, `@storyshelf/db/postgres`).
  */
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
@@ -27,6 +28,8 @@ export {
   type SchemaLevelQuery,
   type SchemaLevelStore,
 } from "./schema-level.ts";
+
+export { readSchemaRelease } from "./schema-release.ts";
 
 export {
   duplicateGroupsSql,
@@ -77,6 +80,8 @@ export interface Tables {
   projectMembers: Table;
   projectGroupMappings: Table;
   contentUses: Table;
+  gitConnections: Table;
+  gitRepositoryLinks: Table;
 }
 
 /** Table keys every DatabaseAdapter must expose (contract + validation share this). */
@@ -155,6 +160,29 @@ export function listSelection(
   return Object.fromEntries([...keys].map((key) => [key, all[key]]));
 }
 
+/** The `limit` and `offset` a list query applies; a missing key is not applied. */
+export interface ListPage {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * The page a list applies, by the rule every adapter has always used: a `limit` only when it is a
+ * number ≥ 0, an `offset` only when it is non-zero (`NaN` neither). Drizzle 1.0 emits whatever it is
+ * given (a negative `LIMIT` is an error on Postgres and MySQL), so each dialect pages through this
+ * and list results stay what they were.
+ */
+export function listPage(opts: Pick<ListOptions, "limit" | "offset">): ListPage {
+  const page: ListPage = {};
+  if (typeof opts.limit === "number" && opts.limit >= 0) {
+    page.limit = opts.limit;
+  }
+  if (opts.offset !== undefined && opts.offset !== 0 && !Number.isNaN(opts.offset)) {
+    page.offset = opts.offset;
+  }
+  return page;
+}
+
 /**
  * Transactional CRUD subset available inside {@link DatabaseAdapter.transact}.
  * Mirrors the adapter surface minus metadata, lifecycle, and raw `all`
@@ -162,19 +190,19 @@ export function listSelection(
  */
 export interface TxStore {
   /** Insert a row and return the inserted record. */
-  insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
+  insert<T extends Table>(table: T, values: InferInsertModel<T>): Promise<InferSelectModel<T>>;
   /** Update a row by id and return the updated record. */
   update<T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
-  ): Promise<T["$inferSelect"]>;
+    values: Partial<InferInsertModel<T>>,
+  ): Promise<InferSelectModel<T>>;
   /** Fetch a single row by id, or null if not found. */
-  get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
+  get<T extends Table>(table: T, id: string): Promise<InferSelectModel<T> | null>;
   /** Delete a row by id. */
   remove(table: Table, id: string): Promise<void>;
   /** List rows matching the given options. */
-  list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
+  list<T extends Table>(table: T, opts?: ListOptions): Promise<InferSelectModel<T>[]>;
   /** Count rows matching an optional where condition. */
   count(table: Table, where?: SQL): Promise<number>;
 }
@@ -374,28 +402,28 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */
-  insert<T extends Table>(table: T, values: T["$inferInsert"]): Promise<T["$inferSelect"]>;
+  insert<T extends Table>(table: T, values: InferInsertModel<T>): Promise<InferSelectModel<T>>;
   /** Update a row by id and return the updated record. */
   update<T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
-  ): Promise<T["$inferSelect"]>;
+    values: Partial<InferInsertModel<T>>,
+  ): Promise<InferSelectModel<T>>;
   /** Atomically update a row only while `where` matches; return the current row, or null if absent.
    * Custom adapters must implement the condition in the same database statement as the update.
    */
   updateWhere<T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
+    values: Partial<InferInsertModel<T>>,
     where: SQL,
-  ): Promise<T["$inferSelect"] | null>;
+  ): Promise<InferSelectModel<T> | null>;
   /** Fetch a single row by id, or null if not found. */
-  get<T extends Table>(table: T, id: string): Promise<T["$inferSelect"] | null>;
+  get<T extends Table>(table: T, id: string): Promise<InferSelectModel<T> | null>;
   /** Delete a row by id. */
   remove(table: Table, id: string): Promise<void>;
   /** List rows matching the given options. */
-  list<T extends Table>(table: T, opts?: ListOptions): Promise<T["$inferSelect"][]>;
+  list<T extends Table>(table: T, opts?: ListOptions): Promise<InferSelectModel<T>[]>;
   /** Count rows matching an optional where condition. */
   count(table: Table, where?: SQL): Promise<number>;
   /** Run an arbitrary SQL query and return typed rows. */

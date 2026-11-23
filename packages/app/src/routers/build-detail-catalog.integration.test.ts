@@ -1,4 +1,4 @@
-import { catalogueBuild } from "@storyshelf/core/capture";
+import { catalogueBuild } from "@storyshelf/core/catalog";
 import { BuildModel, LabelModel } from "@storyshelf/core/models";
 import {
   createTestBuild,

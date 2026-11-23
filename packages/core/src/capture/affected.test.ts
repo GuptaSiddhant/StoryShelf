@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { BuildModel } from "../models/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import type { StoryEntry } from "./adapter.ts";
 import { partitionAffectedStories } from "./affected.ts";
 
 const VIEWPORT = { name: "desktop", width: 1280, height: 720 };

@@ -11,19 +11,19 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { mapLimit } from "../utils/map-limit.ts";
-import { isPathSafe, isSafeSegment } from "../utils/path-security.ts";
-import { contentKey, storybookDir } from "../utils/paths.ts";
-import { parseManifest } from "./catalog/manifest-cache.ts";
-import { ZipInvalidError } from "./publish/invalid-zip.ts";
+import { parseManifest } from "../catalog/manifest-cache.ts";
+import { ZipInvalidError } from "../publish/invalid-zip.ts";
 import {
   DEFAULT_MAX_UNZIPPED_BYTES,
   DEFAULT_MAX_ZIP_ENTRIES,
   ZipLimitError,
   type ExtractionLimits,
-} from "./publish/limits.ts";
-import { jobScratchDir, shardScratchDir } from "./scratch.ts";
-import { extractStorybookToScratch } from "./statics.ts";
+} from "../publish/limits.ts";
+import { jobScratchDir, shardScratchDir } from "../publish/scratch.ts";
+import { extractStorybookToScratch } from "../publish/statics.ts";
+import { mapLimit } from "../utils/map-limit.ts";
+import { isPathSafe, isSafeSegment } from "../utils/path-security.ts";
+import { contentKey, storybookDir } from "../utils/paths.ts";
 
 /** Blobs read and written at once; bounds how many file buffers are in memory together. */
 const MATERIALIZE_CONCURRENCY = 8;

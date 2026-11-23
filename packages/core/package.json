@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/core",
-  "version": "0.11.0",
-  "description": "StoryShelf core: adapter interfaces, models, capture pipeline, diff, and retention (no HTTP).",
+  "version": "0.15.1",
+  "description": "Self-hosted visual testing and review for Storybook: StoryShelf core, with adapter interfaces, models, capture pipeline and retention (no HTTP).",
   "keywords": [
     "chromatic-alternative",
     "self-hosted",
@@ -39,7 +39,7 @@
       "default": "./dist/adapter/capture-queue.mjs"
     },
     "./adapter/capture-runner": {
-      "source": "./src/adapters/capture-runner.ts",
+      "source": "./src/capture/runner-kit.ts",
       "default": "./dist/adapter/capture-runner.mjs"
     },
     "./adapter/database": {
@@ -86,25 +86,33 @@
       "source": "./src/auth.ts",
       "default": "./dist/auth.mjs"
     },
+    "./build-state": {
+      "source": "./src/build-state/index.ts",
+      "default": "./dist/build-state.mjs"
+    },
     "./capture": {
       "source": "./src/capture/index.ts",
       "default": "./dist/capture.mjs"
+    },
+    "./catalog": {
+      "source": "./src/catalog/index.ts",
+      "default": "./dist/catalog.mjs"
     },
     "./config": {
       "source": "./src/config.ts",
       "default": "./dist/config.mjs"
     },
-    "./diff": {
-      "source": "./src/diff/index.ts",
-      "default": "./dist/diff.mjs"
-    },
     "./insights": {
       "source": "./src/insights/index.ts",
       "default": "./dist/insights.mjs"
     },
-    "./integrations/push": {
-      "source": "./src/integrations/push/index.ts",
-      "default": "./dist/integrations/push.mjs"
+    "./integrations": {
+      "source": "./src/integrations/index.ts",
+      "default": "./dist/integrations.mjs"
+    },
+    "./jobs": {
+      "source": "./src/jobs/index.ts",
+      "default": "./dist/jobs.mjs"
     },
     "./logger": {
       "source": "./src/logger.ts",
@@ -130,6 +138,10 @@
       "source": "./src/utils/paths.ts",
       "default": "./dist/paths.mjs"
     },
+    "./publish": {
+      "source": "./src/publish/index.ts",
+      "default": "./dist/publish.mjs"
+    },
     "./retention": {
       "source": "./src/retention/purge.ts",
       "default": "./dist/retention.mjs"
@@ -137,6 +149,14 @@
     "./schema": {
       "source": "./src/schema/index.ts",
       "default": "./dist/schema.mjs"
+    },
+    "./storage/local": {
+      "source": "./src/storage/local/index.ts",
+      "default": "./dist/storage/local.mjs"
+    },
+    "./telemetry": {
+      "source": "./src/telemetry/index.ts",
+      "default": "./dist/telemetry.mjs"
     },
     "./test-helpers": {
       "source": "./src/test-helpers/index.ts",
@@ -172,19 +192,24 @@
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
       "./ai": "./dist/ai.mjs",
       "./auth": "./dist/auth.mjs",
+      "./build-state": "./dist/build-state.mjs",
       "./capture": "./dist/capture.mjs",
+      "./catalog": "./dist/catalog.mjs",
       "./config": "./dist/config.mjs",
-      "./diff": "./dist/diff.mjs",
       "./insights": "./dist/insights.mjs",
-      "./integrations/push": "./dist/integrations/push.mjs",
+      "./integrations": "./dist/integrations.mjs",
+      "./jobs": "./dist/jobs.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",
       "./orm": "./dist/orm.mjs",
       "./orm/pg-core": "./dist/orm/pg-core.mjs",
       "./orm/sqlite-core": "./dist/orm/sqlite-core.mjs",
       "./paths": "./dist/paths.mjs",
+      "./publish": "./dist/publish.mjs",
       "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
+      "./storage/local": "./dist/storage/local.mjs",
+      "./telemetry": "./dist/telemetry.mjs",
       "./test-helpers": "./dist/test-helpers.mjs",
       "./types": "./dist/types.mjs",
       "./urls": "./dist/urls.mjs",
@@ -203,35 +228,57 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/utils/map-limit.test.ts src/utils/session-gate.test.ts src/utils/page-limiter.test.ts src/utils/adaptive-concurrency.test.ts src/capture/rediff.test.ts src/models/build.test.ts src/models/design-credentials.test.ts"
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/utils/map-limit.test.ts src/capture/rediff.test.ts src/models/build.test.ts src/models/design-credentials.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
     "@storyshelf/affected": "workspace:*",
-    "@storyshelf/image": "workspace:*",
-    "axe-core": "4.13.0",
+    "@storyshelf/common": "workspace:*",
     "drizzle-orm": "catalog:",
     "pino": "catalog:",
     "unzipper": "0.12.5",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/jsdom": "^30.0.0",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
+    "@types/nodemailer": "^8.0.2",
     "@types/pngjs": "catalog:",
     "@types/unzipper": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "^0.6.1",
-    "jsdom": "^30.0.1",
+    "nodemailer": "^10.2.1",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
+  "peerDependencies": {
+    "nodemailer": "^10.2.1",
+    "vitest": "^5.0.5"
+  },
+  "peerDependenciesMeta": {
+    "nodemailer": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=24"
+  },
+  "storyshelf": {
+    "peerSubpaths": {
+      "nodemailer": [
+        "./adapter/email-sender"
+      ]
+    }
   }
 }

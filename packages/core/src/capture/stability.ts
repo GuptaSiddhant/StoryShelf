@@ -5,12 +5,13 @@
  */
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { isCaptureTarget } from "../adapters/capture-target.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { BuildModel } from "../models/build.ts";
 import { emitAttemptLog } from "../models/capture-attempt.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
-import type { StoryEntry } from "./adapter.ts";
 import { diffStoredScreenshots } from "./diff-record.ts";
 import { renderWork, type MatrixInput } from "./matrix.ts";
 
@@ -161,7 +162,7 @@ async function differs(
   capture: RenderedSnapshot,
 ): Promise<boolean> {
   const result = await diffStoredScreenshots(
-    input.storage,
+    { storage: input.storage, images: input.runner.images },
     input.project,
     row.screenshotPath,
     await storedPathOf(input, capture),
@@ -180,6 +181,8 @@ async function storedPathOf(input: MatrixInput, capture: RenderedSnapshot): Prom
 
 /** A cancel must stop the capture; any other failure only leaves the snapshots unjudged. */
 async function rethrowIfCancelled(input: MatrixInput, error: unknown): Promise<void> {
+  // The job was cancelled, lost its lease or passed its deadline: stop without a database read.
+  if (error instanceof JobAbortedError) throw error;
   const build = await new BuildModel(input.db, input.tables).get(input.build.id);
   if (build?.status === "cancelled") throw error;
 }

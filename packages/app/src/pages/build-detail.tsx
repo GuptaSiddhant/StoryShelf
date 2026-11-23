@@ -1,4 +1,5 @@
-import { groupComponents, parseTestResults } from "@storyshelf/core/capture";
+import { groupComponents } from "@storyshelf/core/catalog";
+import { parseTestResults } from "@storyshelf/core/models";
 import { CaptureAttemptModel, CaptureLogModel, LabelModel } from "@storyshelf/core/models";
 import type { Build, CaptureAttempt, CaptureLog, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
@@ -17,6 +18,7 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { a11ySummaryNote, type A11ySummary } from "./a11y-violations.tsx";
+import { DefaultBranchNotice } from "./build-branch-notice.tsx";
 import { StaleBaselineNotice } from "./build-diff-stale.tsx";
 import { TestsCard } from "./build-tests.tsx";
 import { ChangeRequestsCard } from "./review-change-requests.tsx";
@@ -103,7 +105,7 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
             <VStack>
               {logs.map((line): Rendered => (
                 <HStack key={line.id} align="baseline" wrap={false}>
-                  <Badge tone={logTone(line.level)}>{line.level}</Badge>
+                  <Badge tone={logTone(line.level)}>{statusLabel(line.level)}</Badge>
                   <span>{line.message}</span>
                   {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
                 </HStack>
@@ -183,6 +185,9 @@ export function BuildDetails(props: BuildDetailsProps): Rendered {
       <VStack>
         <BuildTags build={build} details={details} />
         <DefinitionList items={detailItems(build, details, props.snapshotCount, props.a11y)} />
+        {details.testing ? (
+          <DefaultBranchNotice project={project} build={build} canReview={canReview} />
+        ) : null}
         {details.testing && staleCount > 0 ? (
           <StaleBaselineNotice
             project={project}

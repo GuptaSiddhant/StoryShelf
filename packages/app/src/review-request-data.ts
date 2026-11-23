@@ -3,7 +3,7 @@
  * (`eventId` + target), the parse of a stored job's data, and the enqueuer that skips a request the
  * build already has a job for. References only: never an address, URL or secret.
  */
-import { NOTIFY_MAX_ATTEMPTS } from "@storyshelf/core/capture";
+import { NOTIFY_MAX_ATTEMPTS } from "@storyshelf/core/build-state";
 import { CaptureJobModel } from "@storyshelf/core/models";
 import type { JobQueue } from "./job-queue.ts";
 import type { NotifyDeps, ReviewRequestJob, ReviewTarget } from "./notify.ts";

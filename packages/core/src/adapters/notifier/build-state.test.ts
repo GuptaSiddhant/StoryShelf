@@ -5,9 +5,12 @@ import {
   statusesForBuild,
   type BuildStateBuild,
   type BuildStateChange,
+  type BuildStateExtras,
   type BuildStateFlags,
+  type BuildStateSource,
   type PublishingState,
 } from "./build-state.ts";
+import { ALL_OUTPUTS, type StateOutputs } from "./outputs.ts";
 
 const build = (overrides: Partial<BuildStateBuild> = {}): BuildStateBuild => ({
   id: "b1",
@@ -27,8 +30,12 @@ function run(
     publishing?: PublishingState;
     approvals?: { given: number; required: number };
     changes?: BuildStateChange[];
+    source?: BuildStateSource;
     prefix?: string;
     base?: string;
+    supersededBy?: { id: string; sha: string };
+    outputs?: StateOutputs;
+    extras?: BuildStateExtras;
   } = {},
 ) {
   return statusesForBuild({
@@ -40,6 +47,10 @@ function run(
     publishing: overrides.publishing ?? "success",
     approvals: overrides.approvals,
     changes: overrides.changes,
+    supersededBy: overrides.supersededBy,
+    extras: overrides.extras,
+    source: overrides.source,
+    outputs: overrides.outputs,
   });
 }
 
@@ -164,7 +175,7 @@ describe("statusesForBuild: storybook", () => {
     expect(status).toMatchObject({
       context: "storyshelf/storybook",
       state: "success",
-      url: "https://shelf.example.com/projects/web/storybook/build/b1/",
+      url: "https://shelf.example.com/projects/web/storybook/build/b1/index.html",
     });
   });
 
@@ -266,18 +277,21 @@ describe("statusesForBuild: the comment", () => {
       url: "https://shelf.example.com/projects/web/builds/b1/diff",
       state: "pending",
     });
+    expect(comment?.markdown).toContain("### 🟡 StoryShelf: 3 visual changes need review");
     expect(comment?.markdown).toContain(
-      "[View build](https://shelf.example.com/projects/web/builds/b1/diff)",
+      "[**Review changes →**](https://shelf.example.com/projects/web/builds/b1/diff)",
     );
-    expect(comment?.markdown).toContain("Visual tests: Review open: 3 changes to review");
-    expect(comment?.markdown).toContain("Snapshots: 10 total, 4 changed, 1 approved, 0 rejected");
-    expect(comment?.markdown).toContain("storybook/build/b1/");
+    expect(comment?.markdown).toContain("6 unchanged");
+    expect(comment?.markdown).toContain(
+      "[Storybook](https://shelf.example.com/projects/web/storybook/build/b1/index.html)",
+    );
+    expect(comment?.markdown).toContain("<sub>Commit `abc123`</sub>");
   });
 
   it("leaves out the Storybook link until published, and the summary without testing or review", () => {
     const { comment } = run({ publishing: "pending", flags: { testing: false, review: false } });
-    expect(comment?.markdown).not.toContain("Storybook:");
-    expect(comment?.markdown).not.toContain("Snapshots:");
+    expect(comment?.markdown).not.toContain("[Storybook]");
+    expect(comment?.markdown).not.toContain("unchanged");
   });
 });
 
@@ -368,5 +382,265 @@ describe("statusesForBuild: progress and annotations", () => {
     expect(withTesting.statuses.find((s) => s.name === "storybook")?.annotations).toBeUndefined();
     const review = run({ flags: { testing: false, review: true }, changes: [change(1)] });
     expect(gate(review)?.annotations).toBeUndefined();
+  });
+});
+
+/** A reviewing build that named `main`, with the host's answer and its standing. */
+const claim = (branchVerified: string | null, isDefault = false) => ({
+  status: "reviewing",
+  gitBranch: "main",
+  isDefault,
+  branchVerified,
+});
+
+describe("statusesForBuild: a default-branch claim that did not count (#910)", () => {
+  it.each([
+    ["refused", "Commit is not on main: 3 changes to review"],
+    ["unreachable", "Git host could not confirm main: 3 changes to review"],
+    ["unverified", "Default branch not verified: 3 changes to review"],
+  ])("says why a %s claim waits for review, and never passes", (verification, description) => {
+    const status = gate(run({ build: claim(verification) }));
+    expect(status).toMatchObject({ state: "pending", description });
+  });
+
+  it("reads like any review for a verified or unclaimed build", () => {
+    expect(gate(run({ build: claim("verified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+    expect(gate(run({ build: claim(null) }))?.description).toBe("Review open: 3 changes to review");
+  });
+
+  it("says nothing more for an unverified claim the project counts", () => {
+    expect(gate(run({ build: claim("unverified", true) }))?.description).toBe(
+      "Review open: 3 changes to review",
+    );
+  });
+
+  it("passes only after an approver accepted the changes", () => {
+    const status = gate(
+      run({ build: { ...claim("refused"), status: "approved", approvedCount: 4 } }),
+    );
+    expect(status).toMatchObject({
+      state: "success",
+      description: "Review closed: 4 changes approved",
+    });
+  });
+});
+
+describe("statusesForBuild: a superseded build (ADR 0045)", () => {
+  const supersededBy = { id: "b2", sha: "def4567890" };
+
+  it("keeps the cancelled outcome and says which commit replaced it", () => {
+    for (const flags of [{ testing: true }, { testing: false, review: true }]) {
+      const set = run({ flags, build: { status: "cancelled" }, supersededBy });
+      expect(gate(set)).toMatchObject({ state: "cancelled", description: "Superseded by def4567" });
+      expect(set.comment?.state).toBe("cancelled");
+      expect(set.comment?.markdown).toContain(
+        "Cancelled: superseded by [`def4567`](https://shelf.example.com/projects/web/builds/b2/diff)",
+      );
+    }
+  });
+
+  it("changes nothing for a build that is not cancelled, or has no superseder", () => {
+    expect(gate(run({ build: { status: "reviewing" }, supersededBy }))?.description).not.toContain(
+      "Superseded",
+    );
+    expect(gate(run({ build: { status: "cancelled" } }))).toMatchObject({
+      description: "Cancelled",
+    });
+  });
+});
+
+const skippedSource = (overrides: Partial<BuildStateSource> = {}): BuildStateSource => ({
+  id: "src1",
+  gitSha: "1234567890abcdef",
+  status: "approved",
+  available: true,
+  ...overrides,
+});
+const skippedRun = (overrides: Parameters<typeof run>[0] = {}) =>
+  run({
+    ...overrides,
+    build: { id: "sk1", gitSha: "fedcba0987", status: "skipped", ...overrides.build },
+  });
+
+describe("statusesForBuild: a skipped build (ADR 0044, decision 5)", () => {
+  it("is green with the source's short sha while the source is approved", () => {
+    const set = skippedRun({ source: skippedSource() });
+    expect(gate(set)).toMatchObject({
+      name: "testing",
+      state: "success",
+      description: "No story changed since 1234567",
+      url: "https://shelf.example.com/projects/web/builds/sk1/diff",
+    });
+  });
+
+  it("uses the review gate when only review is on", () => {
+    const set = skippedRun({ source: skippedSource(), flags: { testing: false, review: true } });
+    expect(gate(set)).toMatchObject({
+      name: "review",
+      state: "success",
+      description: "No story changed since 1234567",
+    });
+  });
+
+  it.each([
+    ["rejected", "failure"],
+    ["failed", "failure"],
+    ["cancelled", "cancelled"],
+    ["reviewing", "pending"],
+    ["capturing", "pending"],
+  ])("follows a source that is now %s -> %s", (status, state) => {
+    expect(gate(skippedRun({ source: skippedSource({ status }) }))).toMatchObject({ state });
+  });
+
+  it("fails when the source build no longer exists", () => {
+    const set = skippedRun({});
+    expect(gate(set)).toMatchObject({ state: "failure" });
+    expect(set.statuses.map((status) => status.name)).toEqual(["testing"]);
+  });
+
+  it("links the source's Storybook only while the source is available", () => {
+    const linked = skippedRun({ source: skippedSource() });
+    expect(linked.statuses.find((status) => status.name === "storybook")).toMatchObject({
+      state: "success",
+      informational: true,
+      url: "https://shelf.example.com/projects/web/storybook/build/src1/index.html",
+    });
+    const gone = skippedRun({ source: skippedSource({ available: false }) });
+    expect(gone.statuses.map((status) => status.name)).toEqual(["testing"]);
+  });
+
+  it("shows no gate with neither testing nor review, only the available Storybook", () => {
+    const set = skippedRun({ source: skippedSource(), flags: { testing: false, review: false } });
+    expect(set.statuses.map((status) => status.name)).toEqual(["storybook"]);
+  });
+
+  it("writes one comment line that links both builds and carries the gate state", () => {
+    const set = skippedRun({ source: skippedSource() });
+    expect(set.comment).toMatchObject({
+      url: "https://shelf.example.com/projects/web/builds/sk1/diff",
+      state: "success",
+    });
+    const markdown = set.comment?.markdown ?? "";
+    expect(markdown.split("\n")).toHaveLength(1);
+    expect(markdown).toContain("(https://shelf.example.com/projects/web/builds/sk1/diff)");
+    expect(markdown).toContain(
+      "[`1234567`](https://shelf.example.com/projects/web/builds/src1/diff)",
+    );
+    expect(markdown).toContain("⏭️ StoryShelf: Skipped: no story changed since");
+  });
+
+  it("says so in the comment when the source is gone", () => {
+    expect(skippedRun({}).comment?.markdown).toContain("no longer exists");
+  });
+
+  it("waits (pending) on a source status it does not know, and shows nothing for a local identity", () => {
+    expect(gate(skippedRun({ source: skippedSource({ status: "skipped" }) }))).toMatchObject({
+      state: "pending",
+    });
+    expect(
+      skippedRun({ build: { gitSha: "local-abc123def456" }, source: skippedSource() }),
+    ).toEqual({ statuses: [], comment: null });
+  });
+
+  it("shows nothing without a commit, like any build", () => {
+    expect(skippedRun({ build: { gitSha: "" }, source: skippedSource() })).toEqual({
+      statuses: [],
+      comment: null,
+    });
+  });
+});
+
+const names = (set: ReturnType<typeof run>) => set.statuses.map((status) => status.name);
+const commentOutputs = (comment: StateOutputs["comment"]): StateOutputs => ({
+  ...ALL_OUTPUTS,
+  comment,
+});
+
+describe("statusesForBuild: a repository link's outputs (ADR 0054, decision 10)", () => {
+  const reviewing: { build: Partial<BuildStateBuild>; changes: BuildStateChange[] } = {
+    build: { status: "reviewing" },
+    changes: [change(1)],
+  };
+
+  it("posts everything with every output on, as a per-project channel does", () => {
+    expect(run({ ...reviewing, outputs: ALL_OUTPUTS })).toEqual(run(reviewing));
+  });
+
+  it("always keeps the gate; the Storybook status and annotations can be off", () => {
+    const set = run({
+      ...reviewing,
+      outputs: { storybook: false, comment: "always", annotations: false },
+    });
+    expect(names(set)).toEqual(["testing"]);
+    expect(gate(set)?.annotations).toBeUndefined();
+    expect(set.comment).not.toBeNull();
+  });
+
+  it("keeps the comment always, only for a build with changes, or never", () => {
+    expect(run({ ...reviewing, outputs: commentOutputs("off") }).comment).toBeNull();
+    expect(run({ ...reviewing, outputs: commentOutputs("on-changes") }).comment).not.toBeNull();
+    expect(
+      run({ build: { status: "approved", changedCount: 0 }, outputs: commentOutputs("on-changes") })
+        .comment,
+    ).toBeNull();
+  });
+
+  it("keeps the review gate of a hosting-only project", () => {
+    const set = run({
+      flags: { testing: false, review: true },
+      outputs: { storybook: false, comment: "off", annotations: false },
+    });
+    expect(names(set)).toEqual(["review"]);
+  });
+});
+
+const withChanges = (overrides: Partial<Parameters<typeof run>[0]> = {}) =>
+  run({
+    build: { status: "reviewing" },
+    publishing: "success",
+    changes: [
+      change(1, { storyId: "button--s1", diffRatio: 0.024 }),
+      change(2, { status: "new", storyId: "button--s2" }),
+      change(3, { status: "unchanged" }),
+    ],
+    ...overrides,
+  });
+
+describe("statusesForBuild: the comment's changed stories", () => {
+  it("lists changed and new stories with the review page and the story in the Storybook", () => {
+    const markdown = withChanges().comment?.markdown ?? "";
+    expect(markdown).toContain(
+      "| Button / Story 1 | chromium, desktop | 2.4 % | [review](https://shelf.example.com/projects/web/builds/b1/diff?snapshot=S1) · [story](https://shelf.example.com/projects/web/storybook/build/b1/index.html?path=/story/button--s1) |",
+    );
+    expect(markdown).toContain("| Button / Story 2 | chromium, desktop | new |");
+    expect(markdown).not.toContain("Story 3");
+    expect(markdown).not.toContain("iframe.html");
+  });
+
+  it("links no story until the Storybook is published, and lists none without testing", () => {
+    expect(withChanges({ publishing: "pending" }).comment?.markdown).not.toContain("[story]");
+    const hosting = withChanges({ flags: { testing: false, review: true } }).comment?.markdown;
+    expect(hosting).not.toContain("| Story |");
+  });
+
+  it("gives the gate, not the Storybook status, the comment as its check-run summary", () => {
+    const set = withChanges();
+    for (const status of set.statuses) {
+      expect(status.summary).toBe(status.name === "storybook" ? undefined : set.comment?.markdown);
+    }
+  });
+
+  it("reports a partial capture with the commit's update time and the extras", () => {
+    const markdown =
+      withChanges({
+        build: { status: "reviewing", inheritedCount: 8, updatedAt: "2026-11-20T16:42:00Z" },
+        extras: { failedTests: ["Form / Submit"], a11yCount: 2 },
+      }).comment?.markdown ?? "";
+    expect(markdown).toContain("partial capture (2 of 10 stories)");
+    expect(markdown).toContain("updated 16:42 UTC");
+    expect(markdown).toContain("1 failing Storybook test");
+    expect(markdown).toContain("2 a11y findings");
   });
 });

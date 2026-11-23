@@ -1,8 +1,9 @@
 import { contentHostSuffix } from "@storyshelf/core/config";
-import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
+import { BuildModel, SnapshotModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { loadHealthBadge } from "../insights/health-panel.ts";
+import { visibleProjects } from "../project-visibility.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -28,7 +29,7 @@ const projectGrid = css`
 const setupSummary = css`
   /* setup-summary */
   cursor: pointer;
-  font-weight: 650;
+  font-weight: var(--weight-semibold);
   font-size: var(--text-lg);
   letter-spacing: -0.01em;
 `;
@@ -57,7 +58,7 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
           {open ? (
             <>
               <Meta>1. Create a project (writes .storybook/storyshelf.json for later runs).</Meta>
-              <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $STORYSHELF_ADMIN_TOKEN' />
+              <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $SHELF_ADMIN_TOKEN' />
             </>
           ) : null}
           <Meta>
@@ -104,7 +105,7 @@ function ProjectGrid({
 export async function renderProjectsPage(): Promise<RenderedContent> {
   const { db, user, config } = getStore();
   const urls = createUrlBuilder("/", contentHostSuffix(config));
-  const projects = await new ProjectModel(db).list();
+  const projects = await visibleProjects(db);
   const summaries = await Promise.all(projects.map((project) => summarize(project)));
   const canCreate = !user || user.role === "admin" || user.role === "member";
   const newProject = canCreate ? (

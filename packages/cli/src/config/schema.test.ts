@@ -28,6 +28,7 @@ const CONFIG_KEYS = [
   "skip",
   "affectedOnly",
   "buildStats",
+  "skipUnchanged",
   "untraced",
 ] as const;
 
@@ -66,6 +67,7 @@ describe("storyshelf-config.json parity", () => {
     expect(schema.properties["url"]?.type).toBe("string");
     expect(schema.properties["affectedOnly"]?.type).toBe("boolean");
     expect(schema.properties["buildStats"]?.type).toBe("boolean");
+    expect(schema.properties["skipUnchanged"]?.type).toBe("boolean");
     expect(schema.properties["untraced"]?.type).toBe("array");
   });
 
@@ -91,25 +93,49 @@ describe("storyshelf-config.json parity", () => {
   });
 });
 
-function fakeInstall(target: string): { moduleUrl: string; configDir: string } {
-  const distFile = join(target, "fake-cli", "dist", "config.js");
-  mkdirSync(join(target, "fake-cli", "dist"), { recursive: true });
-  mkdirSync(join(target, "fake-cli", "schema"), { recursive: true });
+function fakeInstall(
+  target: string,
+  root = join("node_modules", "storyshelf"),
+): { moduleUrl: string; configDir: string } {
+  const cli = join(target, root);
+  const distFile = join(cli, "dist", "config.js");
+  mkdirSync(join(cli, "dist"), { recursive: true });
+  mkdirSync(join(cli, "schema"), { recursive: true });
   writeFileSync(distFile, "export {};\n");
-  writeFileSync(join(target, "fake-cli", "schema", "storyshelf-config.json"), "{}\n");
+  writeFileSync(join(cli, "schema", "storyshelf-config.json"), "{}\n");
   mkdirSync(configRoot(), { recursive: true });
   return { moduleUrl: pathToFileURL(distFile).href, configDir: configRoot() };
 }
 
 describe("schemaReference", () => {
-  it("prefers a path relative to the config directory", async () => {
+  it("prefers a path relative to the config directory when installed in the project", async () => {
     const { moduleUrl, configDir } = fakeInstall(dir);
     const expected = toPosix(
-      relative(configDir, join(dir, "fake-cli", "schema", "storyshelf-config.json")),
+      relative(
+        configDir,
+        join(dir, "node_modules", "storyshelf", "schema", "storyshelf-config.json"),
+      ),
     );
     const ref = schemaReference(configDir, { moduleUrl });
     expect(ref).toBe(expected.startsWith(".") ? expected : `./${expected}`);
     expect(ref.endsWith("schema/storyshelf-config.json")).toBe(true);
+  });
+
+  it("writes a versioned URL, not a path, when run from an npx cache", () => {
+    const { moduleUrl, configDir } = fakeInstall(
+      dir,
+      join("cache", "_npx", "abc", "node_modules", "storyshelf"),
+    );
+    expect(schemaReference(configDir, { moduleUrl, version: "1.2.3" })).toBe(
+      "https://unpkg.com/storyshelf@1.2.3/schema/storyshelf-config.json",
+    );
+  });
+
+  it("writes a URL for a CLI that is not under node_modules", () => {
+    const { moduleUrl, configDir } = fakeInstall(dir, "fake-cli");
+    expect(schemaReference(configDir, { moduleUrl, version: "1.2.3" })).toBe(
+      "https://unpkg.com/storyshelf@1.2.3/schema/storyshelf-config.json",
+    );
   });
 
   it("falls back to a versioned unpkg URL without a local schema", () => {

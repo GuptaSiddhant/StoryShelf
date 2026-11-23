@@ -1,5 +1,5 @@
 /** The runs pushed to the capture child and not yet settled, and who may start next. */
-import type { ConsumerJob, JobRunContext } from "../consumer/types.ts";
+import type { ConsumerJob, JobRunContext } from "../../jobs/consumer/types.ts";
 
 /** How a push ended. */
 export type RunVerdict =

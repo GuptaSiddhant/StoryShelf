@@ -20,6 +20,8 @@ const CONCURRENCY = Number(process.env.STORYBOOK_SMOKE_CONCURRENCY ?? 4);
 const BASE = `http://127.0.0.1:${PORT}`;
 const START_TIMEOUT_MS = 240_000;
 const STORY_TIMEOUT_MS = 60_000;
+/** Every story is opened at this width; none may need more (#1133). */
+const PHONE_WIDTH = 390;
 
 /** URLs whose failure is not a story's fault: Chrome asks every new origin for a favicon the dev server lacks. */
 const IGNORED_URLS = [/\/favicon\.ico$/u];
@@ -91,10 +93,64 @@ async function inspect(page, id, errors) {
     errors.push("smoke: the story rendered an empty canvas");
   }
   await page.waitForTimeout(200);
+  await checkPhoneWidth(page, errors);
+  await checkSummaryRing(page, errors);
+}
+
+/** What the story's document measures: the canvas, or the frame inside it for a page story (#1133). */
+async function documentWidths(page) {
+  const own = await page.evaluate(() => ({
+    scroll: globalThis.document.documentElement.scrollWidth,
+    inner: globalThis.innerWidth,
+  }));
+  const frame = page.frames().find((candidate) => candidate !== page.mainFrame());
+  if (!frame) {
+    return own;
+  }
+  await frame.waitForLoadState("load");
+  const inside = await frame.evaluate(() => ({
+    scroll: globalThis.document.documentElement.scrollWidth,
+    inner: globalThis.innerWidth,
+  }));
+  return inside.scroll > own.scroll ? inside : own;
+}
+
+/** No story is wider than a phone: a document that scrolls sideways at 390px fails (#1133). */
+async function checkPhoneWidth(page, errors) {
+  const { scroll, inner } = await documentWidths(page);
+  if (scroll > inner) {
+    errors.push(`width: the document is ${scroll}px wide in a ${inner}px viewport`);
+  }
+}
+
+/** Tab to the first `<summary>` of a story (if any) and fail if it shows the browser's own ring (#1132). */
+async function checkSummaryRing(page, errors) {
+  if ((await page.locator("summary").count()) === 0) {
+    return;
+  }
+  const outline = await focusFirstSummary(page);
+  if (outline === "auto") {
+    errors.push("focus: a <summary> shows the browser's default ring (outline-style: auto)");
+  }
+}
+
+const isSummary = () => globalThis.document.activeElement?.tagName === "SUMMARY";
+
+/** The `outline-style` of the first `<summary>` reached by Tab, or `null` when none is reachable. */
+async function focusFirstSummary(page) {
+  for (let step = 0; step < 60; step += 1) {
+    await page.keyboard.press("Tab");
+    if (await page.evaluate(isSummary)) {
+      return await page.evaluate(
+        () => globalThis.getComputedStyle(globalThis.document.activeElement).outlineStyle,
+      );
+    }
+  }
+  return null;
 }
 
 async function check(browser, id) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: PHONE_WIDTH, height: 844 } });
   const errors = [];
   listen(page, errors);
   try {

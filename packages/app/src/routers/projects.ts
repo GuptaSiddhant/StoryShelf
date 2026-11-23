@@ -7,6 +7,7 @@ import type { ProjectRole } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
+import { visibleProjects } from "../project-visibility.ts";
 import { getStore } from "../store.ts";
 import { assertTargetsSelectable } from "../targets.ts";
 import { toProjectPatch } from "./capture-config.ts";
@@ -41,7 +42,8 @@ const listProjectsRoute = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: projectSchema.array() } },
-      description: "List projects",
+      description:
+        "The projects the signed-in user can open (all with auth off, or for a site admin or viewer)",
     },
     ...unauthorized,
   },
@@ -128,8 +130,7 @@ function assertAiProfileChange(c: Context, profile: string | null | undefined): 
 export function registerProjects(app: ShelfRouter): void {
   app.openapi(listProjectsRoute, async (c) => {
     requireSessionUser();
-    const projects = new ProjectModel(getStore().db);
-    return c.json(await projects.list());
+    return c.json(await visibleProjects());
   });
 
   app.openapi(createProjectRoute, async (c) => {

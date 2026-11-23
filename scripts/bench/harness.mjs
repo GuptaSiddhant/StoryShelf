@@ -30,9 +30,9 @@ export async function startApp(dir) {
   const [{ serve }, { createShelfApp }, sqlite, local, playwright, models] = await Promise.all([
     load("node_modules/@hono/node-server/dist/index.mjs"),
     load("packages/app/dist/index.mjs"),
-    load("packages/db-sqlite/dist/index.mjs"),
-    load("packages/storage-local/dist/index.mjs"),
-    load("packages/runner-playwright/dist/index.mjs"),
+    load("packages/db/dist/sqlite/index.mjs"),
+    load("packages/core/dist/storage/local.mjs"),
+    load("packages/runner/dist/index.mjs"),
     load("packages/core/dist/models.mjs"),
   ]);
   const rawDb = sqlite.createSqliteDatabase(join(dir, "shelf.db"));
@@ -47,7 +47,7 @@ export async function startApp(dir) {
     database: instrument(rawDb, dbCalls),
     storage: instrument(local.createLocalStorage(dir), storageCalls),
     testing: {
-      runner: playwright.createPlaywrightCaptureRunner({ concurrency: PAGES }),
+      runner: playwright.createCaptureRunner({ concurrency: PAGES }),
       concurrency: 1,
     },
     logger,
@@ -99,7 +99,9 @@ export async function upload(system, buildDir, sha) {
     buildDir,
     "--full",
   ]);
-  const id = /Build created: (\w+)/u.exec(stdout)?.[1];
+  const id =
+    /^\s*Build:\s+([0-9A-Z]{26})\s*$/mu.exec(stdout)?.[1] ??
+    /Build created: (\w+)/u.exec(stdout)?.[1];
   if (!id) throw new Error(`no build id in CLI output: ${stdout}`);
   return id;
 }

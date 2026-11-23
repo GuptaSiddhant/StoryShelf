@@ -89,10 +89,16 @@ export type NotifierStateTarget =
       annotations?: StateAnnotation[];
       /** Changed snapshots beyond `annotations` (cut at the cap); the host says "and N more". */
       omitted?: number;
+      /** Markdown a host with a rich summary (a check run) shows in place of the description. */
+      summary?: string;
     }
   | {
       kind: "comment";
       sha: string;
+      /** Project slug: one comment per pull request and project. */
+      project: string;
+      /** The build shown; a comment written for a newer build is left alone. */
+      buildId: string;
       /** Comment body below the idempotency marker. */
       markdown: string;
     };
@@ -119,4 +125,6 @@ export type SystemEventName =
   | "sys:capture-failed"
   | "sys:purge-completed"
   | "sys:notify-failed"
-  | "sys:ai-budget";
+  | "sys:ai-budget"
+  | "sys:target-unreachable"
+  | "sys:target-recovered";

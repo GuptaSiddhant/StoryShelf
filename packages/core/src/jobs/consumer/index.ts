@@ -1,0 +1,229 @@
+/**
+ * The capture consumer (ADR 0006, decisions 4 and 11): consumes any `PollableCaptureQueue` (the
+ * database queue, the IPC queue of a forked capture child) and runs a handler per
+ * job `kind`. A slot is taken before polling, a failing job is retried with exponential backoff
+ * until its last attempt, the lease is kept by the job's progress, a lost lease or a cancel stops
+ * the run, and `stop()` drains the jobs in flight: until they end, or with `graceMs` until the grace
+ * runs out, when the jobs still running are handed back to the queue (`shutdown.ts`, #912).
+ *
+ * ```ts
+ * const queue = createDatabaseCaptureQueue(db);
+ * const consumer = createCaptureConsumer({
+ *   queue,
+ *   handlers: { capture: createCaptureHandler({ db, storage, runner, scratchDir, logger, enqueue }) },
+ *   scratchDir,
+ *   config: { concurrency: 2 },
+ * });
+ * consumer.start(); // resolves after stop()
+ * // on SIGTERM: await consumer.stop({ graceMs: 20_000 });
+ * ```
+ */
+import type { PollableCaptureQueue } from "../../adapters/capture-queue.ts";
+import { createShelfLogger, type Logger } from "../../logger.ts";
+import type { CaptureJobKind } from "../../schema/capture-job.ts";
+import { recommendedBuildConcurrency } from "../../utils/resources.ts";
+import { startPollLoop, type PollLoop } from "../db-queue/poll-loop.ts";
+import { REAL_TIMERS } from "../db-queue/timers.ts";
+import type { DatabaseCaptureQueue } from "../db-queue/types.ts";
+import { startSlotLoop } from "./loop.ts";
+import { startQueueSampling } from "./metrics.ts";
+import {
+  DEFAULT_BACKOFF_MS,
+  DEFAULT_MAX_JOB_SECONDS,
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_WAIT_TIME_SECONDS,
+} from "./retry.ts";
+import { runJob, type JobRuntime } from "./run-job.ts";
+import { createReleaser, drainWithin, type Releaser } from "./shutdown.ts";
+import { sweepScratch } from "./startup.ts";
+import type {
+  CaptureConsumer,
+  CaptureConsumerOptions,
+  ConsumerJob,
+  ConsumerStopOptions,
+  JobHandlers,
+  KindHandler,
+} from "./types.ts";
+
+/** Create a consumer of `options.queue`; nothing runs until `start()`. */
+export function createCaptureConsumer(options: CaptureConsumerOptions): CaptureConsumer {
+  const logger = options.logger ?? createShelfLogger();
+  options.queue.setLogger?.(logger.child({ component: options.queue.metadata.kind }));
+  const rt = buildRuntime(options, logger);
+  claimHandledKinds(options.queue, rt);
+  const slots = options.config?.concurrency ?? recommendedBuildConcurrency();
+  let session: Promise<void> | null = null;
+  let requestStop: ((stop: ConsumerStopOptions) => void) | null = null;
+  let stopRequested = false;
+  return {
+    isRunning: () => session !== null,
+    start: async () => {
+      if (session !== null) {
+        return;
+      }
+      const stopped = Promise.withResolvers<ConsumerStopOptions>();
+      stopRequested = false;
+      requestStop = (stop): void => {
+        stopRequested = true;
+        stopped.resolve(stop);
+      };
+      session = consume({
+        options,
+        rt,
+        slots,
+        stopped: stopped.promise,
+        isStopped: () => stopRequested,
+      });
+      await session.finally(() => {
+        session = null;
+      });
+    },
+    stop: async (stop = {}) => {
+      requestStop?.(stop);
+      await session?.catch(() => {});
+    },
+  };
+}
+
+interface Consuming {
+  options: CaptureConsumerOptions;
+  rt: JobRuntime;
+  slots: number;
+  /** Resolves with the stop's options when `stop()` was called. */
+  stopped: Promise<ConsumerStopOptions>;
+  isStopped: () => boolean;
+}
+
+/** One start-to-drain session: sweep, prepare the handlers (the image engine for `capture`), poll until stopped, drain. */
+async function consume(c: Consuming): Promise<void> {
+  const { options, rt } = c;
+  const sweep = sweepScratch(options.scratchDir, rt.logger);
+  try {
+    for (const handler of rt.handlers.values()) {
+      // oxlint-disable-next-line no-await-in-loop -- one at a time, in registration order
+      await handler.prepare?.(rt.logger);
+    }
+    if (!c.isStopped()) {
+      await pollUntilStopped(c);
+    }
+  } finally {
+    await sweep;
+  }
+}
+
+/**
+ * Poll (and sample the queue) until `stop()`, then drain the jobs in flight: with a grace, the jobs
+ * still running when it runs out are handed back (`drainWithin`).
+ */
+async function pollUntilStopped(c: Consuming): Promise<void> {
+  const { options, rt } = c;
+  const releaser = createReleaser();
+  const loop = startLoop(c, releaser);
+  const stopSampling = startQueueSampling(options.queue, options.metrics, {
+    now: rt.now,
+    timers: rt.timers ?? REAL_TIMERS,
+    logger: rt.logger,
+  });
+  const { graceMs } = await c.stopped;
+  stopSampling();
+  if (!(await drainWithin(loop.stop(), { graceMs, releaser, timers: rt.timers }))) {
+    rt.logger.error({ graceMs }, "drain did not settle within the shutdown grace; stopping anyway");
+  }
+}
+
+/** The database queue sets its own cadence; any other queue is polled in a slot loop. */
+function startLoop(c: Consuming, releaser: Releaser): PollLoop {
+  const { options } = c;
+  const rt: JobRuntime = { ...c.rt, releaser };
+  const run = async (job: ConsumerJob): Promise<void> => {
+    await runJob(rt, job);
+  };
+  if (isDatabaseQueue(options.queue)) {
+    return startPollLoop({
+      queue: options.queue,
+      slots: c.slots,
+      run,
+      logger: rt.logger,
+      now: rt.now,
+      ...(options.cadence === undefined ? {} : { cadence: options.cadence }),
+      ...(options.random === undefined ? {} : { random: options.random }),
+    });
+  }
+  const waitSeconds = options.config?.waitTimeSeconds ?? DEFAULT_WAIT_TIME_SECONDS;
+  return startSlotLoop({
+    queue: options.queue,
+    slots: c.slots,
+    waitMs: waitSeconds * 1000,
+    run,
+    logger: rt.logger,
+    now: rt.now,
+    timers: options.timers,
+  });
+}
+
+/** Claim only the kinds this consumer can run: an old copy never takes a newer kind (ADR 0053). */
+function claimHandledKinds(queue: PollableCaptureQueue, rt: JobRuntime): void {
+  if (isDatabaseQueue(queue)) {
+    queue.claimOnly([...rt.handlers.keys()] as CaptureJobKind[]);
+  }
+}
+
+function isDatabaseQueue(queue: PollableCaptureQueue): queue is DatabaseCaptureQueue {
+  return typeof (queue as Partial<DatabaseCaptureQueue>).waitForWork === "function";
+}
+
+function buildRuntime(options: CaptureConsumerOptions, logger: Logger): JobRuntime {
+  return {
+    queue: options.queue,
+    handlers: registry(options.handlers),
+    maxRetries: options.config?.maxRetries ?? DEFAULT_MAX_RETRIES,
+    backoffMs: options.config?.backoffMs ?? DEFAULT_BACKOFF_MS,
+    logger,
+    metrics: options.metrics,
+    onProgress: options.onProgress,
+    now: options.now ?? Date.now,
+    timers: options.timers,
+    lease: options.lease,
+    maxJobMs: (options.config?.maxJobSeconds ?? DEFAULT_MAX_JOB_SECONDS) * 1000,
+  };
+}
+
+/** The handlers by kind; a plain function becomes `{ run }`. */
+function registry(handlers: JobHandlers = {}): Map<string, KindHandler> {
+  const map = new Map<string, KindHandler>();
+  for (const [kind, handler] of Object.entries(handlers)) {
+    if (handler !== undefined) {
+      map.set(kind, typeof handler === "function" ? { run: handler } : handler);
+    }
+  }
+  return map;
+}
+
+export { idleDelayMs, isFastEmptyPoll, MIN_BLOCKING_POLL_MS } from "./idle.ts";
+export {
+  DEFAULT_SAMPLE_MS,
+  sampleQueue,
+  type ConsumerMetrics,
+  type JobFinishedEvent,
+  type JobOutcome,
+  type QueueSample,
+} from "./metrics.ts";
+export {
+  backoffDelayMs,
+  DEFAULT_BACKOFF_MS,
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_WAIT_TIME_SECONDS,
+  isFinalAttempt,
+  MAX_BACKOFF_MS,
+  type RetryConfig,
+} from "./retry.ts";
+export type {
+  CaptureConsumer,
+  CaptureConsumerOptions,
+  ConsumerConfig,
+  ConsumerJob,
+  ConsumerStopOptions,
+  JobHandlers,
+  JobRunContext,
+  KindHandler,
+} from "./types.ts";

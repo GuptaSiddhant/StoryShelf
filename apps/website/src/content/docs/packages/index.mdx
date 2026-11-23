@@ -10,9 +10,9 @@ StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`]
 | Package                                                 | What it does                                                                          |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [`@storyshelf/core`](/packages/core/)                   | Adapter interfaces, models, the capture pipeline, diffing and retention (no HTTP).    |
+| [`@storyshelf/common`](/packages/common/)               | Shared settings, outbound HTTP, redaction, tracing, errors, ids and logging.          |
 | [`@storyshelf/app`](/packages/app/)                     | The Hono app: JSON API under `/api/v1` and the server-rendered UI.                    |
 | [`@storyshelf/affected`](/packages/affected/)           | Affected capture: picks the stories a change impacts by tracing the dependency graph. |
-| [`@storyshelf/image`](/packages/image/)                 | Pixel diffs, diff overlays and thumbnails on a worker pool.                           |
 | [`@storyshelf/observability`](/packages/observability/) | OpenTelemetry tracing, metrics and log correlation.                                   |
 | [`@storyshelf/auth`](/packages/auth/)                   | Local accounts, social login, OIDC, SAML SSO and passkeys.                            |
 | [`@storyshelf/ai`](/packages/ai/)                       | AI insights: build triage and project health.                                         |
@@ -20,35 +20,30 @@ StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`]
 
 ## Databases
 
-| Package                                             | What it does                                                         |
-| --------------------------------------------------- | -------------------------------------------------------------------- |
-| [`@storyshelf/db-sqlite`](/packages/db-sqlite/)     | The default. SQLite, with Turso, better-sqlite3, Bun and D1 presets. |
-| [`@storyshelf/db-postgres`](/packages/db-postgres/) | Postgres, with Neon, Vercel, pg and PGlite presets.                  |
-| [`@storyshelf/db-mysql`](/packages/db-mysql/)       | MySQL and MariaDB, with PlanetScale and TiDB presets.                |
+| Package                           | What it does                                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@storyshelf/db`](/packages/db/) | `/sqlite` (the default, with Turso, better-sqlite3, Bun and D1 presets), `/postgres` (Neon, Vercel, pg, PGlite, RDS IAM) and `/mysql` (PlanetScale, TiDB). |
 
 ## Storage
 
-| Package                                                 | What it does                                         |
-| ------------------------------------------------------- | ---------------------------------------------------- |
-| [`@storyshelf/storage-local`](/packages/storage-local/) | The default. Blobs on the local filesystem.          |
-| [`@storyshelf/storage-s3`](/packages/storage-s3/)       | Amazon S3 and compatible stores (R2, MinIO, Spaces). |
-| [`@storyshelf/storage-azure`](/packages/storage-azure/) | Azure Blob Storage.                                  |
-| [`@storyshelf/storage-gcs`](/packages/storage-gcs/)     | Google Cloud Storage.                                |
+Local filesystem storage is built into [`@storyshelf/core`](/packages/core/) as `@storyshelf/core/storage/local`. These packages add object stores.
+
+| Package                                     | What it does                                          |
+| ------------------------------------------- | ----------------------------------------------------- |
+| [`@storyshelf/storage`](/packages/storage/) | `/s3` (S3, R2, MinIO), `/gcs`, `/azure` and `/local`. |
 
 ## Capture runners
 
-| Package                                                         | What it does                                                          |
-| --------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [`@storyshelf/runner-playwright`](/packages/runner-playwright/) | Renders stories with Playwright: Chromium, Firefox and WebKit.        |
-| [`@storyshelf/runner-puppeteer`](/packages/runner-puppeteer/)   | Renders with Puppeteer and chrome-headless-shell, for smaller images. |
+| Package                                   | What it does                                                   |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| [`@storyshelf/runner`](/packages/runner/) | Renders stories with Playwright: Chromium, Firefox and WebKit. |
 
-## Design and notifications
+## Storybook
 
-| Package                                               | What it does                                                   |
-| ----------------------------------------------------- | -------------------------------------------------------------- |
-| [`@storyshelf/design-figma`](/packages/design-figma/) | Links components to Figma: link checks, metadata and previews. |
-| [`@storyshelf/notify-chat`](/packages/notify-chat/)   | Slack and Microsoft Teams webhook alerts.                      |
-| [`@storyshelf/notify-email`](/packages/notify-email/) | An email transport: SMTP, Mailpit, HTTP APIs.                  |
-| [`@storyshelf/notify-git`](/packages/notify-git/)     | GitHub and GitLab commit statuses and pull-request comments.   |
+| Package                                                     | What it does                                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`@storyshelf/storybook-addon`](/packages/storybook-addon/) | Read-only addon that shows each story's review state in Storybook's sidebar. |
+
+Need a storage backend or notifier that is not listed? [Write your own adapter](/guides/custom-adapters/).
 
 Looking for the HTTP endpoints instead? See the [HTTP API reference](/api/).

@@ -33,6 +33,12 @@ describe("CreateGitChannelCard", () => {
     expect(await render()).toContain("&lt;prefix&gt;/storybook");
   });
 
+  it("offers a GitHub Enterprise Server API base and points at the operator allowlist", async () => {
+    const html = await render();
+    expect(html).toContain('name="apiUrl"');
+    expect(html).toContain("outbound.allowHosts");
+  });
+
   it("offers GitHub App check runs next to commit statuses, with the key as a separate field", async () => {
     const html = await render();
     expect(html).toContain("Check runs (GitHub App)");

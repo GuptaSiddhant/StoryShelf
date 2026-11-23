@@ -80,7 +80,7 @@ if (dryRun) {
 
 const branch = `release/v${version}`;
 run(`git switch -c ${branch}`);
-run("git add packages .changeset CHANGELOG.md");
+run("git add packages .changeset CHANGELOG.md config/version-manifest.json");
 run(`git commit -m "chore(release): v${version}"`);
 log(`${previous} → ${version} committed on ${branch}`);
 console.log(`

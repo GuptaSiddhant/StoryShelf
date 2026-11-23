@@ -11,16 +11,19 @@ export interface SqlChunk {
   queryChunks?: SqlChunk[];
 }
 
-/** Flatten the string parts of a drizzle SQL chunk into a single string. */
+/**
+ * The text of a drizzle string chunk (Drizzle 1.0 holds a string, 0.45 an array of strings), or
+ * undefined for any other chunk.
+ */
 function textOf(chunk: SqlChunk | undefined): string | undefined {
-  if (
-    chunk === undefined ||
-    !Array.isArray(chunk.value) ||
-    !chunk.value.every((part) => typeof part === "string")
-  ) {
+  if (chunk === undefined || chunk === null || typeof chunk !== "object" || "brand" in chunk) {
     return undefined;
   }
-  return chunk.value.join("");
+  if (typeof chunk.value === "string") return chunk.value;
+  if (Array.isArray(chunk.value) && chunk.value.every((part) => typeof part === "string")) {
+    return chunk.value.join("");
+  }
+  return undefined;
 }
 
 /** Test whether an in-memory row satisfies a drizzle where-clause. */
@@ -30,23 +33,30 @@ export function whereMatches(
   table: Table,
   lookup?: RowLookup,
 ): boolean {
-  let current = where.queryChunks as unknown as SqlChunk[];
-  let wrapped = current[1]?.queryChunks;
-  while (wrapped !== undefined && textOf(current[0]) === "(" && textOf(current.at(-1)) === ")") {
-    current = wrapped;
-    wrapped = current[1]?.queryChunks;
-  }
-  // Drizzle's `and(singleCondition)` emits the condition directly, without
-  // the enclosing parens produced for two or more clauses, so unwrap it.
-  if (current.length === 1 && current[0]?.queryChunks !== undefined) {
-    current = current[0].queryChunks as unknown as SqlChunk[];
-  }
-  if (current.some((chunk) => textOf(chunk)?.trim() === "and")) {
-    return current
-      .filter((chunk) => textOf(chunk) === undefined)
-      .every((chunk) => matchChunk(chunk.queryChunks ?? [], row, table, lookup));
-  }
-  return matchChunk(current, row, table, lookup);
+  return conjuncts(where.queryChunks as unknown as SqlChunk[]).every((chunks) =>
+    matchChunk(chunks, row, table, lookup),
+  );
+}
+
+/** A text chunk without its parentheses and spaces, or undefined for any other chunk. */
+function glueOf(chunk: SqlChunk): string | undefined {
+  return textOf(chunk)?.replaceAll(/[()\s]/gu, "");
+}
+
+/**
+ * Split a where-clause into the predicates it ANDs together. A node whose only text is parentheses
+ * and `and` (`((a) and (b))`, `(a)`, a single `and(a)`) is glue around nested SQL; anything else is
+ * one predicate.
+ */
+function conjuncts(chunks: SqlChunk[]): SqlChunk[][] {
+  const nested = chunks.filter((chunk) => glueOf(chunk) === undefined);
+  const glue = chunks.map((chunk) => glueOf(chunk)).filter((text) => text !== undefined);
+  const isGlue =
+    nested.length > 0 &&
+    nested.every((chunk) => chunk.queryChunks !== undefined) &&
+    glue.every((text) => text === "" || text === "and");
+  if (!isGlue) return [chunks];
+  return nested.flatMap((chunk) => conjuncts(chunk.queryChunks ?? []));
 }
 
 /** Rows of the table named `name` in the fake store, for conditions that read another table. */

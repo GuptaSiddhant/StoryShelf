@@ -1,12 +1,14 @@
-/** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import { publishingOf, publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
+import type { Catalog } from "@storyshelf/core/catalog";
 import {
+  BuildModel,
   changesetOf,
   CommentModel,
   SnapshotModel,
   UserModel,
   type BuildChangeset,
 } from "@storyshelf/core/models";
+/** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
+import { publishingOf, publishingOfBuild } from "@storyshelf/core/publish";
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import { assignedReviewersOf, type AssignedReviewer } from "../review-assignment.ts";
 import { getStore } from "../store.ts";
@@ -47,6 +49,17 @@ export interface ReviewSectionData extends ReviewCapabilities {
   testing: boolean;
   /** Whether the build's Storybook is published; a verdict waits for `success` (ADR 0013). */
   publishing: Awaited<ReturnType<typeof publishingOfBuild>>;
+  /** The newer build that superseded this one (ADR 0045); null when it was not, or that build is gone. */
+  supersededBy: Pick<Build, "id" | "gitSha"> | null;
+}
+
+/** The build that superseded `build`, when it still exists (retention may have purged it). */
+async function supersederOf(build: Build): Promise<ReviewSectionData["supersededBy"]> {
+  if (!build.supersededByBuildId) {
+    return null;
+  }
+  const newer = await new BuildModel(getStore().db).get(build.supersededByBuildId);
+  return newer ? { id: newer.id, gitSha: newer.gitSha } : null;
 }
 
 /** Whether review is on for the project (a row without the column counts as on). */
@@ -58,6 +71,10 @@ export function reviewIsOn(project: Pick<Project, "reviewEnabled">): boolean {
 export async function reviewCapabilities(project: Project): Promise<ReviewCapabilities> {
   if (!getStore().authEnabled) {
     return { canComment: true, canVerdict: true };
+  }
+  // A read-only shared account (#1274) is shown no review control; its writes are refused anyway.
+  if (getStore().user?.readOnly === true) {
+    return { canComment: false, canVerdict: false };
   }
   const role = await currentProjectRole(project.id);
   return {
@@ -110,6 +127,7 @@ export async function loadReviewSection(
     canTriage: capabilities.canComment || isBuildAuthor(build),
     testing,
     publishing,
+    supersededBy: await supersederOf(build),
     ...capabilities,
   };
 }

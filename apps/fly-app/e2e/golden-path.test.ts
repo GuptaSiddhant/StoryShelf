@@ -1,12 +1,13 @@
 /**
- * Browser golden path against the running Fly container (issue #941; gated by `STORYSHELF_E2E=1`).
+ * Browser golden path against the running Fly container (issue #941; gated by `SHELF_E2E=1`).
  *
  * The Fly dry run (`.github/workflows/fly-dry-run.yml`, `e2e: true`) has already booted the
- * production image with password sign-in and a confirmed `PUBLIC_BASE_URL`, and seeded the demo
- * with `apps/fly-app/seed.sh` (a `main` baseline). This spec adds what a person does next: upload
- * one changed build to a feature branch, sign in, review it with the keyboard, check the git status
- * the verdict produced (the `git-log` provider, read from `docker logs`), open the private build's
- * Storybook, and run axe on every app page visited.
+ * production image with password sign-in, a confirmed `SHELF_PUBLIC_BASE_URL` and the read-only demo
+ * account, and run `apps/fly-app/seed.sh`. The demo seeds no project of its own (#1275), so this spec
+ * creates one with the admin token, uploads a baseline and one changed build, signs in, reviews it
+ * with the keyboard, checks the git status the verdict produced (the `git-log` provider, read from
+ * `docker logs`), checks the private build stays private and opens its Storybook, signs in as the
+ * demo account and checks it is read-only, and runs axe on every app page visited.
  *
  * Every wait is on API or log state (`vi.waitFor`) or a DOM state; there are no sleeps and no retries.
  */
@@ -15,7 +16,7 @@ import {
   inPageRunAxe,
   loadAxeSource,
   resolveA11yRun,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/runner/a11y";
 import { execFile } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -26,21 +27,25 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 const run = promisify(execFile);
 const env = process.env;
-const enabled = env["STORYSHELF_E2E"] === "1";
+const enabled = env["SHELF_E2E"] === "1";
 const repoRoot = resolve(import.meta.dirname, "../../..");
 
-const BASE = env["STORYSHELF_URL"] ?? "http://127.0.0.1:3000";
-const ADMIN_TOKEN = env["STORYSHELF_ADMIN_TOKEN"] ?? "";
+const BASE = env["SHELF_URL"] ?? "http://127.0.0.1:3000";
+const SHELF_ADMIN_TOKEN = env["SHELF_ADMIN_TOKEN"] ?? "";
 const EMAIL = env["E2E_EMAIL"] ?? "";
 const PASSWORD = env["E2E_PASSWORD"] ?? "";
+const DEMO_EMAIL = "demo@storyshelf.js.org";
+const DEMO_PASSWORD = env["E2E_DEMO_PASSWORD"] ?? "";
+/** The demo project the read-only account is a viewer of (`demo-viewer.ts`). */
+const DEMO_SLUG = "storyshelf-ui";
 const CONTAINER = env["E2E_CONTAINER"] ?? "storyshelf";
 const FIXTURE_STATIC = join(repoRoot, "fixtures/storybook-9/storybook-static");
 const CLI = join(repoRoot, "packages/cli/dist/index.js");
 /** A failed run leaves its Playwright trace here (CI uploads the folder); a passing run keeps none. */
 const TRACE_DIR = env["E2E_TRACE_DIR"] ?? join(repoRoot, ".tmp/e2e-trace");
 
-/** The seeded demo project: its `main` build is the baseline the changed build is compared with. */
-const SLUG = "demo-design-system";
+/** This spec's own project (created in the first test); its `main` build is the baseline. */
+let SLUG = "";
 const BRANCH = "feature/e2e-golden-path";
 /** The story the variant repaints; every other story renders as in the baseline. */
 const CHANGED_STORY = "components-button--secondary";
@@ -60,7 +65,7 @@ interface BuildBody {
 
 const api = async <T>(path: string): Promise<T> => {
   const response = await fetch(`${BASE}/api/v1${path}`, {
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    headers: { authorization: `Bearer ${SHELF_ADMIN_TOKEN}` },
   });
   if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
   return (await response.json()) as T;
@@ -69,7 +74,7 @@ const api = async <T>(path: string): Promise<T> => {
 const apiPost = async (path: string, body: unknown): Promise<void> => {
   const response = await fetch(`${BASE}/api/v1${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${SHELF_ADMIN_TOKEN}`, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -87,8 +92,8 @@ async function writeVariant(into: string): Promise<void> {
   await writeFile(file, (await readFile(file, "utf8")).replace("</head>", `${patch}</head>`));
 }
 
-/** Upload with the workspace CLI, as the seed does; resolves to the new build's id. */
-async function upload(buildDir: string, sha: string): Promise<string> {
+/** Upload with the workspace CLI; resolves to the new build's id. */
+async function upload(buildDir: string, sha: string, branch = BRANCH): Promise<string> {
   const args = [
     CLI,
     "upload",
@@ -97,19 +102,57 @@ async function upload(buildDir: string, sha: string): Promise<string> {
     "--slug",
     SLUG,
     "--token",
-    ADMIN_TOKEN,
+    SHELF_ADMIN_TOKEN,
     "--sha",
     sha,
     "--branch",
-    BRANCH,
+    branch,
     "--build-dir",
     buildDir,
     "--full",
   ];
   const { stdout } = await run(process.execPath, args);
-  const id = /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
+  const id =
+    /^\s*Build:\s+(?<id>[0-9A-Z]{26})\s*$/mu.exec(stdout)?.groups?.["id"] ??
+    /Build created: (?<id>\w+)/u.exec(stdout)?.groups?.["id"];
   if (!id) throw new Error(`no build id in CLI output: ${stdout}`);
   return id;
+}
+
+/** Wait until a build has left the capture queue. */
+async function settled(id: string): Promise<void> {
+  // One request per tick: `/api/v1` allows 100 requests a minute per client, shared with the CLI.
+  await vi.waitFor(
+    async () => {
+      const build = await api<BuildBody>(`/projects/${SLUG}/builds/${id}`);
+      expect(["pending", "capturing", "comparing"]).not.toContain(build.status);
+    },
+    { timeout: 120_000, interval: POLL_MS },
+  );
+}
+
+/** Create this spec's project and approve a baseline `main` build of the unchanged fixture. */
+async function createProjectWithBaseline(): Promise<void> {
+  const response = await fetch(`${BASE}/api/v1/projects`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${SHELF_ADMIN_TOKEN}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "E2E golden path",
+      gitRepository: "acme/e2e",
+      gitDefaultBranch: "main",
+      requireVerifiedDefault: false,
+    }),
+  });
+  if (!response.ok) throw new Error(`create project answered ${response.status}`);
+  SLUG = ((await response.json()) as { slug: string }).slug;
+  // Both shas (this one and the variant's below) must be hex: the API validates them (#1278).
+  const baseline = await upload(
+    FIXTURE_STATIC,
+    `ba5e${Date.now().toString(16)}`.padEnd(40, "0"),
+    "main",
+  );
+  await settled(baseline);
+  await apiPost(`/projects/${SLUG}/builds/${baseline}/approve-all`, {});
 }
 
 /** The structured `git state (log)` records in the container's log, as parsed objects. */
@@ -143,8 +186,8 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
 
   beforeAll(async () => {
     expect(
-      ADMIN_TOKEN && EMAIL && PASSWORD,
-      "STORYSHELF_ADMIN_TOKEN, E2E_EMAIL, E2E_PASSWORD",
+      SHELF_ADMIN_TOKEN && EMAIL && PASSWORD,
+      "SHELF_ADMIN_TOKEN, E2E_EMAIL, E2E_PASSWORD",
     ).toBeTruthy();
     scratch = await mkdtemp(join(tmpdir(), "storyshelf-e2e-"));
     browser = await chromium.launch();
@@ -165,7 +208,8 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
     await rm(scratch, { recursive: true, force: true });
   });
 
-  it("creates a git-log channel and uploads a changed build to a feature branch", async () => {
+  it("creates a project with a baseline, a git-log channel and a changed build", async () => {
+    await createProjectWithBaseline();
     await apiPost(`/projects/${SLUG}/notification-channels`, {
       provider: "git-log",
       config: {},
@@ -174,20 +218,12 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
     const variant = join(scratch, "variant");
     await writeVariant(variant);
     buildId = await upload(variant, sha);
-
-    // One request per tick: `/api/v1` allows 100 requests a minute per client, shared with the CLI.
-    await vi.waitFor(
-      async () => {
-        const build = await api<BuildBody>(`/projects/${SLUG}/builds/${buildId}`);
-        expect(["pending", "capturing", "comparing"]).not.toContain(build.status);
-      },
-      { timeout: 120_000, interval: POLL_MS },
-    );
+    await settled(buildId);
     const snaps = await api<Snapshot[]>(`/projects/${SLUG}/builds/${buildId}/snapshots`);
     expect(snaps.filter((snap) => snap.status === "changed").map((snap) => snap.storyId)).toEqual([
       CHANGED_STORY,
     ]);
-  }, 180_000);
+  }, 300_000);
 
   it("signs in through the login page", async () => {
     await page.goto(`${BASE}/auth/login`);
@@ -200,13 +236,15 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
 
   it("reviews the changed build: count, comparison, approve with the keyboard", async () => {
     await page.goto(`${BASE}/projects/${SLUG}/builds/${buildId}`);
-    const label = page.getByText(/changed \/ new/iu);
-    await label.waitFor({ state: "visible" });
-    expect(((await label.locator("xpath=..").textContent()) ?? "").trim()).toMatch(/^1(?!\d)/u);
+    // The build page is the review workspace: the header counts the changes still waiting for a
+    // verdict (one here), and the comparison of the selected change is on the page itself.
+    await page.getByRole("button", { name: "Approve remaining 1", exact: true }).waitFor();
     await expectAccessible("build page");
 
-    await page.getByRole("link", { name: "Review diffs" }).click();
-    await page.locator("[data-compare]").first().waitFor({ state: "visible" });
+    await page
+      .getByRole("group", { name: /screenshot$/iu })
+      .first()
+      .waitFor({ state: "visible" });
     await expectAccessible("comparison");
     await page.keyboard.press("a");
     await page
@@ -241,13 +279,22 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
     );
   });
 
-  it("serves the private build's Storybook to the signed-in viewer only", async () => {
-    expect((await api<BuildBody>(`/projects/${SLUG}/builds/${buildId}`)).public).toBe(false);
+  it("keeps a private build private, and opens its Storybook once signed in", async () => {
+    // The project is private (no `publicBranchRegex`): an anonymous visitor gets neither the build's
+    // Storybook nor its settings.
+    const project = await api<{ publicBranchRegex: string | null }>(`/projects/${SLUG}`);
+    expect(project.publicBranchRegex).toBeNull();
     const anonymous = await fetch(`${BASE}/_/${buildId}/`, { redirect: "manual" });
     expect(anonymous.status).not.toBe(200);
+    expect(await anonymous.text()).not.toContain("sb-manager");
+
+    const settings = await fetch(`${BASE}/projects/${SLUG}/settings`, { redirect: "manual" });
+    expect(settings.status).toBe(302);
+    expect(settings.headers.get("location")).toMatch(/^\/auth\/login\?return_to=/u);
 
     await page.goto(`${BASE}/projects/${SLUG}/builds/${buildId}`);
-    await page.getByRole("link", { name: "View Storybook" }).first().click();
+    await page.getByLabel("More build actions").click();
+    await page.getByRole("menuitem", { name: /^Open Storybook/u }).click();
     await page.waitForURL(new RegExp(`/_/${buildId}/`, "u"));
     await page
       .frameLocator("iframe#storybook-preview-iframe")
@@ -267,4 +314,63 @@ describe.skipIf(!enabled)("golden path in a browser, on the Fly container", () =
       .evaluate((body) => body.ownerDocument.defaultView?.getComputedStyle(body).backgroundColor);
     expect(paint).toBe(PATCHED_BACKGROUND);
   }, 60_000);
+
+  it("signs in as the read-only demo account: sees storyshelf-ui, cannot write", async () => {
+    expect(DEMO_PASSWORD, "E2E_DEMO_PASSWORD").toBeTruthy();
+    const demo = await browser.newContext();
+    try {
+      const view = await demo.newPage();
+      await view.goto(`${BASE}/auth/login`);
+      await view.getByLabel("Email").fill(DEMO_EMAIL);
+      await view.getByLabel("Password").fill(DEMO_PASSWORD);
+      await view.getByRole("button", { name: "Sign in", exact: true }).click();
+      await view.waitForURL(`${BASE}/`);
+
+      // The server adds the membership once `storyshelf-ui` exists (`demo-viewer.ts`, each minute).
+      // `/` is a landing page; the project list is `/projects`, whose card links to the project.
+      await vi.waitFor(
+        async () => {
+          await view.goto(`${BASE}/projects`);
+          await view
+            .locator(`a[href^="/projects/${DEMO_SLUG}/"]:visible`)
+            .first()
+            .waitFor({ state: "visible", timeout: 1000 });
+        },
+        { timeout: 120_000, interval: 5000 },
+      );
+      // Only that project: this spec's own project is listed nowhere on the page (cards or the
+      // project switcher), and its pages and API answer 404 as for a project that does not exist.
+      expect(await view.locator(`a[href^="/projects/${SLUG}/"]`).count()).toBe(0);
+      expect(await view.getByText("E2E golden path").count()).toBe(0);
+      expect((await demo.request.get(`${BASE}/projects/${SLUG}/builds/${buildId}`)).status()).toBe(
+        404,
+      );
+      expect((await demo.request.get(`${BASE}/api/v1/projects/${SLUG}`)).status()).toBe(404);
+
+      // Writes with the demo account's own session (same origin, so only its role can refuse).
+      const write = (path: string, body: string, headers: Record<string, string> = {}) =>
+        view.evaluate(
+          async ([url, data, extra]) =>
+            (
+              await fetch(url as string, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/x-www-form-urlencoded",
+                  ...(extra as object),
+                },
+                body: data as string,
+              })
+            ).status,
+          [`${BASE}${path}`, body, headers] as const,
+        );
+      await view.goto(`${BASE}/profile`);
+      const csrf = (await view.content()).match(/name="csrf_token"\s+value="([^"]+)"/u)?.[1] ?? "";
+      expect(await write("/profile", `name=Changed&csrf_token=${csrf}`)).toBe(403);
+      expect(await write(`/api/v1/projects/${DEMO_SLUG}/builds/none/comments`, "body=hi")).toBe(
+        403,
+      );
+    } finally {
+      await demo.close();
+    }
+  }, 180_000);
 });

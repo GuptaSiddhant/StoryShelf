@@ -11,6 +11,7 @@ import {
   Meta,
   SectionTitle,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 interface TriageItem {
   snapshotKey: string;
@@ -91,7 +92,7 @@ export function InsightPanel(
         <HStack>
           <SectionTitle level={3}>AI triage (advisory)</SectionTitle>
           {latest?.status === "done" ? (
-            <Badge tone={verdictTone(latest.verdict)}>{latest.verdict}</Badge>
+            <Badge tone={verdictTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}
           {inFlight ? <Badge tone="info">generating…</Badge> : null}
         </HStack>

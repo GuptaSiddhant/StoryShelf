@@ -1,4 +1,4 @@
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import { normalizeImportPath } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
 

@@ -1,4 +1,4 @@
-import { loadManifest } from "@storyshelf/core/capture";
+import { loadManifest } from "@storyshelf/core/catalog";
 import { maxOfflineDaysOf } from "@storyshelf/core/config";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";

@@ -2,7 +2,7 @@ import type { Build, Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Button, EmptyState, HStack } from "../ui/components.tsx";
 import type { BuildDetailsData } from "./build-detail.tsx";
-import { failureReason, isCapturing } from "./build-diff-status.ts";
+import { failureReason, isCapturing, isRetryable } from "./build-diff-status.ts";
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -45,7 +45,7 @@ function EmptyActions(props: {
 }): Rendered | null {
   const { project, build, canManage } = props;
   const retry = `/api/v1/projects/${project.slug}/builds/${build.id}/retry`;
-  const retryable = build.status === "failed" || build.status === "cancelled";
+  const retryable = isRetryable(build);
   if (!retryable) {
     return null;
   }

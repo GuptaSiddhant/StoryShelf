@@ -126,6 +126,12 @@
           "reviewApprovals": {
             "type": "number"
           },
+          "cancelSuperseded": {
+            "type": "boolean"
+          },
+          "requireVerifiedDefault": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "number",
             "nullable": true
@@ -211,6 +217,9 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 20
+          },
+          "requireVerifiedDefault": {
+            "type": "boolean"
           }
         },
         "required": ["name"]
@@ -297,11 +306,93 @@
             "minimum": 1,
             "maximum": 20
           },
+          "cancelSuperseded": {
+            "type": "boolean"
+          },
+          "requireVerifiedDefault": {
+            "type": "boolean"
+          },
           "storybookUrlTtlSeconds": {
             "type": "integer",
             "nullable": true
           }
         }
+      },
+      "InFlightBuilds": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            }
+          },
+          "required": ["id", "sha"]
+        }
+      },
+      "BulkCancelResult": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        },
+        "required": ["cancelled", "count", "dryRun"]
+      },
+      "BulkCancelRequest": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keepNewest": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "SkipSource": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "sourceBuildId": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          }
+        },
+        "required": ["sourceBuildId", "sha"]
+      },
+      "SkippedBuildCreated": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "$ref": "#/components/schemas/Build"
+          },
+          "buildUrl": {
+            "type": "string"
+          }
+        },
+        "required": ["build", "buildUrl"]
       },
       "Build": {
         "type": "object",
@@ -320,6 +411,11 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "branchVerified": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["verified", "unverified", "refused", "unreachable", null]
           },
           "authorEmail": {
             "type": "string",
@@ -346,7 +442,8 @@
               "approved",
               "rejected",
               "failed",
-              "cancelled"
+              "cancelled",
+              "skipped"
             ]
           },
           "snapshotCount": {
@@ -383,11 +480,37 @@
             "type": "string",
             "nullable": true
           },
+          "skippedFromBuildId": {
+            "type": "string",
+            "nullable": true
+          },
+          "supersededByBuildId": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
           "updatedAt": {
             "type": "string"
+          },
+          "publishing": {
+            "type": "string",
+            "enum": ["pending", "success", "failure", "unavailable"]
+          },
+          "capture": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "done": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number",
+                "nullable": true
+              }
+            },
+            "required": ["done", "total"]
           }
         },
         "required": [
@@ -414,6 +537,80 @@
           "updatedAt"
         ]
       },
+      "SkippedBuildCreate": {
+        "type": "object",
+        "properties": {
+          "gitSha": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-fA-F]{7,64}|local-[0-9a-fA-F]{1,64})$/u"
+          },
+          "gitBranch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceBuildId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20000
+          },
+          "entryIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100000
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": ["key", "value"]
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "gitSha",
+          "gitBranch",
+          "sourceBuildId",
+          "changedFiles",
+          "entryIds",
+          "idempotencyKey"
+        ]
+      },
       "BuildCreated": {
         "type": "object",
         "properties": {
@@ -422,6 +619,10 @@
           },
           "uploadUrl": {
             "type": "string"
+          },
+          "buildUrl": {
+            "type": "string",
+            "description": "Path of the build page, from the server's URL builder. Never absolute: a client joins it to the server URL it already uses."
           },
           "baselineSha": {
             "type": "string",
@@ -432,14 +633,14 @@
             "description": "False when the server has no `testing` option: the build is published but never captured or compared."
           }
         },
-        "required": ["build", "uploadUrl", "baselineSha", "testing"]
+        "required": ["build", "uploadUrl", "buildUrl", "baselineSha", "testing"]
       },
       "BuildCreate": {
         "type": "object",
         "properties": {
           "gitSha": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^(?:[0-9a-fA-F]{7,64}|local-[0-9a-fA-F]{1,64})$/u"
           },
           "gitBranch": {
             "type": "string",
@@ -472,6 +673,14 @@
               },
               "required": ["key", "value"]
             }
+          },
+          "supersedes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 50
           }
         },
         "required": ["gitSha", "gitBranch"]
@@ -689,7 +898,8 @@
                   "approved",
                   "rejected",
                   "failed",
-                  "cancelled"
+                  "cancelled",
+                  "skipped"
                 ]
               },
               "reviewPath": {
@@ -902,7 +1112,8 @@
               "approved",
               "rejected",
               "failed",
-              "cancelled"
+              "cancelled",
+              "skipped"
             ]
           },
           "approvalsRequired": {
@@ -1777,7 +1988,7 @@
         "summary": "List projects",
         "responses": {
           "200": {
-            "description": "List projects",
+            "description": "The projects the signed-in user can open (all with auth off, or for a site admin or viewer)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2004,6 +2215,272 @@
         "x-storyshelf-class": "hosting"
       }
     },
+    "/api/v1/projects/{slug}/builds/in-flight": {
+      "get": {
+        "tags": ["Builds"],
+        "summary": "List a branch's in-flight builds",
+        "description": "The builds of one branch that are still working (pending, capturing or comparing), as `{ id, sha }`. The CLI compares them with local history and names the older ones in `supersedes` when it creates a build (ADR 0045). Same roles as build creation. `testing` class.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "branch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The branch's builds in a cancellable status, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InFlightBuilds"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/cancel": {
+      "post": {
+        "tags": ["Builds"],
+        "summary": "Cancel older unfinished builds",
+        "description": "Cancels the unfinished builds (pending, capturing or comparing) of the project, or of one `branch`, keeping the `keepNewest` newest unfinished builds of each branch (default 1; 0 cancels them all). Builds in any other status are left alone. Each build is cancelled as `POST …/builds/{buildId}/cancel` does, in batches: its jobs end, it ends `cancelled`, `build:cancelled` is raised and its git statuses are requested. A build that reaches a verdict meanwhile is skipped. With `dryRun` nothing changes and `cancelled` lists the builds that would be. `testing` class; same roles as a single cancel.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The IDs of the cancelled builds (or those a dry run would cancel) and their count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCancelResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/skip-source": {
+      "get": {
+        "tags": ["Builds"],
+        "summary": "Find the build a commit may skip from",
+        "description": "A hint for `--skip-unchanged`: the real build the newest build on `branch` (other than commit `sha`) repeats, or null. Only an `approved` build qualifies, or a skipped build whose source is still `approved`; a newer build that is open, rejected, failed or cancelled answers null. `testing` class; 404 unless the instance enables skipped builds. Creation re-checks, so this is never a promise.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "branch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "sha",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The source build and its commit, or null when the commit must upload normally",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkipSource"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
+    "/api/v1/projects/{slug}/builds/skipped": {
+      "post": {
+        "tags": ["Builds"],
+        "summary": "Create a skipped build",
+        "description": "Records a commit that changed no story as a `skipped` build repeating the outcome of `sourceBuildId`: no upload, capture or snapshots. Eligibility is checked again in the same transaction as the insert: `409` when the source is no longer the newest approved build of the branch (or a skipped one's approved source), is on another branch, the project runs Storybook tests, or `entryIds` differ from the source build's catalog (a story was added, renamed or deleted). A repeated `idempotencyKey` returns the build it already created (`200`). `labels` are validated and attached as on normal build creation. It raises `build:skipped` and asks for the build's state on its git channels. `testing` class; 404 unless the instance enables skipped builds.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkippedBuildCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The build an earlier request with the same `idempotencyKey` created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkippedBuildCreated"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The skipped build and the URL of its page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkippedBuildCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The source is not eligible: upload the Storybook normally",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-storyshelf-class": "testing"
+      }
+    },
     "/api/v1/projects/{slug}/builds": {
       "get": {
         "tags": ["Builds"],
@@ -2028,7 +2505,8 @@
                 "approved",
                 "rejected",
                 "failed",
-                "cancelled"
+                "cancelled",
+                "skipped"
               ]
             },
             "required": false,

@@ -1,0 +1,83 @@
+import type { Logger } from "../../logger.ts";
+import { httpJson } from "../../utils/index.ts";
+import { apiBase, gitlabHeaders, projectRef } from "./gitlab-api.ts";
+import { findMrIid } from "./gitlab-pr.ts";
+import type { GitLabProject } from "./gitlab-status.ts";
+import {
+  listAllPages,
+  PAGE_SIZE,
+  upsertReviewComment,
+  type CommentInput,
+  type ReviewThread,
+} from "./review-comment.ts";
+
+interface MergeRequestNote {
+  id: number;
+  body?: string | null;
+}
+
+/** Fetch-backed review thread (notes) for a merge request. */
+function createThread(
+  base: string,
+  pid: string,
+  iid: number,
+  headers: Record<string, string>,
+): ReviewThread {
+  const threadUrl = `${base}/api/v4/projects/${pid}/merge_requests/${iid}/notes`;
+  return {
+    list: async () => {
+      try {
+        const notes = await listAllPages(
+          async (page) =>
+            await httpJson<MergeRequestNote[]>(`${threadUrl}?per_page=${PAGE_SIZE}&page=${page}`, {
+              headers,
+              destination: "project",
+            }),
+        );
+        return notes.map((note) => ({ id: note.id, body: note.body ?? "" }));
+      } catch {
+        return [];
+      }
+    },
+    update: async (id, body) => {
+      const updated = await httpJson<MergeRequestNote>(`${threadUrl}/${String(id)}`, {
+        method: "PUT",
+        headers,
+        json: { body },
+        destination: "project",
+      });
+      return String(updated.id);
+    },
+    create: async (body) => {
+      const created = await httpJson<MergeRequestNote>(threadUrl, {
+        method: "POST",
+        headers,
+        json: { body },
+        destination: "project",
+      });
+      return String(created.id);
+    },
+  };
+}
+
+/** Create or update the StoryShelf review note on the merge request of a commit. */
+export async function upsertMrNote(
+  project: GitLabProject,
+  input: CommentInput & { logger?: Logger },
+): Promise<string> {
+  const { host, owner, repo, token } = project;
+  const base = apiBase(host);
+  const pid = projectRef(project);
+  const headers = gitlabHeaders(token);
+  return await upsertReviewComment({
+    project: input.project,
+    buildId: input.buildId,
+    url: input.url,
+    markdown: input.markdown,
+    sha: input.sha,
+    logger: input.logger,
+    resolveNumber: async () =>
+      await findMrIid({ host, owner, repo, projectId: project.projectId, token, sha: input.sha }),
+    thread: (iid) => createThread(base, pid, iid, headers),
+  });
+}

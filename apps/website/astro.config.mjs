@@ -11,7 +11,8 @@ import { typeDocGroups, typeDocPlugins } from "./typedoc-packages.mjs";
 const SITE = "https://storyshelf.js.org";
 const REPO = "https://github.com/GuptaSiddhant/StoryShelf";
 const OG_IMAGE = `${SITE}/og-image.png`;
-const OG_ALT = "StoryShelf: visual testing for Storybook, with the build review workspace";
+const OG_ALT =
+  "StoryShelf: self-hosted visual testing and review for Storybook, shown with the build review workspace";
 
 /** A package's page, with its generated TypeScript API nested under it when it has one. */
 const packageItem = (slug) => {
@@ -33,6 +34,8 @@ export default defineConfig({
     "/openapi": "/api/",
     "/guides/ai-insights": "/ai/",
     "/guides/ai-testing": "/ai/testing/",
+    "/packages/runner-playwright": "/packages/runner/",
+    "/reference/runner-playwright": "/reference/runner/",
   },
   markdown: { remarkPlugins: [remarkReferenceLinks, remarkReadmeSection] },
   integrations: [
@@ -40,14 +43,21 @@ export default defineConfig({
     starlight({
       title: "StoryShelf",
       description: "An open-source, self-hosted alternative to Chromatic.",
-      logo: { src: "./src/assets/logo.svg", alt: "" },
+      logo: {
+        light: "./src/assets/brand/storyshelf-logo-purple-white-rounded.svg",
+        dark: "./src/assets/brand/storyshelf-logo-white-purple-rounded.svg",
+        alt: "",
+      },
       components: {
+        Footer: "./src/components/overrides/Footer.astro",
         Hero: "./src/components/overrides/Hero.astro",
         SocialIcons: "./src/components/overrides/SocialIcons.astro",
         Sidebar: "./src/components/overrides/Sidebar.astro",
         PageTitle: "./src/components/overrides/PageTitle.astro",
       },
       customCss: ["./src/styles/custom.css"],
+      // Adds the Markdown copy of each page to its <head> (see the file).
+      routeMiddleware: "./src/routeData.ts",
       editLink: { baseUrl: `${REPO}/edit/main/apps/website/` },
       lastUpdated: true,
       social: [{ label: "GitHub", href: REPO, icon: "github" }],
@@ -112,9 +122,13 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "guides/getting-started" },
             { label: "Live demo", slug: "guides/demo" },
+            { label: "Set up with an AI agent", slug: "guides/ai-agent-setup" },
             { label: "How it works", slug: "concepts/how-it-works" },
             { label: "Common setups", slug: "guides/recipes" },
             { label: "Troubleshooting & FAQ", slug: "guides/troubleshooting" },
+            { label: "When the browser changes", slug: "guides/browser-changes" },
+            { label: "Upgrading guide", slug: "guides/upgrading" },
+            { label: "Upgrading & support", slug: "guides/support" },
             {
               label: "Coming from other tools",
               collapsed: true,
@@ -176,7 +190,9 @@ export default defineConfig({
             { label: "Azure", slug: "guides/deployment/azure" },
             { label: "GCP", slug: "guides/deployment/gcp" },
             { label: "Cloud assembly", slug: "guides/deployment/cloud" },
+            { label: "Migrate a Terraform stack", slug: "guides/deployment/migrate-terraform" },
             { label: "Server configuration", slug: "guides/config" },
+            { label: "Write your own adapter", slug: "guides/custom-adapters" },
             { label: "Secret rotation", slug: "guides/deployment/secret-rotation" },
             { label: "Observability", slug: "guides/observability" },
           ],
@@ -245,24 +261,18 @@ export default defineConfig({
             { label: "Overview", slug: "packages" },
             packageGroup("Core", [
               "core",
+              "common",
               "app",
               "affected",
-              "image",
               "observability",
               "auth",
               "ai",
               "mcp",
             ]),
-            packageGroup("Databases", ["db-sqlite", "db-postgres", "db-mysql"]),
-            packageGroup("Storage", [
-              "storage-local",
-              "storage-s3",
-              "storage-azure",
-              "storage-gcs",
-            ]),
-            packageGroup("Capture runners", ["runner-playwright", "runner-puppeteer"]),
-            packageGroup("Design", ["design-figma"]),
-            packageGroup("Notifications", ["notify-chat", "notify-email", "notify-git"]),
+            packageGroup("Databases", ["db"]),
+            packageGroup("Storage", ["storage"]),
+            packageGroup("Capture runners", ["runner"]),
+            packageGroup("Storybook", ["storybook-addon"]),
           ],
         },
       ],

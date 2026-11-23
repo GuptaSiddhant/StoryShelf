@@ -1,7 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
-import { DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
+import { contentHostSuffix, DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
+import { ContentCollectingError, recordContentUses } from "@storyshelf/core/publish";
+import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   CONTENT_HASH_PATTERN,
   contentKey,
@@ -19,6 +20,7 @@ import {
   APPROVER_ROLES,
   buildCreateJsonSchema,
   buildListQuery,
+  assertNotSkipped,
   buildForProject,
   createBuildRecord,
   storeUploadStream,
@@ -104,6 +106,11 @@ async function recordUses(
 import { registerBuildCancel } from "./build-cancel.ts";
 import { registerBuildChangeset } from "./build-changeset.ts";
 import { registerBuildReviews } from "./build-reviews.ts";
+import { registerBuildSkip } from "./build-skip.ts";
+import { buildWaitState } from "./build-wait-state.ts";
+import { registerBuildsCancelBulk } from "./builds-cancel-bulk.ts";
+import { registerBuildsCancelForm } from "./builds-cancel-form.ts";
+import { registerBuildsInFlight } from "./builds-in-flight.ts";
 import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
@@ -121,6 +128,11 @@ import { registerSnapshots } from "./snapshots.ts";
 import { registerStoryStatus } from "./story-status.ts";
 /** Register the build list, upload, fetch, retry, and delete endpoints. */
 export function registerBuilds(app: ShelfRouter): void {
+  // Before `GET …/builds/:buildId`, which would otherwise take `in-flight` or `skip-source` for a build id.
+  registerBuildsInFlight(app);
+  registerBuildsCancelBulk(app);
+  registerBuildsCancelForm(app);
+  registerBuildSkip(app);
   app.openapi(listBuildsRoute, async (c) => {
     const project = await resolveAuthorizedProject(c, c.req.valid("param").slug, ...VIEW_ROLES);
     const { status, branch, labelKey, labelValue } = c.req.valid("query");
@@ -141,8 +153,15 @@ export function registerBuilds(app: ShelfRouter): void {
     );
     const build = await createBuildRecord(project, c.req.valid("json"));
     const uploadUrl = `/api/v1/projects/${project.slug}/builds/${build.id}/zip`;
+    const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
     return c.json(
-      { build, uploadUrl, baselineSha: build.baselineSha, testing: getStore().testing },
+      {
+        build,
+        uploadUrl,
+        buildUrl: urls.build(project.slug, build.id),
+        baselineSha: build.baselineSha,
+        testing: getStore().testing,
+      },
       202,
     );
   });
@@ -259,13 +278,14 @@ export function registerBuilds(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...VIEW_ROLES);
     const build = await buildForProject(project.id, buildId);
-    return c.json(build);
+    return c.json({ ...build, ...(await buildWaitState(build)) });
   });
 
   app.openapi(retryBuildRoute, async (c) => {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
+    assertNotSkipped(build, "retried");
     const updated = await new BuildModel(getStore().db).resetStatus(build.id, "pending");
     await getStore().enqueueCapture?.(build.id, c.get("requestId"));
     hxRefresh(c);
@@ -311,6 +331,10 @@ const buildCreatedSchema = z
   .object({
     build: buildSchema,
     uploadUrl: z.string(),
+    buildUrl: z.string().openapi({
+      description:
+        "Path of the build page, from the server's URL builder. Never absolute: a client joins it to the server URL it already uses.",
+    }),
     baselineSha: z.string().nullable(),
     testing: z.boolean().openapi({
       description:

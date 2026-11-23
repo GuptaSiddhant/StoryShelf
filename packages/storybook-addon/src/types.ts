@@ -23,6 +23,7 @@ export const BUILD_STATUSES = [
   "rejected",
   "failed",
   "cancelled",
+  "skipped",
 ] as const;
 
 /** Known design problems; a current or unknown design is left out of the response. */

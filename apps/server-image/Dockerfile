@@ -25,6 +25,12 @@ COPY apps ./apps
 RUN nubx --yes turbo@2.11.2 prune server-image --docker --out-dir out && mv out/json/pnpm-lock.yaml out/json/nub.lock
 
 FROM toolchain AS builder
+# Native install scripts (bufferutil, from @vercel/postgres) have no prebuilt binary on every
+# platform; on linux/arm64 they compile with node-gyp, which needs Python and a C++ toolchain. This
+# stage only: the shipped images copy the bundle, never these tools.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=pruner /app/out/json ./
 COPY --from=pruner /app/nub.jsonc ./nub.jsonc
@@ -36,7 +42,7 @@ USER node
 RUN --mount=type=cache,target=/root/.cache/nub,id=nub-cache \
     nub install --frozen-lockfile
 COPY --chown=node:node --from=pruner /app/out/full ./
-# Bundle the workspace into one file; pino, Playwright and sharp stay external (rolldown.config.ts).
+# Bundle the workspace into one file; pino, pg, Playwright and sharp stay external (rolldown.config.ts).
 RUN nubx rolldown -c apps/server-image/rolldown.config.ts
 
 # Shared by both variants: the bundle, tini and a non-root user that owns /data.
@@ -48,16 +54,21 @@ RUN apt-get update \
 COPY --from=builder /app/apps/server-image/dist ./dist
 COPY --from=builder /app/apps/server-image/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+# `storyshelf-server` on PATH: `docker run <image> storyshelf-server migrate` (or `doctor`, `purge`,
+# `check-storage`) runs it against the same environment as the server. It loads dist/instance.mjs
+# (package.json#storyshelf.server) from /app.
+RUN printf '#!/bin/sh\nexec node /app/dist/bin.mjs "$@"\n' > /usr/local/bin/storyshelf-server \
+    && chmod +x /usr/local/bin/storyshelf-server
 # `node` (uid 1000) owns the data volume: SQLite, local storage and scratch space.
 RUN mkdir -p /data && chown node:node /data
 ENV NODE_ENV=production \
     PORT=3000 \
-    DATA_DIR=/data
+    SHELF_DATA_DIR=/data
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "dist/server.mjs"]
+CMD ["storyshelf-server", "serve"]
 
 # Hosting only: no browser, so capture is off (`SHELF_CAPTURE=off`). Hosting and review still work.
 FROM base AS hosting

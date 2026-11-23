@@ -5,8 +5,8 @@
  * published manifest must add a changeset, unless it carries the `no-release` label.
  *
  * A release pull request (head branch `release/v<version>`, `--head-ref`) adds no changeset: it
- * consumes them. It passes when it changes only package versions, `CHANGELOG.md` and deleted
- * changesets, and fails when it changes anything else.
+ * consumes them. It passes when it changes only package versions, `CHANGELOG.md`, the generated
+ * `config/version-manifest.json` and deleted changesets, and fails when it changes anything else.
  *
  * Reads the pull request as the checkout's merge commit (first parent = the base branch tip), the
  * same way the `changes` job does.
@@ -19,6 +19,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   checkChangeset,
+  checkSchemaBreak,
   malformedChangesets,
   manifestPublished,
   releaseBranchVersion,
@@ -127,7 +128,7 @@ if (releaseVersion !== null) {
   });
   if (problems.length > 0) {
     console.error(
-      `::error title=Not a release::Branch ${headRef} may change only package versions, CHANGELOG.md and deleted changesets: ${problems.join("; ")}`,
+      `::error title=Not a release::Branch ${headRef} may change only package versions, CHANGELOG.md, config/version-manifest.json and deleted changesets: ${problems.join("; ")}`,
     );
     process.exit(1);
   }
@@ -135,6 +136,17 @@ if (releaseVersion !== null) {
     `changeset check passed: release ${releaseVersion} (versions, changelog, consumed changesets)`,
   );
   process.exit(0);
+}
+const schemaBreak = checkSchemaBreak({
+  labels,
+  added,
+  read: (path) => readFileSync(join(root, path), "utf8"),
+});
+if (!schemaBreak.ok) {
+  console.error(
+    `::error title=Schema break undeclared::This pull request ${schemaBreak.reason}. Add or edit a changeset: \`Breaking: <summary>\`, a blank line, then a \`Schema: <the contract step>\` line (ADR 0053 amendment, 2026-11-21).`,
+  );
+  process.exit(1);
 }
 const isPublished = (manifest) => manifestPublished(readHead(manifest), readBase(base, manifest));
 const verdict = checkChangeset({ changed, added, labels, isPublished });

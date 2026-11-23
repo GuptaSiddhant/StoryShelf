@@ -73,8 +73,10 @@ const projects = defineTable("projects", {
   aiProfile: "ai_profile",
   reviewEnabled: "review_enabled",
   reviewApprovals: "review_approvals",
+  requireVerifiedDefault: "require_verified_default",
   storybookUrlTtlSeconds: "storybook_url_ttl_seconds",
   componentOwners: "component_owners",
+  cancelSuperseded: "cancel_superseded",
   createdAt: "created_at",
   updatedAt: "updated_at",
 });
@@ -137,6 +139,7 @@ const builds = defineTable("builds", {
   gitSha: "git_sha",
   gitBranch: "git_branch",
   isDefault: "is_default",
+  branchVerified: "branch_verified",
   authorEmail: "author_email",
   authorName: "author_name",
   message: "message",
@@ -156,6 +159,9 @@ const builds = defineTable("builds", {
   reviewCycle: "review_cycle",
   reviewRequestedCycle: "review_requested_cycle",
   captureJobId: "capture_job_id",
+  skippedFromBuildId: "skipped_from_build_id",
+  supersededByBuildId: "superseded_by_build_id",
+  idempotencyKey: "idempotency_key",
   manifestSha256: "manifest_sha256",
   createdAt: "created_at",
   updatedAt: "updated_at",
@@ -524,6 +530,40 @@ const contentUses = defineTable("content_uses", {
   claimToken: "claim_token",
 });
 
+const gitConnections = defineTable("git_connections", {
+  id: "id",
+  provider: "provider",
+  name: "name",
+  apiBase: "api_base",
+  config: "config",
+  secretEncrypted: "secret_encrypted",
+  createdBy: "created_by",
+  state: "state",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
+const gitRepositoryLinks = defineTable("git_repository_links", {
+  id: "id",
+  projectId: "project_id",
+  connectionId: "connection_id",
+  host: "host",
+  owner: "owner",
+  repo: "repo",
+  hostRepositoryId: "host_repository_id",
+  prefix: "prefix",
+  state: "state",
+  reason: "reason",
+  outputs: "outputs",
+  installationId: "installation_id",
+  requestedBy: "requested_by",
+  approvedBy: "approved_by",
+  approvedAt: "approved_at",
+  lastDeliveredAt: "last_delivered_at",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+});
+
 /** Stub schema bundled into the `Tables` map every fake serves. */
 export const fakeSchema: Tables = {
   projects,
@@ -560,4 +600,6 @@ export const fakeSchema: Tables = {
   notificationSubscriptions,
   pushSubscriptions,
   contentUses,
+  gitConnections,
+  gitRepositoryLinks,
 };

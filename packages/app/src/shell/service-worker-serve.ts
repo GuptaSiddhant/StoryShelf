@@ -12,25 +12,28 @@ function tokens(theme: BrandTheme): string {
   ].join(";");
 }
 
+/** The app's space scale (`ui/styles/tokens.ts`), copied because the page cannot load the app's styles. */
+const SPACE = "--space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-6:1.5rem";
+
 /**
  * The offline home page's styles, inlined: the page is static and its CSP allows only inline
  * styles, so it carries the default theme's tokens (light, and dark by `prefers-color-scheme`).
  */
-const HOME_CSS = `:root{${tokens(LIGHT_THEME)}}
+const HOME_CSS = `:root{${SPACE};${tokens(LIGHT_THEME)}}
 @media (prefers-color-scheme:dark){:root{${tokens(DARK_THEME)}}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,sans-serif}
-main{max-width:40rem;margin:0 auto;padding:1.5rem 16px}
-h1{font-size:1.4rem;margin:.5rem 0}
+main{max-width:40rem;margin:0 auto;padding:var(--space-6) var(--space-4)}
+h1{font-size:1.4rem;margin:var(--space-2) 0}
 .lead,.meta,.note,.empty{color:var(--text2)}
-.banner{display:inline-block;margin:0;padding:.25rem .75rem;border:1px solid var(--warn);border-radius:999px;color:var(--warn);font-size:.85rem;font-weight:600}
-.list{list-style:none;margin:1.5rem 0 0;padding:0;display:grid;gap:.75rem}
+.banner{display:inline-block;margin:0;padding:var(--space-1) var(--space-3);border:1px solid var(--warn);border-radius:999px;color:var(--warn);font-size:.85rem;font-weight:600}
+.list{list-style:none;margin:var(--space-6) 0 0;padding:0;display:grid;gap:var(--space-3)}
 .item{background:var(--card);border:1px solid var(--border);border-radius:.5rem}
-.item a,.item.expired{display:grid;gap:.15rem;padding:.9rem 1rem;color:inherit;text-decoration:none}
+.item a,.item.expired{display:grid;gap:var(--space-1);padding:var(--space-4);color:inherit;text-decoration:none}
 .item a:hover,.item a:focus-visible{outline:2px solid var(--accent)}
 .name{font-weight:600}
 .meta,.note{font-size:.85rem}
-.empty{margin-top:1.5rem;padding:1rem;border:1px dashed var(--border);border-radius:.5rem}
+.empty{margin-top:var(--space-6);padding:var(--space-4);border:1px dashed var(--border);border-radius:.5rem}
 `;
 
 /**

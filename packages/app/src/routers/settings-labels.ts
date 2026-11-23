@@ -5,9 +5,9 @@ import type { ShelfRouter } from "../app-types.ts";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
-import { publicMessage } from "./helpers.ts";
+import { publicMessage, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
-import { asString, findProject, renderSettingsPage } from "./settings.handlers.ts";
+import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** Label-type settings (create custom types, delete removable ones). */
 export function registerLabelSettings(app: ShelfRouter): void {
   app.post("/projects/:slug/settings/labels", handleCreateLabelType);
@@ -16,7 +16,7 @@ export function registerLabelSettings(app: ShelfRouter): void {
 }
 
 async function handleCreateLabelType(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
   const key = asString(form.get("key"));
   const labelName = asString(form.get("labelName")) ?? asString(form.get("name"));
@@ -53,7 +53,7 @@ async function persistLabelType(
 }
 
 async function handleUpdateLabelType(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const key = c.req.param("key") ?? "";
   const form = await c.req.formData();
   const name = asString(form.get("labelName"));
@@ -89,7 +89,7 @@ async function persistLabelUpdate(
 }
 
 async function handleDeleteLabelType(c: Context): Promise<Response> {
-  const project = await findProject(c.req.param("slug") ?? "");
+  const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   try {
     await new LabelModel(getStore().db).removeType(project.id, c.req.param("key") ?? "");
   } catch {

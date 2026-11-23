@@ -8,8 +8,8 @@
  *
  * Usage:
  *   node scripts/npm-trust-all.mjs
- *   node scripts/npm-trust-all.mjs --package @storyshelf/notify-git
- *   node scripts/npm-trust-all.mjs --package @storyshelf/image --package @storyshelf/mcp
+ *   node scripts/npm-trust-all.mjs --package @storyshelf/affected
+ *   node scripts/npm-trust-all.mjs --package @storyshelf/ai --package @storyshelf/mcp
  *
  * With no `--package`, every public package is checked. Repeat the flag (or
  * pass bare package names) to limit the run to one or more packages.

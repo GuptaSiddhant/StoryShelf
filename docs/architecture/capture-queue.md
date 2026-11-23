@@ -13,7 +13,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 ### Database queue (`capture_jobs`)
 
-`createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/capture`, `core/src/capture/db-queue/`)
+`createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/jobs`, `core/src/jobs/db-queue/`)
 is a `PollableCaptureQueue` on the app's own database and the app's only production queue (ADR 0006;
 there is no in-memory queue). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
@@ -41,10 +41,13 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
    job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
-**Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
+**Consumer** (`createCaptureConsumer`, `@storyshelf/core/jobs`, `core/src/jobs/consumer/`). Consumes any
 `PollableCaptureQueue` (this queue and the IPC queue of a forked child) and runs a
-handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
-through `handlers`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
+handler per job `kind`, all registered through `handlers`: `capture` is `createCaptureHandler`
+(`core/src/capture/capture-handler.ts`, wired to `createDispatchJob`), `publish` and `notify` come
+from `/publish` and `/build-state`. Before it polls, the consumer awaits each handler's `prepare`
+(the capture handler's loads the image engine, so a consumer without `capture` never touches it);
+a rejection stops `start()`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
 claims a kind it cannot run (a queue that does not filter by kind fails such a job with `no handler
 registered for job kind "<kind>"`). Every payload carries a version `v` (absent = 1); a job newer
 than the handler's `payloadVersion` is handed back (`handBack`: queued again after a delay, attempt
@@ -56,7 +59,20 @@ only count deliveries), then nacked without requeue so it ends `failed`; the con
 `consumer/retry.ts`. The lease is kept by heartbeat and progress (`keepJobLease`): a lost lease or a `cancelled`
 reading stops the run through `runner.cancel(buildId, shard)`; a lost lease writes nothing (the
 new holder settles the job), a cancel ends the job `cancelled`. `stop()` (SIGTERM) stops polling
-and waits for the jobs in flight; the runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
+and waits for the jobs in flight. `stop({ graceMs })` bounds that wait (#912, `consumer/shutdown.ts`):
+at the grace minus a reserve (`HAND_BACK_RESERVE_MS`, 2 s, or a quarter of a short grace) each job
+still running is released: its keeper ends `released` and aborts its signal, its handler's `cancel`
+runs, and once the handler stopped (within the reserve) the job is handed back with
+`handBack({ delayMs: 0 })`, visible to any instance at once with its attempt not spent (outcome
+`handed-back`). A handler that has not stopped may still write, so its job is left to its lease
+instead (outcome `lost`). Only the current holder hands back: the job-row write is conditional on
+its running attempt, so a superseded holder writes nothing, and a job whose cancel was asked ends
+`cancelled` instead. The stop resolves by `graceMs` even when a hand-back or ack stalls. The app passes the grace through
+`lifecycle.teardown({ graceMs })`; on Node, `startServer` (`@storyshelf/app/node`) calls it with what
+its `shutdownTimeoutMs` leaves after requests in flight, less a reserve for closing adapters. The hosts
+pass `SHELF_SHUTDOWN_GRACE_SECONDS` as that timeout, to be set a few seconds below the platform's stop
+timeout (the Fly host defaults to 3 s, under Fly's 5 s); unset, `startServer`'s default is 30 s. Called
+without `graceMs`, `teardown()` waits for every job. The runners launch browsers with `handleSIGINT`/`handleSIGTERM`/`handleSIGHUP` off, so the signal does not close a browser under a capture that is still draining (each render closes its own). Optional `metrics` hooks report each job's outcome and the
 queue's depth and oldest waiting job (a sample costs one read; off unless `queueSample` is given).
 
 **In the app** (`packages/app/src/jobs-setup.ts`). One lazily built database queue carries the `capture` jobs (only when `testing` has a `runner`) and the `publish` jobs (only on a long-running host, not a serverless one) and one consumer runs them: the `capture` handler (`capture-setup.ts`: `createCaptureHandler`, wrapped to alert admins when a capture leaves its build failed), the `publish` handler (`publish-setup.ts`); `notify` jobs run on a second queue and consumer over the same `capture_jobs` table (long-running hosts only; a serverless host has none), with their own retry limit (`NOTIFY_MAX_ATTEMPTS`; see PR Status Checks & Merge Gate), kept apart so a status never waits behind a capture (`queuesFor` in `jobs-setup.ts`). The consumer starts when adapters are ready and `teardown()` drains it. `DatabaseCaptureQueueOptions.onExhausted` is the hook the queue offers its host: a job whose final attempt lost its lease has no running handler to record the failure, so the host writes it (the crash path of the capture handler for `capture`, the publish completer for `publish`) while the job is `exhausting`; `onAbandoned` is called once if that hook failed five times. There is no `testing.queue`: `testing` requires a `runner` and the database queue is the only queue.
@@ -73,6 +89,6 @@ one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
 ### Clock
 
-Every lease is an absolute timestamp on the clock of the copy that wrote it. `isoAt` (`packages/core/src/capture/db-queue/clock.ts`) stamps each `visible_at`, claim, renewal and expiry check from that copy's runtime `now`, and every copy compares another copy's lease with its own `now`. The queue therefore assumes the copies' clocks agree. Run every copy with NTP or the platform's time sync.
+Every lease is an absolute timestamp on the clock of the copy that wrote it. `isoAt` (`packages/core/src/jobs/db-queue/clock.ts`) stamps each `visible_at`, claim, renewal and expiry check from that copy's runtime `now`, and every copy compares another copy's lease with its own `now`. The queue therefore assumes the copies' clocks agree. Run every copy with NTP or the platform's time sync.
 
 A holder renews its lease to `its now + leaseMs` every `min(30 s, leaseMs / 3)` (`keeper.ts`), so its last renewal is up to one interval old. If two copies' clocks differ by `leaseMs − renewal interval` or more, a copy can see a live holder's lease as expired and take the job over. With the default lease of 300 s that is about 270 s. Ordinary clock drift is far below that, but a host that has drifted by minutes must be fixed before it runs a copy.

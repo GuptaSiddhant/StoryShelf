@@ -4,8 +4,11 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { createLatch, deferred } from "../test-helpers/index.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/index.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { PERSIST_CONCURRENCY } from "./pipeline.ts";
 import { rediffBuild } from "./rediff.ts";
+
+const images = pngImageEngine();
 
 const T1 = "2026-01-01T00:00:00.000Z";
 const T2 = "2026-01-02T00:00:00.000Z";
@@ -92,7 +95,7 @@ describe("rediffBuild", () => {
   it("clears a stale change once the baseline caught up and records the new baseline", async () => {
     const { db, storage } = await setup();
 
-    const result = await rediffBuild({ db, storage }, project, build);
+    const result = await rediffBuild({ db, storage, images }, project, build);
 
     expect(result).toEqual({ rediffed: 1, statusChanged: 1, missingScreenshots: [] });
     const row = await db.get(db.tables.snapshots, "s1");
@@ -105,7 +108,7 @@ describe("rediffBuild", () => {
     const old = "p1/builds/f1/comparisons/01ARZ3NDEKTSV4RRFFQ69G5FAV.png";
     const { db, storage, objects } = await setup({ comparisonImagePath: old });
     objects.set(old, Buffer.from("previous"));
-    await rediffBuild({ db, storage }, project, build);
+    await rediffBuild({ db, storage, images }, project, build);
     const row = await db.get(db.tables.snapshots, "s1");
     expect(row?.comparisonImagePath).not.toBe(old);
     expect(objects.has(old)).toBe(false);
@@ -121,7 +124,7 @@ describe("rediffBuild", () => {
     const { db, storage, objects } = await setup({ status: "unchanged" });
     objects.set("baselines/main/a.png", png(RED));
 
-    const result = await rediffBuild({ db, storage }, project, build);
+    const result = await rediffBuild({ db, storage, images }, project, build);
 
     expect(result.statusChanged).toBe(1);
     const row = await db.get(db.tables.snapshots, "s1");
@@ -136,7 +139,7 @@ describe("rediffBuild", () => {
       const { db, storage, objects } = await setup(patch);
       objects.set("baselines/main/a.png", png(RED));
 
-      const result = await rediffBuild({ db, storage }, project, build);
+      const result = await rediffBuild({ db, storage, images }, project, build);
 
       expect(result.rediffed).toBe(0);
       expect((await db.get(db.tables.snapshots, "s1"))?.baselineVersion).toBe(T1);
@@ -147,7 +150,7 @@ describe("rediffBuild", () => {
     const { db, storage, objects } = await setup();
     objects.delete("shots/a.png");
 
-    const result = await rediffBuild({ db, storage }, project, build);
+    const result = await rediffBuild({ db, storage, images }, project, build);
 
     expect(result).toEqual({ rediffed: 0, statusChanged: 0, missingScreenshots: ["s1"] });
     expect((await db.get(db.tables.snapshots, "s1"))?.status).toBe("changed");
@@ -161,7 +164,7 @@ describe("rediffBuild", () => {
       baselineVersion: "none",
     });
 
-    await rediffBuild({ db, storage }, project, build);
+    await rediffBuild({ db, storage, images }, project, build);
 
     const row = await db.get(db.tables.snapshots, "s1");
     expect(row?.status).toBe("new");
@@ -175,7 +178,7 @@ describe("rediffBuild", () => {
       baselineVersion: "none",
     });
 
-    await rediffBuild({ db, storage }, project, build);
+    await rediffBuild({ db, storage, images }, project, build);
 
     const row = await db.get(db.tables.snapshots, "s1");
     expect(row?.status).toBe("unchanged");
@@ -234,7 +237,7 @@ describe("rediffBuild", () => {
       return await read(path);
     };
 
-    const result = rediffBuild({ db, storage }, project, build);
+    const result = rediffBuild({ db, storage, images }, project, build);
     await full.promise;
     expect(inFlight).toBe(PERSIST_CONCURRENCY);
     latch.open();

@@ -38,8 +38,8 @@ export async function runOnce(dir, scratch) {
   const system = await startApp(dir);
   try {
     const story = firstStory();
-    const first = await step(system, FIXTURE, "sha-1");
-    const unchanged = await step(system, FIXTURE, "sha-2");
+    const first = await step(system, FIXTURE, "1111111");
+    const unchanged = await step(system, FIXTURE, "2222222");
     // The row ADR 0052's speed gate measures is a FULL capture of an unchanged build: the upload
     // passes `--full`, so every story renders again. A smaller count means affected capture ran.
     if (unchanged.capture.snapshots !== first.capture.snapshots) {
@@ -48,7 +48,7 @@ export async function runOnce(dir, scratch) {
       );
     }
     const changed = changedCopy(join(scratch, "changed"));
-    const oneFile = await step(system, changed.dir, "sha-3");
+    const oneFile = await step(system, changed.dir, "3333333");
     return {
       storage: {
         firstUpload: first.storage,

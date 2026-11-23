@@ -12,31 +12,36 @@ For a visual overview, see [`architecture-diagrams.md`](./architecture-diagrams.
 ## Bundler rule: tsdown for libs, rolldown for apps
 
 - **Publishable packages** (`packages/*`): `tsdown` via `config/tsdown.ts` (`libConfig` for libraries, `cliConfig` for the CLI binary). Entry points derive from each `package.json` `exports` map.
-- **Deployables** (`apps/fly-app`, `apps/server-image`): `rolldown` (`rolldown.config.ts` bundles `server.ts` → `dist/server.mjs`).
+- **Deployables** (`apps/fly-app`, `apps/server-image`): `rolldown` (`rolldown.config.ts` bundles `instance.ts` → `dist/instance.mjs` and the `storyshelf-server` bin → `dist/bin.mjs`).
 - **No-build dev**: `apps/dev-server` runs TS source directly (`nub run serve`, `nub watch`).
 - **Launcher ownership**: `apps/dev-server` and `apps/fly-app` each own their adapter
   wiring so deployments can diverge (locals vs Turso/S3). Shared code goes in
   `packages/`, not `apps/`.
-  The CLI `server init` template is standalone by design (registry installs, no
+  The CLI `create-storyshelf` template is standalone by design (registry installs, no
   workspace), so the template carries its own copy of the wiring.
 
 Rationale: tsdown targets distributable ESM libraries (dts, per-entry outputs); rolldown targets single-file app bundles. Do not swap them without updating this section.
 
 ## Export mechanism (not `tsdown-entry`)
 
-There is no `tsdown-entry` key. Each library `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }`, plus a dist-only `publishConfig.exports`. The release publishes with `npm publish`, which does not apply `publishConfig.exports`, so the published manifest still carries the `source` conditions (#393). `storyshelf` (cli) and `@storyshelf/mcp` have plain `dist` exports and no `source` condition. `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
+There is no `tsdown-entry` key. Each library `package.json` `exports` map carries `{ source: ./src/..., default: ./dist/... }`, plus a dist-only `publishConfig.exports`. npm does not apply `publishConfig.exports`, so the release (and `packed-install`) runs `scripts/materialize-exports.mjs`, which writes that dist-only map over `exports` in the staged manifest, and `scripts/check-packed-archives.mjs` fails when a packed `exports` or `bin` target is missing, a `source` condition ships or a source map ships (#1265). `npm publish` runs with `--ignore-scripts`: `prepublishOnly` would rebuild, and tsdown writes the `source` conditions back. `storyshelf` (cli) and `@storyshelf/mcp` have plain `dist` exports and no `source` condition. `nub.jsonc → conditions: ["source"]` and `tsconfig.base.json → customConditions: ["source"]` resolve workspace imports to `.ts`/`.tsx` source in dev, editor, and `tsc`.
 
 ## Public import surface
 
 - `@storyshelf/app` root barrel is the HTTP app: `createShelfApp` plus
   `ShelfApp`/`ShelfRouter`/`ShelfContext`/`ShelfLifecycle` and the re-exported
   option types (`ShelfOptions`/`ShelfConfig`/`UIConfig`/`BrandTheme` from core).
+- `@storyshelf/app/node` is the Node host: `startServer({ app, port, handleSignals })` owns the
+  listener, readiness, the bounded drain and the app's teardown (#394). `@hono/node-server` is a
+  runtime dependency of app only; hosts that call `app.fetch` themselves never load it.
 - `@storyshelf/core` root barrel is domain-only (config/logger/types surface).
   Importing it must never pull Hono into bundles that do not serve it
   (e.g. runners, the forked capture child) — enforced by keeping all HTTP modules in app.
 - Everything else lives under a subpath: adapter interfaces under
-  `core/adapter/*`, runtime capture under `core/capture`, logging under
-  `core/logger`, diff under `core/diff` (re-exported from the leaf `@storyshelf/image`), URLs under `core/urls`, storage paths
+  `core/adapter/*`, runtime capture (testing only) under `core/capture`, the job queue and
+  consumer under `core/jobs`, publishing under `core/publish`, git build state under
+  `core/build-state`, the Storybook catalog under `core/catalog`, logging under
+  `core/logger` (the image engine contract is in `core/adapter/capture-runner`; codecs, worker pool and pixel diff are `@storyshelf/runner/images`), URLs under `core/urls`, storage paths
   under `core/paths`, tables/rows under `core/schema`, models under
   `core/models`, config under `core/config`, retention under `core/retention`,
   shared utils under `core/utils`, in-memory fakes under `core/test-helpers`.
@@ -47,17 +52,23 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
 - `@storyshelf/ai` exports only `createAi` and its option types; the `Ai` contract
   (`core/ai`) and the pure evidence/redaction/budget code (`core/insights`) live in
   core so `ShelfOptions.ai` needs no dependency on the implementation package.
-- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
-- `@storyshelf/observability` root barrel is runtime-agnostic (`@opentelemetry/api`
-  only); the Node SDK lifecycle lives under `observability/node`. `core` never imports `observability` (no-cycle rule,
-  ADR 0015 §5) — cross-package span/propagation helpers are intentionally
-  duplicated, not shared.
+- `@storyshelf/mcp` is a thin `/api/v1` client (no core models/DB; it depends on `@storyshelf/common`, not core). Public surface: the `storyshelf-mcp` bin and the `@storyshelf/mcp/http` subpath (`createMcpHttpHandler`, `serveHttp`); tools stay internal (ADR 0017).
+- `core/storage/local` (`packages/core/src/storage/local/`) is the built-in local filesystem `StorageAdapter`; the `@storyshelf/storage-local` package is removed (ADR 0049 amendment 2026-11-21).
+- `packages/storage` (`@storyshelf/storage`) holds the cloud storage adapters as subpaths `/s3`, `/gcs` and `/azure` (`src/<backend>/`, each with its own contract and live tests) and `/local`, a re-export of core's `storage/local`. The SDKs are optional peers that only their own subpath loads (`src/peer-isolation.test.ts`).
+- `packages/common` (`@storyshelf/common`) holds the dependency-light code shared across packages: `settings` (`readSetting`, the renamed table), `http` (`httpJson`, the outbound guard), `redact`, `tracing` (spans, propagation, memoized instruments), `errors`, `ids` and the `Logger` type. Its only runtime dependency is `@opentelemetry/api`. Core re-exports every moved name from its existing subpaths (`utils`, `config`, `telemetry`).
+- `core/telemetry` (`packages/core/src/telemetry/`) holds the runtime-agnostic helpers over
+  `@opentelemetry/api`: `withSpan`, the propagation helpers, the memoized instruments, the database and
+  storage wrappers and the HTTP middleware (ADR 0049, decision 7). `@storyshelf/app` imports them from
+  there and does not depend on `@storyshelf/observability`. The otel-only part (`withSpan`, propagation, instruments) lives in `@storyshelf/common/tracing`,
+  which `@storyshelf/observability` re-exports from its root barrel; the database and storage wrappers need core's adapter
+  types and stay in core. Observability owns the Node SDK lifecycle under `observability/node`, depends on `common`
+  and never installs core. `core` never imports `observability` (#1334).
 
 ## Schema layout (0.2.0 target, R2)
 
 - `packages/core/src/schema/` — one module per entity, mirroring `packages/core/src/models/` 1:1 (`project.ts`, `build.ts`, `snapshot.ts`, `baseline.ts`, `comment.ts`, `label.ts`, `token.ts`, `webhook.ts`, `member.ts`, `user.ts`).
-- The DDL is hand-written per dialect in `packages/db-{sqlite,postgres,mysql}/src/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
-- `@storyshelf/db-sqlite` owns the SQLite schema/DDL/shared factory; `./turso`, `./better-sqlite3`, `./bun-sqlite`, `./d1` are driver presets over it (R3).
+- The DDL is hand-written per dialect in `packages/db/src/{sqlite,postgres,mysql}/ddl.ts`; there is no `packages/core/src/ddl.ts`. A single source of truth is the target of ADR 0041 (accepted, not yet implemented).
+- `packages/db` (`@storyshelf/db`) holds the three dialects as subpaths `/sqlite`, `/postgres` and `/mysql` (`src/<dialect>/`, each with its own contract and migration tests) and their presets under each (`/sqlite/turso`, `/sqlite/better-sqlite3`, `/sqlite/bun-sqlite`, `/sqlite/d1`, `/postgres/pg`, `/postgres/neon`, …). Each driver is an optional peer that only its own subpath loads (`src/peer-isolation.test.ts`). Each dialect's `ddl`, `schema` and `drizzle-factory` modules are internal and unpublished (ADR 0041 replaces them); auth's DDL-parity tests load the two `ddl` modules by file. The package sits above core until #1242 inverts the layering (ADR 0049 amendment 2026-11-21).
 
 ## App convention (lives in `packages/app/src/`)
 

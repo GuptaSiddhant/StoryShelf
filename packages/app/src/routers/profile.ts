@@ -6,7 +6,7 @@ import type { Project } from "@storyshelf/core/schema";
 import { readSessionCookie, type AuthUser } from "@storyshelf/core/types";
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
-import { notificationsPaused } from "../notifications-pause.ts";
+import { pausedBannerShown } from "../notifications-pause.ts";
 import { renderProfilePage } from "../pages/profile.tsx";
 import { getStore } from "../store.ts";
 import { forwardToEngine } from "./auth.ts";
@@ -106,8 +106,12 @@ async function loadEngineSecurity(
     auth.hasPassword(user.id),
   ]);
   const current = readSessionToken(c);
+  // Every visitor of a read-only shared account (#1274) shares its user id: show only their own
+  // session, never the others' devices, addresses and sign-in times.
+  const shown =
+    user.readOnly === true ? sessions.filter((session) => session.token === current) : sessions;
   return {
-    sessions: sessions.map((session) => ({
+    sessions: shown.map((session) => ({
       id: session.id,
       ipAddress: session.ipAddress,
       userAgent: session.userAgent,
@@ -137,7 +141,7 @@ async function profileView(
     isLocal: extra?.local ?? security.hasPassword,
     security,
     error: extra?.error,
-    notificationsPaused: getStore().notifiers.length > 0 && (await notificationsPaused()),
+    notificationsPaused: await pausedBannerShown(getStore()),
   });
   if (extra?.success) {
     flash(c, extra.success);

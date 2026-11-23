@@ -1,39 +1,17 @@
 /** Running a project's Storybook 10 `.test()` entries and keeping what they reported (ADR 0004, decision 10). */
 import type { Logger } from "pino";
 import type { CaptureRunner, CaptureTarget, TestOutcome } from "../adapters/capture-runner.ts";
+import { isDisabledStory, type StoryEntry } from "../adapters/story-source.ts";
 import type { BuildModel } from "../models/build.ts";
 import { emitAttemptLog, type AttemptLogRecorder } from "../models/capture-attempt.ts";
+import type { TestResult } from "../models/test-results.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { redactSecrets } from "../utils/redact.ts";
-import { isDisabledStory, type StoryEntry } from "./adapter.ts";
 import { classifyFailures } from "./failure-sets.ts";
 import { renderBudgetMs } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
-
-/** What a build keeps of one `.test()` entry (JSON in `builds.test_results`). */
-export interface TestResult {
-  /** The test entry's id (`<story id>:<test name slug>`). */
-  id: string;
-  /** Story file title (the component path), as on its index entry. */
-  title: string;
-  /** The test's own name, as written in `story.test("...")`. */
-  name: string;
-  /** The story the test is written under. */
-  parentId: string | null;
-  status: "passed" | "failed";
-  /** The failure message of a failed test. */
-  error?: string;
-  durationMs: number;
-}
-
-/** Pass and fail counts of a build's tests. */
-export interface TestSummary {
-  total: number;
-  passed: number;
-  failed: number;
-}
 
 /** Longest failure message kept (rows and logs stay bounded). */
 const ERROR_MAX = 1000;
@@ -184,31 +162,4 @@ async function reportFailures(
   input.logger?.[level](fields, "storybook tests finished");
   await emitAttemptLog(input.recordLog, input.logger, level, "storybook tests finished", fields);
   return sets;
-}
-
-/** The results a build holds; empty for none or an unreadable value. */
-export function parseTestResults(json: string | null | undefined): TestResult[] {
-  if (!json) return [];
-  try {
-    const parsed: unknown = JSON.parse(json);
-    return Array.isArray(parsed) ? parsed.filter((item) => isTestResult(item)) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Counts of a build's results. */
-export function summarizeTests(results: readonly TestResult[]): TestSummary {
-  const failed = results.filter((result) => result.status === "failed").length;
-  return { total: results.length, passed: results.length - failed, failed };
-}
-
-function isTestResult(value: unknown): value is TestResult {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record["id"] === "string" &&
-    typeof record["name"] === "string" &&
-    (record["status"] === "passed" || record["status"] === "failed")
-  );
 }

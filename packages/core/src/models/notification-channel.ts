@@ -67,6 +67,20 @@ export class NotificationChannelModel {
     })) as unknown as NotificationChannelRow[];
   }
 
+  /**
+   * Every channel, project or site-wide, whose provider is none of `kinds` (the kinds the server
+   * offers): the System page lists them, as they are kept but not delivered to (issue #1126).
+   * Empty `kinds` reads every channel.
+   */
+  async listOutsideProviders(kinds: readonly string[]): Promise<NotificationChannelRow[]> {
+    // Channels are few per server; filtering here keeps the query plain on every dialect.
+    const rows = (await this.db.list(
+      this.tables.notificationChannels,
+    )) as unknown as NotificationChannelRow[];
+    const offered = new Set(kinds);
+    return rows.filter((row) => !offered.has(row.provider));
+  }
+
   /** Create a channel (secret encrypted at rest when provided). */
   async create(input: NotificationChannelCreateInput): Promise<NotificationChannelRow> {
     const now = new Date().toISOString();
@@ -84,6 +98,22 @@ export class NotificationChannelModel {
       createdAt: now,
       updatedAt: now,
     })) as unknown as NotificationChannelRow;
+  }
+
+  /**
+   * Change a channel's settings: its config and event filter always, its secret only when one is
+   * given (a blank edit keeps the stored secret). The provider never changes.
+   */
+  async update(
+    id: string,
+    input: { config: Record<string, unknown>; events?: string[]; secret?: string },
+  ): Promise<void> {
+    await this.db.update(this.tables.notificationChannels, id, {
+      config: JSON.stringify(input.config),
+      events: input.events && input.events.length > 0 ? JSON.stringify(input.events) : null,
+      ...(input.secret ? { secretEncrypted: encrypt(this.secret, input.secret) } : {}),
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   /** Fetch a channel by id, or null. */
@@ -216,17 +246,21 @@ export class NotificationChannelModel {
   }
 }
 
-/** Refuse a chat webhook URL or GitLab host that is private or local; never echoes an address. */
+/** The config field that holds the destination URL of a git provider, when it has one. */
+const GIT_HOST_FIELD: Record<string, string> = { gitlab: "host", github: "apiUrl" };
+
+/** Refuse a chat webhook URL, GitLab host or GHES API base that is private or local; never echoes an address. */
 async function destinationProblem(
   provider: string,
   config: unknown,
   secret: string | undefined,
 ): Promise<ChannelValidation> {
-  const host = (config as { host?: unknown } | null)?.host;
+  const hostField = GIT_HOST_FIELD[provider];
+  const host = hostField ? (config as Record<string, unknown> | null)?.[hostField] : undefined;
   const [field, url] =
     provider === "slack" || provider === "teams"
       ? (["secret", secret] as const)
-      : provider === "gitlab" && typeof host === "string"
+      : typeof host === "string"
         ? (["config", host] as const)
         : ([null, undefined] as const);
   if (field === null || !url) {
@@ -239,7 +273,7 @@ async function destinationProblem(
   const message = outboundReasonText(reason);
   return field === "secret"
     ? { ok: false, field, message }
-    : { ok: false, field, message, issues: [{ path: "host", message }] };
+    : { ok: false, field, message, issues: [{ path: hostField ?? "host", message }] };
 }
 
 /** Git channels belong to one project and carry their own token. */

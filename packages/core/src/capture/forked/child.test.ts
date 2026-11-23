@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
+import { pngImageEngine } from "../../test-helpers/png-image-engine.ts";
 import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
 
 const dispatch = vi.hoisted(() => ({
@@ -30,6 +31,22 @@ vi.mock("../dispatch.ts", async (importOriginal) => {
 
 const { runCaptureChild } = await import("./child.ts");
 type Host = import("./child.ts").ChildHost;
+
+/** A promise the test opens by hand, to hold a run mid-pass. */
+function gate(): { promise: Promise<null>; open: () => void } {
+  const opener: { open: () => void } = { open: () => {} };
+  const promise = new Promise<null>((resolve) => {
+    opener.open = () => {
+      resolve(null);
+    };
+  });
+  return {
+    promise,
+    open: () => {
+      opener.open();
+    },
+  };
+}
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,7 +78,7 @@ function options(overrides: Record<string, unknown> = {}) {
     db,
     logger: silent as never,
     storage: {} as never,
-    runner: { cancel: vi.fn(async () => {}), render: vi.fn() } as never,
+    runner: { cancel: vi.fn(async () => {}), render: vi.fn(), images: pngImageEngine() } as never,
     scratchDir: ".tmp/child-test",
     ...overrides,
   };
@@ -183,7 +200,7 @@ describe("runCaptureChild", () => {
 
   it("cancels the render of a run when the parent says so", async () => {
     const cancel = vi.fn(async () => {});
-    const opts = options({ runner: { cancel, render: vi.fn() } });
+    const opts = options({ runner: { cancel, render: vi.fn(), images: pngImageEngine() } });
     dispatch.run.mockReset().mockImplementation(async () => {
       await sleep(60);
     });
@@ -197,6 +214,33 @@ describe("runCaptureChild", () => {
     await sleep(10);
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(cancel).toHaveBeenCalledWith("b1", "b1:render:1");
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("aborts the run's signal on cancel, so no further pass starts (#1154)", async () => {
+    const opts = options();
+    const leases: { check?: () => void }[] = [];
+    const stop = gate();
+    dispatch.run
+      .mockReset()
+      .mockImplementation(async (_job: unknown, lease: { check?: () => void }) => {
+        leases.push(lease);
+        await stop.promise;
+        // The checkpoint before the next pass: it throws once the parent cancelled the run.
+        lease.check?.();
+      });
+    const { host, events, sent } = fakeHost();
+    const running = runCaptureChild(opts, host);
+    await sleep(20);
+    push(events, "run-1", "b1");
+    await sleep(10);
+    expect(() => leases[0]?.check?.()).not.toThrow();
+    events.emit("message", { type: "cancel", runId: "run-1" });
+    expect(() => leases[0]?.check?.()).toThrow("job cancelled");
+    stop.open();
+    await sleep(10);
+    expect(sent).toContainEqual({ type: "failed", runId: "run-1", error: "job cancelled" });
     events.emit("SIGTERM");
     await running;
   });

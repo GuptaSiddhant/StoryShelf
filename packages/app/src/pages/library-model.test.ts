@@ -1,4 +1,4 @@
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import type { Snapshot } from "@storyshelf/core/schema";
 import { describe, expect, it } from "vitest";
 import { entriesFromSnapshots, groupLibrary } from "./library-model.ts";

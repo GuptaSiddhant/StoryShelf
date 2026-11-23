@@ -116,6 +116,12 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             </div>
           ) : null}
 
+          {ui.publicLink ? (
+            <Button variant="secondary" href={ui.publicLink.href}>
+              {ui.publicLink.label}
+            </Button>
+          ) : null}
+
           {ui.helpText ? (
             <p class="login__help">
               <Meta>{ui.helpText}</Meta>

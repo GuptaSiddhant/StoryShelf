@@ -9,12 +9,13 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
+import { buildScratchDir } from "../publish/scratch.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "./orchestrator.ts";
-import { buildScratchDir } from "./scratch.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
 import { stabilityCandidates, stabilityKey } from "./stability.ts";
 
@@ -71,6 +72,7 @@ function scriptedRunner(
       category: "capture-runner",
       ...(targets ? { targets } : {}),
     },
+    images: pngImageEngine(),
     render,
     cancel: vi.fn(async () => {
       await Promise.resolve();
@@ -123,7 +125,10 @@ async function world(
 ): Promise<World> {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db, tables(db)).create({ name: "Stability" });
+  const project = await new ProjectModel(db, tables(db)).create({
+    name: "Stability",
+    requireVerifiedDefault: false,
+  });
   await db.update(db.tables.projects, project.id, projectPatch);
   const builds = new Map<string, string>();
   const capture: World["capture"] = async (branch, script) => {
@@ -322,6 +327,7 @@ describe("unstable render detection across shards", () => {
     });
     const runner: CaptureRunner = {
       metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+      images: pngImageEngine(),
       render,
       cancel: vi.fn(async () => {
         await Promise.resolve();
@@ -333,7 +339,10 @@ describe("unstable render detection across shards", () => {
   it("judges each shard's own changed snapshots, once", async () => {
     const { db } = makeDatabase();
     const { storage } = makeStorage();
-    const project = await new ProjectModel(db, tables(db)).create({ name: "Sharded stability" });
+    const project = await new ProjectModel(db, tables(db)).create({
+      name: "Sharded stability",
+      requireVerifiedDefault: false,
+    });
     const builds = new BuildModel(db, tables(db));
     const main = await builds.create(project.id, {
       gitSha: "sha-main",
@@ -343,6 +352,7 @@ describe("unstable render detection across shards", () => {
     await storage.write(storybookZipPath(project.id, main.id), twoStoryZip());
     const grey: CaptureRunner = {
       metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+      images: pngImageEngine(),
       cancel: async () => {},
       render: async (input) => {
         await Promise.resolve();

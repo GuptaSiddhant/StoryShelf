@@ -4,13 +4,17 @@ import type { BrandTheme } from "../theme.ts";
  * CSS variable tokens: brand-driven colors (per theme), theme-independent
  * scales (type, space, radius, motion), and tokens derived from the brand
  * accent/status colors so customer themes need no extra fields.
+ *
+ * Breakpoints (`max-width`): only these three exist. 480 px is a phone, 880 px is where the sidebar
+ * becomes a drawer and grids stack, 1024 px is where the review workspace drops its side panel.
+ * `consistency.test.ts` refuses any other `@media (max-width)` outside them.
  */
 export function tokenCss(light: BrandTheme, dark: BrandTheme): string {
   return [
     scaleTokens(),
-    `:root {\n${colorVars(light, LIGHT_FALLBACK)}\n}`,
-    `[data-theme="dark"] {\n${colorVars(dark, DARK_FALLBACK)}\n}`,
-    `@media (prefers-color-scheme: dark) {\n[data-theme="system"] {\n${colorVars(dark, DARK_FALLBACK)}\n}\n}`,
+    `:root {\n  color-scheme: light;\n${colorVars(light, LIGHT_FALLBACK)}\n}`,
+    `[data-theme="dark"] {\n  color-scheme: dark;\n${colorVars(dark, DARK_FALLBACK)}\n}`,
+    `@media (prefers-color-scheme: dark) {\n[data-theme="system"] {\n  color-scheme: dark;\n${colorVars(dark, DARK_FALLBACK)}\n}\n}`,
   ].join("\n");
 }
 
@@ -64,6 +68,10 @@ function scaleTokens(): string {
       --text-lg: 1rem;
       --text-xl: 1.25rem;
       --text-2xl: 1.5rem;
+      --weight-normal: 400;
+      --weight-medium: 500;
+      --weight-semibold: 600;
+      --weight-bold: 700;
       --leading-tight: 1.25;
       --leading-normal: 1.5;
       --space-1: 0.25rem;
@@ -73,6 +81,9 @@ function scaleTokens(): string {
       --space-5: 1.25rem;
       --space-6: 1.5rem;
       --space-8: 2rem;
+      /* Control heights: every button, input, select, filter and toolbar item is one of the two. */
+      --control-sm: 32px;
+      --control-md: 40px;
       --radius-pill: 999px;
       --ease: cubic-bezier(0.2, 0, 0, 1);
       --dur-fast: 120ms;
@@ -138,6 +149,8 @@ function derivedVars(fb: Fallbacks): string {
       --status-new-fg: ${mix("--status-new", "60%", "--text-primary")};
       --status-rejected-fg: ${mix("--status-rejected", "60%", "--text-primary")};
       --status-info-fg: ${mix("--status-info", "60%", "--text-primary")};
+      --status-rejected-solid: color-mix(in srgb, var(--status-rejected) 82%, black);
+      --status-rejected-contrast: #fff;
       --status-approved-bg: ${mix("--status-approved", fb.tint, "--surface-card")};
       --status-new-bg: ${mix("--status-new", fb.tint, "--surface-card")};
       --status-rejected-bg: ${mix("--status-rejected", fb.tint, "--surface-card")};

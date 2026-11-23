@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { UserModel } from "@storyshelf/core/models";
 import { ulid } from "@storyshelf/core/utils";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -274,14 +274,24 @@ describe("createShelfAuth", () => {
     await shelf.adapter.destroySession("");
   });
 
-  it("rejects short secrets at setup", async () => {
+  it("refuses a short secret at creation, before the library sees it", async () => {
     const { db } = await testEngine();
-    const weak = createShelfAuth({
-      db,
-      secret: "too-short",
-      baseURL: "http://localhost:3000",
-    });
-    await expect(weak.adapter.setup()).rejects.toThrow(/at least 32 characters/u);
+    expect(() =>
+      createShelfAuth({ db, secret: "too-short", baseURL: "http://localhost:3000" }),
+    ).toThrow(/SECRET .*at least 32 characters/u);
+  });
+
+  it("refuses a missing secret instead of falling back to the library default", async () => {
+    const { db } = await testEngine();
+    for (const secret of [undefined, ""]) {
+      expect(() =>
+        createShelfAuth({
+          db,
+          secret: secret as unknown as string,
+          baseURL: "http://localhost:3000",
+        }),
+      ).toThrow(/SECRET .*unset/u);
+    }
   });
 
   it("describes password and oauth methods and builds the Keycloak redirect offline", async () => {

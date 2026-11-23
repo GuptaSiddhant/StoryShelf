@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { MIN_CAPTURES_PER_SLICE } from "../utils/storybook-token.ts";
-import type { StoryEntry } from "./adapter.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { renderInSlices, SignedUrlLifetimeError } from "./token-chunks.ts";
@@ -14,7 +14,7 @@ const stories = (count: number): StoryEntry[] =>
     (_, index) => ({ id: `s${index}`, title: "T", name: `n${index}` }) as StoryEntry,
   );
 
-function setup(ttl: number | undefined, count: number) {
+function setup(ttl: number | undefined, count: number, checkpoint?: () => void) {
   const seen: { url: string | undefined; stories: number }[] = [];
   const render = vi.fn((request: RenderRequest): Promise<RenderResult> => {
     seen.push({ url: request.storybookUrl, stories: request.stories.length });
@@ -33,6 +33,7 @@ function setup(ttl: number | undefined, count: number) {
       storybookUrl: source,
       captureCount: () => 1,
       renderTimeoutMs: undefined,
+      checkpoint,
     });
   return { run, seen, mint };
 }
@@ -58,6 +59,21 @@ describe("renderInSlices", () => {
     expect(seen.map((call) => call.stories)).toEqual([460, 460, 80]);
     expect(new Set(seen.map((call) => call.url)).size).toBe(3);
     expect(mint).toHaveBeenCalledTimes(3);
+  });
+
+  it("starts no further slice, and mints no URL for it, once the job is cancelled (#1154)", async () => {
+    let cancelled = false;
+    const { run, seen, mint } = setup(7200, 1000, () => {
+      if (cancelled) throw new Error("job cancelled");
+    });
+    mint.mockImplementation(() => {
+      // The first slice's URL is minted, then the cancel lands while that slice renders.
+      cancelled = true;
+      return Promise.resolve("https://x/_s/t1/");
+    });
+    await expect(run()).rejects.toThrow("job cancelled");
+    expect(seen.map((call) => call.stories)).toEqual([460]);
+    expect(mint).toHaveBeenCalledTimes(1);
   });
 
   it("slices legacy short lifetimes below the usual minimum", async () => {

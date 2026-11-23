@@ -5,13 +5,13 @@ MCP server for [StoryShelf](https://github.com/GuptaSiddhant/StoryShelf): let AI
 ## Usage
 
 ```sh
-STORYSHELF_URL=https://shelf.example.com STORYSHELF_TOKEN=... STORYSHELF_SLUG=web npx @storyshelf/mcp   # stdio
-STORYSHELF_URL=https://shelf.example.com npx @storyshelf/mcp --http --port 3333                           # HTTP at /mcp
+SHELF_URL=https://shelf.example.com SHELF_TOKEN=... SHELF_SLUG=web npx @storyshelf/mcp   # stdio
+SHELF_URL=https://shelf.example.com npx @storyshelf/mcp --http --port 3333                           # HTTP at /mcp
 ```
 
 The tools that read snapshots, capture logs or AI insights are advertised only when the instance has `testing` (read from `GET /api/v1/health`).
 
-Over HTTP each client sends its own `Authorization: Bearer <token>`, which is forwarded to the StoryShelf API. Or scaffold with `storyshelf mcp init`.
+Over HTTP each client sends its own `Authorization: Bearer <token>`, which is forwarded to the StoryShelf API. Or scaffold with `npx @storyshelf/mcp init` (`storyshelf-mcp init`; `storyshelf-mcp serve` runs the scaffold).
 
 ## Tools
 

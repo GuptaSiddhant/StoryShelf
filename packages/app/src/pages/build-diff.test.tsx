@@ -221,8 +221,8 @@ describe("review page with several browsers", () => {
   it("shows browser tabs and a per-browser escape hatch", async () => {
     const html = await multiBrowserPage((ids) => `?snapshot=${ids["firefox"]}`);
     expect(html).toContain('data-browser-tabs="true"');
-    expect(html).toContain("chromium · changed");
-    expect(html).toContain("firefox · changed");
+    expect(html).toContain("chromium · Changed");
+    expect(html).toContain("firefox · Changed");
     expect(html).toContain("Only firefox");
   });
 

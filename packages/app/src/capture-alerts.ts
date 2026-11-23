@@ -1,7 +1,9 @@
+import type { ReachabilityChange } from "@storyshelf/core/capture";
 /** Admin alerts for captures that leave their build failed; the app, not the capture child, sends them. */
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { alertDataOf } from "./capture-reachability.ts";
 import { notifyProjectWith, notifySystemWith } from "./notify.ts";
 
 /**
@@ -22,7 +24,7 @@ export function alreadyAlerted(build: { id: string; updatedAt: string }): boolea
 
 /** Alert admins when a capture leaves its build failed. */
 export async function notifyCaptureFailed(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   buildId: string,
@@ -41,7 +43,7 @@ export async function notifyCaptureFailed(
  * build did not fail by a verdict; a build already settled by someone else needs none.
  */
 export async function notifyCaptureStuck(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   buildId: string,
@@ -62,7 +64,7 @@ export async function notifyCaptureStuck(
 }
 
 function alertDeps(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   publicOrigin?: () => Promise<string | undefined>,
@@ -79,7 +81,7 @@ function alertDeps(
 }
 
 async function sendCaptureAlert(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   logger: Logger,
   build: { id: string; projectId: string; gitBranch: string },
@@ -103,4 +105,19 @@ async function sendCaptureAlert(
       `/builds/${buildId}`,
     );
   }
+}
+
+/** Alert admins once when a capture target becomes unreachable, and once when it recovers. */
+export async function notifyTargetChange(
+  options: ResolvedShelfOptions,
+  config: ShelfConfig,
+  logger: Logger,
+  change: ReachabilityChange,
+  publicOrigin?: () => Promise<string | undefined>,
+): Promise<void> {
+  await notifySystemWith(
+    alertDeps(options, config, logger, publicOrigin),
+    change.kind === "unreachable" ? "sys:target-unreachable" : "sys:target-recovered",
+    alertDataOf(change),
+  );
 }
