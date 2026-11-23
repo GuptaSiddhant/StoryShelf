@@ -1,6 +1,6 @@
 /** axe-core accessibility checks for captured pages (ADR 0004 §6). */
 
-import { axeUnavailableNote, parametersNote } from "@storyshelf/core/capture";
+import { axeUnavailableNote, parametersNote } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Page } from "playwright-core";
 import { axeInjectionScript, loadAxeSource } from "./a11y-source.ts";

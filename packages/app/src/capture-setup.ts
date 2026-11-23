@@ -8,15 +8,15 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import {
   captureDispatchDeps,
   reachabilityOf,
-  DEFAULT_RETRIES,
-  type BuildStatePublisher,
   type CaptureHandlerOptions,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
+import { DEFAULT_RETRIES } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import type { GitConnectionModel } from "@storyshelf/core/models";
 import { currentTraceparent } from "@storyshelf/core/telemetry";

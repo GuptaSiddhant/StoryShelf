@@ -5,7 +5,7 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import type { BuildStatePublisher } from "@storyshelf/core/capture";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { GitLinkConfig, IntegrationStatus } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
@@ -35,7 +35,7 @@ export interface StoreScopeDeps {
   cancelBuildJobs?: (buildId: string) => Promise<boolean>;
   buildState?: BuildStatePublisher;
   captureConcurrency?: number;
-  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  runner?: Pick<CaptureRunner, "metadata" | "images"> | undefined;
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];

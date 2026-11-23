@@ -11,8 +11,8 @@ import {
   type StorySourceAdapter,
   type Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/capture";
-import type { StoryParameters } from "@storyshelf/core/capture";
+import { StorybookAdapter, resolveStoryViewports } from "@storyshelf/core/adapter/capture-runner";
+import type { StoryParameters } from "@storyshelf/core/adapter/capture-runner";
 import {
   DEFAULT_RECYCLE_BROWSER_EVERY,
   chunk,

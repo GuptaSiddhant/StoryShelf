@@ -39,11 +39,24 @@ describe("telemetryRow", () => {
 });
 
 describe("imageEngineRow", () => {
-  it("reports the engine and the diff workers", () => {
-    const row = imageEngineRow();
-    expect(row).toMatchObject({ id: "image-engine", tone: "ok" });
-    expect(["pngjs", "sharp"]).toContain(row.value);
-    expect(row.detail).toMatch(/diff worker|main thread/u);
+  it("reports the runner's engine and its diff workers", () => {
+    const state = vi.fn(() => ({ engine: "sharp" as const, workers: 3, inThread: false }));
+    expect(imageEngineRow({ state })).toEqual({
+      id: "image-engine",
+      label: "Image engine",
+      value: "sharp",
+      tone: "ok",
+      detail: "3 diff workers",
+    });
+  });
+
+  it("notes diffs on the main thread", () => {
+    const state = vi.fn(() => ({ engine: "pngjs" as const, workers: 0, inThread: true }));
+    expect(imageEngineRow({ state }).detail).toBe("diffs run on the main thread");
+  });
+
+  it("reads off without testing: a hosting-only instance has no image engine", () => {
+    expect(imageEngineRow()).toMatchObject({ value: "off", tone: "off", detail: "no testing" });
   });
 });
 

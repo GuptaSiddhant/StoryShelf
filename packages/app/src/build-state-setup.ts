@@ -11,10 +11,10 @@ import {
   notifyExhausted,
   type BuildStateDeps,
   type BuildStatePublisher,
-  type KindHandler,
   type NotifyFailure,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/build-state";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import type { KindHandler } from "@storyshelf/core/jobs";
 import { ProjectModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";

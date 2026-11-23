@@ -1,0 +1,143 @@
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
+import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import { mapLimit } from "../utils/map-limit.ts";
+import { contentKey, storybookDir, storybookZipPath } from "../utils/paths.ts";
+import { recordContentUses } from "./content-uses.ts";
+import { extractZipStream } from "./extract.ts";
+import {
+  DEFAULT_MAX_UNZIPPED_BYTES,
+  DEFAULT_MAX_ZIP_ENTRIES,
+  type ExtractionLimits,
+} from "./limits.ts";
+import { jobScratchDir, shardScratchDir } from "./scratch.ts";
+
+/**
+ * Shared Storybook statics handling: unzip a stored build into a scratch
+ * directory and persist the extracted files back to storage. Used by the
+ * capture orchestrator and by the upload path for opt-in inline extraction
+ * (`maxInlineUnzipSize`); both write identical keys, so either may run first.
+ */
+
+const DEFAULT_EXTRACTION_LIMITS: ExtractionLimits = {
+  maxEntries: DEFAULT_MAX_ZIP_ENTRIES,
+  maxBytes: DEFAULT_MAX_UNZIPPED_BYTES,
+};
+
+/**
+ * Extract a build's stored zip into a dedicated scratch directory. The caller removes it when
+ * done (`removeJobScratch`).
+ *
+ * @param storage - Storage holding the uploaded zip.
+ * @param scratchDir - Root under which per-build scratch dirs are created.
+ * @param projectId - Owning project id.
+ * @param buildId - Build whose zip to extract.
+ * @param shardId - Shard extracting it; gives the shard a directory of its own.
+ * @param limits - Entry and uncompressed-byte caps (safe defaults when omitted).
+ * @returns The extracted Storybook directory.
+ * @throws {ZipLimitError} When the archive breaks a cap or escapes the target directory.
+ */
+export async function extractStorybookToScratch(
+  storage: StorageAdapter,
+  scratchDir: string,
+  projectId: string,
+  buildId: string,
+  shardId?: string,
+  limits: ExtractionLimits = DEFAULT_EXTRACTION_LIMITS,
+  signal?: AbortSignal,
+): Promise<string> {
+  signal?.throwIfAborted();
+  const base = shardId
+    ? shardScratchDir(scratchDir, projectId, buildId, shardId)
+    : jobScratchDir(scratchDir, projectId, buildId);
+  const targetDir = join(base, "storybook");
+  await rm(join(base, "storybook.complete"), { force: true });
+  const root = await prepareTargetDir(targetDir);
+  const source = await storage.readStream(storybookZipPath(projectId, buildId));
+  await extractZipStream(source, root, limits, signal);
+  return targetDir;
+}
+
+/** Reset a scratch target directory, returning its resolved root. */
+async function prepareTargetDir(targetDir: string): Promise<string> {
+  await rm(targetDir, { recursive: true, force: true });
+  await mkdir(targetDir, { recursive: true });
+  return resolve(targetDir);
+}
+
+/**
+ * Persist an extracted Storybook directory to storage for published serving.
+ *
+ * Uses content-addressed deduplication: each file is hashed and stored once
+ * under `content/<hash>`, with a per-build manifest (path to hash) at
+ * `${projectId}/builds/${buildId}/storybook/manifest.json`. No other file is
+ * written under the build's `storybook/` directory; that layout is legacy and
+ * only read for builds published before the content store.
+ *
+ * @param storage - Destination storage adapter.
+ * @param sourceDir - Extracted Storybook directory.
+ * @param projectId - Owning project id.
+ * @param buildId - Build the files belong to.
+ * @param db - Optional database; with the lifecycle capability the build's content uses are recorded (enables GC).
+ * @param signal - Checked before every write, the content uses and the manifest: an aborted run writes nothing more and throws the signal's reason.
+ */
+export async function persistStorybookStatics(
+  storage: StorageAdapter,
+  sourceDir: string,
+  projectId: string,
+  buildId: string,
+  db?: DatabaseAdapter,
+  signal?: AbortSignal,
+): Promise<void> {
+  const root = resolve(sourceDir);
+  const destinationPrefix = storybookDir(projectId, buildId);
+  const files = await walkFiles(root);
+  const manifest: Record<string, string> = {};
+  const sizes = new Map<string, number>();
+  // Bounded: a large Storybook has thousands of files, and buffering them all
+  // at once exhausts memory on small hosts.
+  await mapLimit(files, STATICS_CONCURRENCY, async (file) => {
+    signal?.throwIfAborted();
+    const rel = relative(root, file);
+    const buffer = await readFile(file);
+    const hash = createHash("sha256").update(buffer).digest("hex");
+    manifest[rel] = hash;
+    sizes.set(hash, buffer.length);
+    // Only write if not already exists (dedup)
+    if (!(await storage.exists(contentKey(hash)))) {
+      signal?.throwIfAborted();
+      await storage.write(contentKey(hash), buffer);
+    }
+  });
+  // The uses are recorded once per hash, before the manifest that names them makes the build serve.
+  signal?.throwIfAborted();
+  await recordContentUses(
+    db,
+    storage,
+    { projectId, buildId },
+    Object.values(manifest),
+    undefined,
+    sizes,
+  );
+  signal?.throwIfAborted();
+  await storage.write(`${destinationPrefix}/manifest.json`, Buffer.from(JSON.stringify(manifest)));
+}
+
+/** Files persisted at once; bounds how many file buffers are in memory together. */
+const STATICS_CONCURRENCY = 8;
+
+async function walkFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return await walkFiles(full);
+      }
+      return [full];
+    }),
+  );
+  return nested.flat();
+}

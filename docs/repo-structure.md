@@ -38,8 +38,10 @@ There is no `tsdown-entry` key. Each library `package.json` `exports` map carrie
   Importing it must never pull Hono into bundles that do not serve it
   (e.g. runners, the forked capture child) — enforced by keeping all HTTP modules in app.
 - Everything else lives under a subpath: adapter interfaces under
-  `core/adapter/*`, runtime capture under `core/capture`, logging under
-  `core/logger`, diff under `core/diff` (codecs, worker pool and engine), URLs under `core/urls`, storage paths
+  `core/adapter/*`, runtime capture (testing only) under `core/capture`, the job queue and
+  consumer under `core/jobs`, publishing under `core/publish`, git build state under
+  `core/build-state`, the Storybook catalog under `core/catalog`, logging under
+  `core/logger` (the image engine contract is in `core/adapter/capture-runner`; codecs, worker pool and pixel diff are `@storyshelf/runner/images`), URLs under `core/urls`, storage paths
   under `core/paths`, tables/rows under `core/schema`, models under
   `core/models`, config under `core/config`, retention under `core/retention`,
   shared utils under `core/utils`, in-memory fakes under `core/test-helpers`.

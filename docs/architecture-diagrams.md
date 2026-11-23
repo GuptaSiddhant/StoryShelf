@@ -74,7 +74,7 @@ flowchart TB
         models["Models\ncore/models/*\n(constructor-injected)"]
         schema["Schema\ncore/schema/* + ddl.ts"]
         capture["Capture\ncore/capture/*\norchestrator / pipeline / queue\nstorybook discovery"]
-        diff["Diff\ncore/diff\npixelmatch + pngjs"]
+        diff["Image engine contract\ncore/adapter/capture-runner\n(runner/images: pixelmatch + pngjs)"]
         retention["Retention\ncore/retention/purge.ts"]
         utils["Utils\ncore/utils + paths + urls\nlogger (pino) + config"]
     end
@@ -251,7 +251,7 @@ sequenceDiagram
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
     participant Runner as CaptureRunner<br/>runner
-    participant Diff as Diff Engine<br/>core/diff (pixelmatch)
+    participant Diff as Image Engine<br/>runner.images (pixelmatch)
     participant Git as Git notifier (state delivery)
 
     CI->>CLI: storyshelf upload --token=xxx
@@ -291,7 +291,7 @@ sequenceDiagram
     Orc->>Orc: partition failures → blockingFailed vs flakyFailed (isFlakyStory)
     Orc->>Diff: persistCapture({ db, storage, project, build, viewports, captures })
     Diff->>FS: storage.read(baseline) — per-branch fallback
-    Diff->>Diff: diffImages(baseline, current, { pixelThreshold, maxDiffRatio })
+    Diff->>Diff: compare(baseline, current, { pixelThreshold, maxDiffRatio })
     Diff->>FS: storage.write(screenshots/{story}/{viewport}.png)
     Diff->>FS: storage.write(diffs/{story}/{viewport}.png) if changed
     Diff->>DB: snapshots upsert (status: new/unchanged/changed)
@@ -587,7 +587,7 @@ flowchart TB
     class Purge,Publish purge;
 ```
 
-Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). Publishing is independent of capture: a zip up to `maxInlineUnzipSize` (default 50 MB) is extracted inline at upload, a larger one by a `publish` job on the database queue, and extraction is capped by `maxZipEntries` and `maxUnzippedBytes` (`packages/core/src/capture/publish/`).
+Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). Publishing is independent of capture: a zip up to `maxInlineUnzipSize` (default 50 MB) is extracted inline at upload, a larger one by a `publish` job on the database queue, and extraction is capped by `maxZipEntries` and `maxUnzippedBytes` (`packages/core/src/publish/`).
 
 ---
 

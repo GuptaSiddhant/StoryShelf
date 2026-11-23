@@ -1,7 +1,7 @@
 /** Per-run runtime-parameter extraction cache (ADR 0017). */
 
-import { mergeParameters } from "@storyshelf/core/capture";
-import type { StoryParameters } from "@storyshelf/core/capture";
+import { mergeParameters } from "@storyshelf/core/adapter/capture-runner";
+import type { StoryParameters } from "@storyshelf/core/adapter/capture-runner";
 import type { ExtractedEntry, RuntimeParamsPage, RuntimeParamsState } from "./types.ts";
 
 /** Create the per-run runtime-parameter cache shared across captures. */

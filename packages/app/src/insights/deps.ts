@@ -1,3 +1,4 @@
+import type { ImageEngine } from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 /** Explicit dependencies for insight work (requests and background jobs share them). */
@@ -13,6 +14,8 @@ export interface InsightDeps {
   storage: StorageAdapter;
   logger: Logger;
   notify: NotifyDeps;
+  /** The runner's image engine, which downscales screenshots for the model; absent without `testing`. */
+  images?: Pick<ImageEngine, "downscale"> | undefined;
 }
 
 /** Snapshot the current request store into explicit deps (null when AI is off). */
@@ -27,5 +30,6 @@ export function insightDepsFromStore(): InsightDeps | null {
     storage: store.storage,
     logger: store.logger,
     notify: store,
+    images: store.runner?.images,
   };
 }

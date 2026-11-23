@@ -1,10 +1,10 @@
+import { SnapshotModel } from "@storyshelf/core/models";
 /**
  * What `storyshelf upload --wait` reads from `GET …/builds/:buildId` besides the build row: how
  * publishing stands and how far capture has got. Both are optional additions to the response
  * (ADR 0053, an expand step); an older CLI ignores them.
  */
-import { publishingOfBuild } from "@storyshelf/core/capture";
-import { SnapshotModel } from "@storyshelf/core/models";
+import { publishingOfBuild } from "@storyshelf/core/publish";
 import type { Build } from "@storyshelf/core/schema";
 import { catalogOf, getStore } from "../store.ts";
 

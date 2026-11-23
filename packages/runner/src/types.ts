@@ -7,7 +7,7 @@ import type {
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import type { StoryParameters } from "@storyshelf/core/capture";
+import type { StoryParameters } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
 import type { Browser } from "playwright-core";
 import type { PagePool } from "./pages.ts";

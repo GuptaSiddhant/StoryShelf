@@ -1,5 +1,5 @@
 /** Progress leases for jobs out with the capture child: no progress within the lease means the child is hung. */
-import { ProgressLease } from "../job-lease.ts";
+import { ProgressLease } from "../../jobs/job-lease.ts";
 
 /** One {@link ProgressLease} per in-flight receipt. A `leaseMs` of 0 disables the whole book. */
 export class LeaseBook {

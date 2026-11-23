@@ -751,9 +751,6 @@ importers:
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
-      sharp:
-        specifier: 'catalog:'
-        version: 0.35.5(@types/node@26.6.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)
@@ -1004,6 +1001,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
+      '@types/pngjs':
+        specifier: 'catalog:'
+        version: 6.0.5
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(vitest@5.0.5)
@@ -1022,6 +1022,9 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2005
+      sharp:
+        specifier: 'catalog:'
+        version: 0.35.5(@types/node@26.6.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.22.14(typescript@7.0.2)

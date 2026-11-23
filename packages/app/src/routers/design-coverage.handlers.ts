@@ -1,5 +1,5 @@
 import { parseDesignUrl } from "@storyshelf/core/adapter/design";
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import {
   BaselineModel,
   DesignCredentialModel,

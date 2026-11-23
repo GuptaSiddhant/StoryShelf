@@ -1,5 +1,6 @@
 import { TargetLaunchError } from "@storyshelf/core/adapter/capture-runner";
-import { TargetReachability, type ConsumerJob } from "@storyshelf/core/capture";
+import { TargetReachability } from "@storyshelf/core/capture";
+import type { ConsumerJob } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models";
 import { makeDatabase } from "@storyshelf/core/test-helpers";

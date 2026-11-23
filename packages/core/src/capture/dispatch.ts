@@ -1,4 +1,7 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildStatePublisher } from "../build-state/types.ts";
+import type { ShardRepeatedEvent } from "../jobs/consumer/metrics.ts";
+import type { JobLease } from "../jobs/job-lease.ts";
 import type { Logger } from "../logger.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
@@ -15,9 +18,6 @@ import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { redactSecrets } from "../utils/redact.ts";
-import type { BuildStatePublisher } from "./build-state/types.ts";
-import type { ShardRepeatedEvent } from "./consumer/metrics.ts";
-import type { JobLease } from "./job-lease.ts";
 import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "./orchestrator.ts";
 import { leaseProgress, type CaptureProgress } from "./progress.ts";
 import { executeCaptureShard } from "./shards/execute.ts";

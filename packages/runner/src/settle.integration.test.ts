@@ -1,7 +1,7 @@
 import { createShelfApp } from "@storyshelf/app";
 import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter } from "@storyshelf/core/capture";
-import { parseTestResults } from "@storyshelf/core/capture";
+import { StorybookAdapter } from "@storyshelf/core/adapter/capture-runner";
+import { parseTestResults } from "@storyshelf/core/models";
 import type { Build, Snapshot } from "@storyshelf/core/schema";
 import { createLocalStorage } from "@storyshelf/core/storage/local";
 import { createSqliteDatabase } from "@storyshelf/db/sqlite";
