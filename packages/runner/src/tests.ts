@@ -6,7 +6,7 @@ import {
   type StoryEntry,
   type TestOutcome,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter } from "@storyshelf/core/capture";
+import { StorybookAdapter } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser, Page } from "playwright-core";
 import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
 import { isTimeoutError } from "./concurrency/adaptive-concurrency.ts";

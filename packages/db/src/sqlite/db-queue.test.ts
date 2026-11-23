@@ -3,7 +3,7 @@
  * queue instances on one database), and the query plan of the poll probe.
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   databaseQueueMultiInstanceSuite,

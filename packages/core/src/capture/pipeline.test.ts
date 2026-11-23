@@ -1,6 +1,7 @@
 import { PNG } from "pngjs";
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
+import type { StoryEntry, Viewport } from "../adapters/story-source.ts";
 import { BaselineModel } from "../models/baseline.ts";
 import { BuildModel } from "../models/build.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
@@ -9,7 +10,6 @@ import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { diffPath } from "../utils/paths.ts";
-import type { StoryEntry, Viewport } from "./adapter.ts";
 import { parseComparisonReference } from "./comparison-reference.ts";
 import { finalizeBuild, persistCapture, persistRendered, type CaptureContext } from "./pipeline.ts";
 

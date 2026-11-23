@@ -11,10 +11,10 @@ import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
+import { parseTestResults } from "../../models/test-results.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
 import { storybookDir, storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
-import { parseTestResults } from "../tests.ts";
 import { executeCaptureShard, type ShardOutcome } from "./execute.ts";
 import type { ShardDelivery } from "./repeated-work.ts";
 

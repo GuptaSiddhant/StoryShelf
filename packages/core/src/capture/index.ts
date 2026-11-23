@@ -1,9 +1,10 @@
 /**
- * Server-side capture runtime: story discovery, rendering orchestration,
- * persistence, the database job queue and the consumer that runs its jobs.
+ * Server-side capture runtime (testing only): story discovery, rendering orchestration,
+ * persistence, rediff and the `capture` job handler. The hosting side lives in `/jobs`, `/publish`,
+ * `/build-state` and `/catalog`; the stored-result readers in `/models`.
  *
- * Pure renderers implement `CaptureRunner` (see `core/adapter/capture-runner`);
- * everything here drives them.
+ * Pure renderers implement `CaptureRunner` (see `core/adapter/capture-runner`, which also
+ * re-exports the helpers a runner reuses); everything here drives them.
  */
 export {
   assertBrowserCount,
@@ -40,35 +41,11 @@ export {
   parseModesAllowlist,
 } from "./modes.ts";
 export {
-  DEFAULT_VIEWPORTS,
-  isDisabledStory,
-  isFlakyStory,
-  type ModeDefinition,
-  type ModeMap,
-  type ModeViewportValue,
-  type StoryEntry,
-  type StoryParameters,
-  type StorySourceAdapter,
-  type StoryViewportConfig,
-  type StoryViewportDefinition,
-  type Viewport,
-} from "./adapter.ts";
-export { parseTestResults, summarizeTests, type TestResult, type TestSummary } from "./tests.ts";
-export {
   executeCaptureJob,
   type CaptureAttemptRef,
   type CaptureJobInput,
   type CaptureJobOptions,
 } from "./orchestrator.ts";
-export {
-  buildScratchDir,
-  removeBuildScratch,
-  removeJobScratch,
-  SCRATCH_DIRNAME,
-  SCRATCH_MAX_AGE_MS,
-  sweepOrphanedScratch,
-  type ScratchSweepOptions,
-} from "./scratch.ts";
 export {
   buildFingerprint,
   changedFields,
@@ -77,18 +54,7 @@ export {
   type EnvironmentChange,
   type Fingerprint,
 } from "./fingerprint.ts";
-export {
-  axeUnavailableNote,
-  axeUnavailableReason,
-  baselineNote,
-  baselineSha,
-  BASELINE_SHA_LENGTH,
-  isA11yNote,
-  parametersNote,
-  parametersReason,
-} from "./a11y/index.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
-export * from "./build-state/index.ts";
 export {
   rediffBuild,
   REDIFFABLE_BUILD_STATUSES,
@@ -96,69 +62,12 @@ export {
   type RediffResult,
 } from "./rediff.ts";
 export { failCrashedCapture, type CrashFailureOutcome } from "./crash-failure.ts";
-export { ProgressLease, type JobLease } from "./job-lease.ts";
 export {
-  createDatabaseCaptureQueue,
-  DATABASE_QUEUE_METADATA,
-  DEFAULT_LEASE_MS,
-  DEFAULT_RETRIES,
-  LEASE_EXHAUSTED_ERROR,
-  MAX_NACK_DELAY_MS,
-  type DatabaseCaptureQueue,
-  type DatabaseCaptureQueueOptions,
-  type DatabaseJob,
-  type QueueJobInput,
-} from "./db-queue/index.ts";
-export {
-  ACTIVE_POLL_MS,
-  ACTIVE_WINDOW_MS,
-  CANCEL_CHECK_MS,
-  DEFAULT_CADENCE,
-  IDLE_POLL_MS,
-  nextPollDelay,
-  POLL_JITTER,
-  type PollCadence,
-} from "./db-queue/cadence.ts";
-export {
-  keepJobLease,
-  RENEW_THROTTLE_MS,
-  type JobLeaseKeeper,
-  type LeaseEnd,
-  type LeaseKeeperOptions,
-} from "./db-queue/keeper.ts";
-export { startPollLoop, type PollLoop, type PollLoopOptions } from "./db-queue/poll-loop.ts";
-export {
-  backoffDelayMs,
   captureDispatchDeps,
-  createCaptureConsumer,
   createCaptureHandler,
-  DEFAULT_BACKOFF_MS,
-  DEFAULT_MAX_RETRIES,
-  DEFAULT_SAMPLE_MS,
-  DEFAULT_WAIT_TIME_SECONDS,
-  idleDelayMs,
-  isFastEmptyPoll,
-  isFinalAttempt,
-  MAX_BACKOFF_MS,
-  MIN_BLOCKING_POLL_MS,
-  sampleQueue,
-  type CaptureConsumer,
-  type CaptureConsumerOptions,
   type CaptureHandlerOptions,
-  type ConsumerConfig,
-  type ConsumerJob,
-  type ConsumerMetrics,
-  type ConsumerStopOptions,
-  type JobFinishedEvent,
-  type JobHandlers,
-  type JobOutcome,
-  type JobRunContext,
-  type KindHandler,
-  type QueueSample,
-  type RetryConfig,
-} from "./consumer/index.ts";
+} from "./capture-handler.ts";
 export { runCaptureChild, type CaptureChildOptions, type ChildHost } from "./forked/child.ts";
-export type { LeaseRenewal, PollableCaptureQueue, PollableJob } from "../adapters/capture-queue.ts";
 export {
   STORYBOOK_BUILTIN_VIEWPORTS,
   StorybookAdapter,
@@ -166,11 +75,7 @@ export {
   resolveStoryViewports,
 } from "./storybook.ts";
 export { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
-export { ContentCollectingError, recordContentUses } from "./content-uses.ts";
-export { extractStorybookToScratch, persistStorybookStatics } from "./statics.ts";
 export { MissingContentError, materializeStorybook, prepareStorybook } from "./materialize.ts";
-export * from "./publish/index.ts";
-export * from "./catalog/index.ts";
 export {
   getScreenshotPlan,
   resolveViewports as resolveCaptureViewports,

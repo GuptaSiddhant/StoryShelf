@@ -10,9 +10,9 @@ import {
   validateBootAssembly,
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
-import type { CaptureConsumer } from "@storyshelf/core/capture";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
+import type { CaptureConsumer } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
 import { sanitizeErrorText } from "@storyshelf/core/utils";

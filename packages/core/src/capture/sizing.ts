@@ -1,4 +1,4 @@
-import type { Viewport } from "./adapter.ts";
+import type { Viewport } from "../adapters/story-source.ts";
 
 /** Padding around the cropped component (8px each side). */
 const PAD = 16;

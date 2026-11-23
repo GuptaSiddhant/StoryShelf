@@ -1,5 +1,10 @@
 /** Named capture modes: parameters → viewports carrying Storybook globals. */
-import type { ModeDefinition, ModeMap, ModeViewportValue, Viewport } from "./adapter.ts";
+import type {
+  ModeDefinition,
+  ModeMap,
+  ModeViewportValue,
+  Viewport,
+} from "../adapters/story-source.ts";
 
 /** Upper bound on captures (global viewports + modes) per story. */
 export const MAX_MODES_PER_STORY = 8;

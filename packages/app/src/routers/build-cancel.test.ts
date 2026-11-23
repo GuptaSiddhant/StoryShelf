@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { BuildModel, CaptureAttemptModel } from "@storyshelf/core/models";
 import {
   createTestBuild,

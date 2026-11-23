@@ -4,7 +4,7 @@
  * This one holds a fixed, deterministic store that a page story can adjust with `setStoryStore`.
  * Pages call the same `getStore()` / `testingEnabled()` / `catalogOf()` they do in production.
  */
-import type { CatalogLoader } from "@storyshelf/core/capture";
+import type { CatalogLoader } from "@storyshelf/core/catalog";
 import type { Store } from "../../src/store.ts";
 import type { StoryDataset } from "../../src/stories-fixtures/database.ts";
 import { seedStoryDatabase } from "../../src/stories-fixtures/database.ts";

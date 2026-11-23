@@ -9,8 +9,8 @@ import type {
   StoryViewportConfig,
   StoryViewportDefinition,
   Viewport,
-} from "./adapter.ts";
-import type { DiscoverOptions } from "./adapter.ts";
+} from "../adapters/story-source.ts";
+import type { DiscoverOptions } from "../adapters/story-source.ts";
 import { extractDesignUrl, type DesignUrlParser } from "./design.ts";
 import { declaredIgnoreSelectors } from "./ignore-regions.ts";
 import { applyModes, buildGlobalsParam } from "./modes.ts";

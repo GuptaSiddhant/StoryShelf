@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 /**
  * Publishing wiring (ADR 0006, decision 10): the completer every upload route ends in, and the
  * `publish` job kind on the shared database queue. Its handler runs on every instance with a
@@ -10,20 +11,21 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import {
   createCatalogHook,
   createCatalogLoader,
+  type CatalogLoader,
+} from "@storyshelf/core/catalog";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
+import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
+import type { KindHandler } from "@storyshelf/core/jobs";
+import type { Logger } from "@storyshelf/core/logger";
+import { BuildModel } from "@storyshelf/core/models";
+import {
   createPublishCompleter,
   createPublishHandler,
   extractionLimitsOf,
   resolvePublishLimits,
   type AfterPublishHook,
-  type BuildStatePublisher,
-  type CatalogLoader,
-  type KindHandler,
   type PublishCompleter,
-} from "@storyshelf/core/capture";
-import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
-import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
-import type { Logger } from "@storyshelf/core/logger";
-import { BuildModel } from "@storyshelf/core/models";
+} from "@storyshelf/core/publish";
 import type { Build, Project } from "@storyshelf/core/schema";
 import type { JobQueue } from "./job-queue.ts";
 import { precompressBuild } from "./routers/published-precompress.ts";

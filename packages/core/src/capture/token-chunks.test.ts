@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { MIN_CAPTURES_PER_SLICE } from "../utils/storybook-token.ts";
-import type { StoryEntry } from "./adapter.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
 import { renderInSlices, SignedUrlLifetimeError } from "./token-chunks.ts";

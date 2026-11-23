@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { baselineNote, isA11yNote, parseList } from "../models/a11y-notes.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import { SnapshotModel, type SnapshotTables } from "../models/snapshot.ts";
-import { baselineNote, isA11yNote } from "./a11y/index.ts";
 
 /** The sha shown when the baseline's build row is gone (builds are transient). */
 const UNKNOWN_SHA = "unknown";
@@ -23,17 +23,4 @@ export async function inheritedA11yJson(
   if (findings.length === 0) return null;
   const build = source.buildId ? await new BuildModel(db, tables).get(source.buildId) : null;
   return JSON.stringify([baselineNote(build?.gitSha ?? UNKNOWN_SHA), ...findings]);
-}
-
-/** The string entries of a stored JSON list; empty when absent or malformed. */
-export function parseList(stored: string | null | undefined): string[] {
-  if (!stored) return [];
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
 }

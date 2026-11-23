@@ -3,13 +3,13 @@
  * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
  */
 import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
-import { publishingOfBuild } from "@storyshelf/core/capture";
 import {
   BuildModel,
   BuildReviewModel,
   deriveReviewStatus,
   latestVerdicts,
 } from "@storyshelf/core/models";
+import { publishingOfBuild } from "@storyshelf/core/publish";
 import type { Build, BuildReview, Project } from "@storyshelf/core/schema";
 import type { BuildStatus, ReviewVerdict } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";

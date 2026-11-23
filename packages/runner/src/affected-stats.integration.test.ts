@@ -1,4 +1,4 @@
-import { StorybookAdapter } from "@storyshelf/core/capture";
+import { StorybookAdapter } from "@storyshelf/core/adapter/capture-runner";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

@@ -5,13 +5,13 @@
  */
 import type { CaptureTarget, RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { isCaptureTarget } from "../adapters/capture-target.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { BuildModel } from "../models/build.ts";
 import { emitAttemptLog } from "../models/capture-attempt.ts";
 import { SnapshotModel } from "../models/snapshot.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
-import type { StoryEntry } from "./adapter.ts";
 import { diffStoredScreenshots } from "./diff-record.ts";
 import { renderWork, type MatrixInput } from "./matrix.ts";
 

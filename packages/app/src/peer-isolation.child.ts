@@ -2,7 +2,7 @@
  * Run by `peer-isolation.test.ts` in a fresh Node with the testing-only libraries unresolvable:
  * boot `createShelfApp` with `testing` off or on (argv[2]), then print a JSON report on stdout.
  */
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import AdmZip from "adm-zip";

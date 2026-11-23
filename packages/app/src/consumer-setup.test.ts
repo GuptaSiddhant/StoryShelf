@@ -1,10 +1,10 @@
-import type { CaptureConsumer } from "@storyshelf/core/capture";
+import type { CaptureConsumer } from "@storyshelf/core/jobs";
 import { captureMetrics } from "@storyshelf/core/telemetry";
 import { describe, expect, it, vi } from "vitest";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
 
 const built = vi.hoisted(() => ({ stop: vi.fn(async () => {}) }));
-vi.mock(import("@storyshelf/core/capture"), async (importOriginal) => ({
+vi.mock(import("@storyshelf/core/jobs"), async (importOriginal) => ({
   ...(await importOriginal()),
   createCaptureConsumer: () => ({
     start: async () => {},

@@ -18,7 +18,7 @@ import {
   createDatabaseCaptureQueue,
   type DatabaseCaptureQueue,
   type DatabaseJob,
-} from "../capture/db-queue/index.ts";
+} from "../jobs/db-queue/index.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import type { CaptureJobRow } from "../schema/capture-job.ts";
 import type { SharedDatabaseFactory } from "./queue-multi-instance.ts";

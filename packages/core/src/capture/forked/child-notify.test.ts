@@ -5,12 +5,12 @@
  */
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { createNotifyHandler } from "../../build-state/notify-job.ts";
+import { world, type World } from "../../build-state/test-world.ts";
+import type { BuildStatePublisher } from "../../build-state/types.ts";
+import { createCaptureConsumer } from "../../jobs/consumer/index.ts";
+import { createDatabaseCaptureQueue } from "../../jobs/db-queue/index.ts";
 import { createShelfLogger } from "../../logger.ts";
-import { createNotifyHandler } from "../build-state/notify-job.ts";
-import { world, type World } from "../build-state/test-world.ts";
-import type { BuildStatePublisher } from "../build-state/types.ts";
-import { createCaptureConsumer } from "../consumer/index.ts";
-import { createDatabaseCaptureQueue } from "../db-queue/index.ts";
 
 // The capture itself is stubbed: a pushed job only asks the publisher the child built to show the
 // build's state, as a real capture does when its status changes.

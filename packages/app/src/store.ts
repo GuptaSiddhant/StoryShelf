@@ -5,11 +5,8 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import {
-  createCatalogLoader,
-  type BuildStatePublisher,
-  type CatalogLoader,
-} from "@storyshelf/core/capture";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
+import { createCatalogLoader, type CatalogLoader } from "@storyshelf/core/catalog";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { IntegrationStatus } from "@storyshelf/core/integrations";
 import type { GitLinkConfig } from "@storyshelf/core/integrations";
