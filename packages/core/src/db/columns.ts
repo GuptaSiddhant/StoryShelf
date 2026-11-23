@@ -13,13 +13,14 @@ export type ColumnKind =
   | "key"
   | "int"
   | "bigint"
+  | "double"
   | "bool"
   | "timestamp"
   | "json"
   | "enum";
 
 /** What a foreign key does when its parent row is deleted. */
-export type OnDelete = "cascade" | "restrict" | "set null";
+export type OnDelete = "cascade" | "restrict" | "set null" | "no action";
 
 /** A literal column default, the only kind the neutral schema allows. */
 export type DefaultValue = string | number | boolean;
@@ -81,6 +82,14 @@ export class NeutralColumn<
     return new NeutralColumn({ ...this.spec, defaultValue: value });
   }
 
+  /** The default of a `json<T>` column, stored as its JSON text (`DEFAULT '{}'`). */
+  defaultJson(value: TData): NeutralColumn<TData, TNotNull, true> {
+    if (this.spec.kind !== "json") {
+      throw new Error(`defaultJson on ${this.spec.kind} column ${this.spec.name}`);
+    }
+    return new NeutralColumn({ ...this.spec, defaultValue: toJsonText(value) });
+  }
+
   references(
     table: string,
     column: string,
@@ -93,6 +102,18 @@ export class NeutralColumn<
   $type<T extends TData>(): NeutralColumn<T, TNotNull, THasDefault> {
     return new NeutralColumn(this.spec);
   }
+}
+
+/**
+ * The JSON text of a `json<T>` value. Refuses a value with no JSON form (`undefined`, a function,
+ * a symbol), for which `JSON.stringify` returns `undefined` instead of text.
+ */
+export function toJsonText(value: unknown): string {
+  const serialized: unknown = JSON.stringify(value);
+  if (typeof serialized !== "string") {
+    throw new TypeError(`A json<T> value must have a JSON form; got ${typeof value}`);
+  }
+  return serialized;
 }
 
 /** Any neutral column, for constraints. */
@@ -128,6 +149,11 @@ export function bigint(name: string): NeutralColumn<number> {
   return new NeutralColumn(columnSpec("bigint", name));
 }
 
+/** A double-precision float: `real` in SQLite, `double precision` in Postgres, `double` in MySQL. */
+export function double(name: string): NeutralColumn<number> {
+  return new NeutralColumn(columnSpec("double", name));
+}
+
 /** A boolean (`integer` 0/1 in SQLite, `boolean` in Postgres and MySQL). */
 export function bool(name: string): NeutralColumn<boolean> {
   return new NeutralColumn(columnSpec("bool", name));
@@ -138,7 +164,10 @@ export function timestamp(name: string): NeutralColumn<string> {
   return new NeutralColumn(columnSpec("timestamp", name));
 }
 
-/** A JSON document stored as text and parsed on read. */
+/**
+ * A JSON document stored as `TEXT` in every dialect: written with `JSON.stringify`, parsed on read
+ * (`jsonCodec`), so the row type is `T`. Its default comes from `defaultJson`, not `default`.
+ */
 export function json<T>(name: string): NeutralColumn<T> {
   return new NeutralColumn(columnSpec("json", name));
 }

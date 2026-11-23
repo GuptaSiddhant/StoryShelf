@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   bigint,
   bool,
+  double,
   enumOf,
   id,
   int,
@@ -22,10 +23,12 @@ describe("neutral columns", () => {
       values: ["a", "b"],
       length: 32,
     });
-    expect([text, int, bigint, bool, timestamp, json].map((make) => make("c").spec.kind)).toEqual([
+    const makers = [text, int, bigint, double, bool, timestamp, json];
+    expect(makers.map((make) => make("c").spec.kind)).toEqual([
       "text",
       "int",
       "bigint",
+      "double",
       "bool",
       "timestamp",
       "json",
@@ -44,6 +47,15 @@ describe("neutral columns", () => {
     });
     expect(id("id").primaryKey().spec).toMatchObject({ primaryKey: true, notNull: true });
     expect(base.$type<"a">()).toBeInstanceOf(NeutralColumn);
+  });
+
+  it("stores a json<T> default as its JSON text, and only on a json<T> column", () => {
+    const column = json<{ tags: string[] }>("meta").notNull().defaultJson({ tags: [] });
+    expect(column.spec.defaultValue).toBe('{"tags":[]}');
+    expectTypeOf(column).toEqualTypeOf<NeutralColumn<{ tags: string[] }, true, true>>();
+    expect(() => text("name").defaultJson("x")).toThrow("defaultJson on text column name");
+    // `JSON.stringify` returns `undefined` for a value with no JSON form; that is refused.
+    expect(() => json<symbol>("meta").defaultJson(Symbol("x"))).toThrow("must have a JSON form");
   });
 
   it("tracks the row type, nullability and default in the type", () => {

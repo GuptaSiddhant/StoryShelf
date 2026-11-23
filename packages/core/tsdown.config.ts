@@ -25,6 +25,7 @@ const config = libConfig({
   "build-state": "./src/build-state/index.ts",
   catalog: "./src/catalog/index.ts",
   config: "./src/config.ts",
+  db: "./src/db/index.ts",
   models: "./src/models/index.ts",
   retention: "./src/retention/purge.ts",
   orm: "./src/orm/index.ts",

@@ -102,6 +102,10 @@
       "source": "./src/config.ts",
       "default": "./dist/config.mjs"
     },
+    "./db": {
+      "source": "./src/db/index.ts",
+      "default": "./dist/db.mjs"
+    },
     "./insights": {
       "source": "./src/insights/index.ts",
       "default": "./dist/insights.mjs"
@@ -196,6 +200,7 @@
       "./capture": "./dist/capture.mjs",
       "./catalog": "./dist/catalog.mjs",
       "./config": "./dist/config.mjs",
+      "./db": "./dist/db.mjs",
       "./insights": "./dist/insights.mjs",
       "./integrations": "./dist/integrations.mjs",
       "./jobs": "./dist/jobs.mjs",

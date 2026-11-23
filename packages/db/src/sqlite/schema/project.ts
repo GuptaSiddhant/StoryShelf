@@ -4,7 +4,7 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  slug: text("slug").notNull(),
+  slug: text("slug").notNull().unique(),
   gitRepository: text("git_repository"),
   gitDefaultBranch: text("git_default_branch").notNull().default("main"),
   pixelThreshold: real("pixel_threshold").notNull().default(0.1),

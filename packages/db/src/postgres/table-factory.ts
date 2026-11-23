@@ -1,12 +1,15 @@
 /**
  * Postgres table factory (ADR 0041 decision 2; spike #800): builds a Drizzle `pgTable` from a
- * neutral table. Not used by the adapter yet; `schema/` and `ddl.ts` stay authoritative.
+ * neutral table. Tables not yet
+ * defined in core stay hand-written in `schema/` and `ddl.ts`.
  */
-import { neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import * as ns from "@storyshelf/core/db";
 import {
   bigint,
   boolean,
   check,
+  customType,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -34,9 +37,12 @@ export type PgTableOf<T extends ns.NeutralTable> = PgTableWithColumns<{
   >;
 }>;
 
-const refuseJson = (spec: ns.ColumnSpec): never => {
-  throw new Error(`json<T> column ${spec.name}: not mapped until a table needs it`);
-};
+/** A `json<T>` column: `TEXT` holding the JSON, encoded and parsed by `ns.jsonCodec`. */
+const jsonText = customType<{ data: unknown; driverData: string }>({
+  dataType: () => "text",
+  toDriver: (value) => ns.jsonCodec.toDriver(value),
+  fromDriver: (value) => ns.jsonCodec.fromDriver(value),
+});
 const plainText = (spec: ns.ColumnSpec): ns.ModifiableBuilder => text(spec.name);
 const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuilder> = {
   id: plainText,
@@ -45,9 +51,10 @@ const COLUMNS: Record<ns.ColumnKind, (spec: ns.ColumnSpec) => ns.ModifiableBuild
   enum: plainText,
   int: (spec) => integer(spec.name),
   bigint: (spec) => bigint(spec.name, { mode: "number" }),
+  double: (spec) => doublePrecision(spec.name),
   bool: (spec) => boolean(spec.name),
   timestamp: (spec) => timestamp(spec.name, { withTimezone: true, mode: "string" }),
-  json: refuseJson,
+  json: (spec) => jsonText(spec.name),
 };
 
 const builders = { check, foreignKey, index, primaryKey, uniqueIndex } as never;

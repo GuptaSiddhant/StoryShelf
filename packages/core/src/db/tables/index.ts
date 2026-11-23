@@ -1,4 +1,14 @@
-/** The neutral tables of spike #800. */
+/** Every table, defined once in core (ADR 0041); the dialects still read their hand-written schemas. */
+import { tokens, userConnections, userInviteTokens } from "./access.ts";
+import {
+  authAccount,
+  authPasskey,
+  authSession,
+  authSsoProvider,
+  authUser,
+  authVerification,
+} from "./auth.ts";
+import { buildComponents, buildPackageUsage, buildReviews, contentUses } from "./build-content.ts";
 import {
   buildContentReleases,
   buildDeletions,
@@ -6,23 +16,81 @@ import {
   buildReferences,
   builds,
 } from "./build.ts";
+import { captureAttempts, captureJobs, captureLogs, captureShards } from "./capture.ts";
+import {
+  aiBudgetAlerts,
+  aiUsage,
+  designCredentials,
+  designLinks,
+  designNodes,
+  gitConnections,
+  gitRepositoryLinks,
+  insights,
+} from "./integration.ts";
 import { buildLabels, labelTypes } from "./label.ts";
+import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
+import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
+import { pushSubscriptions } from "./push.ts";
+import { schemaMeta, siteSettings } from "./settings.ts";
+import { baselines, comments, snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";
 
 export {
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  authPasskey,
+  authSsoProvider,
+  designLinks,
+  designCredentials,
+  designNodes,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
+  gitConnections,
+  gitRepositoryLinks,
+  baselines,
+  buildComponents,
   buildContentReleases,
   buildDeletions,
   buildLabels,
+  buildPackageUsage,
   buildReferenceGenerations,
   buildReferences,
+  buildReviews,
   builds,
+  captureAttempts,
+  captureJobs,
+  captureLogs,
+  captureShards,
+  comments,
+  contentUses,
   labelTypes,
+  notificationChannels,
+  notificationSubscriptions,
+  projectGroupMappings,
+  projectLinks,
+  projectMembers,
+  projects,
+  pushSubscriptions,
+  schemaMeta,
+  siteSettings,
+  snapshots,
+  tokens,
+  userConnections,
+  userInviteTokens,
   users,
+  webhooks,
 };
 
-/** Every spike table, parents before children, for `buildAll`. */
-export const SPIKE_TABLES = [
+/** Every neutral table, parents before children, for `buildAll`. */
+export const NEUTRAL_TABLES = [
+  projects,
   users,
+  projectMembers,
+  projectGroupMappings,
+  projectLinks,
   builds,
   labelTypes,
   buildLabels,
@@ -30,4 +98,38 @@ export const SPIKE_TABLES = [
   buildReferenceGenerations,
   buildDeletions,
   buildContentReleases,
+  siteSettings,
+  schemaMeta,
+  tokens,
+  userInviteTokens,
+  userConnections,
+  webhooks,
+  notificationChannels,
+  notificationSubscriptions,
+  captureJobs,
+  captureAttempts,
+  captureLogs,
+  captureShards,
+  buildReviews,
+  buildComponents,
+  buildPackageUsage,
+  contentUses,
+  snapshots,
+  baselines,
+  comments,
+  designLinks,
+  designCredentials,
+  designNodes,
+  insights,
+  aiUsage,
+  aiBudgetAlerts,
+  gitConnections,
+  gitRepositoryLinks,
+  pushSubscriptions,
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  authPasskey,
+  authSsoProvider,
 ] as const;

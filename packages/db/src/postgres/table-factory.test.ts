@@ -1,12 +1,14 @@
+import * as ns from "@storyshelf/core/db";
 /**
  * Spike #800 (ADR 0041 decisions 2 and 3): the neutral tables built by `pgTableOf` generate,
  * through drizzle-kit, the same DDL as `ddl.ts` apart from the differences listed and classified
  * below, and infer exactly the hand-written Drizzle row types.
  */
 import type { BuildLabel, LabelType, User } from "@storyshelf/core/schema";
-import { compareDdlShapes, ddlShape, neutralSchema as ns } from "@storyshelf/core/test-helpers";
+import { compareDdlShapes, ddlShape } from "@storyshelf/core/test-helpers";
 import { indexStatementsIn } from "@storyshelf/core/test-helpers";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/payload/postgres";
+import { getTableColumns, getTableName, is, Table } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -15,11 +17,13 @@ import * as schema from "./schema/index.ts";
 import { pgTableOf } from "./table-factory.ts";
 
 const MIGRATE_SOURCE = readFileSync(fileURLToPath(new URL("migrate.ts", import.meta.url)), "utf8");
-const external = { projects: schema.projects };
-const resolve = ns.resolverOf(external);
+/** No neutral table references a hand-written one now that `projects` is neutral. */
+const external = {};
+const BUILT = ns.buildAll(ns.NEUTRAL_TABLES, pgTableOf, external);
+const resolve = ns.resolverOf(BUILT);
 const resolverOf = (tables: Record<string, unknown>) =>
-  ns.resolverOf({ ...external, ...tables } as never);
-const TABLES = ns.SPIKE_TABLES.map((table) => table.name);
+  ns.resolverOf({ ...BUILT, ...tables } as never);
+const TABLES = ns.NEUTRAL_TABLES.map((table) => table.name);
 
 /**
  * Columns of a composite primary key. ddl.ts writes NOT NULL on each; drizzle-kit 1.0 leaves it to
@@ -35,6 +39,8 @@ const PRIMARY_KEY_COLUMNS = [
   "build_reference_generations.owner_id",
   "build_content_releases.build_id",
   "build_content_releases.content_hash",
+  "content_uses.build_id",
+  "content_uses.content_hash",
 ];
 
 /** Every remaining difference, `today → generated`, with its classification. */
@@ -53,13 +59,36 @@ const DIFFERENCES: readonly { difference: string; kind: "equivalent" | "factory"
     difference: `${column}: notNull true → false`,
     kind: "equivalent" as const,
   })),
+  {
+    // SQLite's ddl.ts indexes the foreign key; Postgres and MySQL never did. The neutral table
+    // indexes it everywhere: a new non-unique index, an ADR 0053 expand step.
+    difference: "index user_invite_tokens_user_id_idx: only generated",
+    kind: "schema",
+  },
 ];
 
+/** A json<T> column is TEXT, its default the JSON text. */
+const JSON_DDL = /"body" text DEFAULT '\{\}' NOT NULL,\n\t"extra" text\n/u;
+
 async function generatedDdl(): Promise<string> {
-  const built = ns.buildAll(ns.SPIKE_TABLES, pgTableOf, external);
+  const built = ns.buildAll(ns.NEUTRAL_TABLES, pgTableOf, external);
   const before = await generateDrizzleJson({});
   const after = await generateDrizzleJson(built);
   return (await generateMigration(before, after)).join(";\n");
+}
+
+/** Neutral columns marked `unique()` whose hand-written Drizzle column is not unique. */
+function uniqueDrift(): string[] {
+  const values: unknown[] = Object.values(schema);
+  const tables = values.filter((value): value is Table => is(value, Table));
+  const byName = new Map(tables.map((table) => [getTableName(table), table]));
+  return ns.NEUTRAL_TABLES.flatMap((neutral) => {
+    const written = byName.get(neutral.name);
+    const columns: Record<string, { isUnique: boolean }> = written ? getTableColumns(written) : {};
+    return Object.entries(neutral.columns)
+      .filter(([key, column]) => column.spec.unique && columns[key]?.isUnique === false)
+      .map(([key]) => `${neutral.name}.${key}`);
+  });
 }
 
 describe("Postgres table factory (spike #800)", () => {
@@ -69,6 +98,10 @@ describe("Postgres table factory (spike #800)", () => {
     expect(compareDdlShapes(TABLES, today, generated)).toEqual(
       DIFFERENCES.map((entry) => entry.difference),
     );
+  });
+
+  it("marks every unique neutral column unique in the hand-written schema", () => {
+    expect(uniqueDrift()).toEqual([]);
   });
 
   it("infers the hand-written Drizzle row types", () => {
@@ -98,12 +131,131 @@ describe("Postgres table factory (spike #800)", () => {
       ns.InferRow<typeof ns.buildContentReleases>
     >();
     expectTypeOf(users.$inferSelect).toExtend<User>();
+    const projects = pgTableOf(ns.projects, resolve);
+    // The hand-written `storybookMeta` is `$type<string | null | undefined>().default(null)`.
+    type Unmeta<T> = Omit<T, "storybookMeta">;
+    expectTypeOf<Unmeta<typeof projects.$inferSelect>>().toEqualTypeOf<
+      Unmeta<typeof schema.projects.$inferSelect>
+    >();
+    expectTypeOf<(typeof projects.$inferSelect)["storybookMeta"]>().toEqualTypeOf<string | null>();
+    expectTypeOf(pgTableOf(ns.projectMembers, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectMembers.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.projectGroupMappings, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectGroupMappings.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.projectLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.projectLinks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.siteSettings, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.siteSettings.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.schemaMeta, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.schemaMeta.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.tokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.tokens.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.userInviteTokens, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userInviteTokens.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.userConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.userConnections.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.webhooks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.webhooks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.notificationChannels, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationChannels.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.notificationSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.notificationSubscriptions.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureJobs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureJobs.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureAttempts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureAttempts.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureLogs, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureLogs.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.captureShards, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.captureShards.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildReviews, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildReviews.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildComponents, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildComponents.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.buildPackageUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.buildPackageUsage.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.contentUses, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.contentUses.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.snapshots, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.snapshots.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.baselines, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.baselines.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.comments, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.comments.$inferSelect
+    >();
     expect(Object.keys(builds)).toContain("retentionState");
   });
 
-  it("refuses a json<T> column until a table needs one", () => {
-    const doc = ns.defineTable("docs", { body: ns.json<{ a: number }>("body") });
-    expect(() => pgTableOf(doc, resolve)).toThrow("json<T> column body");
+  it("infers the hand-written integration row types", () => {
+    expectTypeOf(pgTableOf(ns.designLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designLinks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.designCredentials, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designCredentials.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.designNodes, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.designNodes.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.insights, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.insights.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.aiUsage, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiUsage.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.aiBudgetAlerts, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.aiBudgetAlerts.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.gitConnections, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitConnections.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.gitRepositoryLinks.$inferSelect
+    >();
+    expectTypeOf(pgTableOf(ns.pushSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.pushSubscriptions.$inferSelect
+    >();
+  });
+
+  it("maps json<T> to TEXT that parses on read", async () => {
+    type Doc = { a?: number };
+    const docs = ns.defineTable("docs", {
+      id: ns.id("id").primaryKey(),
+      body: ns.json<Doc>("body").notNull().defaultJson({}),
+      extra: ns.json<string[]>("extra"),
+    });
+    const built = pgTableOf(docs, resolve);
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<{
+      id: string;
+      body: Doc;
+      extra: string[] | null;
+    }>();
+    expectTypeOf(built.$inferSelect).toEqualTypeOf<ns.InferRow<typeof docs>>();
+    expect(built.body.mapToDriverValue({ a: 1 })).toBe('{"a":1}');
+    expect(built.body.mapFromDriverValue('{"a":1}')).toEqual({ a: 1 });
+    const after = await generateDrizzleJson({ docs: built });
+    const statements = await generateMigration(await generateDrizzleJson({}), after);
+    expect(statements.join("\n")).toMatch(JSON_DDL);
   });
 
   it("expresses a partial index", async () => {

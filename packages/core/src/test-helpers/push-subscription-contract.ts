@@ -8,8 +8,13 @@ import { PushSubscriptionModel } from "../models/push-subscription.ts";
 import { ulid } from "../utils/ulid.ts";
 import type { DatabaseFactory } from "./database-contract.ts";
 
-async function addUser(db: DatabaseAdapter, email: string): Promise<string> {
+/**
+ * Adds a user with an email unique to this call: a real database (the MySQL nightly) keeps one
+ * schema across cases, and `users.email` is unique, so a fixed address collides on the second case.
+ */
+async function addUser(db: DatabaseAdapter, name: string): Promise<string> {
   const id = ulid();
+  const email = `${name}-${id.toLowerCase()}@x.test`;
   await db.insert(db.tables.users, {
     id,
     email,
@@ -27,7 +32,7 @@ const keys = { p256dh: "BKey", auth: "secret" };
 async function setupFor(make: DatabaseFactory) {
   const db = await make();
   await db.lifecycle?.setup({ config: {} as never, logger: undefined as never });
-  return { db, model: new PushSubscriptionModel(db), userId: await addUser(db, "a@x.test") };
+  return { db, model: new PushSubscriptionModel(db), userId: await addUser(db, "a") };
 }
 
 /** Run the push subscription model against a factory (one fresh adapter per case). */
@@ -35,7 +40,7 @@ export function pushSubscriptionContractSuite(label: string, make: DatabaseFacto
   describe(`push subscriptions: ${label}`, () => {
     it("adds a device, lists it for its user and replaces it by endpoint", async () => {
       const { db, model, userId } = await setupFor(make);
-      const other = await addUser(db, "b@x.test");
+      const other = await addUser(db, "b");
       const first = await model.add(userId, { endpoint: "https://push.test/1", ...keys });
       expect(first).toMatchObject({ userId, label: null, lastSuccessAt: null, failureCount: 0 });
       await model.recordFailure(first.id);
@@ -80,7 +85,7 @@ export function pushSubscriptionContractSuite(label: string, make: DatabaseFacto
 
     it("deletes a device, only for its owner when asked by user", async () => {
       const { db, model, userId } = await setupFor(make);
-      const other = await addUser(db, "c@x.test");
+      const other = await addUser(db, "c");
       const mine = await model.add(userId, { endpoint: "https://push.test/3", ...keys });
       const theirs = await model.add(other, { endpoint: "https://push.test/4", ...keys });
       expect(await model.removeOwned(userId, theirs.id)).toBe(false);
