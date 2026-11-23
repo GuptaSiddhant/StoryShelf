@@ -17,8 +17,8 @@ root="$(git rev-parse --show-toplevel)"; cd "$root/packages/runner"
 static="$1"; out="$2"; passes="$3"; conc="${4:-1}"
 fw="file://$root/.tmp/fw-install/node_modules/flashwright-core/index.mjs"
 for n in $(seq 1 "$passes"); do
-  env -u FLASHWRIGHT_CORE_ENTRY PLAYWRIGHT_BROWSERS_PATH="$root/.tmp/pwb-stock" node --conditions=source --import ./bench/engine-register.mjs \
+  env -u SHELF_BENCH_CORE_ENTRY PLAYWRIGHT_BROWSERS_PATH="$root/.tmp/pwb-stock" node --conditions=source --import ./bench/engine-register.mjs \
     bench/engine-capture.ts "$static" "$out/stock-$n" 1 "$conc"
-  PLAYWRIGHT_BROWSERS_PATH="$root/.tmp/pwb" FLASHWRIGHT_CORE_ENTRY="$fw" node --conditions=source --import ./bench/engine-register.mjs \
+  PLAYWRIGHT_BROWSERS_PATH="$root/.tmp/pwb" SHELF_BENCH_CORE_ENTRY="$fw" node --conditions=source --import ./bench/engine-register.mjs \
     bench/engine-capture.ts "$static" "$out/fw-$n" 1 "$conc"
 done
