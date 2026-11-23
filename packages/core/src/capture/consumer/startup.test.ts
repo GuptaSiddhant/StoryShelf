@@ -24,7 +24,7 @@ function consumer(extra: Record<string, unknown> = {}) {
   };
   const handle = createCaptureConsumer({
     queue: queue as never,
-    handlers: {},
+    handlers: { capture: async () => {} },
     config: { waitTimeSeconds: 0, concurrency: 1 },
     logger: stubLogger().logger,
     ...extra,
@@ -55,6 +55,18 @@ describe("consumer start-up", () => {
     await expect(handle.start()).rejects.toThrow("sharp is not installed");
     expect(poll).not.toHaveBeenCalled();
     expect(handle.isRunning()).toBe(false);
+  });
+
+  it("starts without loading the image engine when it has no capture handler", async () => {
+    images.verifyImageEngine.mockRejectedValue(new Error("sharp is not installed"));
+    const { handle, poll } = consumer({ handlers: { publish: async () => {} } });
+    const started = handle.start();
+    await vi.waitFor(() => {
+      expect(poll).toHaveBeenCalled();
+    });
+    await handle.stop();
+    await started;
+    expect(images.verifyImageEngine).not.toHaveBeenCalled();
   });
 
   it("starts polling once the engine loads, sweeping scratch first", async () => {

@@ -33,7 +33,18 @@ describe(
   { timeout: BOOT_TIMEOUT_MS },
   () => {
     it("boots, serves health and publishes a Storybook with pngjs, pixelmatch and axe-core unresolvable", () => {
-      expect(boot("hosting", TESTING_ONLY)).toEqual({ setup: "ok", health: 200, upload: 202 });
+      expect(boot("hosting", TESTING_ONLY)).toMatchObject({
+        setup: "ok",
+        health: 200,
+        upload: 202,
+      });
+    });
+
+    it("starts its job consumers and publishes a queued zip without the image peers", () => {
+      expect(boot("hosting", [...TESTING_ONLY, "sharp"])).toMatchObject({
+        published: true,
+        errors: [],
+      });
     });
 
     it("with testing on and the peers present, readiness passes", () => {
