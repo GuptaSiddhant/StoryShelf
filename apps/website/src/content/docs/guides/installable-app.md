@@ -57,7 +57,7 @@ Private projects can be kept offline. A copy on a device is bounded by three thi
 { "offline": { "maxOfflineDays": 14 } }
 ```
 
-It must be a whole number from 1 to 365. This limit stops the worker serving a stale copy; it does not delete files that are already on the device or revoke anything a user saved elsewhere. Treat a private project kept offline as readable by anyone with access to that device's browser storage until a sync removes it or the browser's storage is cleared. A sync keeps a copy you can still read.
+It must be a whole number from 1 to 365. This limit stops the worker serving a stale copy; it does not delete files that are already on the device or revoke anything a user saved elsewhere. Treat a private project kept offline as readable by anyone with access to that device's browser storage until a sync removes it or the browser's storage is cleared. A sync that gets an answer keeps the projects the answer includes and removes the ones it leaves out.
 
 ## Related
 
