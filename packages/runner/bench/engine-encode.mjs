@@ -6,13 +6,14 @@
 const [entry = "playwright-core", base = "http://127.0.0.1:6109", reps = "30"] =
   process.argv.slice(2);
 const { chromium } = await import(entry);
-const { waitForSettled } = await import("../src/settle.ts");
+const { installSettleRecorder, waitForSettled } = await import("../src/settle.ts");
 const med = (a) => a.toSorted((x, y) => x - y)[Math.floor(a.length / 2)];
 const t = async (fn) => {
   const s = performance.now();
   const r = await fn();
   return [performance.now() - s, r];
 };
+const settled = [];
 const launches = [],
   pages = [],
   vp = [],
@@ -28,11 +29,13 @@ for (let i = 0; i < 5; i += 1) {
       return await c.newPage();
     });
     pages.push(p);
+    await installSettleRecorder(page);
     await page.goto(`${base}/iframe.html?id=components-themed--surface&viewMode=story`, {
       waitUntil: "load",
     });
     // Storybook's own render-finished event, bounded; the runner's fixed wait only when it never signals.
     const report = await waitForSettled(page, 5000);
+    settled.push(report.settled);
     if (!report.settled) await page.waitForTimeout(500);
     for (let n = 0; n < Number(reps) / 5; n += 1) {
       const [a, b1] = await t(() => page.screenshot({ type: "png" }));
@@ -54,5 +57,6 @@ console.log(
     viewportBytes: vpBytes,
     fullShotMs: med(full),
     fullBytes,
+    settledEveryRun: settled.every(Boolean),
   }),
 );
