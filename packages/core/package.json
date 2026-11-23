@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/core",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Self-hosted visual testing and review for Storybook: StoryShelf core, with adapter interfaces, models, capture pipeline, diff and retention (no HTTP).",
   "keywords": [
     "chromatic-alternative",

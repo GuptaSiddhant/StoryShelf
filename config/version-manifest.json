@@ -1,37 +1,37 @@
 {
   "packages": {
     "@storyshelf/affected": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "@storyshelf/ai": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "@storyshelf/core": {
-          "range": "0.15.0",
+          "range": "0.15.1",
           "optional": false
         }
       }
     },
     "@storyshelf/app": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "@storyshelf/auth": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "@storyshelf/core": {
-          "range": "0.15.0",
+          "range": "0.15.1",
           "optional": false
         }
       }
     },
     "@storyshelf/common": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "@storyshelf/core": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "nodemailer": {
           "range": "^10.2.1",
@@ -57,7 +57,7 @@
       }
     },
     "@storyshelf/db": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "@aws-sdk/rds-signer": {
           "range": "^3.0.0",
@@ -85,7 +85,7 @@
           "subpaths": ["./mysql/planetscale"]
         },
         "@storyshelf/core": {
-          "range": "0.15.0",
+          "range": "0.15.1",
           "optional": false
         },
         "@tidbcloud/serverless": {
@@ -121,24 +121,24 @@
       }
     },
     "@storyshelf/mcp": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "@storyshelf/observability": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "@storyshelf/runner": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "@storyshelf/core": {
-          "range": "0.15.0",
+          "range": "0.15.1",
           "optional": false
         }
       }
     },
     "@storyshelf/storage": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "@aws-sdk/client-s3": {
           "range": "^3.700.0",
@@ -166,13 +166,13 @@
           "subpaths": ["./gcs"]
         },
         "@storyshelf/core": {
-          "range": "0.15.0",
+          "range": "0.15.1",
           "optional": false
         }
       }
     },
     "@storyshelf/storybook-addon": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {
         "storybook": {
           "range": "^8.6.0 || ^9.0.0 || ^10.0.0",
@@ -181,11 +181,11 @@
       }
     },
     "create-storyshelf": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     },
     "storyshelf": {
-      "version": "0.15.0",
+      "version": "0.15.1",
       "peers": {}
     }
   }
