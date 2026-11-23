@@ -1,4 +1,4 @@
-import { summarizeTests, type TestResult } from "@storyshelf/core/capture";
+import { summarizeTests, type TestResult } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Badge, Card, HStack, Meta, SectionTitle, VStack, statusLabel } from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;

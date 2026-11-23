@@ -210,3 +210,20 @@ export {
   type StoredPublicOrigin,
 } from "./public-origin.ts";
 export { SkipSourceRefused } from "./skip-source-refused.ts";
+export {
+  axeUnavailableNote,
+  axeUnavailableReason,
+  baselineNote,
+  baselineSha,
+  BASELINE_SHA_LENGTH,
+  isA11yNote,
+  parametersNote,
+  parametersReason,
+  parseList,
+} from "./a11y-notes.ts";
+export {
+  parseTestResults,
+  summarizeTests,
+  type TestResult,
+  type TestSummary,
+} from "./test-results.ts";

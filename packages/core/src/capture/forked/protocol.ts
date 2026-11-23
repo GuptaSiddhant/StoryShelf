@@ -3,8 +3,8 @@
  * Plain JSON only. The parent owns the queue: it pushes each leased job to the child, and the
  * child only reports on it (ADR 0006, decision 5), so there is no `poll`, `enqueue`, `ack` or `nack`.
  */
-import type { ShardRepeatedEvent } from "../consumer/metrics.ts";
-import type { ConsumerJob } from "../consumer/types.ts";
+import type { ShardRepeatedEvent } from "../../jobs/consumer/metrics.ts";
+import type { ConsumerJob } from "../../jobs/consumer/types.ts";
 
 /** Parent to child. `runId` names one push of a job; a re-push after a crash gets a new one. */
 export type ParentMessage =

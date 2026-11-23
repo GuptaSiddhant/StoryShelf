@@ -14,11 +14,6 @@
 //
 // Usage (from the scratch directory): node mixed-queue-previous.mjs <sqlite|postgres> <seconds> <log>
 // Env: DATABASE_URL (postgres) or DATA_DIR (sqlite).
-import {
-  createCaptureConsumer,
-  createDatabaseCaptureQueue,
-  createNotifyHandler,
-} from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { appendFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -35,6 +30,26 @@ function importDatabase(dialectName) {
       : Promise.reject(error),
   );
 }
+
+/**
+ * 0.16.0 moved the queue and consumer to `@storyshelf/core/jobs` and the notify job to
+ * `@storyshelf/core/build-state` (#1364); older releases export them from `@storyshelf/core/capture`.
+ */
+async function importJobs() {
+  try {
+    const [jobs, buildState] = await Promise.all([
+      import("@storyshelf/core/jobs"),
+      import("@storyshelf/core/build-state"),
+    ]);
+    return { ...jobs, ...buildState };
+  } catch (error) {
+    if (error?.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+    return import("@storyshelf/core/capture");
+  }
+}
+
+const { createCaptureConsumer, createDatabaseCaptureQueue, createNotifyHandler } =
+  await importJobs();
 
 async function openDatabase() {
   if (dialect === "sqlite") {

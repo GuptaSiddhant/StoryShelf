@@ -3,7 +3,7 @@ import {
   baselineSha,
   isA11yNote,
   parametersReason,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { Alert, Badge, Meta } from "../ui/components.tsx";

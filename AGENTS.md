@@ -65,7 +65,11 @@ rather than pushing and waiting.
 ## Layout
 
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
-  diff, retention, publishing (no HTTP). Must not import Hono.
+  diff, retention, publishing (no HTTP). Must not import Hono. Hosting code lives in `jobs/`,
+  `publish/`, `build-state/` and `catalog/` (subpaths of the same names); `capture/` and `diff/` are
+  testing only, and `no-testing-imports.test.ts` fails if hosting code imports them. A runner
+  imports `adapter/*`, `utils` and `logger`, never `/capture`: `adapter/capture-runner`
+  (`capture/runner-kit.ts`) re-exports the capture helpers it reuses (#1364).
 - `packages/common` — `@storyshelf/common`: the lightweight code packages share (`/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids`, `/logger`). Its only runtime dependency is `@opentelemetry/api`; it never imports `@storyshelf/*`. Core re-exports everything that moved from its existing subpaths; `mcp` and `observability` import it directly and do not install core (#1334).
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
@@ -171,7 +175,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
   a finding. Never change a status, failure set or git state because of a11y results. The axe source,
   injection, in-page functions, `parameters.a11y` plan and violation mapper are the runner's
-  (`@storyshelf/runner/a11y`); core keeps the note strings (`capture/a11y/notes.ts`) and the readers.
+  (`@storyshelf/runner/a11y`); core keeps the note strings (`models/a11y-notes.ts`) and the readers.
 - **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
   `Channel.on` (`packages/runner/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
   the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through

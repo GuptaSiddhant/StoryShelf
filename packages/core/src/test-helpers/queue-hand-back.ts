@@ -12,7 +12,7 @@
  * Every case uses its own job ids, so a shared live database needs no cleanup between runs.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { createDatabaseCaptureQueue } from "../capture/db-queue/index.ts";
+import { createDatabaseCaptureQueue } from "../jobs/db-queue/index.ts";
 import { CaptureJobModel } from "../models/capture-job.ts";
 import type { SharedDatabaseFactory } from "./queue-multi-instance.ts";
 

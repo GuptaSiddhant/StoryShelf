@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { JobRunContext } from "../consumer/types.ts";
+import type { JobRunContext } from "../../jobs/consumer/types.ts";
 import { jobKey, RunBook } from "./runs.ts";
 
 const context: JobRunContext = {

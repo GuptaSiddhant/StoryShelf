@@ -9,12 +9,12 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
+import { buildScratchDir } from "../publish/scratch.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "./orchestrator.ts";
-import { buildScratchDir } from "./scratch.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
 import { stabilityCandidates, stabilityKey } from "./stability.ts";
 

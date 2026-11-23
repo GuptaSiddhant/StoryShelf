@@ -6,9 +6,9 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
 import * as capture from "@storyshelf/core/capture";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import type { ConsumerJob, JobRunContext } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   BuildModel,

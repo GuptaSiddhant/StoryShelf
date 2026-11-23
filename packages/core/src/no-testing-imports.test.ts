@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Ratchet for the hosting/testing line (#1361, #1363): hosting-side modules must not import
- * testing-side ones, type imports included. `ALLOWED` lists today's violations (#1364 and #1365
- * empty it); a new violation fails, and so does an entry that no longer occurs.
+ * testing-side ones, type imports included. `ALLOWED` lists today's violations (#1364 emptied
+ * it); a new violation fails, and so does an entry that no longer occurs.
  */
 const SRC = import.meta.dirname;
 
@@ -25,32 +25,13 @@ const HOSTING = [
   "publish/",
   "build-state/",
   "catalog/",
-  // Until #1364 moves them out of capture/:
-  "capture/db-queue/",
-  "capture/consumer/",
-  "capture/job-lease",
-  "capture/publish/",
-  "capture/statics",
-  "capture/content-uses",
-  "capture/scratch",
-  "capture/build-state/",
-  "capture/catalog/",
 ];
 /** Under a hosting prefix, but testing. */
-const TESTING_EXCEPTIONS = ["capture/consumer/capture-handler"];
+const TESTING_EXCEPTIONS: string[] = [];
 const TESTING = ["capture/", "diff/", "insights/"];
 
 /** Today's violations, one `from → to` per line (paths without extension, relative to `src/`). */
-const ALLOWED: string[] = [
-  "adapters/capture-runner → capture/adapter",
-  "capture/build-state/comment-extras → capture/a11y/index",
-  "capture/build-state/comment-extras → capture/inherited-a11y",
-  "capture/build-state/comment-extras → capture/tests",
-  "capture/consumer/test-fixtures → diff/index",
-  "capture/consumer/index → capture/consumer/capture-handler",
-  "capture/consumer/startup → diff/index",
-  "capture/consumer/types → capture/consumer/capture-handler",
-];
+const ALLOWED: string[] = [];
 
 const IMPORT =
   /(?:\b(?:import|export)\b[^"';]*?\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']*)["']/gu;

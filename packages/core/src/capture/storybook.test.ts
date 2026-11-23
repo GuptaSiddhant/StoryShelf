@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isDisabledStory, isFlakyStory } from "./adapter.ts";
+import { isDisabledStory, isFlakyStory } from "../adapters/story-source.ts";
 import { StorybookAdapter } from "./storybook.ts";
 
 async function withIndex(index: unknown, fn: (dir: string) => Promise<void>): Promise<void> {

@@ -4,7 +4,7 @@
  * 2026-11-16): without one, project admins never see it.
  */
 import { DEFAULT_STATUS_PREFIX } from "@storyshelf/core/adapter/notifier";
-import { postsComments } from "@storyshelf/core/capture";
+import { postsComments } from "@storyshelf/core/build-state";
 import { GitRepositoryLinkModel, linkOutputsOf, type GitConnection } from "@storyshelf/core/models";
 import type { GitRepositoryLinkRow, Project } from "@storyshelf/core/schema";
 import { gitConnectionModel } from "../git-admin.ts";

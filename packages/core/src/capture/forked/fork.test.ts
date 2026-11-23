@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { ConsumerJob, JobRunContext } from "../consumer/types.ts";
+import type { ConsumerJob, JobRunContext } from "../../jobs/consumer/types.ts";
 import type { ChildProcessHandle } from "./channel.ts";
 import { canForkCaptureChild, forkCaptureChild } from "./fork.ts";
 import {

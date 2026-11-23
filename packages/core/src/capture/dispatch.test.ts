@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
+import { createBuildStatePublisher } from "../build-state/publisher.ts";
+import { abortableLease } from "../jobs/job-lease.ts";
 import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
@@ -17,9 +19,7 @@ import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
-import { abortableLease } from "./job-lease.ts";
 import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
 const SECRET = "test-secret-0123456789abcdef";

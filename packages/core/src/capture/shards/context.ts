@@ -1,9 +1,9 @@
 /** What every stage of a sharded capture works against. */
 import type { Logger } from "pino";
 import type { CaptureTarget } from "../../adapters/capture-runner.ts";
+import type { Viewport } from "../../adapters/story-source.ts";
 import type { Build } from "../../schema/build.ts";
 import type { Project } from "../../schema/project.ts";
-import type { Viewport } from "../adapter.ts";
 import type { MatrixInput } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
 import type { CaptureContext } from "../pipeline.ts";

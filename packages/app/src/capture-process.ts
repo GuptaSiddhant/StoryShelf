@@ -8,11 +8,10 @@ import {
   forkCaptureChild,
   type ForkDecision,
   type ForkedCaptureHandler,
-  type KindHandler,
-  type ConsumerJob,
 } from "@storyshelf/core/capture";
 import type { ShelfTestingOptions } from "@storyshelf/core/config";
 import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
+import type { KindHandler, ConsumerJob } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";
 

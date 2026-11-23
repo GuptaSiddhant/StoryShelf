@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import type { CatalogLoader } from "@storyshelf/core/capture";
+import type { CatalogLoader } from "@storyshelf/core/catalog";
 import type { Build } from "@storyshelf/core/schema";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { SHARED_READ_ONLY_MEMBERSHIP } from "./accounts.ts";

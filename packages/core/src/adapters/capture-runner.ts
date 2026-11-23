@@ -2,14 +2,9 @@
  * Capture-runner adapter interface: render story screenshots for a build.
  */
 import type { Logger } from "pino";
-import type {
-  StoryEntry,
-  StoryParameters,
-  StorySourceAdapter,
-  Viewport,
-} from "../capture/adapter.ts";
 import type { CaptureTarget, RunnerTarget } from "./capture-target.ts";
 import type { Adapter } from "./metadata.ts";
+import type { StoryEntry, StoryParameters, StorySourceAdapter, Viewport } from "./story-source.ts";
 
 export { createTargetOffers, type TargetOffers } from "./capture-target-offers.ts";
 export {
@@ -35,7 +30,7 @@ export type {
 
 export type { JobStatus } from "./capture-queue.ts";
 export { RenderRuns } from "./render-runs.ts";
-export type { StoryEntry, StorySourceAdapter, Viewport } from "../capture/adapter.ts";
+export type { StoryEntry, StorySourceAdapter, Viewport } from "./story-source.ts";
 
 /**
  * The rendering environment a runner captured in. Two captures with the same environment (and

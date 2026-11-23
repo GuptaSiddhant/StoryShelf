@@ -39,7 +39,7 @@
       "default": "./dist/adapter/capture-queue.mjs"
     },
     "./adapter/capture-runner": {
-      "source": "./src/adapters/capture-runner.ts",
+      "source": "./src/capture/runner-kit.ts",
       "default": "./dist/adapter/capture-runner.mjs"
     },
     "./adapter/database": {
@@ -86,9 +86,17 @@
       "source": "./src/auth.ts",
       "default": "./dist/auth.mjs"
     },
+    "./build-state": {
+      "source": "./src/build-state/index.ts",
+      "default": "./dist/build-state.mjs"
+    },
     "./capture": {
       "source": "./src/capture/index.ts",
       "default": "./dist/capture.mjs"
+    },
+    "./catalog": {
+      "source": "./src/catalog/index.ts",
+      "default": "./dist/catalog.mjs"
     },
     "./config": {
       "source": "./src/config.ts",
@@ -105,6 +113,10 @@
     "./integrations": {
       "source": "./src/integrations/index.ts",
       "default": "./dist/integrations.mjs"
+    },
+    "./jobs": {
+      "source": "./src/jobs/index.ts",
+      "default": "./dist/jobs.mjs"
     },
     "./logger": {
       "source": "./src/logger.ts",
@@ -129,6 +141,10 @@
     "./paths": {
       "source": "./src/utils/paths.ts",
       "default": "./dist/paths.mjs"
+    },
+    "./publish": {
+      "source": "./src/publish/index.ts",
+      "default": "./dist/publish.mjs"
     },
     "./retention": {
       "source": "./src/retention/purge.ts",
@@ -180,17 +196,21 @@
       "./adapter/webhook-events": "./dist/adapter/webhook-events.mjs",
       "./ai": "./dist/ai.mjs",
       "./auth": "./dist/auth.mjs",
+      "./build-state": "./dist/build-state.mjs",
       "./capture": "./dist/capture.mjs",
+      "./catalog": "./dist/catalog.mjs",
       "./config": "./dist/config.mjs",
       "./diff": "./dist/diff.mjs",
       "./insights": "./dist/insights.mjs",
       "./integrations": "./dist/integrations.mjs",
+      "./jobs": "./dist/jobs.mjs",
       "./logger": "./dist/logger.mjs",
       "./models": "./dist/models.mjs",
       "./orm": "./dist/orm.mjs",
       "./orm/pg-core": "./dist/orm/pg-core.mjs",
       "./orm/sqlite-core": "./dist/orm/sqlite-core.mjs",
       "./paths": "./dist/paths.mjs",
+      "./publish": "./dist/publish.mjs",
       "./retention": "./dist/retention.mjs",
       "./schema": "./dist/schema.mjs",
       "./storage/local": "./dist/storage/local.mjs",
