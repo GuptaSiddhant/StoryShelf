@@ -10,6 +10,7 @@ StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`]
 | Package                                                 | What it does                                                                          |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [`@storyshelf/core`](/packages/core/)                   | Adapter interfaces, models, the capture pipeline, diffing and retention (no HTTP).    |
+| [`@storyshelf/common`](/packages/common/)               | Shared settings, outbound HTTP, redaction, tracing, errors, ids and logging.          |
 | [`@storyshelf/app`](/packages/app/)                     | The Hono app: JSON API under `/api/v1` and the server-rendered UI.                    |
 | [`@storyshelf/affected`](/packages/affected/)           | Affected capture: picks the stories a change impacts by tracing the dependency graph. |
 | [`@storyshelf/observability`](/packages/observability/) | OpenTelemetry tracing, metrics and log correlation.                                   |
@@ -19,8 +20,8 @@ StoryShelf is a set of small packages. `createShelfApp` from [`@storyshelf/app`]
 
 ## Databases
 
-| Package                                             | What it does                                                         |
-| --------------------------------------------------- | -------------------------------------------------------------------- |
+| Package                           | What it does                                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`@storyshelf/db`](/packages/db/) | `/sqlite` (the default, with Turso, better-sqlite3, Bun and D1 presets), `/postgres` (Neon, Vercel, pg, PGlite, RDS IAM) and `/mysql` (PlanetScale, TiDB). |
 
 ## Storage
@@ -36,6 +37,12 @@ Local filesystem storage is built into [`@storyshelf/core`](/packages/core/) as 
 | Package                                   | What it does                                                   |
 | ----------------------------------------- | -------------------------------------------------------------- |
 | [`@storyshelf/runner`](/packages/runner/) | Renders stories with Playwright: Chromium, Firefox and WebKit. |
+
+## Storybook
+
+| Package                                                     | What it does                                                                 |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`@storyshelf/storybook-addon`](/packages/storybook-addon/) | Read-only addon that shows each story's review state in Storybook's sidebar. |
 
 Need a storage backend or notifier that is not listed? [Write your own adapter](/guides/custom-adapters/).
 
