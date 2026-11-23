@@ -49,7 +49,7 @@ In `trusted` mode, uploaded Storybook code runs on the app's origin, so it can r
 
 Private projects can be kept offline. A copy on a device is bounded by three things rather than by trust in the device:
 
-- **Sign-out clears the device.** `POST /auth/logout` answers with `Clear-Site-Data: "cache", "storage"`, which clears Cache Storage and IndexedDB and unregisters the worker. Before that, the worker unsubscribes the device's push endpoint.
+- **Sign-out asks the browser to clear the device.** `POST /auth/logout` answers with `Clear-Site-Data: "cache", "storage"`. A browser that honours the header clears Cache Storage and IndexedDB and unregisters the worker. Before that, the worker unsubscribes the device's push endpoint. Not every browser honours the header, and the worker does not delete its caches itself. On such a browser, offline copies stay on the device until the next online sync removes them or `maxOfflineDays` stops the worker serving them.
 - **Every online sync re-checks access.** A project you can no longer read stops appearing in the answer and is deleted from the device.
 - **`maxOfflineDays`.** Once this many days have passed since a project's last successful sync, the worker stops serving it, and the offline home page says so. The default is 30. Set it in the server config:
 
@@ -57,7 +57,7 @@ Private projects can be kept offline. A copy on a device is bounded by three thi
 { "offline": { "maxOfflineDays": 14 } }
 ```
 
-It must be a whole number from 1 to 365. A device that stays offline therefore cannot keep a revoked user's copy for ever.
+It must be a whole number from 1 to 365. This limit stops the worker serving a stale copy; it does not delete files that are already on the device or revoke anything a user saved elsewhere. Treat a private project kept offline as readable by anyone with access to that device's browser storage until it syncs or is cleared.
 
 ## Related
 
