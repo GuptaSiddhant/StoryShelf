@@ -191,6 +191,10 @@ When a site admin has enabled AI for the project, the review page shows an advis
 
 Every story file has a stable page at `/projects/<slug>/components/<path>`. Its **Stories** tab previews the published story with the story's review comments, and lists the file's stories and docs, and its **History** tab lists the builds that hold it; with `testing` it also has **States**, **Figma** design and **Linked** packages. See [Published Storybook](/concepts/publishing/#the-catalog-and-the-pages-it-feeds). The library, review page and build cards link to it. If a file is renamed or removed, the old URL explains where it moved or which build last had it.
 
+## Review state inside Storybook
+
+Add [`@storyshelf/storybook-addon`](/packages/storybook-addon/) to your Storybook. When the published build is open in StoryShelf, each story's sidebar entry then shows its state: **Changed**, **New**, **Pending review**, **Approved**, **Rejected**, or a stale linked design. Each badge links back to this review. The addon only reads state; you still approve and reject here.
+
 ## Related
 
 - [Builds & snapshots](/concepts/builds/) — statuses & attempts

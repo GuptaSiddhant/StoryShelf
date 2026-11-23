@@ -1,0 +1,37 @@
+---
+title: "@storyshelf/storybook-addon"
+description: Read-only Storybook addon that shows StoryShelf's review state beside each story in the sidebar.
+---
+
+import { PackageManagers } from "starlight-package-managers";
+
+`@storyshelf/storybook-addon` puts each story's review state in Storybook's sidebar: **Unchanged**, **Changed**, **New**, **Pending review**, **Approved**, **Rejected**, and **Design stale** or **Design deleted** when a [linked design](/guides/design-links/) has drifted. Each badge links to the build's [review](/guides/review/). It only reads, and never posts a verdict or a comment ([ADR 0042](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0042-storybook-addon.md)).
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/storybook-addon): install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/storybook-addon): package directory on `main`.
+
+## Where it works
+
+<Readme heading="Where it works" />
+
+## Install
+
+<PackageManagers pkg="@storyshelf/storybook-addon" dev />
+
+Then register it:
+
+```ts title=".storybook/main.ts"
+export default {
+  addons: ["@storyshelf/storybook-addon"],
+};
+```
+
+Storybook 8.6, 9 and 10 are supported. The addon sets `sidebar.renderLabel`, so whichever loads last wins: another addon, your own `renderLabel` in `.storybook/manager.ts`, or this addon. Adding it changes nothing for a Storybook you upload elsewhere, because the addon switches itself off.
+
+## How it talks to StoryShelf
+
+<Readme heading="How it talks to StoryShelf" />
+
+## Public surface
+
+<Readme heading="Public surface" />
