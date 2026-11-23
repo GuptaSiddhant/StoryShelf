@@ -61,6 +61,10 @@ else
   for peer in pngjs pixelmatch; do
     PKGS+=("$peer@$(node -p "require('./packages/core/package.json').peerDependencies['$peer']")")
   done
+  # The drivers are optional peers of `@storyshelf/db`; sqlite uses `node:sqlite`, postgres needs `postgres`.
+  if [ "$DIALECT" = postgres ]; then
+    PKGS+=("postgres@$(node -p "require('./packages/db/package.json').peerDependencies['postgres']")")
+  fi
   TAG_DB_DIR="packages/db" TAG_DB_FILTER="@storyshelf/db"
   TAG_LIVE_TEST="src/postgres/postgres.live.test.ts"
 fi
