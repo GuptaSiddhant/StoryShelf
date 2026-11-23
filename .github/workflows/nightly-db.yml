@@ -71,12 +71,14 @@ jobs:
           persist-credentials: false
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
+      # One file at a time: the suites share this database and some empty its tables first, so
+      # vitest's parallel files corrupt each other's rows (#1359).
       - name: Run PostgreSQL suite against disposable database
         env:
           LIVE_CLOUD: "1"
           DATABASE_URL: postgres://postgres:test-password@127.0.0.1:5432/storyshelf_test
           POSTGRES_SCHEMA_MUTATION_TEST: "1"
-        run: nubx turbo test --filter='@storyshelf/db' --force --env-mode=loose -- src/postgres
+        run: nubx turbo test --filter='@storyshelf/db' --force --env-mode=loose -- src/postgres --no-file-parallelism
 
   sqlite:
     name: SQLite and local libSQL migrations and queue
