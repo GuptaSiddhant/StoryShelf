@@ -16,7 +16,7 @@ export type KeyUsed = "current" | "previous";
 export class UndecryptableCredentialError extends Error {
   constructor(cause?: unknown) {
     super(
-      "Stored credential cannot be decrypted: check that SECRET (and SECRET_PREVIOUS after a rotation) match the key it was encrypted with",
+      "Stored credential cannot be decrypted: check that SHELF_SECRET (and SHELF_SECRET_PREVIOUS after a rotation) match the key it was encrypted with",
       { cause },
     );
     this.name = "UndecryptableCredentialError";

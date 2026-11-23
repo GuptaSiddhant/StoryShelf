@@ -29,7 +29,25 @@ vi.mock("../dispatch.ts", async (importOriginal) => {
 });
 
 const { runCaptureChild } = await import("./child.ts");
+// The child verifies the image engine at start, which imports pngjs and pixelmatch (#1335): load them once here.
+await (await import("../../diff/index.ts")).verifyImageEngine();
 type Host = import("./child.ts").ChildHost;
+
+/** A promise the test opens by hand, to hold a run mid-pass. */
+function gate(): { promise: Promise<null>; open: () => void } {
+  const opener: { open: () => void } = { open: () => {} };
+  const promise = new Promise<null>((resolve) => {
+    opener.open = () => {
+      resolve(null);
+    };
+  });
+  return {
+    promise,
+    open: () => {
+      opener.open();
+    },
+  };
+}
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -197,6 +215,33 @@ describe("runCaptureChild", () => {
     await sleep(10);
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(cancel).toHaveBeenCalledWith("b1", "b1:render:1");
+    events.emit("SIGTERM");
+    await running;
+  });
+
+  it("aborts the run's signal on cancel, so no further pass starts (#1154)", async () => {
+    const opts = options();
+    const leases: { check?: () => void }[] = [];
+    const stop = gate();
+    dispatch.run
+      .mockReset()
+      .mockImplementation(async (_job: unknown, lease: { check?: () => void }) => {
+        leases.push(lease);
+        await stop.promise;
+        // The checkpoint before the next pass: it throws once the parent cancelled the run.
+        lease.check?.();
+      });
+    const { host, events, sent } = fakeHost();
+    const running = runCaptureChild(opts, host);
+    await sleep(20);
+    push(events, "run-1", "b1");
+    await sleep(10);
+    expect(() => leases[0]?.check?.()).not.toThrow();
+    events.emit("message", { type: "cancel", runId: "run-1" });
+    expect(() => leases[0]?.check?.()).toThrow("job cancelled");
+    stop.open();
+    await sleep(10);
+    expect(sent).toContainEqual({ type: "failed", runId: "run-1", error: "job cancelled" });
     events.emit("SIGTERM");
     await running;
   });

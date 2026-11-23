@@ -153,6 +153,150 @@ These rules come over from the packages as they are:
 - **For third parties:** they still write providers against the same contracts and pass them through
   the function form.
 
+## Amendment 2026-11-20: offered only when available (#1126)
+
+Owner, 2026-11-16: a project never shows an integration the server does not support or has turned
+off. Built-ins are still registered, but offered to projects only when available.
+
+- A notifier or design provider may declare `availability()`: `available`, or
+  `{ unavailable: reason }`. Absent means available. It is evaluated once at startup
+  (`offerIntegrations` in `resolveShelfOptions`); the app registers only available providers and
+  keeps a status for every kind.
+- The built-in `email` notifier is unavailable until a transport replaces it. Figma is available
+  (personal tokens); its OAuth button still needs the client id and secret. Git stays available
+  until ADR 0054's connections land, when it follows the server's connection (#1119).
+- `SHELF_INTEGRATIONS_DISABLED` (`integrationsFromEnv`) turns kinds off without code, for the
+  server image and the Fly demo. A built-in kind missing after resolution reads as turned off.
+- Project settings, the channel API and MCP offer only available kinds; creating one of another
+  kind answers 400 with the reason. A stored channel of such a kind is kept, hidden from its project
+  and not delivered to; the System page lists it with the reason. No schema change, no deletion.
+- The System page and the site-admin deep health list every integration as available,
+  unavailable (reason) or turned off. Site admins see one line in a project's settings in place of
+  what is missing; project admins see nothing.
+
+## Amendment 2026-11-21: the packaging rule and local storage (#1241)
+
+Owner, 2026-11-20 and 2026-11-21. `@storyshelf/storage-local` (146 lines, depends only on core,
+needed by almost every server) is built into core as `@storyshelf/core/storage/local`; the factory
+and options are unchanged, and core's `exports` map gains that one subpath. It adds no dependency.
+`@storyshelf/storage-local` stays for one minor release as a deprecated re-export with a notice,
+then is no longer published (a `Breaking:` changeset at removal). A scaffold from `server init`
+imports core and lists no storage package for local.
+
+The amendment also records the test for every later "fold into core or keep as a package" call.
+
+### The packaging rule
+
+1. **Core** holds what every server needs, plus built-in features whose own code is light. A
+   third-party dependency of such a feature is an optional peer of core, loaded only when the
+   feature is used: email uses `nodemailer`, images use `sharp`, and the database drivers are
+   optional peers of `@storyshelf/db` (#1242).
+2. **A separate package** is right when any of these holds:
+   - the concern is optional and its dependencies are heavy enough that they must never enter a
+     server or serverless bundle unused: cloud storage SDKs (`storage`, one optional peer per
+     subpath), the OpenTelemetry Node SDK (`observability`), the AI SDK (`ai`), the auth engine
+     (`auth`), Playwright (`runner`). Related backends with heavy SDKs share **one** package, one
+     subpath and one optional peer each, not a package per vendor;
+   - its version is a user-visible contract: the runner pins the browser, and the browser decides
+     the baselines;
+   - it runs in another runtime or process: the CLI, the Storybook addon, the MCP server;
+   - it is a layer core must not depend on: `app` (Hono);
+   - it is shared by core and the CLI, which must not depend on core: `affected`;
+   - it is **a layer core is built on**, with its own test infrastructure and no imports from core:
+     `db` (persistence: tables, dialects, migrations, drivers). This mirrors `app` and needs both
+     halves; code that only *could* be a lower layer stays in core.
+3. **Retiring.** A package folded into core is published as a deprecated re-export for **one minor
+   release**, then no longer published. The owner runs `npm deprecate` on it. Until 2027-01-01 the
+   amendment "No shims until 2027" below applies instead: no re-export is published at all.
+4. **Built in does not mean closed.** The adapter interfaces (`StorageAdapter`, `CaptureRunner`,
+   notifier and design providers) stay the extension points. The database is the exception:
+   dialects are built into `@storyshelf/db`, so `DatabaseAdapter` stops being a third-party
+   extension point. A new SQL dialect is a contribution to `@storyshelf/db`; a new driver for an
+   existing dialect plugs in through its public driver entry point (#1242). The databases move
+   under #1242 once ADR 0041 task 5 lands; until then `db-{sqlite,postgres,mysql}` stay as they are.
+
+### Audit and target
+
+The audit of every package (2026-11-20) found these follow the rule: `core`, `app`, `cli`,
+`affected`, `auth`, `ai`, `mcp`, `observability`, `storybook-addon`. The rest change:
+
+- **`runner-playwright` becomes `@storyshelf/runner`** in 0.15.0 (#1295). It is the only runner once
+  Puppeteer is gone and stays separate because its version is a user-visible contract.
+- **`storage-{s3,gcs,azure}` become one `@storyshelf/storage`** (#1294) with `/s3`, `/gcs` and
+  `/azure` subpaths, each cloud SDK an optional peer that only its own subpath loads (the shape of
+  `@storyshelf/db`), plus `/local`, a re-export of core's built-in local storage, so every backend is
+  importable from one place. The implementation stays in core. The SDKs stay: they provide
+  credential chains (IRSA, workload identity, managed identity), signing and multipart uploads that
+  StoryShelf must not reimplement.
+- **`storage-local`** moves into core (this amendment), `db-{sqlite,postgres,mysql}` into one `db`
+  package (#1242), and `runner-puppeteer` is removed (deprecated in 0.14.0 by #1243, removed in
+  0.15.0 by #1244).
+- **Overdue:** the shims `notify-{git,chat,email}`, `design-figma` and `image` shipped as re-exports
+  in 0.13.0 and stop being published in 0.14.0 (#1245).
+
+The target is 12 packages: `core`, `app`, `cli`, `db`, `storage`, `runner`, `auth`, `ai`,
+`observability`, `mcp`, `affected`, `storybook-addon`.
+
+## Amendment 2026-11-21: no shims until 2027 (#1309)
+
+Owner, 2026-11-21: "Till 2026, all breaking changes are allowed so no need to support old packages,
+env vars and properties or columns." This changes rule 3 (Retiring) for every release before
+**2027-01-01**, the public launch:
+
+- A renamed or folded package is not published again. The release that moves it deletes it, with a
+  `Breaking:` changeset naming the new path. There is no deprecated re-export.
+- The owner runs `npm deprecate` on the old name after that release, with a message that names the
+  new package or path.
+- `@storyshelf/storage-local` follows this: it was never published as a re-export, and the
+  "one minor release" sentence of the amendment above does not apply to it.
+
+From 2027-01-01 rule 3 applies again: one minor release as a deprecated re-export, then no longer
+published. ADR 0053 has the matching amendment for the schema.
+
+## Amendment 2026-11-21: `@storyshelf/db` lands above core (#1331)
+
+The owner brought the packaging part of #1242 forward, so the rename lands before the no-shim window
+closes on 2027-01-01. `db-{sqlite,postgres,mysql}` are folded into one `@storyshelf/db` with `/sqlite`,
+`/postgres` and `/mysql` subpaths and the existing presets under each, and every driver is an optional
+peer that only its own subpath loads. The move changes no code and no schema. `ddl`, `schema` and
+`drizzle-factory` are no longer published (ADR 0041 replaces them).
+
+Until #1242 inverts the layering, the package sits **above** core: it imports core's adapter
+interfaces, models and test helpers, which is the reverse of the target in rule 2. The inversion, with
+core building on `@storyshelf/db`, stays in #1242 and still waits for ADR 0041 task 5.
+
+## Amendment 2026-11-21: testing-only libraries follow the runner (#1335)
+
+Folding `@storyshelf/image` into core made a hosting-only deployment (no `testing` option) install
+libraries it never loads: `axe-core` (3.1 MB), `pngjs` (0.7 MB) and `pixelmatch`. The image _code_ stays
+in core; its _libraries_ move to the package a testing deployment already needs:
+
+- `axe-core` is a `@storyshelf/runner` dependency. `axeInjectionScript` and `loadAxeSource` live in the
+  runner (`a11y-source.ts`); core keeps the a11y types, the in-page helpers and the stored-result readers.
+- `pngjs` and `pixelmatch` are optional peers of core, used only by `./diff`, and runner `dependencies`,
+  so a testing install gets them. `./diff` imports them lazily on first use, never at module load;
+  `verifyImageEngine` runs only with `testing`, and a missing peer fails readiness with a message naming
+  it and the install line. `sharp` is unchanged (optional peer).
+
+## Amendment 2026-11-22: `@storyshelf/common` holds the shared light code (#1334)
+
+The owner added one public package to the list: `@storyshelf/common`. It holds the code that
+`mcp` and `observability` took from core (settings, outbound HTTP, redaction, tracing helpers,
+errors, ids) so that installing them no longer installs all of core. Its only runtime dependency is
+`@opentelemetry/api`, and it never imports another `@storyshelf/*` package. Moving the code keeps one
+owner; copying it into each package would not.
+
+- Core keeps re-exporting every moved name from its existing subpaths (`utils`, `config`,
+  `telemetry`), because its `exports` map is frozen. The Storybook token prefixes move with
+  `redactSecrets`; signing, verifying and key derivation stay in core's `storybook-token.ts`.
+- `createShelfLogger` and pino stay in core; `common` declares a small `Logger` type that a pino
+  logger satisfies.
+- `@opentelemetry/api` stays a declared dependency of every package that imports it, `common`
+  included. The API is a no-op without an SDK and registers globally, so each package declares the
+  same catalog range rather than reaching it through another package.
+- `createInstrumentedDatabase` and `createInstrumentedStorage` need core's adapter types and
+  Drizzle, so they stay in core's `telemetry` subpath.
+
 ## Alternatives considered
 
 - **Keep the packages (ADR 0014, ADR 0018).** Rejected: the SDK risk they guarded against is absent,

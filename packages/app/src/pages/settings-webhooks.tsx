@@ -1,18 +1,17 @@
 import type { Project } from "@storyshelf/core/schema";
-import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
-  Badge,
   Button,
-  Card,
-  Field,
-  FormActions,
-  HStack,
+  DialogLink,
   Meta,
   SectionTitle,
-  Table,
+  SummaryList,
+  VStack,
+  type SummaryItem,
 } from "../ui/components.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { ADD_WEBHOOK_DIALOG } from "./token-forms.tsx";
 
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {
@@ -21,114 +20,75 @@ export interface SettingsWebhook {
   events: string[];
 }
 
-/** Webhooks settings tab: webhook list plus the create-webhook form. */
+function webhookItems(
+  project: Project,
+  webhooks: SettingsWebhook[],
+  isAdmin: boolean,
+): SummaryItem[] {
+  return webhooks.map((webhook) => {
+    const action = `/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`;
+    return {
+      id: webhook.id,
+      name: webhook.url,
+      details: webhook.events.length === 0 ? "All events" : webhook.events.join(", "),
+      actions: isAdmin ? (
+        <form
+          method="post"
+          action={action}
+          hx-post={action}
+          hx-target="body"
+          hx-confirm="Delete this webhook?"
+        >
+          {csrfField()}
+          <Button variant="ghost" size="sm" type="submit">
+            Delete
+          </Button>
+        </form>
+      ) : undefined,
+    };
+  });
+}
+
+/** Webhooks settings tab: webhooks as a summary; adding one opens a dialog. */
 export function renderSettingsWebhooks(
   project: Project,
   webhooks: SettingsWebhook[],
   isAdmin: boolean,
   formState?: { errors?: Record<string, string>; globalError?: string; secret?: string },
 ): unknown {
+  const add = isAdmin ? (
+    <DialogLink
+      dialogId={ADD_WEBHOOK_DIALOG}
+      href={`/projects/${project.slug}/settings/webhooks/new`}
+      variant="primary"
+      icon="plus"
+    >
+      Add webhook
+    </DialogLink>
+  ) : undefined;
   return (
-    <div class="grid max-w-form">
+    <VStack>
       {formState?.secret ? (
         <Alert tone="success" title="Webhook created">
           Copy the signing secret now — shown once: <code>{formState.secret}</code>
         </Alert>
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-
-      <Card>
-        <SectionTitle>Webhooks</SectionTitle>
-        <Meta>
-          Notify external services when builds are created, updated, approved or rejected. Payloads
-          are POSTed as JSON and signed with the webhook secret.
-        </Meta>
-        <Table label="Webhooks">
-          <table>
-            <thead>
-              <tr>
-                <th>URL</th>
-                <th>Events</th>
-                <th>
-                  <span class="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {webhooks.map((webhook): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                <tr key={webhook.id}>
-                  <td class="truncate max-w-cell" title={webhook.url}>
-                    {webhook.url}
-                  </td>
-                  <td>
-                    {webhook.events.length === 0 ? (
-                      <Meta as="span">all events</Meta>
-                    ) : (
-                      <HStack>
-                        {webhook.events.map(
-                          (event): HtmlEscapedString | Promise<HtmlEscapedString> => (
-                            <Badge tone="neutral">{event}</Badge>
-                          ),
-                        )}
-                      </HStack>
-                    )}
-                  </td>
-                  <td>
-                    {isAdmin ? (
-                      <form
-                        method="post"
-                        action={`/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`}
-                        hx-post={`/projects/${project.slug}/settings/webhooks/${webhook.id}/delete`}
-                        hx-target="body"
-                        hx-confirm="Delete this webhook?"
-                      >
-                        {csrfField()}
-                        <Button variant="ghost" size="sm" type="submit">
-                          Delete
-                        </Button>
-                      </form>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-        {webhooks.length === 0 ? <Meta>No webhooks configured.</Meta> : null}
-      </Card>
-
+      <SectionTitle>Webhooks</SectionTitle>
+      <Meta>
+        Notify external services when builds are created, updated, approved or rejected. Payloads
+        are POSTed as JSON and signed with the webhook secret.
+      </Meta>
+      <SummaryList
+        label="Webhooks"
+        items={webhookItems(project, webhooks, isAdmin)}
+        emptyTitle="No webhooks configured"
+        add={add}
+      />
+      {webhooks.length > 0 ? add : null}
       {isAdmin ? (
-        <Card>
-          <SectionTitle level={3}>Create webhook</SectionTitle>
-          <form
-            method="post"
-            action={`/projects/${project.slug}/settings/webhooks`}
-            hx-post={`/projects/${project.slug}/settings/webhooks`}
-            hx-target="body"
-          >
-            {csrfField()}
-            <Field
-              label="URL"
-              name="url"
-              type="url"
-              required
-              placeholder="https://example.com/hooks/storyshelf"
-              error={formState?.errors?.["url"]}
-            />
-            <Field
-              label="Events"
-              name="events"
-              placeholder="build.created, build.approved, snapshot.reviewed"
-              hint="Comma-separated. Leave blank to receive all events."
-            />
-            <FormActions>
-              <Button variant="primary" type="submit" icon="plus">
-                Add webhook
-              </Button>
-            </FormActions>
-          </form>
-        </Card>
+        <FormDialog id={ADD_WEBHOOK_DIALOG} title="Add webhook" submitLabel="Add webhook" />
       ) : null}
-    </div>
+    </VStack>
   );
 }

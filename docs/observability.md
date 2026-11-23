@@ -51,8 +51,8 @@ persist), with every log line carrying the same `trace_id`.
 | `OTEL_EXPORTER_OTLP_HEADERS`                      | unset                                 | Extra OTLP headers, `k=v,k2=v2` (e.g. `authorization=Bearer …`).  |
 | `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | SDK default (`parentbased_always_on`) | Standard sampling. Production suggestion: `traceidratio` + `0.1`. |
 | `OTEL_SDK_DISABLED`                               | `false`                               | `true` forces noop even with an endpoint.                         |
-| `STORYSHELF_OTEL_ENABLED`                         | auto (on iff endpoint set)            | Explicit kill-switch (`false`) or force-on (`true`).              |
-| `STORYSHELF_OTEL_METRICS_INTERVAL_MS`             | `60000`                               | Metric export interval.                                           |
+| `SHELF_OTEL_ENABLED`                              | auto (on iff endpoint set)            | Explicit kill-switch (`false`) or force-on (`true`).              |
+| `SHELF_OTEL_METRICS_INTERVAL_MS`                  | `60000`                               | Metric export interval.                                           |
 
 ## Span catalog
 
@@ -90,7 +90,7 @@ No per-story or per-build instruments — labels stay low-cardinality by rule.
 
 Every log line carries `trace_id`/`span_id` whenever a span is active
 (`otelLogMixin`, wired as the pino `mixin` in all server scaffolds), so
-`LOG_LEVEL=debug` output joins directly with traces in your backend. Logs
+`SHELF_LOG_LEVEL=debug` output joins directly with traces in your backend. Logs
 stay on stdout as JSON — there is intentionally no OTLP log exporter (see
 ADR 0015 §6); your collector/agent forwards stdout as usual.
 
@@ -105,10 +105,10 @@ ADR 0015 §6); your collector/agent forwards stdout as usual.
 
 ## Troubleshooting
 
-| Symptom                              | Check                                                                                                                      |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| No spans arrive                      | `OTEL_EXPORTER_OTLP_ENDPOINT` reachable from the server? `OTEL_SDK_DISABLED` unset? `STORYSHELF_OTEL_ENABLED` not `false`? |
-| Spans arrive but capture is detached | Queue payload dropping `traceparent` (third-party queue?) — in-process and bundled queues propagate automatically.         |
-| Missing `trace_id` in logs           | Server started from a scaffold that passes `mixin: otelLogMixin` to `createShelfLogger`?                                   |
-| High metric cardinality              | Custom dashboards grouping by `db.table` with unbounded table growth — aggregate by `db.operation` instead.                |
-| SDK startup errors                   | Collector TLS/host mismatch; SDK logs to stderr and the server keeps serving (telemetry never blocks requests).            |
+| Symptom                              | Check                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| No spans arrive                      | `OTEL_EXPORTER_OTLP_ENDPOINT` reachable from the server? `OTEL_SDK_DISABLED` unset? `SHELF_OTEL_ENABLED` not `false`? |
+| Spans arrive but capture is detached | Queue payload dropping `traceparent` (third-party queue?) — in-process and bundled queues propagate automatically.    |
+| Missing `trace_id` in logs           | Server started from a scaffold that passes `mixin: otelLogMixin` to `createShelfLogger`?                              |
+| High metric cardinality              | Custom dashboards grouping by `db.table` with unbounded table growth — aggregate by `db.operation` instead.           |
+| SDK startup errors                   | Collector TLS/host mismatch; SDK logs to stderr and the server keeps serving (telemetry never blocks requests).       |

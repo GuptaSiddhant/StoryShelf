@@ -172,6 +172,8 @@ jobs:
       packages: write
       id-token: write # provenance attestation
       attestations: write
+    outputs:
+      dockerhub: ${{ steps.dockerhub.outputs.dockerhub }} # "true" when Docker Hub got the tags; never the secret
     env:
       VERSION: ${{ needs.validate.outputs.version }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'guptasiddhant' }}
@@ -283,6 +285,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.detect.outputs.tag }}
       RELEASE_SHA: ${{ needs.detect.outputs.sha }}
+      DOCKERHUB_PUSHED: ${{ needs.publish-image.outputs.dockerhub }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -311,7 +314,10 @@ jobs:
         # the git log when the tag has no section.
         run: |
           set -e
-          if node scripts/release-notes.mjs "$RELEASE_TAG" > release-body.md; then
+          flags=""
+          if [ "$DOCKERHUB_PUSHED" = "true" ]; then flags="--dockerhub"; fi
+          # shellcheck disable=SC2086
+          if node scripts/release-notes.mjs "$RELEASE_TAG" $flags > release-body.md; then
             echo "notes from CHANGELOG.md"
           else
             PREV_TAG=$(git describe --tags --abbrev=0 "${RELEASE_TAG}^" 2>/dev/null || echo "")
@@ -325,9 +331,21 @@ jobs:
               echo "## $RELEASE_TAG"
               echo ""
               echo "$LOG"
+              echo ""
+              node scripts/release-notes.mjs "$RELEASE_TAG" --install-only $flags
             } > release-body.md
           fi
           cat release-body.md
+
+      - name: Package the Terraform modules (#891)
+        # The same files the git source `deploy/terraform/<cloud>?ref=<tag>` serves, for installs
+        # that cannot reach GitHub from Terraform. `.terraform` and state never ship.
+        run: |
+          set -e
+          version="${RELEASE_TAG#v}"
+          tar --exclude='.terraform' --exclude='*.tfstate*' --exclude='.terraform.lock.hcl' \
+            -czf "storyshelf-terraform-${version}.tar.gz" deploy/terraform
+          tar -tzf "storyshelf-terraform-${version}.tar.gz" | head -20
 
       - name: Create GitHub Release
         # Updates the release when a re-run finds it.
@@ -336,6 +354,7 @@ jobs:
           tag_name: ${{ needs.detect.outputs.tag }}
           body_path: release-body.md
           generate_release_notes: false
+          files: storyshelf-terraform-*.tar.gz
 
   # The website and the Fly demo follow stable releases only (ADR 0043, amendments 2026-11-10 and
   # 2026-11-11). They run after the tag exists and the image is pushed, so the site builds from the

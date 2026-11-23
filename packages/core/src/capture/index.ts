@@ -78,25 +78,14 @@ export {
   type Fingerprint,
 } from "./fingerprint.ts";
 export {
-  axeInjectionScript,
   axeUnavailableNote,
   axeUnavailableReason,
-  A11Y_ROOT_SELECTOR,
   baselineNote,
   baselineSha,
   BASELINE_SHA_LENGTH,
-  inPageReadA11yParameters,
   isA11yNote,
-  inPageRunAxe,
-  loadAxeSource,
-  mapAxeViolations,
-  MAX_REPORTED_VIOLATIONS,
   parametersNote,
   parametersReason,
-  resolveA11yRun,
-  type A11yParametersRead,
-  type A11yRunPlan,
-  type SlimViolation,
 } from "./a11y/index.ts";
 export { persistCapture, type CaptureContext } from "./pipeline.ts";
 export * from "./build-state/index.ts";
@@ -159,6 +148,7 @@ export {
   type ConsumerConfig,
   type ConsumerJob,
   type ConsumerMetrics,
+  type ConsumerStopOptions,
   type JobFinishedEvent,
   type JobHandlers,
   type JobOutcome,
@@ -217,3 +207,12 @@ export {
   parseComparisonReference,
   type ComparisonReference,
 } from "./comparison-reference.ts";
+export {
+  launchFailureOf,
+  reachabilityOf,
+  reasonClassOf,
+  TargetReachability,
+  type ReachabilityChange,
+  type UnreachableReason,
+  type UnreachableTarget,
+} from "./target-reachability.ts";

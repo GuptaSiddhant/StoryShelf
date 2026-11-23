@@ -1,15 +1,12 @@
+import { readSetting } from "../env-settings/read.ts";
 /** Process-wide image settings, set once at app boot and read by the diff pool and thumbnails. */
-import {
-  DEFAULT_IMAGE_ENGINE,
-  IMAGE_ENGINE_ENV,
-  type ImageEngine,
-  resolveImageEngine,
-} from "./codec.ts";
+import { IMAGE_ENGINE_ENV, type ImageEngine, resolveImageEngine } from "./codec.ts";
 import { loadCodec } from "./codecs.ts";
+import { loadPixelmatch } from "./engine.ts";
 
 /** What `createShelfApp` passes down: `images.engine` and `compare.threads`. */
 export interface ImageSettings {
-  /** Image library: `"pngjs"` (default) or `"sharp"`; falls back to `STORYSHELF_IMAGE_ENGINE`. */
+  /** Image library: `"pngjs"` (default) or `"sharp"`; falls back to `SHELF_IMAGE_ENGINE`. */
   engine?: string;
   /** Worker threads for diffs; `0` runs on the main thread. */
   threads?: number;
@@ -20,12 +17,14 @@ let configuredThreads: number | undefined;
 
 /**
  * Record the engine and thread count (the caller then rebuilds anything that depends on them).
- * The option wins: `STORYSHELF_IMAGE_ENGINE` is read only when no engine is given, so a bad
+ * The option wins: `SHELF_IMAGE_ENGINE` is read only when no engine is given, so a bad
  * variable cannot break an explicit option. Throws on an unknown name so a typo never silently
  * picks a different engine.
  */
 export function setImageSettings(settings: ImageSettings): void {
-  configuredEngine = resolveImageEngine(settings.engine ?? process.env[IMAGE_ENGINE_ENV]);
+  configuredEngine = resolveImageEngine(
+    settings.engine ?? readSetting(process.env, IMAGE_ENGINE_ENV),
+  );
   configuredThreads = settings.threads;
 }
 
@@ -39,7 +38,7 @@ export function appliedImageSettings(): {
 
 /** The engine in effect: the configured one, else the environment, else the default. */
 export function currentImageEngine(): ImageEngine {
-  return configuredEngine ?? resolveImageEngine(process.env[IMAGE_ENGINE_ENV]);
+  return configuredEngine ?? resolveImageEngine(readSetting(process.env, IMAGE_ENGINE_ENV));
 }
 
 /** The configured thread count, or `undefined` to defer to the environment/default. */
@@ -48,14 +47,12 @@ export function configuredThreadCount(): number | undefined {
 }
 
 /**
- * Load the engine's dependencies now, so a missing `sharp` fails at boot with a clear message
- * instead of on the first diff. The default engine is a hard dependency with nothing to verify,
- * so it returns at once and never delays startup (or the first capture).
+ * Load the engine's dependencies and `pixelmatch` now, so a missing peer fails readiness with a
+ * message naming it instead of the first diff. Call it only with `testing`: a hosting-only
+ * deployment never loads an image library.
  */
 export async function verifyImageEngine(): Promise<ImageEngine> {
   const engine = currentImageEngine();
-  if (engine !== DEFAULT_IMAGE_ENGINE) {
-    await loadCodec(engine);
-  }
+  await Promise.all([loadCodec(engine), loadPixelmatch()]);
   return engine;
 }

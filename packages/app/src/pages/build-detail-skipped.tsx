@@ -13,6 +13,8 @@ import {
   SectionTitle,
   VStack,
   statusTone,
+  statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
@@ -100,7 +102,7 @@ function SourceTerms({
               {from.gitBranch} · {from.gitSha.slice(0, 7)}
             </a>{" "}
             <Badge tone={statusTone(from.status)} icon>
-              {from.status}
+              {statusLabel(from.status)}
             </Badge>
           </>
         ) : (
@@ -205,7 +207,7 @@ export async function renderSkippedBuildPage(
       <PageHeader
         title={
           <>
-            {build.gitBranch} <Meta as="span">· {sha}</Meta> <Badge tone="neutral">skipped</Badge>
+            {build.gitBranch} <Meta as="span">· {sha}</Meta> <Badge tone="neutral">Skipped</Badge>
           </>
         }
         description={
@@ -214,7 +216,7 @@ export async function renderSkippedBuildPage(
             {build.authorName
               ? `· ${build.authorName}${build.authorEmail ? ` <${build.authorEmail}>` : ""}`
               : ""}{" "}
-            · {new Date(build.createdAt).toLocaleString()}
+            · <Time value={build.createdAt} />
           </>
         }
         actions={

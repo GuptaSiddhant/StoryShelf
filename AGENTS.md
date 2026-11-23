@@ -3,7 +3,7 @@
 Guidance for AI agents (and humans) working in the StoryShelf monorepo.
 
 StoryShelf is a self-hosted visual-testing platform for Storybook (a Chromatic alternative): upload
-a built Storybook, render stories server-side with Playwright/Puppeteer, pixel-diff against per-branch
+a built Storybook, render stories server-side with Playwright, pixel-diff against per-branch
 baselines, then review and approve. `docs/architecture/` is the current-state spec;
 `docs/repo-structure.md` is the spatial index; `docs/adr/` records decisions.
 
@@ -25,7 +25,7 @@ baselines, then review and approve. `docs/architecture/` is the current-state sp
 export PATH="$HOME/.nub/bin:$PATH"   # once per shell
 nub ci                    # install workspace deps (once per clone/worktree)
 nub run hook:install      # enable .githooks: fmt/lint staged files + conventional commits
-nub run serve             # dev server from TS source, :3000, DATA_DIR=.dev-data, hot restart
+nub run serve             # dev server from TS source, :3000, SHELF_DATA_DIR=.dev-data, hot restart
 nub run fmt | lint | test # turbo across the workspace
 nub run docs:check        # ADR numbering, references, links, line cap
 nub run lint:files        # oxfmt --check + oxlint on every tracked file the commit hook checks (CI runs it)
@@ -53,9 +53,8 @@ Real-browser suite (gated; `turbo test` stays hermetic):
 (cd fixtures/storybook-8 && pnpm install && pnpm run build-storybook)  # default, :6008
 # storybook-9 :6009; storybook-10 :6010 (CSF-Next .test() entries)
 npx -y playwright@1.63.0 install chromium   # one-time browser install
-(cd packages/runner-playwright && nub run test:integration)
-(cd packages/runner-playwright && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
-# Puppeteer: set PUPPETEER_EXECUTABLE_PATH to a Chrome binary
+(cd packages/runner && nub run test:integration)
+(cd packages/runner && FIXTURE_DIR="$(git rev-parse --show-toplevel)/fixtures/storybook-9" nub run test:integration)
 ```
 
 CI runs `nub ci` → `docs:check` → `turbo verify` (affected on PRs; full on `main`, cached unless a
@@ -67,11 +66,14 @@ rather than pushing and waiting.
 
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono.
+- `packages/common` — `@storyshelf/common`: the lightweight code packages share (`/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids`, `/logger`). Its only runtime dependency is `@opentelemetry/api`; it never imports `@storyshelf/*`. Core re-exports everything that moved from its existing subpaths; `mcp` and `observability` import it directly and do not install core (#1334).
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
-- Adapters: `db-{sqlite,postgres,mysql}` (defaults node:sqlite/postgres.js/mysql2; cloud presets via
-  subpaths), `storage-{local,s3,azure,gcs}`, `auth`, `image`, `affected`, `runner-{playwright,puppeteer}`,
-  `notify-{git,chat,email}`, `design-figma`, `observability`, `ai`, `mcp`.
-- `packages/cli` — `storyshelf` binary (upload/init/create/server/retry/purge; no Playwright).
+- Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,
+  `observability`, `ai`, `mcp`.
+- `packages/cli` — `storyshelf` binary (project commands: upload/init/create/retry/cancel/protect; no Playwright, no server scaffold, no MCP commands).
+- `packages/create-storyshelf` — `create-storyshelf` (`npm create storyshelf`): scaffolds a server project that default-exports `defineShelfInstance`, and `--cloud` writes a Terraform stub. Zero runtime dependencies (`prompts` is bundled into one file); never depends on `@storyshelf/app` or `@storyshelf/core`. `--install` is opt-in and uses the runner from `npm_config_user_agent`. Its versions and SDK ranges come from the generated `config/version-manifest.json` (`nub run manifest`; a test fails on drift), never from constants copied by hand (#1332).
+- `@storyshelf/mcp` also has a `storyshelf-mcp` bin: `init` scaffolds an MCP project, `serve` runs it, no arguments serves stdio/HTTP.
+- `storyshelf-server` — the instance binary, a `bin` of `@storyshelf/app` (`packages/app/src/server-bin/`): `serve` (via `startServer`, `--watch`), `migrate`, `purge`, `check-storage`, `doctor` (which reads the installed `@storyshelf/*` packages and their peers before importing the instance; a missing optional peer is named with its range and install line from the manifest). The instance module (`--entry`, else `package.json#storyshelf.server`, else `src/index.ts` and the usual names) default-exports `defineShelfInstance(async (env) => options, { afterSetup })`: configuration, never a constructed app (one that is refused, naming `defineShelfInstance`). The bin loads `.env`, refuses renamed settings, calls the factory and creates the one app with `createShelfApp(options, { mode })`: `serve` (everything, today's path), `migrate` (the database's setup only) or `tool` (no setup, consumer, timers, git-link sync or replay; `purge`, `check-storage` and `doctor` run as `tool` and never migrate). Only `serve` runs `afterSetup`. An app built before the bin's own fails the run (`appsConstructed()`). It never reads `.storybook/storyshelf.json` (#367).
 - `apps/dev-server` (local, no build), `apps/website` (Astro Starlight docs), `apps/fly-app` (deploy demo).
 - `fixtures/storybook-{8,9,10}` — Storybook 8.6 / 9 / 10 (pnpm, built on demand).
 - `docs/` — `architecture/`, `repo-structure.md`, `testing.md`, `adr/`.
@@ -96,9 +98,9 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   404 when a project has review off. Gate by class, never with an ad-hoc `if` in a handler; check
   `testingEnabled()` before linking to a `testing` page. No `testing` option ⇒ no capture, compare or
   baselines; `testing` requires a `runner` (`testing: {}` throws). `assertServerless` refuses a runner
-  on AWS Lambda and warns on Vercel/Netlify (`STORYSHELF_ALLOW_SERVERLESS=1` overrides).
+  on AWS Lambda and warns on Vercel/Netlify (`SHELF_ALLOW_SERVERLESS=1` overrides).
 - **Capture targets.** `browser`/`browsers`, a snapshot's `browser`, and baseline keys hold a
-  `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName`. Split with
+  `CaptureTarget` (an engine or `<engine>@<name>`), never a bare `BrowserName` (core owns the type and parsers; `RemoteBrowser`/`RemoteTarget` are the runner's). Split with
   `parseTarget`/`engineOf`, validate with `isCaptureTarget`; the render input is `target`, not
   `browser`. Save a project's browsers only through `runnerTargets()`/`assertTargetsSelectable()`.
   A launch failure is a `TargetLaunchError`, not a story crash.
@@ -112,8 +114,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `BuildStatePublisher.request(buildId)` (app: `requestBuildState`) queues one `notify` job per git
   channel. A new status is a new case in `statusesForBuild`; a refused write throws so the consumer
   retries. GitHub check runs share that mapper
-  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the channel secret and must
-  never appear in config, logs, errors or API output.
+  (`packages/core/src/integrations/git/github-check-mapper.ts`); the private key is the connection secret (a
+  per-project channel secret until it moves) and must never appear in config, logs, errors or API output.
 - **`cancelled` is terminal.** Cancel through `announceBuildStatus` (`build:cancelled`; no
   `build:failed` / `sys:capture-failed`). `BuildModel.update`/`setStatus` refuse other statuses for a
   cancelled build; `finalizeBuild` and the orchestrator skip it; only `resetStatus` (retry) leaves it.
@@ -125,9 +127,10 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   (`packages/app/src/routers/read-grants.ts`, class `hosting`) takes `read` tokens only: one build, at
   most an hour, current secret only (`previousSecret` is never tried), every answer sandboxed,
   `private, no-store`, `no-referrer`. `packages/core/src/utils/storybook-token.ts` is the single owner
-  of both prefixes (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`), the token shape, the derived
-  key per purpose, sign/verify and the lifetimes: never type `/_s/` or `/_r/` or derive a key
-  elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
+  of signing, verifying, the derived key per purpose and the lifetimes; the prefix constants
+  (`STORYBOOK_TOKEN_PREFIX`, `STORYBOOK_READ_PREFIX`, `STORYBOOK_EXCHANGE_PREFIX`) and the token's regex
+  source live in `@storyshelf/common/redact` so log redaction needs no signing code, and core re-exports
+  them: never type `/_s/` or `/_r/` or derive a key elsewhere. Mint a `capture` token only through `storybookUrlSource` (renders; it alone signs the
   purpose) and a `read` grant only through `mintReadGrant` (`redirectToReadGrant` for the sandboxed
   redirect, `previewBaseOf` for previews); `renderInSlices` re-mints capture tokens for long passes.
   Every published-file route goes through `publishedAccess` +
@@ -135,7 +138,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   header only from `sandboxHeaders` (route family + `config.storybookHosting.mode`, ADR 0051: never
   `allow-same-origin`). Both token routes are rate-limited per IP in one bucket before the token is
   read; every refusal returns one identical 404 (`refuseToken`) with `Cache-Control: private,
-  no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
+no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` or `/_r/`, widen
   what a token grants, or accept one purpose on the other's route (ADR 0051 allows only these two
   routes plus the content host's `/_x/` exchange, purpose `exchange`, with #358; nothing more). Only `signedCacheControl`
   (`packages/app/src/routers/capture-cache.ts`) may give a signed answer freshness: a success for a
@@ -166,10 +169,12 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Accessibility is informational.** `run_a11y` is on by default. Runners put axe lines on
   `RenderedSnapshot.a11y`; they are stored in `snapshots.a11y_violations` and read only through
   `a11yViolationsOf` / `a11yFindingsOf` / `a11ySummaryOf`. `axe unavailable: <reason>` is a note, not
-  a finding. Never change a status, failure set or git state because of a11y results.
-- **Settling and Storybook tests.** Runners wait for Storybook's own events through the public
-  `Channel.on` (`packages/runner-*/src/settle.ts`), falling back to `delay ?? 500`; keep the two
-  runners' copies identical. `projects.run_tests` (default off) runs `subtype: "test"` entries through
+  a finding. Never change a status, failure set or git state because of a11y results. The axe source,
+  injection, in-page functions, `parameters.a11y` plan and violation mapper are the runner's
+  (`@storyshelf/runner/a11y`); core keeps the note strings (`capture/a11y/notes.ts`) and the readers.
+- **Settling and Storybook tests.** The runner waits for Storybook's own events through the public
+  `Channel.on` (`packages/runner/src/settle.ts`), falling back to `delay ?? 500`. Playwright is
+  the only runner; Puppeteer was removed in 0.15.0 (ADR 0001, amendment 2026-11-20). `projects.run_tests` (default off) runs `subtype: "test"` entries through
   `runProjectTests`/`CaptureRunner.runTests`; results are stored once as JSON in
   `builds.test_results` (`BuildModel.setTestResults`). A failing test is a blocking failure; never
   render a test entry as a story or add a test table.
@@ -208,12 +213,15 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Logging and HTTP.** Use pino from core (`createShelfLogger()`): structured objects, never string
   interpolation (`logger.info({ buildId }, "msg")`), errors as an `err` child. Adapters receive scoped
   loggers via `Adapter.setLogger` and never create their own. Outbound HTTP only through
-  `@storyshelf/core/utils` (`httpJson`/`HttpError`); never add `ky`/`ofetch`. On every span (core,
-  `observability`, `ai`), record an exception only as a redacted copy (core's `spanException`, or
-  the wrappers' own copy of it), rethrowing the original.
+  `@storyshelf/common/http` (`httpJson`/`HttpError`, re-exported by `@storyshelf/core/utils`); never add `ky`/`ofetch`. On every span (core,
+  `observability`, `ai`), record an exception only as a redacted copy (`spanException` from
+  `@storyshelf/common/tracing`, or the wrappers' own copy of it), rethrowing the original.
   An `HttpError` is recorded as `HTTP <status>`, never its body; log and trace a request URL only as
   `redactUrlForLog(url)` (origin only).
-- **Remote browsers.** `defineRemote` expands to `<engine>@<name>` targets; presets are plain
+- **Remote browsers.** All browser code lives in `@storyshelf/runner`, never in core (a ratchet test in
+  core fails on `playwright-core`, `launch` or `connect`): `src/remote/` (`@storyshelf/runner/remote`:
+  `remote-browser.ts`, `remote-lease*.ts`, `remote-limiter.ts`, `remote-pool.ts`, `remote-sizing.ts`,
+  `remote-environment.ts`, the presets) and `src/concurrency/` (page limiter). `defineRemote` expands to `<engine>@<name>` targets; presets are plain
   configuration, no vendor SDKs. Measure the environment in-browser (`inPageProbe`), never from the
   host. `protocol`/`reach` are declared, not inferred. Use `connectLeased`/`shutdownRemote` so a lease
   is released exactly once; scrub endpoints, headers and leases (`scrubConnection`) and never log
@@ -244,7 +252,7 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   is accepted: the one service worker caches only opted-in default-branch Storybooks and the
   offline home page, never app HTML or `/api/v1` answers. ADR 0049 (built-in integrations) is accepted: git, chat, email, push and design integrations
   move into `packages/core/src/integrations/`, `@storyshelf/image` folds into core, and the app
-  stops requiring observability; until its epic merges, the packages listed under Layout stay. ADR 0050 (cloud deployment) is
+  stops requiring observability; the compatibility packages were retired in 0.14.0 (§8). ADR 0050 (cloud deployment) is
   accepted: no per-cloud packages; a cloud preset lives in the package it serves, and infrastructure is a
   versioned Terraform module per cloud on the published image. ADR 0052 (story switching during
   capture) is accepted behind `projects.switch_stories` (default off) and ships only after its
@@ -256,7 +264,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   thing. Rename = add, dual-write, drop over three releases. A new status value or job kind is read
   first and written one release later; backfills are batched, idempotent jobs, never boot work.
   Until the claim filter and payload version land, ship no new job kind or status value. A schema
-  change's changeset carries a `Schema:` line.
+  change's changeset carries a `Schema:` line. Until 2027-01-01 contract steps ship in the release
+  that needs them and the upgrade is stop-the-world (label `schema-break`; ADR 0053 amendment 2026-11-21).
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 
 ## Conventions
@@ -270,8 +279,16 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   `Changed`, `Fixed`, `Security` or `Internal`), then a blank line and the details. The summary is
   the release note; mark stories, tests and groundwork `Internal`. Never edit `CHANGELOG.md` by hand and never bump versions;
   `release.yml` does both (ADR 0043). Docs, tests and CI changes add none; the `no-release` label
-  tells the CI check so. Task PRs on an epic branch add theirs there.
-- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` (`SHELF_*` variables, "Shelf" in prose and diagrams).
+  tells the CI check so. Task PRs on an epic branch add theirs there. Until 2027-01-01 a breaking
+  change ships without a shim or alias, as `Breaking:` (ADR 0049 and ADR 0053 amendments, 2026-11-21).
+- **Naming.** Never abbreviate StoryShelf to `SS`; the short form is `SHELF` ("Shelf" in prose and
+  diagrams). `SHELF_*` for StoryShelf's own settings; unprefixed only for platform or SDK names. Read
+  them through `readSetting` (`@storyshelf/common/settings`, re-exported by `@storyshelf/core/config`; the CLI keeps its rows in
+  `packages/cli/src/settings.ts`). Old names are never read: they live only in `RENAMED_SETTINGS`
+  (`packages/common/src/settings/renames.ts`), which every entry point checks at boot
+  (`refuseRenamedSettings`, names only; `SHELF_ALLOW_OLD_NAMES=1` warns instead; removed in the first
+  release of 2027), and `packages/core/src/env-settings/ratchet.test.ts`
+  (it scans every package, `common` included) fails on any other unprefixed read.
 - **URLs** come from the `UrlBuilder` of `createUrlBuilder` (`@storyshelf/core/urls`; in the app,
   the store's `urls`), never hand-built strings. **Forms** use HTMX `hx-post` + `HX-Redirect`.
   JSON endpoints live under `/api/v1`; HTML pages at `/`.
@@ -279,12 +296,15 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
   module at ~150 lines or 3+ concerns. Adapters follow per-kind layouts (storage:
   `types`/`keys`/`client`/`lifecycle`/`operations`/`streams`/`errors`; runners:
   `types`/`browser`/`runtime-params`/`pipeline`/`screenshot`/`play`/`a11y`). `index.ts` is a
-  composition root, not a logic dump. Keep the package `exports` map frozen; a new module needs a
+  composition root, not a logic dump. Keep the package `exports` map frozen (the keys; the published manifest keeps them and only drops the `source` conditions, `scripts/materialize-exports.mjs`); a new module needs a
   colocated `<module>.test.ts` (indirect coverage only for pure mappers). Load the `adapter-layout`
   skill for templates.
 - **One production owner per third-party dep.** A runtime dependency belongs in exactly one package's
-  `dependencies` (e.g. `pino` and `axe-core` in core); other packages use `devDependencies` and import
-  types through the owner (`@storyshelf/core/logger`), never directly.
+  `dependencies` (e.g. `pino` in core, `axe-core` in the runner); other packages use `devDependencies` and import
+  types through the owner (`@storyshelf/core/logger`), never directly. The one deliberate exception
+  is `@opentelemetry/api`, declared by `common`, `core`, `app`, `ai` and `observability` alike: it is a
+  no-op API whose global registration only works when every package resolves one copy, so each
+  declares the same catalog range instead of reaching it through another package (#1334).
 - **Tests.** Every model, router and adapter needs tests (target 100% coverage). `nub run test` must
   stay hermetic; real-browser is gated by `RUN_INTEGRATION=1`; live cloud by `LIVE_CLOUD=1`. See
   `docs/testing.md` for the adapter matrix and determinism rules. Do not paper over flaky timing
@@ -328,7 +348,8 @@ Terminology: `"app"` = the product UI (`packages/app`); `"website"` = the public
 - **Releases** (ADR 0043). `release-pr.yml` opens the release PR when a P0 PR (label `p0-critical`)
   or an epic merges into `main`, and otherwise once the last minor release is 7 days old; only the
   owner merges it. Label a P0 fix's PR `p0-critical`. There is no 1.0 yet: a breaking change is a
-  `minor`, and a `major` changeset fails the changeset check.
+  `minor`, and a `major` changeset fails the changeset check. Until 2027-01-01 a renamed or folded
+  package is not published again; the owner deprecates it on npm (ADR 0049 amendment 2026-11-21).
 
 ## Agent operating model
 
@@ -351,6 +372,14 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
   green PR back.
 - **Batch mechanical work.** A lint, story or rename sweep is two or three PRs, not one per file.
   Label those PRs `skip-review`, so CodeRabbit skips them.
+- **Triage** (a scheduled Sonnet run at 05:41, 11:41, 17:41 and 23:41 UTC; owner, #1099) does the
+  mechanical work and hands judgement calls to the architect. It carries out mechanical items the
+  architect has already decided (labels, milestones, `status-ready`, archiving finished sessions,
+  auto-merge) in the same run instead of re-reporting them, and never re-lists an answered item
+  unless something on it changed. It reports a session stopped by the usage limit as such, with
+  the time, so the architect can resume it. At most four developer sessions start at once, so one
+  burst can't hit the 5-hour limit together. Until the public launch a lane may run two developer
+  sessions (owner, 2026-11-18); after it, one.
 - **Models.** The architect runs on Opus. Developers run on Sonnet by default, or on Opus when the
   issue has the `model-opus` label. The Expert is the only Fable agent. Interns run on Haiku. Triage
   runs on Sonnet.

@@ -177,6 +177,11 @@ describe("storybook routes", () => {
     const body = await response.text();
     expect(body).toContain("Preparing preview");
     expect(body).not.toContain("<iframe");
+    // WCAG 2.2.1: no meta refresh; a polite status, a pause control and a no-JS link instead.
+    expect(body).not.toContain("http-equiv");
+    expect(body).toContain('aria-live="polite"');
+    expect(body).toContain("Pause automatic check");
+    expect(body).toContain(">Check again</a>");
   });
 
   it("serves a static JS asset with the correct content type", async () => {

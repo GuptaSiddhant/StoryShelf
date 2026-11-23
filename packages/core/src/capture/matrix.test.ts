@@ -4,13 +4,16 @@ import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import type { StoryEntry, Viewport } from "./adapter.ts";
+import { abortableLease } from "./job-lease.ts";
 import {
   captureAcrossBrowsers,
   partitionBrowsers,
   renderWork,
   type MatrixInput,
 } from "./matrix.ts";
+import { leaseProgress } from "./progress.ts";
 
 const VIEWPORT: Viewport = { name: "desktop", width: 1280, height: 720 };
 
@@ -178,12 +181,13 @@ describe("captureAcrossBrowsers", () => {
     ]);
   });
 
-  it("calls the progress hook for every screenshot and logs a line every ten", async () => {
+  it("calls the progress hook before the pass and for every screenshot, and logs a line every ten", async () => {
     const progress = vi.fn();
     const stories = Array.from({ length: 10 }, (_unused, index) => story(`s${index}`));
     const { input, logged } = setup({ browsers: ["chromium"], stories, progress });
     await captureAcrossBrowsers(input);
-    expect(progress).toHaveBeenCalledTimes(10);
+    // Once as the pass starts (its cancel checkpoint), then once per screenshot.
+    expect(progress).toHaveBeenCalledTimes(11);
     expect(logged.map((line) => line.message)).toContain("captured 10/10 screenshots");
   });
 
@@ -347,5 +351,62 @@ describe("renderWork", () => {
     ).rejects.toBeInstanceOf(TargetLaunchError);
     expect(logged.map((line) => line.message)).toContain("launching");
     expect(calls).toHaveLength(1);
+  });
+});
+
+/** The progress hook a consumer job gets: it throws once the job's signal is aborted. */
+function cancellable() {
+  const controller = new AbortController();
+  const progress = leaseProgress(abortableLease({ touch: () => {} }, controller.signal));
+  return { controller, progress };
+}
+
+describe("a cancelled job (#1154)", () => {
+  it("does not isolate or retry a pass the cancel stopped: no new pass starts", async () => {
+    const { controller, progress } = cancellable();
+    const { runner, calls } = runnerOf(async (render) => {
+      const [first] = render.stories;
+      if (first) {
+        await render.onCapture?.({ story: first, viewportName: "desktop", screenshot: png() });
+      }
+      // The consumer saw the cancel: it aborts the job and `runner.cancel` ends this render.
+      controller.abort(new Error("job cancelled"));
+      throw new Error("Capture cancelled");
+    });
+    const stories = [story("a"), story("b"), story("c"), story("d")];
+    const { input } = setup({
+      runner,
+      stories,
+      progress,
+      browsers: ["chromium@sprite", "chromium"],
+    });
+    await expect(captureAcrossBrowsers(input)).rejects.toBeInstanceOf(JobAbortedError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("starts no pass on the next target once the job is cancelled between passes", async () => {
+    const { controller, progress } = cancellable();
+    const { runner, calls } = runnerOf(async (render) => {
+      for (const entry of render.stories) {
+        // oxlint-disable-next-line no-await-in-loop -- one capture at a time
+        await render.onCapture?.({ story: entry, viewportName: "desktop", screenshot: png() });
+      }
+      // Cancelled just as the pass ended: the runner had nothing left to stop.
+      controller.abort(new Error("job cancelled"));
+      return { captures: [], failures: [] };
+    });
+    const { input } = setup({ runner, progress, browsers: ["chromium@sprite", "chromium"] });
+    await expect(captureAcrossBrowsers(input)).rejects.toBeInstanceOf(JobAbortedError);
+    expect(calls.map((call) => call.target)).toEqual(["chromium@sprite"]);
+  });
+
+  it("starts no render of a slice of work once the job is cancelled", async () => {
+    const { controller, progress } = cancellable();
+    controller.abort(new Error("job lease lost"));
+    const { input, calls } = setup({ progress });
+    await expect(
+      renderWork(input, [{ browser: "chromium", stories: [story("a")] }]),
+    ).rejects.toBeInstanceOf(JobAbortedError);
+    expect(calls).toHaveLength(0);
   });
 });

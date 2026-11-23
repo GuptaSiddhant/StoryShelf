@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/observability",
-  "version": "0.13.0",
-  "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
+  "version": "0.15.0",
+  "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over StoryShelf adapters.",
   "keywords": [
     "metrics",
     "observability",
@@ -61,18 +61,18 @@
   "dependencies": {
     "@hono/otel": "catalog:",
     "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
-    "@storyshelf/core": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "hono": "catalog:"
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
-    "@opentelemetry/exporter-metrics-otlp-http": "catalog:",
-    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

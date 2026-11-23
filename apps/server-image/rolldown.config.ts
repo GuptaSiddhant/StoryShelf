@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { defineConfig } from "rolldown";
 
 // `sharp` is the optional native image engine: it must resolve at runtime, never be inlined.
-const EXTERNAL = /^(pino(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
+// `pg` (the rds-iam preset) stays external too: inlined, its `pg-pool` resolves to the ESM entry and
+// `pg`'s CommonJS `require` gets a module namespace instead of the class (`Class extends value #<Object>`).
+const EXTERNAL = /^(pino(\/|$)|pg(\/|$)|playwright(-core)?(\/|$)|sharp(\/|$))/u;
 
 const root = resolve(import.meta.dirname ?? ".", "../..");
 
@@ -24,7 +26,10 @@ export default defineConfig({
   // and once it is inlined into server.mjs that resolves next to it. Without it the pool would
   // silently fall back to diffing on the main thread.
   input: {
-    server: resolve(root, "apps/server-image/server.ts"),
+    // The instance module `storyshelf-server serve` loads (package.json#storyshelf.server), and
+    // the `storyshelf-server` executable itself: both bundles share one copy of `@storyshelf/app`.
+    instance: resolve(root, "apps/server-image/instance.ts"),
+    bin: resolve(root, "packages/app/src/server-bin/bin.ts"),
     worker: resolve(root, "packages/core/src/diff/worker.ts"),
   },
   output: {
@@ -47,12 +52,15 @@ export default defineConfig({
     alias: {
       "@storyshelf/core": resolve(root, "packages/core/src/index.tsx"),
       "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
-      "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
-      "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
-      "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
+      "@storyshelf/db/sqlite": resolve(root, "packages/db/src/sqlite/index.ts"),
+      "@storyshelf/runner": resolve(root, "packages/runner/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
-      "@storyshelf/db-postgres": resolve(root, "packages/db-postgres/src/index.ts"),
-      "@storyshelf/db-mysql": resolve(root, "packages/db-mysql/src/index.ts"),
+      // The preset loads the signer with a dynamic import; the runtime image carries only the
+      // root `node_modules`, where the isolated linker does not put it, so inline this copy.
+      "@aws-sdk/rds-signer": resolve(root, "apps/server-image/node_modules/@aws-sdk/rds-signer"),
+      "@storyshelf/db/postgres/rds-iam": resolve(root, "packages/db/src/postgres/rds-iam.ts"),
+      "@storyshelf/db/postgres": resolve(root, "packages/db/src/postgres/index.ts"),
+      "@storyshelf/db/mysql": resolve(root, "packages/db/src/mysql/index.ts"),
     },
     conditionNames: ["source", "import", "default"],
   },

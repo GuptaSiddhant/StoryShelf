@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/ai",
-  "version": "0.13.0",
+  "version": "0.15.0",
   "description": "StoryShelf AI insights engine on the Vercel AI SDK: build triage and project health (providers are supplied by the deployer).",
   "keywords": [
     "ai",
@@ -54,13 +54,13 @@
   "dependencies": {
     "@ai-sdk/otel": "1.0.133",
     "@opentelemetry/api": "catalog:",
-    "@storyshelf/core": "workspace:*",
     "ai": "7.0.133"
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
+    "@storyshelf/core": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
@@ -70,6 +70,9 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@storyshelf/core": "workspace:*"
   },
   "engines": {
     "node": ">=24"

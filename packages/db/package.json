@@ -1,0 +1,241 @@
+{
+  "name": "@storyshelf/db",
+  "version": "0.15.0",
+  "description": "Database adapters for StoryShelf: SQLite (node:sqlite default), Postgres and MySQL/MariaDB, with their driver and cloud presets, one subpath each.",
+  "keywords": [
+    "database",
+    "drizzle",
+    "mariadb",
+    "mysql",
+    "postgres",
+    "self-hosted",
+    "sqlite",
+    "storybook"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/db"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./mysql": {
+      "source": "./src/mysql/index.ts",
+      "default": "./dist/mysql/index.mjs"
+    },
+    "./mysql/planetscale": {
+      "source": "./src/mysql/planetscale.ts",
+      "default": "./dist/mysql/planetscale.mjs"
+    },
+    "./mysql/tidb": {
+      "source": "./src/mysql/tidb.ts",
+      "default": "./dist/mysql/tidb.mjs"
+    },
+    "./postgres": {
+      "source": "./src/postgres/index.ts",
+      "default": "./dist/postgres/index.mjs"
+    },
+    "./postgres/neon": {
+      "source": "./src/postgres/neon.ts",
+      "default": "./dist/postgres/neon.mjs"
+    },
+    "./postgres/neon-http": {
+      "source": "./src/postgres/neon-http.ts",
+      "default": "./dist/postgres/neon-http.mjs"
+    },
+    "./postgres/pg": {
+      "source": "./src/postgres/pg.ts",
+      "default": "./dist/postgres/pg.mjs"
+    },
+    "./postgres/pglite": {
+      "source": "./src/postgres/pglite.ts",
+      "default": "./dist/postgres/pglite.mjs"
+    },
+    "./postgres/rds-iam": {
+      "source": "./src/postgres/rds-iam.ts",
+      "default": "./dist/postgres/rds-iam.mjs"
+    },
+    "./postgres/vercel": {
+      "source": "./src/postgres/vercel.ts",
+      "default": "./dist/postgres/vercel.mjs"
+    },
+    "./sqlite": {
+      "source": "./src/sqlite/index.ts",
+      "default": "./dist/sqlite/index.mjs"
+    },
+    "./sqlite/better-sqlite3": {
+      "source": "./src/sqlite/better-sqlite3.ts",
+      "default": "./dist/sqlite/better-sqlite3.mjs"
+    },
+    "./sqlite/bun-sqlite": {
+      "source": "./src/sqlite/bun-sqlite.ts",
+      "default": "./dist/sqlite/bun-sqlite.mjs"
+    },
+    "./sqlite/d1": {
+      "source": "./src/sqlite/d1.ts",
+      "default": "./dist/sqlite/d1.mjs"
+    },
+    "./sqlite/turso": {
+      "source": "./src/sqlite/turso.ts",
+      "default": "./dist/sqlite/turso.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      "./mysql": "./dist/mysql/index.mjs",
+      "./mysql/planetscale": "./dist/mysql/planetscale.mjs",
+      "./mysql/tidb": "./dist/mysql/tidb.mjs",
+      "./postgres": "./dist/postgres/index.mjs",
+      "./postgres/neon": "./dist/postgres/neon.mjs",
+      "./postgres/neon-http": "./dist/postgres/neon-http.mjs",
+      "./postgres/pg": "./dist/postgres/pg.mjs",
+      "./postgres/pglite": "./dist/postgres/pglite.mjs",
+      "./postgres/rds-iam": "./dist/postgres/rds-iam.mjs",
+      "./postgres/vercel": "./dist/postgres/vercel.mjs",
+      "./sqlite": "./dist/sqlite/index.mjs",
+      "./sqlite/better-sqlite3": "./dist/sqlite/better-sqlite3.mjs",
+      "./sqlite/bun-sqlite": "./dist/sqlite/bun-sqlite.mjs",
+      "./sqlite/d1": "./dist/sqlite/d1.mjs",
+      "./sqlite/turso": "./dist/sqlite/turso.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "prepublishOnly": "nub run build"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@libsql/client": "^0.18.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@planetscale/database": "^1.19.0",
+    "@storyshelf/core": "workspace:*",
+    "@tidbcloud/serverless": "^0.1.0",
+    "@types/node": "catalog:",
+    "@vercel/postgres": "^0.10.0",
+    "@vitest/coverage-v8": "catalog:",
+    "better-sqlite3": "^12.0.0",
+    "drizzle-kit": "catalog:",
+    "mysql2": "^3.9.0",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "pg": "^8.0.0",
+    "postgres": "^3.4.0",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@aws-sdk/rds-signer": "^3.0.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@libsql/client": "^0.18.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@planetscale/database": "^1.19.0",
+    "@storyshelf/core": "workspace:*",
+    "@tidbcloud/serverless": "^0.1.0",
+    "@vercel/postgres": "^0.10.0",
+    "better-sqlite3": "^12.0.0",
+    "mysql2": "^3.9.0",
+    "pg": "^8.0.0",
+    "postgres": "^3.4.0"
+  },
+  "peerDependenciesMeta": {
+    "@aws-sdk/rds-signer": {
+      "optional": true
+    },
+    "@electric-sql/pglite": {
+      "optional": true
+    },
+    "@libsql/client": {
+      "optional": true
+    },
+    "@neondatabase/serverless": {
+      "optional": true
+    },
+    "@planetscale/database": {
+      "optional": true
+    },
+    "@tidbcloud/serverless": {
+      "optional": true
+    },
+    "@vercel/postgres": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "postgres": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "storyshelf": {
+    "peerSubpaths": {
+      "@aws-sdk/rds-signer": [
+        "./postgres/rds-iam"
+      ],
+      "@electric-sql/pglite": [
+        "./postgres/pglite"
+      ],
+      "@libsql/client": [
+        "./sqlite/turso"
+      ],
+      "@neondatabase/serverless": [
+        "./postgres/neon",
+        "./postgres/neon-http"
+      ],
+      "@planetscale/database": [
+        "./mysql/planetscale"
+      ],
+      "@tidbcloud/serverless": [
+        "./mysql/tidb"
+      ],
+      "@vercel/postgres": [
+        "./postgres/vercel"
+      ],
+      "better-sqlite3": [
+        "./sqlite/better-sqlite3"
+      ],
+      "mysql2": [
+        "./mysql"
+      ],
+      "pg": [
+        "./postgres/pg"
+      ],
+      "postgres": [
+        "./postgres"
+      ]
+    }
+  }
+}

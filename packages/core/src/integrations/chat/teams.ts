@@ -3,7 +3,7 @@ import type {
   MessageNotifierAdapter,
   MessageNotifierProvider,
 } from "../../adapters/notifier/provider.ts";
-import { httpText } from "../../utils/index.ts";
+import { httpStatus } from "../../utils/index.ts";
 import { chatTogglesSchema, type ChatToggles } from "./types.ts";
 
 export type { ChatToggles };
@@ -65,7 +65,7 @@ function createTeamsAdapter(options: TeamsAdapterOptions): MessageNotifierAdapte
         ],
       };
       logger?.debug({ channelId: input.channel.id }, "posting teams message");
-      await httpText(url, { method: "POST", json: payload, logger, destination: "project" });
+      await httpStatus(url, { method: "POST", json: payload, logger, destination: "project" });
       logger?.info({ channelId: input.channel.id }, "teams message posted");
     },
   };

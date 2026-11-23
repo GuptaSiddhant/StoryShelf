@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { MemberModel, ProjectGroupMappingModel, UserModel } from "@storyshelf/core/models";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { describe, expect, it } from "vitest";
 import type { ShelfSSOProvider } from "./engine.ts";
 import { extractGroups, provisionHook, resolveSiteRole, syncSsoGroups } from "./groups.ts";

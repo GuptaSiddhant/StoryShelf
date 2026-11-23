@@ -3,9 +3,9 @@ name: Live Cloud GCP
 
 # Phase 3 live tests: GCS against strictly real GCP (no fakes, no
 # emulators). The bucket is pre-provisioned (manually or
-# via `terraform apply` from `storyshelf server init --target gcp`); this
-# workflow only consumes `terraform output -json` values as secrets and
-# never creates infrastructure.
+# via `terraform apply` of `deploy/terraform/gcp`); this
+# live job only consumes `terraform output -json` values as secrets and
+# never creates infrastructure; `module-apply` applies the module itself.
 #
 # Required repository secrets:
 # - GCP_PROJECT_ID (GCP project id)
@@ -17,45 +17,17 @@ on:
 permissions:
   contents: read
 
+# Never cancel a run in progress: a cancelled module-apply would lose its runner-local state and
+# orphan a billed stack that destroy can no longer find. A second dispatch waits instead.
 concurrency:
   group: live-cloud-gcp
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  # The scaffold generator stays valid: fmt-clean and `terraform validate`-clean.
-  # Uses the same gate as packages/cli/.../terraform-gcp.integration.test.ts
-  # (skips when no terraform binary — here we install one, so it always runs).
-  scaffold-validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.9.x"
-          terraform_wrapper: false
-
-      - name: Setup Nub
-        uses: nubjs/setup-nub@v0
-        with:
-          # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
-          nub-version: "0.10.0"
-
-      - name: Install dependencies
-        run: nub ci
-
-      - name: Validate generated GCP stack
-        run: nub run test --filter='./packages/cli'
-        env:
-          CI: "true"
-
-  # Real GCS suites. Hermetic tests in the same packages also run
+  # Real GCS suites. Hermetic tests in this subpath also run
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-gcp:
     runs-on: ubuntu-latest
-    needs: [scaffold-validate]
     env:
       LIVE_CLOUD: "1"
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -95,4 +67,64 @@ jobs:
 
       - name: Run GCS suites (hermetic + live)
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/storage-gcs' --force
+        run: nubx turbo test --filter='@storyshelf/storage' --force -- src/gcs
+
+  # The customer path (#892, ADR 0050): apply the GCP module's `examples/minimal` with the current
+  # release image, smoke-test the running stack, destroy it. Real GCP, billed: it runs only when the
+  # repository variable LIVE_GCP_MODULE_APPLY is "1", which the owner turns on (billed). The image
+  # selects GCS from GCS_BUCKET (see the module README, "Image contract"). Uses the same GCP secrets as live-gcp.
+  # Destroy runs even when the apply or the smoke test fails.
+  module-apply:
+    runs-on: ubuntu-latest
+    if: ${{ vars.LIVE_GCP_MODULE_APPLY == '1' }}
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Unique per run (the module caps a name at 20 characters), so runs never collide.
+      TF_VAR_name: shelf-ci-${{ github.run_id }}
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+    defaults:
+      run:
+        working-directory: deploy/terraform/gcp/examples/minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+          terraform_wrapper: false
+
+      - name: Resolve the current release image
+        run: |
+          set -e
+          tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
+          echo "TF_VAR_image_version=${tag#v}" >> "$GITHUB_ENV"
+          echo "applying the module with image ${tag#v}"
+
+      - name: Apply
+        run: |
+          set -e
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Smoke test the stack
+        run: |
+          set -e
+          url=$(terraform output -raw url)
+          for _ in $(seq 1 60); do
+            if curl -fsS "$url/api/v1/health" >/dev/null; then break; fi
+            sleep 15
+          done
+          SMOKE_BASE_URL="$url" bash "$GITHUB_WORKSPACE/scripts/smoke.sh"
+
+      - name: Destroy
+        if: ${{ always() }}
+        run: terraform destroy -input=false -auto-approve

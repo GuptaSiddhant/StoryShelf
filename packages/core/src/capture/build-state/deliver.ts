@@ -10,6 +10,7 @@ import { contentHostSuffix } from "../../content-hosts.ts";
 import { latestVerdicts } from "../../models/build-review-status.ts";
 import { BuildReviewModel } from "../../models/build-review.ts";
 import { BuildModel } from "../../models/build.ts";
+import { GitRepositoryLinkModel } from "../../models/git-repository-link.ts";
 import { NotificationChannelModel } from "../../models/notification-channel.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
@@ -18,11 +19,14 @@ import type { Project } from "../../schema/project.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
 import { createUrlBuilder } from "../../urls.ts";
 import { publishingOfBuild } from "../publish/published.ts";
-import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
+import { extrasOf } from "./comment-extras.ts";
+import { deliverToLink, linkTargets } from "./link-target.ts";
+import type { BuildStateDeps, SkipReason, StateTarget, TargetRef } from "./types.ts";
 
 /**
- * Show the build's current state on one channel. Throws when the host refuses a status, so the
- * caller can retry; resolves to why nothing was written when the build or channel is gone.
+ * Show the build's current state on one channel or repository link. Throws when the host refuses a
+ * status, so the caller can retry; resolves to why nothing was written when the build or channel is
+ * gone, or the link does not post.
  *
  * With a `signal`, an aborted one (the attempt's deadline passed, so a redelivery may be running)
  * stops the delivery before the status is written: the build is read again by that redelivery,
@@ -30,7 +34,7 @@ import type { BuildStateDeps, SkipReason, StateTarget } from "./types.ts";
  */
 export async function deliverBuildState(
   deps: BuildStateDeps,
-  ids: { buildId: string; channelId: string },
+  ids: { buildId: string } & TargetRef,
   signal?: AbortSignal,
 ): Promise<"delivered" | SkipReason> {
   const loaded = await loadBuild(deps, ids.buildId);
@@ -39,11 +43,25 @@ export async function deliverBuildState(
   if (loaded === null || !origin) {
     return loaded === null ? "no-build" : "no-origin";
   }
-  const target = await loadTarget(deps, ids.channelId, loaded.project.id);
+  const write = async (target: StateTarget): Promise<void> => {
+    await writeTo(deps, loaded, { target, origin, signal });
+  };
+  return "linkId" in ids
+    ? await deliverToLink(deps, loaded, { linkId: ids.linkId, write })
+    : await deliverToChannel(deps, loaded, { channelId: ids.channelId, write });
+}
+
+/** Write through a per-project channel; resolves to why not when it cannot take part. */
+async function deliverToChannel(
+  deps: BuildStateDeps,
+  loaded: { build: Build; project: Project },
+  where: { channelId: string; write: (target: StateTarget) => Promise<void> },
+): Promise<"delivered" | SkipReason> {
+  const target = await loadTarget(deps, where.channelId, loaded.project.id);
   if (typeof target === "string") {
     return target;
   }
-  await writeTo(deps, loaded, { target, origin, signal });
+  await where.write(target);
   return "delivered";
 }
 
@@ -57,26 +75,47 @@ export async function loadBuild(
   return build && project ? { build, project } : null;
 }
 
+/** What `target` shows of the build: the statuses, the annotations and the comment. */
+async function statesOf(
+  deps: BuildStateDeps,
+  loaded: { build: Build; project: Project },
+  where: { target: StateTarget; origin: string },
+): Promise<ReturnType<typeof statusesForBuild>> {
+  const { build, project } = loaded;
+  const flags = deps.flags(project);
+  const snapshots = await snapshotsOf(deps, build, flags.testing);
+  const urls = createUrlBuilder(where.origin, contentHostSuffix(deps.config));
+  return statusesForBuild({
+    build,
+    projectSlug: project.slug,
+    prefix: channelPrefix(where.target.channel),
+    urls,
+    flags,
+    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
+    source: (await skipSourceOf(deps, build)) ?? undefined,
+    approvals: await approvalsOf(deps, build, project),
+    changes: snapshots.changes,
+    extras: await extrasOf(deps, {
+      build,
+      project,
+      urls,
+      testing: flags.testing,
+      snapshots: snapshots.all,
+    }),
+    supersededBy: await supersededByOf(deps, build),
+    outputs: where.target.link?.outputs,
+  });
+}
+
 /** Write `target`'s view of the build, linking to `origin`; throws on a refused status. */
 export async function writeTo(
   deps: BuildStateDeps,
   loaded: { build: Build; project: Project },
   where: { target: StateTarget; origin: string; signal?: AbortSignal | undefined },
 ): Promise<void> {
-  const { build, project } = loaded;
-  const { target, origin } = where;
-  const states = statusesForBuild({
-    build,
-    projectSlug: project.slug,
-    prefix: channelPrefix(target.channel),
-    urls: createUrlBuilder(origin, contentHostSuffix(deps.config)),
-    flags: deps.flags(project),
-    publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
-    source: (await skipSourceOf(deps, build)) ?? undefined,
-    approvals: await approvalsOf(deps, build, project),
-    changes: await changesOf(deps, build, project),
-    supersededBy: await supersededByOf(deps, build),
-  });
+  const { build } = loaded;
+  const { target } = where;
+  const states = await statesOf(deps, loaded, where);
   if (states.statuses.length === 0) {
     deps.logger.info({ buildId: build.id }, "no commit to show a state on");
     return;
@@ -89,10 +128,23 @@ export async function writeTo(
     logger: deps.logger,
     signal: where.signal,
   });
+  await stampLinkDelivery(deps, target);
 }
 
-/** What reading a project's git channels needs. */
-export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret"> & {
+/** Record the post on a link; a failed stamp is logged, never retried (the status is already out). */
+async function stampLinkDelivery(deps: BuildStateDeps, target: StateTarget): Promise<void> {
+  if (target.link === undefined) {
+    return;
+  }
+  try {
+    await new GitRepositoryLinkModel(deps.db).markDelivered(target.link.id);
+  } catch (error) {
+    deps.logger.warn({ err: error, linkId: target.link.id }, "could not record the link delivery");
+  }
+}
+
+/** What reading a project's git channels (and, with connections, its approved links) needs. */
+export type ChannelDeps = Pick<BuildStateDeps, "db" | "notifiers" | "secret" | "gitConnections"> & {
   logger?: BuildStateDeps["logger"] | undefined;
 };
 
@@ -113,8 +165,20 @@ async function skipSourceOf(deps: BuildStateDeps, build: Build): Promise<BuildSt
   };
 }
 
-/** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
+/**
+ * Every git target of the project: its enabled channels and its approved repository links (those
+ * that can be reached now; a link that cannot is logged and left out).
+ */
 export async function stateTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
+  const [channels, links] = await Promise.all([
+    channelTargets(deps, projectId),
+    linkTargets(deps, projectId),
+  ]);
+  return [...channels, ...links];
+}
+
+/** The project's enabled channels with a wired `state` provider; unreadable secrets are logged and skipped. */
+export async function channelTargets(deps: ChannelDeps, projectId: string): Promise<StateTarget[]> {
   const model = channelModel(deps);
   const rows = await model.list(projectId);
   return rows.flatMap((row) => {
@@ -183,14 +247,17 @@ async function approvalsOf(
   };
 }
 
-/** The build's snapshots for the annotations; read only when `testing` is on and something changed. */
-async function changesOf(
+/** The build's snapshots (with testing on): `changes` for the annotations only when something changed. */
+async function snapshotsOf(
   deps: BuildStateDeps,
   build: Build,
-  project: Project,
-): Promise<Snapshot[] | undefined> {
-  const wanted = deps.flags(project).testing && build.changedCount > 0;
-  return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
+  testing: boolean,
+): Promise<{ all: Snapshot[] | undefined; changes: Snapshot[] | undefined }> {
+  const all =
+    testing && build.snapshotCount > 0
+      ? await new SnapshotModel(deps.db).listByBuild(build.id)
+      : undefined;
+  return { all, changes: build.changedCount > 0 ? all : undefined };
 }
 
 /** The newer build that cancelled this one (ADR 0045), or undefined for any other build. */

@@ -14,14 +14,12 @@ describe("createProgram", () => {
     const program = createProgram();
     expect(program.commands.map((command) => command.name()).toSorted()).toEqual([
       "build",
+      "cancel",
       "create",
       "doctor",
       "init",
-      "mcp",
       "protect",
-      "purge",
       "retry",
-      "server",
       "upload",
       "whoami",
     ]);

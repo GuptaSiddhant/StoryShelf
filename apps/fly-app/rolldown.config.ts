@@ -24,7 +24,10 @@ export default defineConfig({
   // and once it is inlined into server.mjs that resolves next to it. Without it the pool would
   // silently fall back to diffing on the main thread.
   input: {
-    server: resolve(root, "apps/fly-app/server.ts"),
+    // The instance module `storyshelf-server serve` loads (package.json#storyshelf.server), and the
+    // `storyshelf-server` executable itself: both bundles share one copy of `@storyshelf/app`.
+    instance: resolve(root, "apps/fly-app/instance.ts"),
+    bin: resolve(root, "packages/app/src/server-bin/bin.ts"),
     // `migrate-to-s3.sh` runs this once on the machine: it shares the bundle's inlined AWS SDK.
     "migrate-to-s3": resolve(root, "apps/fly-app/migrate-to-s3.ts"),
     worker: resolve(root, "packages/core/src/diff/worker.ts"),
@@ -49,9 +52,8 @@ export default defineConfig({
     alias: {
       "@storyshelf/core": resolve(root, "packages/core/src/index.tsx"),
       "@storyshelf/app": resolve(root, "packages/app/src/index.tsx"),
-      "@storyshelf/db-sqlite": resolve(root, "packages/db-sqlite/src/index.ts"),
-      "@storyshelf/storage-local": resolve(root, "packages/storage-local/src/index.ts"),
-      "@storyshelf/runner-playwright": resolve(root, "packages/runner-playwright/src/index.ts"),
+      "@storyshelf/db/sqlite": resolve(root, "packages/db/src/sqlite/index.ts"),
+      "@storyshelf/runner": resolve(root, "packages/runner/src/index.ts"),
       "@storyshelf/auth": resolve(root, "packages/auth/src/index.ts"),
     },
     conditionNames: ["source", "import", "default"],

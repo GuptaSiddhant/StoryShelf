@@ -86,6 +86,21 @@ describe("emitNotifications", () => {
     expect(sent).toHaveLength(1);
   });
 
+  it("skips a channel whose provider is not wired, recording no outcome", async () => {
+    const sent: unknown[] = [];
+    const onOutcome = vi.fn(async () => {});
+    await emitNotifications(
+      { event: "build:created", data: {}, timestamp: new Date().toISOString() },
+      {
+        notifiers: [logProvider(sent)],
+        channels: [channel({ id: "off", provider: "email" })],
+        onOutcome,
+      },
+    );
+    expect(sent).toHaveLength(0);
+    expect(onOutcome).not.toHaveBeenCalled();
+  });
+
   it("emits system alerts only to project-less channels", async () => {
     const sent: unknown[] = [];
     await emitSystemNotification(

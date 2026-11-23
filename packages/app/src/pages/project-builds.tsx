@@ -1,9 +1,11 @@
 import { contentHostSuffix } from "@storyshelf/core/config";
-import { BuildModel, ProjectModel } from "@storyshelf/core/models";
+import { BuildModel } from "@storyshelf/core/models";
 import type { Build, Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
+import { visibleProjects } from "../project-visibility.ts";
+import { canManageJobs } from "../routers/settings-insights.ts";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { getStore } from "../store.ts";
+import { getStore, testingEnabled } from "../store.ts";
 import {
   Badge,
   Button,
@@ -14,8 +16,11 @@ import {
   Segmented,
   SelectField,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 import { GetStarted } from "./get-started.tsx";
+import { CancelOlderBuilds, olderUnfinishedCount } from "./project-builds-cancel.tsx";
 import { BuildsTable } from "./project-builds-table.tsx";
 import { loadSkipSources } from "./skipped-source.ts";
 
@@ -62,14 +67,35 @@ function matches(build: Build, filters: BuildFilters): boolean {
   );
 }
 
+const wideOnly = css`
+  /* builds-filter-wide */
+  @media (max-width: 480px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+const phoneOnly = css`
+  /* builds-filter-phone */
+  display: none;
+  @media (max-width: 480px) {
+    & {
+      display: block;
+    }
+  }
+`;
+
 /** Branch select that submits on change and keeps the status filter. */
 function BranchFilter(props: {
   base: string;
   filters: BuildFilters;
   branches: string[];
   skippedTotal: number;
+  /** The status choices, as a select: the phone's stand-in for the segmented chips. */
+  statuses: { value: string; label: string }[];
 }): ReturnType<typeof SelectField> {
-  const { base, filters, branches, skippedTotal } = props;
+  const { base, filters, branches, skippedTotal, statuses } = props;
   return (
     <form
       method="get"
@@ -79,7 +105,15 @@ function BranchFilter(props: {
       hx-target="body"
       hx-push-url="true"
     >
-      {filters.status ? <input type="hidden" name="status" value={filters.status} /> : null}
+      <div class={phoneOnly}>
+        <SelectField
+          label="Status"
+          name="status"
+          layout="inline"
+          value={filters.status ?? ""}
+          options={statuses}
+        />
+      </div>
       {skippedTotal > 0 ? (
         <CheckField
           label={`Show skipped (${skippedTotal})`}
@@ -102,6 +136,27 @@ function BranchFilter(props: {
   );
 }
 
+/** The status choices with their counts: "All" first, then each status that has builds (or is selected). */
+function statusItems(
+  inBranch: Build[],
+  filters: BuildFilters,
+): { label: string; value: string; status: string | undefined }[] {
+  const count = (status: string): number =>
+    inBranch.filter((build) => build.status === status).length;
+  return [
+    { label: `All ${inBranch.length}`, value: "", status: undefined },
+    ...STATUSES.filter(
+      (status) =>
+        (status !== "skipped" || showsSkipped(filters)) &&
+        (count(status) > 0 || filters.status === status),
+    ).map((status) => ({
+      label: `${statusLabel(status)} ${count(status)}`,
+      value: status,
+      status,
+    })),
+  ];
+}
+
 /** Status chips (with counts) plus a branch select that applies instantly. */
 function BuildsToolbar(props: {
   project: Project;
@@ -120,28 +175,27 @@ function BuildsToolbar(props: {
     ]),
   ].toSorted();
   const inBranch = visible.filter((build) => !filters.branch || build.gitBranch === filters.branch);
-  const count = (status: string): number =>
-    inBranch.filter((build) => build.status === status).length;
-  const items = [
-    { label: `All ${inBranch.length}`, value: "", status: undefined },
-    ...STATUSES.filter(
-      (status) =>
-        (status !== "skipped" || showsSkipped(filters)) &&
-        (count(status) > 0 || filters.status === status),
-    ).map((status) => ({ label: `${status} ${count(status)}`, value: status, status })),
-  ];
+  const items = statusItems(inBranch, filters);
   return (
     <HStack justify="between">
-      <Segmented
-        label="Filter by status"
-        items={items.map((item) => ({
-          label: item.label,
-          value: item.value,
-          href: listHref(base, { ...filters, status: item.status }),
-          active: (filters.status ?? "") === item.value,
-        }))}
+      <div class={wideOnly}>
+        <Segmented
+          label="Filter by status"
+          items={items.map((item) => ({
+            label: item.label,
+            value: item.value,
+            href: listHref(base, { ...filters, status: item.status }),
+            active: (filters.status ?? "") === item.value,
+          }))}
+        />
+      </div>
+      <BranchFilter
+        base={base}
+        filters={filters}
+        branches={branches}
+        skippedTotal={skippedTotal}
+        statuses={items.map((item) => ({ value: item.value, label: item.label }))}
       />
-      <BranchFilter base={base} filters={filters} branches={branches} skippedTotal={skippedTotal} />
     </HStack>
   );
 }
@@ -221,13 +275,25 @@ function effectiveFilters(raw: BuildFilters): BuildFilters {
   return raw.status === "skipped" && !showsSkipped(raw) ? { ...raw, status: undefined } : raw;
 }
 
+/** The bulk-cancel button, or nothing when testing is off, the viewer may not cancel, or no build is older. */
+async function cancelActionOf(
+  project: Project,
+  all: Build[],
+): Promise<ReturnType<typeof CancelOlderBuilds> | undefined> {
+  const count =
+    testingEnabled() && (await canManageJobs(project.id)) ? olderUnfinishedCount(all) : 0;
+  if (count === 0) return undefined;
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+  return <CancelOlderBuilds action={urls.buildsCancel(project.slug)} count={count} />;
+}
+
 /** Project builds page: filterable build history for one project. */
 export async function renderProjectBuildsPage(
   slug: string,
   rawQuery: BuildFilters = {},
 ): Promise<RenderedContent | null> {
   const query = effectiveFilters(rawQuery);
-  const projects = await new ProjectModel(getStore().db).list();
+  const projects = await visibleProjects();
   const project = projects.find((item) => item.slug === slug);
   if (!project) {
     return null;
@@ -235,6 +301,7 @@ export async function renderProjectBuildsPage(
   const all = await new BuildModel(getStore().db).list(project.id);
   const builds = all.filter((build) => matches(build, query));
   const sources = await loadSkipSources(builds);
+  const cancelAction = await cancelActionOf(project, all);
 
   return (
     <DocumentLayout
@@ -243,6 +310,7 @@ export async function renderProjectBuildsPage(
     >
       <PageHeader
         title="Builds"
+        actions={cancelAction}
         description={
           <>
             {project.gitRepository ? `${project.gitRepository} · ` : ""}default branch{" "}

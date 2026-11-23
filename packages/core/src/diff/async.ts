@@ -1,5 +1,7 @@
 /** `diffImagesAsync`: `diffImages` on a lazily created, process-wide worker pool, plus `configureImages`. */
 import { availableParallelism } from "node:os";
+import { readSetting } from "../env-settings/read.ts";
+import type { ImageEngine } from "./codec.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import { DiffPool } from "./pool.ts";
 import {
@@ -11,13 +13,13 @@ import {
 } from "./settings.ts";
 
 /** Environment variable overriding the pool size; `0` runs diffs in-thread. */
-export const DIFF_WORKERS_ENV = "STORYSHELF_DIFF_WORKERS";
+export const DIFF_WORKERS_ENV = "SHELF_DIFF_WORKERS";
 
 let pool: DiffPool | undefined;
 
 /**
  * Apply `images.engine` and `compare.threads`; both beat their environment variables
- * (`STORYSHELF_IMAGE_ENGINE`, `STORYSHELF_DIFF_WORKERS`). A running pool whose engine or size no
+ * (`SHELF_IMAGE_ENGINE`, `SHELF_DIFF_WORKERS`). A running pool whose engine or size no
  * longer matches is shut down and rebuilt on next use.
  */
 export function configureImages(settings: ImageSettings): void {
@@ -36,7 +38,7 @@ export function configureImages(settings: ImageSettings): void {
  * Diff two PNGs without blocking the event loop; same result as `diffImages`.
  *
  * Runs on a shared `worker_threads` pool (`max(1, availableParallelism() - 1)` threads, or
- * `STORYSHELF_DIFF_WORKERS`; `0` means in-thread) and falls back to the in-thread path when
+ * `SHELF_DIFF_WORKERS`; `0` means in-thread) and falls back to the in-thread path when
  * threads are unavailable. The buffers may be transferred to a worker, which detaches them in
  * the caller: do not read them afterwards.
  *
@@ -56,6 +58,26 @@ export async function diffImagesAsync(
   return await pool.run(baseline, current, options);
 }
 
+/** What the diff path runs on now (read-only; starts nothing). */
+export interface ImageEngineState {
+  /** The image library in effect: `pngjs` or `sharp`. */
+  engine: ImageEngine;
+  /** Configured worker threads (`0` = in-thread by choice). */
+  workers: number;
+  /** Whether diffs run on the calling thread: by choice, or because workers could not start. */
+  inThread: boolean;
+}
+
+/** The engine and pool size in effect, for the admin health report. Starts no worker. */
+export function imageEngineState(): ImageEngineState {
+  const workers = configuredThreadCount() ?? resolveDiffWorkers(process.env);
+  return {
+    engine: currentImageEngine(),
+    workers,
+    inThread: workers === 0 || pool?.inThread === true,
+  };
+}
+
 /** Stop the shared pool's workers. A later `diffImagesAsync` starts a fresh pool. */
 export async function shutdownDiffPool(): Promise<void> {
   const current = pool;
@@ -68,7 +90,7 @@ export function resolveDiffWorkers(
   env: Record<string, string | undefined>,
   parallelism: number = availableParallelism(),
 ): number {
-  const raw = env[DIFF_WORKERS_ENV]?.trim();
+  const raw = readSetting(env, DIFF_WORKERS_ENV)?.trim();
   if (raw && /^\d+$/u.test(raw)) {
     return Number(raw);
   }

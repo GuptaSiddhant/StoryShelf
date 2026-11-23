@@ -20,3 +20,14 @@ export function hxRefresh(c: Context): void {
     c.header("HX-Refresh", "true");
   }
 }
+
+/**
+ * A form in a dialog posts into the dialog body; an answer that is a whole page (a one-time secret
+ * shown after creating a token) lands on the body instead, which closes the dialog.
+ */
+export function retargetBody(c: Context): void {
+  if (isHxRequest(c)) {
+    c.header("HX-Retarget", "body");
+    c.header("HX-Reswap", "innerHTML");
+  }
+}

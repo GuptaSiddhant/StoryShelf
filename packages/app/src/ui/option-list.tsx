@@ -5,7 +5,7 @@ const optionList = css`
   /* option-list */
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
   min-width: 0;
 `;
 
@@ -14,18 +14,18 @@ const option = css`
   appearance: none;
   display: inline-flex;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
-  min-height: 32px;
-  padding: 0.3rem 0.65rem;
+  min-height: var(--control-sm);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-card);
   color: var(--text-primary);
   font: inherit;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
   &:hover {
@@ -42,7 +42,9 @@ const option = css`
     color: var(--accent-fg);
   }
   &:disabled {
-    opacity: 0.55;
+    opacity: 1;
+    background: var(--surface-muted);
+    color: var(--text-secondary);
     cursor: not-allowed;
   }
 `;

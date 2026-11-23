@@ -161,7 +161,7 @@ describe("runUpload success", () => {
         buildDir: "storybook-static",
         url: source === "flag" ? "https://shelf.example.com//" : undefined,
       };
-      if (source === "env") vi.stubEnv("STORYSHELF_URL", "https://shelf.example.com/");
+      if (source === "env") vi.stubEnv("SHELF_URL", "https://shelf.example.com/");
       if (source === "config") {
         mkdirSync(join(dir, ".storybook"), { recursive: true });
         writeFileSync(
@@ -468,8 +468,8 @@ describe("runUpload affected capture", () => {
     expect(calls.some((call) => call.url.endsWith("/builds/skipped"))).toBe(false);
   });
 
-  it("reads STORYSHELF_SKIP_UNCHANGED and skips without creating a build or uploading a zip", async () => {
-    vi.stubEnv("STORYSHELF_SKIP_UNCHANGED", "1");
+  it("reads SHELF_SKIP_UNCHANGED and skips without creating a build or uploading a zip", async () => {
+    vi.stubEnv("SHELF_SKIP_UNCHANGED", "1");
     git(dir, ["-c", "init.defaultBranch=main", "init"]);
     mkdirSync(join(dir, "src"), { recursive: true });
     writeFileSync(join(dir, "src", "a.tsx"), "v1");
@@ -514,6 +514,21 @@ describe("runUpload affected capture", () => {
     expect(output).toContain("Testing is off on this server");
     expect(output).not.toContain("Full capture");
     expect(calls.map((call) => call.method)).toEqual(["POST", "PUT"]);
+  });
+
+  it("prints the build page link joined to the server URL", async () => {
+    writeBuild(dir);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    stubFetch({ build: { id: "b1" }, uploadUrl: "/x", buildUrl: "/projects/demo/builds/b1" });
+
+    await runUpload({ ...baseOptions(), buildDir: "storybook-static" });
+
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join("");
+    write.mockRestore();
+    expect(output).toMatch(
+      /View the build: https?:\/\/[^\s/]+(:\d+)?\/projects\/demo\/builds\/b1/u,
+    );
+    expect(output).not.toContain("Build created");
   });
 
   it("prints no notice when the server has testing on", async () => {

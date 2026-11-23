@@ -1,10 +1,11 @@
 import { createShelfAuth, samlPreset, type ShelfAuth } from "@storyshelf/auth";
 import { baseAuthTables } from "@storyshelf/auth";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { ShelfOptions } from "@storyshelf/core/config";
 import { BuildModel, MemberModel } from "@storyshelf/core/models";
 import { makeStorage } from "@storyshelf/core/test-helpers";
 import { ulid } from "@storyshelf/core/utils";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -58,7 +59,11 @@ async function testEngine(): Promise<{ db: DatabaseAdapter; shelf: ShelfAuth }> 
   return { db, shelf };
 }
 
-function testApp(db: DatabaseAdapter, shelf: ShelfAuth): ReturnType<typeof createShelfApp> {
+function testApp(
+  db: DatabaseAdapter,
+  shelf: ShelfAuth,
+  ui?: ShelfOptions["ui"],
+): ReturnType<typeof createShelfApp> {
   const { storage } = makeStorage();
   return createShelfApp({
     database: db,
@@ -66,6 +71,7 @@ function testApp(db: DatabaseAdapter, shelf: ShelfAuth): ReturnType<typeof creat
     auth: shelf.adapter,
     logger: silentLogger,
     config: { secret: SECRET, publicBaseUrl: BASE_URL },
+    ...(ui ? { ui } : {}),
   });
 }
 
@@ -102,6 +108,18 @@ describe("engine auth routes", () => {
     expect(html).toContain("data-passkey-login");
     expect(html).toContain("Acme");
     expect(html).toContain("/auth/engine/acme-saml");
+  });
+
+  it("renders the public link under the form only when one is configured", async () => {
+    const { db, shelf } = await testEngine();
+    const link = { href: "/_/demo/", label: "Browse the demo without an account" };
+    const withLink = await (
+      await testApp(db, shelf, { auth: { publicLink: link } }).request("/auth/login")
+    ).text();
+    expect(withLink).toContain('href="/_/demo/"');
+    expect(withLink).toContain("Browse the demo without an account");
+    const without = await (await testApp(db, shelf).request("/auth/login")).text();
+    expect(without).not.toContain("without an account");
   });
 
   it("renders sign-in without the app sidebar or admin links", async () => {

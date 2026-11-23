@@ -1,6 +1,6 @@
 {
   "name": "storyshelf",
-  "version": "0.13.0",
+  "version": "0.15.0",
   "description": "StoryShelf CLI: self-hosted visual testing and review for Storybook.",
   "keywords": [
     "ci",
@@ -57,7 +57,7 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@storyshelf/core": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "catalog:",
     "@types/prompts": "catalog:",

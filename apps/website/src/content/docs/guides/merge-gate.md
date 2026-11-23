@@ -27,9 +27,9 @@ While a build waits for more than one approval, the `pending` description shows 
 
 With `testing` on, `<prefix>/testing` stays the only gate and review never adds a second required check. A project with review off has no gate: without `testing` it posts no `<prefix>/testing` and no pending `<prefix>/review`. When review is turned off, builds that were accepted get a final `<prefix>/review` of `success` with the description `Review is off`, so a pull request that was waiting is not left with a stale `pending` status (and a required `<prefix>/review` never waits for a verdict that will not come). The status is shown for every accepted build of a review-off project.
 
-The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git channel's prefix (default `storyshelf`, so `storyshelf/testing`), and links to the build review page. Its description says whether review is still open. StoryShelf also posts `<prefix>/storybook` (the published Storybook, informational), which you should not require. Statuses follow the build's current state and are delivered durably with retries; see [Delivery](/packages/notify-git/#delivery). The name has no project slug: a repository that holds several projects gives each channel its own prefix (see [Several projects in one repo](#several-projects-in-one-repo)). Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
+The gating status is named **`<prefix>/testing`**, where `<prefix>` is the git channel's prefix (default `storyshelf`, so `storyshelf/testing`), and links to the build review page. Its description says whether review is still open. StoryShelf also posts `<prefix>/storybook` (the published Storybook, informational), which you should not require. Statuses follow the build's current state and are delivered durably with retries; see [Delivery](/guides/notifications/#git-channels-commit-statuses-and-check-runs). The name has no project slug: a repository that holds several projects gives each channel its own prefix (see [Several projects in one repo](#several-projects-in-one-repo)). Only approvers and admins can accept snapshots, so who can green-light a merge is a matter of [roles](/concepts/roles/).
 
-> **A public URL is required.** Every status links to the build page, so nothing is posted, and the required check never appears, while the server has no [public origin](/guides/config/#public-origin). Set `PUBLIC_BASE_URL` (or confirm the detected origin on **System**: a detected address is not used until it is confirmed); until then **System** and the project's notification settings show "Notifications are paused until a public URL is set" and no channel is marked as failing.
+> **A public URL is required.** Every status links to the build page, so nothing is posted, and the required check never appears, while the server has no [public origin](/guides/config/#public-origin). Set `SHELF_PUBLIC_BASE_URL` (or confirm the detected origin on **System**: a detected address is not used until it is confirmed); until then **System** and the project's notification settings show "Notifications are paused until a public URL is set" and no channel is marked as failing.
 
 ## 1. Connect the git provider
 
@@ -40,11 +40,11 @@ Do this once per project. See the [CI guide](/guides/ci/#merge-gate) for the sho
    - GitHub: a token with `repo:status` scope.
    - GitLab: a token with `api` scope.
 
-The token is stored encrypted with the server `SECRET`, in the channel's secret like a chat webhook URL. It is separate from the CLI project token: the CLI token identifies a build, the status token writes to your repo.
+The token is stored encrypted with the server `SHELF_SECRET`, in the channel's secret like a chat webhook URL. It is separate from the CLI project token: the CLI token identifies a build, the status token writes to your repo.
 
 ### GitHub App checks
 
-Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHub App** installed on the repository posts **check runs** named `<prefix>/testing`: the run follows the build (`queued`, `in_progress`, then `success`, `failure` or `cancelled`) and lists each changed snapshot as an annotation that links to its review page. There is no personal access token to rotate. See [GitHub check runs](/packages/notify-git/#github-check-runs) for the exact mapping. GitLab keeps commit statuses.
+Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHub App** installed on the repository posts **check runs** named `<prefix>/testing`: the run follows the build (`queued`, `in_progress`, then `success`, `failure` or `cancelled`) and lists each changed snapshot as an annotation that links to its review page. There is no personal access token to rotate. See [GitHub check runs](#github-app-checks) for the exact mapping. GitLab keeps commit statuses.
 
 1. Create the App: **Settings → Developer settings → GitHub Apps → New GitHub App** (on your organization for a shared repository). Name it, set any homepage URL, **uncheck Webhook → Active** (StoryShelf polls nothing and receives no webhooks from it) and set the repository permissions:
    - **Checks: Read and write** (the check runs)
@@ -57,7 +57,25 @@ Optional, GitHub only. Instead of a token that writes commit statuses, a **GitHu
 4. Open **Install App**, install it on the repository (or organization) and copy the **installation ID** from the URL of the installation's settings page (`…/settings/installations/<installation id>`).
 5. In **Project → Settings → Notifications → Add a git channel** choose GitHub, set **GitHub mode** to _Check runs (GitHub App)_, enter owner, repository, prefix, **App ID**, **Installation ID** and paste the whole PEM into **App private key**. Leave the token empty. Through the API: `"config": { "owner": "acme", "repo": "widgets", "mode": "checks", "appId": "123456", "installationId": "7654321" }` and the PEM as `"secret"`.
 
-The private key is stored encrypted with the server `SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
+The private key is stored encrypted with the server `SHELF_SECRET`, is never returned by the API or shown in the UI again, and is removed from logs and error text; to rotate it, add the channel again with a new key and delete the old one. A required check keeps its name, so branch protection (below) is the same in either mode.
+
+### Server-wide connection from configuration
+
+Optional, and the way to set a server up from code (Terraform, a container platform) without anyone pasting a key into a project (ADR 0054). The operator declares a **git connection**: one credential for a git host account that serves the whole server. The image reads it from its environment:
+
+| Variable                                                          | Meaning                                                                                                                                        |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_APP_PRIVATE_KEY` or `…_FILE` | A GitHub App (id `github`). The key is PEM text, or `_FILE` names a file that holds it.                                                        |
+| `SHELF_GITHUB_API_URL`                                            | GitHub Enterprise Server API base, for example `https://ghes.example.com/api/v3`. Unset means github.com.                                      |
+| `SHELF_GITLAB_TOKEN` or `…_FILE`, `SHELF_GITLAB_TOKEN_EXPIRES`    | A GitLab group or project access token with the `api` scope (id `gitlab`), and its expiry (`YYYY-MM-DD`).                                      |
+| `SHELF_GITLAB_HOST`                                               | A self-managed GitLab base URL. Unset means `https://gitlab.com`.                                                                              |
+| `SHELF_GIT_CONFIG_FILE`                                           | A JSON file with more connections and approved links (`{ "connections": [...], "links": [...] }`, secrets as `privateKeyFile` or `tokenFile`). |
+
+Setting only half of a connection, or both a secret and its `_FILE`, stops the server at start-up with a message that names the variable and never its value. The key and the token are read once at start, are never written to the database, and never appear in logs, errors or API answers; rotating one is a new secret value and a restart. A connection from configuration is listed as **managed by configuration** and wins over a stored one with the same id. A link declared in the file counts as approved.
+
+What StoryShelf reads is fixed and small: which pull request contains a commit, the pull request's own comments (to find its own), which installation covers a repository, the repository's numeric ID, and whether a commit is on the default branch. **It never reads your code, diffs or files**: captures come from the Storybook you upload, not from the git host. GitHub has no narrower permission for the branch check than **Contents: Read-only**, so the App requests it and only the comparison's status is read. Posting is limited by the permissions you give the connection: **Checks: Read and write** is required for the gate; **Pull requests** and **Commit statuses** write are optional.
+
+The [Terraform modules](/guides/deployment/cloud/) take the App ID and a **reference** to a secret-manager secret that holds the key (and the token): a Secrets Manager ARN on AWS, a Secret Manager secret id on GCP, a versionless Key Vault secret id on Azure (the app's identity reads that stack's vault). The key never appears in Terraform variables or state.
 
 ## 2. Upload the PR head commit
 
@@ -69,9 +87,9 @@ On GitHub, `$GITHUB_SHA` in a `pull_request` workflow is a temporary _merge comm
 - name: Upload to StoryShelf
   run: |
     npx storyshelf upload \
-      --url ${{ secrets.STORYSHELF_URL }} \
-      --slug ${{ vars.STORYSHELF_SLUG }} \
-      --token ${{ secrets.STORYSHELF_TOKEN }} \
+      --url ${{ secrets.SHELF_URL }} \
+      --slug ${{ vars.SHELF_SLUG }} \
+      --token ${{ secrets.SHELF_TOKEN }} \
       --sha "${{ github.event.pull_request.head.sha || github.sha }}" \
       --branch "${{ github.head_ref || github.ref_name }}"
 ```
@@ -144,7 +162,7 @@ Status names changed once, when git hosts became notification channels (`@storys
 
 ## Troubleshooting
 
-- **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.
+- **Status never appears.** Check **Project → Settings → Notifications** has a git channel for this project and that its provider is registered on the server. A channel whose last delivery failed shows as **failing** with the error (a revoked token, a missing scope, an unreachable host) until the next build state is delivered successfully; fix the token or the repository and re-run the build or review action. Rotating the server `SHELF_SECRET` makes stored tokens undecryptable (the server logs `failed to decrypt channel secret`); re-save them.
 - **Status is late.** Statuses are delivered by `notify` jobs, so one can lag the build by a queue polling interval, and a refused write is retried with backoff (five attempts in total). A hosting-only instance on a serverless platform delivers inline instead, without retries: the next transition writes the current state again.
 - **Check run stays queued or is missing (GitHub App).** The App must be installed on this repository and have **Checks: Read and write**; a refused write shows on the channel as failing with the GitHub error. Check the App ID, the installation ID and that the whole PEM (including the `BEGIN`/`END` lines) was pasted.
 - **Status stays pending after a failure.** After the last attempt the channel shows the error and a `sys:notify-failed` alert goes to the site-wide channels; fix the token or repository, then run the build or review action again to deliver the current state.

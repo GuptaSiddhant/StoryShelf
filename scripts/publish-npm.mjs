@@ -58,7 +58,9 @@ for (const dir of getPublishOrder()) {
   runPublishStep(
     dir,
     "npm",
-    ["publish", "--access", "public", "--provenance", "--tag", distTag],
+    // --ignore-scripts: `prepublishOnly` rebuilds, and tsdown rewrites `exports` with the `source`
+    // conditions again. The build ran once already, before the exports were materialized (#1265).
+    ["publish", "--access", "public", "--provenance", "--ignore-scripts", "--tag", distTag],
     "npm",
   );
 }

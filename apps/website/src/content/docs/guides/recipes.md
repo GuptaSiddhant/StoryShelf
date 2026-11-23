@@ -10,14 +10,14 @@ Each entry here is the shortest route to one goal, with a link to the full guide
 Scaffold a server, start it, and create a project from your Storybook folder. The default is SQLite and local disk, with no authentication, so there is nothing else to run.
 
 ```sh
-npx storyshelf server init
+npx create-storyshelf
 ```
 
 Then follow [Getting started](/guides/getting-started/): start the server, run `storyshelf init` in your Storybook, and upload a build. To see a finished instance first, open the [live demo](/guides/demo/).
 
 ## Run it on one server
 
-Use Docker Compose with Postgres and local disk, and put HTTPS in front of it. Set a strong `SECRET` and turn on authentication before sharing it. See [Docker Compose](/guides/deployment/docker-compose/), [Security and data handling](/guides/security/) and [Sizing and cost](/guides/sizing/).
+Use Docker Compose with Postgres and local disk, and put HTTPS in front of it. Set a strong `SHELF_SECRET` and turn on authentication before sharing it. See [Docker Compose](/guides/deployment/docker-compose/), [Security and data handling](/guides/security/) and [Sizing and cost](/guides/sizing/).
 
 ## Block pull requests until the visual review is approved
 
@@ -50,12 +50,12 @@ A serverless platform cannot run capture, but it can host Storybooks. Use a serv
 Chromium is the default. List the engines you want on the runner, and every project can then pick from them, each with its own baselines.
 
 ```ts
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 
-createPlaywrightCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
+createCaptureRunner({ browsers: ["chromium", "firefox", "webkit"] });
 ```
 
-Install the browsers on the host first. See [@storyshelf/runner-playwright](/packages/runner-playwright/#browsers).
+Install the browsers on the host first. See [@storyshelf/runner](/packages/runner/#browsers).
 
 ## Render in browsers on other machines
 

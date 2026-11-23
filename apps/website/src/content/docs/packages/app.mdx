@@ -19,13 +19,17 @@ import { PackageManagers } from "starlight-package-managers";
 
 <Readme heading="Quick start" />
 
+## Node host
+
+<Readme heading="Node host" />
+
 ## Logging
 
 <Readme heading="Logging" />
 
 ## Main APIs
 
-The barrel exports only the app and its types (`createShelfApp`, `ShelfApp`, `ShelfRouter`, `ShelfContext`, `ShelfLifecycle`, the logger factory + types, plus the option types re-exported from core). Everything domain-level lives under `@storyshelf/core/*` subpaths.
+`@storyshelf/app/node` exports `startServer` (and `StartInterruptedError`, `DEFAULT_SHUTDOWN_TIMEOUT_MS` and its option and result types) for Node hosts. The barrel exports only the app and its types (`createShelfApp`, `ShelfApp`, `ShelfRouter`, `ShelfContext`, `ShelfLifecycle`, the logger factory + types, plus the option types re-exported from core). Everything domain-level lives under `@storyshelf/core/*` subpaths.
 
 ## Health
 

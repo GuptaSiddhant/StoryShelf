@@ -6,7 +6,7 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { entryProblems, KINDS, renderGrouped, SUMMARY_MAX } from "./changelog-entry.mjs";
+import { entryProblems, KINDS, readEntry, renderGrouped, SUMMARY_MAX } from "./changelog-entry.mjs";
 
 /**
  * No 1.0 until the owner has dogfood proof that everything works (owner decision 2026-11-09): before
@@ -399,6 +399,54 @@ export function checkChangeset({ changed, added, labels, isPublished }) {
   };
 }
 
+/** The label that lets a pull request make a schema contract step (ADR 0053 amendment, 2026-11-21). */
+export const SCHEMA_BREAK_LABEL = "schema-break";
+
+const SCHEMA_LINE = /^Schema:[ \t]*(?<step>\S.*)$/mu;
+const NO_SCHEMA_CHANGE = /^(?:none|no schema changes?|n\/a)\.?$/iu;
+
+/**
+ * What a `schema-break` pull request owes: a `Breaking:` changeset whose body has a `Schema:` line
+ * that names the contract step (not `none`). `previous-release-db` is skipped for it, so this is
+ * the check that the break is declared in the release notes.
+ *
+ * @param {object} input The pull request.
+ * @param {string[]} input.labels The PR's labels.
+ * @param {string[]} input.added Paths the PR adds or modifies.
+ * @param {(path: string) => string} input.read Reads a file from the PR's tree.
+ * @returns {{ ok: boolean, reason: string }} The verdict and why. Without the label it always passes.
+ */
+export function checkSchemaBreak({ labels, added, read }) {
+  if (!labels.includes(SCHEMA_BREAK_LABEL)) {
+    return { ok: true, reason: `not labelled ${SCHEMA_BREAK_LABEL}` };
+  }
+  const declared = added
+    .filter((path) => CHANGESET_FILE.test(path))
+    .some((path) => declaresSchemaBreak(read(path), path));
+  return declared
+    ? { ok: true, reason: `${SCHEMA_BREAK_LABEL}: a Breaking changeset names the schema step` }
+    : {
+        ok: false,
+        reason: `is labelled ${SCHEMA_BREAK_LABEL} but adds no changeset that starts with "Breaking:" and has a "Schema: <the contract step>" line (not "Schema: none")`,
+      };
+}
+
+/** Whether one changeset is `Breaking:` with a `Schema:` line that names a step. */
+function declaresSchemaBreak(text, path) {
+  try {
+    const { body, releases } = parseChangeset(text, path);
+    const step = SCHEMA_LINE.exec(body)?.groups?.step.trim();
+    return (
+      releases.length > 0 &&
+      readEntry(body).kind === "Breaking" &&
+      step !== undefined &&
+      !NO_SCHEMA_CHANGE.test(step)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const RELEASE_BRANCH = /^release\/v(?<version>\d+\.\d+\.\d+)$/u;
 
 /**
@@ -428,6 +476,9 @@ function manifestProblem(path, version, base, head) {
     ? null
     : `${path} changes more than its version`;
 }
+
+/** The generated version and peer manifest a release rewrites (`scripts/version-manifest.mjs`). */
+const VERSION_MANIFEST = "config/version-manifest.json";
 
 /**
  * What a release pull request (branch `release/v<version>`) may change: the `version` of package
@@ -467,7 +518,8 @@ function staleManifestProblem(path, version, head) {
 
 /** Why one changed path is not part of a release, or null when it is. */
 function entryProblem({ status, path, version, readBase, readHead }) {
-  if (path === "CHANGELOG.md") {
+  // The version manifest (#1332) is regenerated with the bump; verify checks it is current.
+  if (path === "CHANGELOG.md" || (path === VERSION_MANIFEST && status === "M")) {
     return null;
   }
   if (CHANGESET_FILE.test(path)) {

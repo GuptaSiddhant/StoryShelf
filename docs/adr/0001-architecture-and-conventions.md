@@ -113,13 +113,13 @@ selection of `server init` only. The scaffold generates only the single-deployab
 // server.ts (generated)
 import { serve } from "@hono/node-server";
 import { createShelfApp } from "@storyshelf/app";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { createLocalStorage } from "@storyshelf/storage-local";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
+import { createCaptureRunner } from "@storyshelf/runner";
 
 const database = createSqliteDatabase("./data/shelf.db");
 const storage = createLocalStorage("./data");
-const runner = createPlaywrightCaptureRunner();
+const runner = createCaptureRunner();
 
 const app = createShelfApp({ database, storage, testing: { runner } });
 serve({ fetch: app.fetch, port: 3000 });
@@ -177,7 +177,7 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
   pipeline". That is not true today. `StorySourceAdapter` exists (`packages/core/src/capture/adapter.ts:126`),
   but `new StorybookAdapter()` is hard-coded at these production sites:
   - `packages/core/src/capture/orchestrator.ts:258` and `packages/core/src/capture/tests.ts:112`;
-  - `packages/runner-playwright/src/pipeline.ts:249` and `:297`, and `packages/runner-playwright/src/tests.ts:137`;
+  - `packages/runner/src/pipeline.ts:249` and `:297`, and `packages/runner/src/tests.ts:137`;
   - `packages/runner-puppeteer/src/pipeline.ts:229` and `packages/runner-puppeteer/src/tests.ts:131`.
 
   The in-page half (settle, play status, parameters, the `#storybook-root` selector) lives in the runners
@@ -198,3 +198,19 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
   URLs are not sources and need their own ADRs.
 - **Package target.** 19 published packages, as ADR 0049 counts them (with `@storyshelf/storybook-addon`,
   ADR 0042). `storage-local` stays its own package (#367).
+
+## Amendment, 2026-11-20 (Puppeteer runner deprecated; owner)
+
+- **Decision.** `@storyshelf/runner-puppeteer` is deprecated in 0.14.0 and removed in 0.15.0 (#1243,
+  #1244). Playwright is the one supported capture runner: it covers Chromium, Firefox and WebKit and
+  reaches remote browsers over its own protocol and CDP, so it does everything Puppeteer does here.
+  Nothing we deploy uses Puppeteer, and before launch nobody depends on it.
+- **Why.** Two runners at parity doubles every capture feature, and they had already drifted (Puppeteer
+  lacks the capture retry, sandbox isolation, signed asset cache and passkey integration tests).
+- **Until removal.** Puppeteer gets fixes only; new capture features go into Playwright only, so the
+  rule that the two runners' `settle.ts` copies stay identical is lifted. The runner logs one
+  deprecation warning when the host binds its logger. Users re-baseline once after switching.
+- **Removed in 0.15.0 (#1244).** The package, its CI leg and its docs are deleted; Playwright is the
+  only runner and the two-runner parity rule no longer applies. The switching steps moved to the
+  upgrading guide (`guides/upgrading`). No further versions are published; `npm deprecate` on the old
+  ones is the owner's step.

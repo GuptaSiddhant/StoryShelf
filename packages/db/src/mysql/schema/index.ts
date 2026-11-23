@@ -1,0 +1,203 @@
+/**
+ * Database schema: table handles, row types, and the schema object passed
+ * to the database client.
+ *
+ * Table handles are available on the `schema` object with full type
+ * inference (`schema.builds`, …); exact column types live on the narrow
+ * per-entity definitions, and the row interfaces are pinned to them by
+ * `schema-types.test.ts`.
+ */
+import type { AnyMySqlTable } from "drizzle-orm/mysql-core";
+import { baselines as baselinesTable } from "./baseline.ts";
+import { buildComponents as buildComponentsTable } from "./build-component.ts";
+import { buildReviews as buildReviewsTable } from "./build-review.ts";
+import { builds as buildsTable } from "./build.ts";
+import {
+  captureAttempts as captureAttemptsTable,
+  captureLogs as captureLogsTable,
+} from "./capture-attempt.ts";
+import { captureJobs as captureJobsTable } from "./capture-job.ts";
+import { captureShards as captureShardsTable } from "./capture-shard.ts";
+import { comments as commentsTable } from "./comment.ts";
+import { userConnections as userConnectionsTable } from "./connection.ts";
+import { contentUses as contentUsesTable } from "./content-uses.ts";
+import {
+  designLinks as designLinksTable,
+  designCredentials as designCredentialsTable,
+  designNodes as designNodesTable,
+} from "./design.ts";
+import {
+  gitConnections as gitConnectionsTable,
+  gitRepositoryLinks as gitRepositoryLinksTable,
+} from "./git-connection.ts";
+import {
+  aiBudgetAlerts as aiBudgetAlertsTable,
+  aiUsage as aiUsageTable,
+  insights as insightsTable,
+} from "./insight.ts";
+import { buildLabels as buildLabelsTable, labelTypes as labelTypesTable } from "./label.ts";
+import { projectMembers as projectMembersTable } from "./member.ts";
+import {
+  notificationChannels as notificationChannelsTable,
+  notificationSubscriptions as notificationSubscriptionsTable,
+} from "./notification.ts";
+import { projectGroupMappings as projectGroupMappingsTable } from "./project-group-mapping.ts";
+import { projects as projectsTable } from "./project.ts";
+import { schemaMeta as schemaMetaTable } from "./schema-meta.ts";
+import { siteSettings as siteSettingsTable } from "./site-setting.ts";
+import { snapshots as snapshotsTable } from "./snapshot.ts";
+import { tokens as tokensTable } from "./token.ts";
+import {
+  buildPackageUsage as buildPackageUsageTable,
+  projectLinks as projectLinksTable,
+} from "./usage.ts";
+import { userInviteTokens as userInviteTokensTable } from "./user-invite.ts";
+import { users as usersTable } from "./user.ts";
+import { webhooks as webhooksTable } from "./webhook.ts";
+
+export { builds } from "./build.ts";
+export { captureAttempts, captureLogs } from "./capture-attempt.ts";
+export { captureJobs } from "./capture-job.ts";
+export { buildComponents } from "./build-component.ts";
+export { buildReviews } from "./build-review.ts";
+export { schemaMeta } from "./schema-meta.ts";
+export { siteSettings } from "./site-setting.ts";
+export { captureShards } from "./capture-shard.ts";
+export { baselines } from "./baseline.ts";
+export { comments } from "./comment.ts";
+export { buildLabels, labelTypes } from "./label.ts";
+export { projectMembers } from "./member.ts";
+export { buildPackageUsage, projectLinks } from "./usage.ts";
+export { userConnections } from "./connection.ts";
+export { designCredentials, designLinks, designNodes } from "./design.ts";
+export { projectGroupMappings } from "./project-group-mapping.ts";
+export { projects } from "./project.ts";
+export { snapshots } from "./snapshot.ts";
+export { tokens } from "./token.ts";
+export { userInviteTokens } from "./user-invite.ts";
+export { users } from "./user.ts";
+export { webhooks } from "./webhook.ts";
+export { aiBudgetAlerts, aiUsage, insights } from "./insight.ts";
+export { notificationChannels, notificationSubscriptions } from "./notification.ts";
+export { contentUses } from "./content-uses.ts";
+export { gitConnections, gitRepositoryLinks } from "./git-connection.ts";
+
+/** A capture attempt and its log lines for a single build run. */
+export type { CaptureAttempt, CaptureLog } from "./capture-attempt.ts";
+/** Build row as stored in the `builds` table. */
+export type { Build } from "./build.ts";
+/** Review comment row as stored in the `comments` table. */
+export type { Comment } from "./comment.ts";
+/** Build label and label type rows. */
+export type { BuildLabel, LabelType } from "./label.ts";
+/** A user's OAuth connection to an external service. */
+export type { UserConnection } from "./connection.ts";
+/** Design link, provider credential and cached design node rows. */
+export type { DesignCredential, DesignLink, DesignNode } from "./design.ts";
+/** Project link and per-build package usage rows. */
+export type { BuildPackageUsage, ProjectLink } from "./usage.ts";
+/** Project membership row linking a user to a project role. */
+export type { ProjectMember } from "./member.ts";
+/** Identity-provider group to project-role mapping row. */
+export type { ProjectGroupMapping } from "./project-group-mapping.ts";
+/** Project row and its embedded Storybook metadata. */
+export type { Project, StorybookMeta } from "./project.ts";
+/** Per-project git provider status-check configuration row. */
+/** Snapshot row capturing a single story at one viewport. */
+export type { Snapshot } from "./snapshot.ts";
+/** CI token row (stores only the hash). */
+export type { Token } from "./token.ts";
+/** One-time invite token for local accounts. */
+export type { UserInviteToken } from "./user-invite.ts";
+/** User row for authenticated identities. */
+export type { User } from "./user.ts";
+/** Webhook subscription row. */
+export type { Webhook } from "./webhook.ts";
+/** Insight, AI usage and budget-alert rows. */
+export type { AiBudgetAlert, AiUsage, Insight } from "./insight.ts";
+/** Notification channel and subscription rows. */
+export type { NotificationChannel, NotificationSubscription } from "./notification.ts";
+/** Baseline row. */
+export type { Baseline } from "./baseline.ts";
+/** Content ref row for deduplicated assets. */
+export type { ContentUse } from "./content-uses.ts";
+/** Git connection and repository link rows. */
+export type { GitConnection, GitRepositoryLink } from "./git-connection.ts";
+
+/** Full Drizzle schema object passed to the database client. */
+export const schema: {
+  projects: AnyMySqlTable;
+  builds: AnyMySqlTable;
+  captureAttempts: AnyMySqlTable;
+  captureLogs: AnyMySqlTable;
+  captureShards: AnyMySqlTable;
+  captureJobs: AnyMySqlTable;
+  buildComponents: AnyMySqlTable;
+  buildReviews: AnyMySqlTable;
+  siteSettings: AnyMySqlTable;
+  schemaMeta: AnyMySqlTable;
+  snapshots: AnyMySqlTable;
+  baselines: AnyMySqlTable;
+  comments: AnyMySqlTable;
+  labelTypes: AnyMySqlTable;
+  buildLabels: AnyMySqlTable;
+  projectLinks: AnyMySqlTable;
+  designLinks: AnyMySqlTable;
+  designCredentials: AnyMySqlTable;
+  userConnections: AnyMySqlTable;
+  designNodes: AnyMySqlTable;
+  buildPackageUsage: AnyMySqlTable;
+  tokens: AnyMySqlTable;
+  webhooks: AnyMySqlTable;
+  insights: AnyMySqlTable;
+  aiUsage: AnyMySqlTable;
+  aiBudgetAlerts: AnyMySqlTable;
+  notificationChannels: AnyMySqlTable;
+  notificationSubscriptions: AnyMySqlTable;
+  users: AnyMySqlTable;
+  userInviteTokens: AnyMySqlTable;
+  projectMembers: AnyMySqlTable;
+  projectGroupMappings: AnyMySqlTable;
+  contentUses: AnyMySqlTable;
+  gitConnections: AnyMySqlTable;
+  gitRepositoryLinks: AnyMySqlTable;
+} = {
+  projects: projectsTable,
+  builds: buildsTable,
+  captureAttempts: captureAttemptsTable,
+  captureLogs: captureLogsTable,
+  captureShards: captureShardsTable,
+  captureJobs: captureJobsTable,
+  buildComponents: buildComponentsTable,
+  buildReviews: buildReviewsTable,
+  siteSettings: siteSettingsTable,
+  schemaMeta: schemaMetaTable,
+  snapshots: snapshotsTable,
+  baselines: baselinesTable,
+  comments: commentsTable,
+  labelTypes: labelTypesTable,
+  buildLabels: buildLabelsTable,
+  projectLinks: projectLinksTable,
+  designLinks: designLinksTable,
+  designCredentials: designCredentialsTable,
+  userConnections: userConnectionsTable,
+  designNodes: designNodesTable,
+  buildPackageUsage: buildPackageUsageTable,
+  tokens: tokensTable,
+  webhooks: webhooksTable,
+  insights: insightsTable,
+  aiUsage: aiUsageTable,
+  aiBudgetAlerts: aiBudgetAlertsTable,
+  notificationChannels: notificationChannelsTable,
+  notificationSubscriptions: notificationSubscriptionsTable,
+  users: usersTable,
+  userInviteTokens: userInviteTokensTable,
+  projectMembers: projectMembersTable,
+  projectGroupMappings: projectGroupMappingsTable,
+  contentUses: contentUsesTable,
+  gitConnections: gitConnectionsTable,
+  gitRepositoryLinks: gitRepositoryLinksTable,
+};
+
+/** The full database schema type. */
+export type Schema = typeof schema;

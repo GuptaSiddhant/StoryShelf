@@ -1,5 +1,6 @@
 import pino from "pino";
 import type { Logger } from "pino";
+import { readSetting } from "./env-settings/read.ts";
 import { redactSecrets } from "./utils/redact.ts";
 
 /**
@@ -14,7 +15,7 @@ import { redactSecrets } from "./utils/redact.ts";
  *   `const captureLogger = logger.child({ buildId })`.
  *
  * The default sink is stdout. The level resolves as explicit option, then
- * the `LOG_LEVEL` environment variable, then `"info"` — so `LOG_LEVEL=debug`
+ * the `SHELF_LOG_LEVEL` environment variable, then `"info"` — so `SHELF_LOG_LEVEL=debug`
  * configures a default-constructed logger with no code changes. Unknown
  * levels throw at construction (fail fast on typos). Hosted observability
  * platforms (Sentry, PostHog, Datadog, GCP, OTEL collector, etc.) are added
@@ -29,7 +30,7 @@ export function createShelfLogger(options: LoggerOptions = {}): Logger {
   const transport = pino.transport({ targets });
   return pino(
     {
-      level: options.level ?? process.env["LOG_LEVEL"] ?? "info",
+      level: options.level ?? readSetting(process.env, "SHELF_LOG_LEVEL") ?? "info",
       base: { env: options.env ?? process.env["NODE_ENV"] },
       mixin: options.mixin,
       serializers: { err: redactedError },
@@ -70,7 +71,7 @@ export interface PinoTransport {
 
 /** Configuration for constructing the shelf logger. */
 export interface LoggerOptions {
-  /** Minimum level to emit. Defaults to `LOG_LEVEL` env, then `"info"`. */
+  /** Minimum level to emit. Defaults to `SHELF_LOG_LEVEL` env, then `"info"`. */
   level?: string;
   /** Extra pino worker transports appended to the default stdout sink. */
   transports?: PinoTransport[];

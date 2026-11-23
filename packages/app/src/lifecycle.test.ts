@@ -1,15 +1,39 @@
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 const silentLogger = pino({ level: "silent" });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 async function throwingSetup(): Promise<void> {
   throw new Error("bad secret");
+}
+
+/** A complete auth singleton whose boot check (`setup`) fails. */
+function failingAuth() {
+  return {
+    handler: () => new Response(),
+    loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
+    setup: throwingSetup,
+    issueInvite: async () => ({}),
+    verifyInvite: async () => ({}),
+    acceptInvite: async () => ({}),
+    passkeysEnabled: () => false,
+    listSessions: async () => [],
+    listPasskeys: async () => [],
+    hasPassword: async () => false,
+    setDisabled: async () => {},
+    check: async () => null,
+    createSession: async () => "",
+    destroySession: async () => {},
+  };
 }
 
 function fakeAdapter(kind: string, setLogger?: (logger: unknown) => void) {
@@ -79,22 +103,7 @@ describe("attachLifecycle", () => {
     const options = {
       database: db,
       storage,
-      auth: {
-        handler: () => new Response(),
-        loginMethods: () => [{ kind: "password", id: "local", label: "Local" }],
-        setup: throwingSetup,
-        issueInvite: async () => ({}),
-        verifyInvite: async () => ({}),
-        acceptInvite: async () => ({}),
-        passkeysEnabled: () => false,
-        listSessions: async () => [],
-        listPasskeys: async () => [],
-        hasPassword: async () => false,
-        setDisabled: async () => {},
-        check: async () => null,
-        createSession: async () => "",
-        destroySession: async () => {},
-      },
+      auth: failingAuth(),
     } as unknown as ResolvedShelfOptions;
     const runtime = {
       config: { branchTtlDays: null },
@@ -109,7 +118,50 @@ describe("attachLifecycle", () => {
     expect(result.ok).toBe(false);
     expect(result.failures[0]).toMatchObject({ category: "auth", error: "bad secret" });
   });
+
+  it("refuses setup() when the auth boot check failed, instead of continuing", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const options = {
+      database: db,
+      storage,
+      auth: failingAuth(),
+    } as unknown as ResolvedShelfOptions;
+    const runtime = {
+      config: { branchTtlDays: null },
+      logger: silentLogger,
+    } as unknown as ServerRuntime;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+    await expect(lifecycle.setup()).rejects.toThrow("Adapter setup failed: auth/auth");
+    // A second call refuses too, and readiness stays failed (no later adapter run masks it).
+    await expect(lifecycle.setup()).rejects.toThrow("auth/auth");
+    // The hook's own text stays in the failures (and the log), never the thrown message.
+    await expect(lifecycle.setup()).rejects.not.toThrow("bad secret");
+    expect(cell.settled?.ok).toBe(false);
+    expect((await cell.ready).failures[0]).toMatchObject({ category: "auth" });
+  });
 });
+
+/** Record the delay of every `setTimeout` (the real timer still runs), then restore on cleanup. */
+function recordTimeouts(): number[] {
+  const delays: number[] = [];
+  const real = globalThis.setTimeout;
+  vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: TimerHandler,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    return real(handler as () => void, delay, ...args);
+  }) as unknown as typeof setTimeout);
+  return delays;
+}
 
 function boot(torn: string[]) {
   const closing = (name: string) => ({
@@ -136,7 +188,9 @@ function boot(torn: string[]) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  const lifecycle = (app as unknown as { lifecycle: { teardown(): Promise<void> } }).lifecycle;
+  const lifecycle = (
+    app as unknown as { lifecycle: { teardown(options?: { graceMs?: number }): Promise<void> } }
+  ).lifecycle;
   return { cell, lifecycle };
 }
 
@@ -172,6 +226,20 @@ describe("teardown and background boot tasks", () => {
     await lifecycle.teardown();
     expect(order).toContain("db");
   });
+
+  it("bounds the boot-task wait by the shutdown grace", async () => {
+    const delays = recordTimeouts();
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000); // no time passes: the whole grace is left
+    const order: string[] = [];
+    const { cell, lifecycle } = boot(order);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.teardown({ graceMs: 30 });
+    expect(order).toContain("db");
+    // Without a grace the wait is the cell's 60 s limit; with one it is the 30 ms grace.
+    expect(delays).toContain(30);
+    expect(delays).not.toContain(60_000);
+  });
 });
 
 function fakeConsumer() {
@@ -191,10 +259,20 @@ function fakeConsumer() {
   };
 }
 
-function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
+function lifecycleOf(
+  consumer: ReturnType<typeof fakeConsumer> | null,
+  given?: ResolvedShelfOptions,
+) {
+  return bootWithConsumer(consumer, given).lifecycle;
+}
+
+function bootWithConsumer(
+  consumer: ReturnType<typeof fakeConsumer> | null,
+  given?: ResolvedShelfOptions,
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+  const options = given ?? ({ database: db, storage } as unknown as ResolvedShelfOptions);
   const runtime = {
     config: { branchTtlDays: null },
     logger: silentLogger,
@@ -206,11 +284,32 @@ function lifecycleOf(consumer: ReturnType<typeof fakeConsumer> | null) {
   };
   const app = {} as ShelfRouter;
   attachLifecycle(app, options, runtime, cell);
-  return (app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } })
-    .lifecycle;
+  const lifecycle = (
+    app as unknown as {
+      lifecycle: {
+        setup(): Promise<void>;
+        teardown(options?: { graceMs?: number }): Promise<void>;
+      };
+    }
+  ).lifecycle;
+  return { cell, lifecycle };
 }
 
 describe("setup rerun", () => {
+  it("runs each adapter hook once when the first setup() adopts the eager run", async () => {
+    const { db } = makeDatabase();
+    let runs = 0;
+    const storage = withSetupHook(makeStorage().storage, () => {
+      runs += 1;
+    });
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const lifecycle = lifecycleOf(null, options);
+    await lifecycle.setup();
+    expect(runs).toBe(1);
+    await lifecycle.setup();
+    expect(runs).toBe(2);
+  });
+
   it("publishes the new run on the cell before it finishes", async () => {
     const { db } = makeDatabase();
     const hold = Promise.withResolvers<null>();
@@ -235,6 +334,7 @@ describe("setup rerun", () => {
     attachLifecycle(app, options, runtime, cell);
     await cell.ready;
     const lifecycle = (app as unknown as { lifecycle: { setup(): Promise<void> } }).lifecycle;
+    await lifecycle.setup();
 
     const rerun = lifecycle.setup();
     const published = cell.ready;
@@ -264,6 +364,42 @@ describe("job consumer lifecycle", () => {
     expect(consumer.isRunning()).toBe(false);
   });
 
+  it("gives a hung boot task only what the consumer drain left of the grace", async () => {
+    const delays = recordTimeouts();
+    let now = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const consumer = fakeConsumer();
+    const stopImpl = consumer.stop.getMockImplementation();
+    consumer.stop.mockImplementation(async (...args) => {
+      now += 60; // the job drain spends 60 of the 80 ms grace
+      await stopImpl?.(...args); // and the consumer's run ends, as a real stop's does
+    });
+    const { cell, lifecycle } = bootWithConsumer(consumer);
+    cell.drainMs = 60_000;
+    trackBackground(cell, new Promise(() => {}));
+    await lifecycle.setup();
+    await lifecycle.teardown({ graceMs: 80 });
+    expect(consumer.stop).toHaveBeenCalledWith({ graceMs: 80 });
+    // The boot-task wait is armed for the 20 ms left, not 80 and not the 60 s limit.
+    expect(delays).toContain(20);
+    expect(delays).not.toContain(60_000);
+    expect(delays).not.toContain(80);
+  });
+
+  it("bounds the drain by the teardown's grace, and drains unbounded without one (#912)", async () => {
+    const bounded = fakeConsumer();
+    const lifecycle = lifecycleOf(bounded);
+    await lifecycle.setup();
+    await lifecycle.teardown({ graceMs: 20_000 });
+    expect(bounded.stop).toHaveBeenCalledWith({ graceMs: 20_000 });
+
+    const unbounded = fakeConsumer();
+    const plain = lifecycleOf(unbounded);
+    await plain.setup();
+    await plain.teardown();
+    expect(unbounded.stop).toHaveBeenCalledWith({});
+  });
+
   it("works without a consumer (serverless hosts)", async () => {
     const lifecycle = lifecycleOf(null);
     await lifecycle.setup();
@@ -276,5 +412,168 @@ describe("job consumer lifecycle", () => {
     const lifecycle = lifecycleOf(consumer);
     await expect(lifecycle.setup()).resolves.toBeUndefined();
     await expect(lifecycle.teardown()).resolves.toBeUndefined();
+  });
+});
+
+/** The adapter with a `lifecycle.setup` hook that calls `onSetup`. */
+function withSetupHook<T extends object>(
+  adapter: T,
+  onSetup: () => Promise<void> | void,
+  onTeardown: () => void = () => {},
+): T {
+  return {
+    ...adapter,
+    lifecycle: {
+      setup: async (): Promise<void> => {
+        await onSetup();
+      },
+      teardown: async (): Promise<void> => {
+        onTeardown();
+      },
+      health: async () => ({ ok: true }),
+    },
+  };
+}
+
+describe("boot checks and the adapter phase", () => {
+  const runtime = {
+    config: { branchTtlDays: null },
+    logger: silentLogger,
+  } as unknown as ServerRuntime;
+
+  it("runs the AI purge only after the adapter setups (migrations) finished", async () => {
+    const order: string[] = [];
+    const { db } = makeDatabase();
+    const list = db.list.bind(db);
+    Object.assign(db, {
+      list: async (...args: Parameters<typeof db.list>) => {
+        order.push("query");
+        return await list(...args);
+      },
+    });
+    const storage = withSetupHook(makeStorage().storage, () => {
+      order.push("migrate");
+    });
+    const ai = {
+      setup: async (): Promise<void> => {
+        order.push("ai check");
+      },
+      teardown: async (): Promise<void> => {},
+    };
+    const options = { database: db, storage, ai } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    attachLifecycle({} as ShelfRouter, options, runtime, cell);
+    await cell.ready;
+    expect(order.indexOf("ai check")).toBeLessThan(order.indexOf("migrate"));
+    expect(order.indexOf("migrate")).toBeLessThan(order.lastIndexOf("query"));
+  });
+
+  it("does not resume a setup() whose boot checks settle after teardown", async () => {
+    const gate = Promise.withResolvers<null>();
+    let adapterRuns = 0;
+    const { db } = makeDatabase();
+    const auth = {
+      ...failingAuth(),
+      setup: async (): Promise<void> => {
+        await gate.promise;
+      },
+    };
+    const storage = withSetupHook(makeStorage().storage, () => {
+      adapterRuns += 1;
+    });
+    const options = { database: db, storage, auth } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    const pending = lifecycle.setup();
+    const closing = lifecycle.teardown();
+    gate.resolve(null);
+    await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
+    await cell.ready;
+    // Neither the eager boot run nor the abandoned setup() reached the closed adapters.
+    expect(adapterRuns).toBe(0);
+  });
+
+  it("abandons a setup() whose teardown starts right after the boot checks settle", async () => {
+    let adapterRuns = 0;
+    const { db } = makeDatabase();
+    const storage = withSetupHook(makeStorage().storage, () => {
+      adapterRuns += 1;
+    });
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    await cell.ready;
+    // Boot checks still pending. Callbacks run in registration order, so the teardown below starts
+    // after setup()'s own boot-check callback and before its continuation.
+    const passed = Promise.resolve(null);
+    cell.bootChecked = undefined;
+    cell.bootFailure = passed;
+    const pending = lifecycle.setup();
+    const closing = passed.then(async () => {
+      await lifecycle.teardown();
+    });
+    await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
+    // Only the eager boot run reached the adapters.
+    expect(adapterRuns).toBe(1);
+  });
+
+  it("drains an in-flight setup() rerun before teardown and never restarts the consumer", async () => {
+    const gate = Promise.withResolvers<null>();
+    const order: string[] = [];
+    let runs = 0;
+    const { db } = makeDatabase();
+    const storage = withSetupHook(
+      makeStorage().storage,
+      async () => {
+        runs += 1;
+        if (runs === 2) {
+          await gate.promise;
+        }
+        order.push(`setup ${runs}`);
+      },
+      () => order.push("teardown"),
+    );
+    const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+    const consumer = { isRunning: () => false, start: vi.fn(async () => {}), stop: async () => {} };
+    const cell: LifecycleCell = {
+      ready: Promise.resolve({ ok: true, failures: [] }),
+      settled: null,
+      consumer: consumer as unknown as LifecycleCell["consumer"],
+    };
+    const app = {} as ShelfRouter;
+    attachLifecycle(app, options, runtime, cell);
+    const lifecycle = (
+      app as unknown as { lifecycle: { setup(): Promise<void>; teardown(): Promise<void> } }
+    ).lifecycle;
+    await cell.ready;
+    await lifecycle.setup();
+    consumer.start.mockClear();
+    const pending = lifecycle.setup();
+    const closing = lifecycle.teardown();
+    gate.resolve(null);
+    await expect(pending).rejects.toThrow("teardown ran");
+    await closing;
+    // The rerun's hook finished before the adapters were torn down, and nothing restarted polling.
+    expect(order).toEqual(["setup 1", "setup 2", "teardown"]);
+    expect(consumer.start).not.toHaveBeenCalled();
   });
 });

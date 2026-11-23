@@ -9,6 +9,8 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationStatus } from "./integrations/availability.ts";
+import type { ShelfGitOptions } from "./integrations/git/connections/types.ts";
 import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
@@ -52,6 +54,14 @@ export interface BrandTheme {
   shadow?: string;
 }
 
+/** A secondary link on the sign-in page to something anyone may open without an account. */
+export interface AuthPublicLink {
+  /** An `https:` URL or a same-origin path (`/_/<slug>/`); nothing else is accepted. */
+  href: string;
+  /** Link text, e.g. "Browse the demo's Storybook without an account". */
+  label: string;
+}
+
 /** Text overrides for the auth (login) UI. */
 export interface AuthUiConfig {
   /** Page title, default "Sign in". */
@@ -71,6 +81,11 @@ export interface AuthUiConfig {
   ssoLabelTemplate?: string;
   /** Help text shown under the form. */
   helpText?: string;
+  /**
+   * A link under the form to public content (a public build's Storybook). It opens hosting only,
+   * never review (ADR 0011). Nothing renders when unset.
+   */
+  publicLink?: AuthPublicLink;
   /** Footer text shown at the bottom of the card. */
   footerText?: string;
 }
@@ -165,7 +180,7 @@ export interface ShelfConfig {
    */
   migrateCredentialsOnBoot?: boolean;
   /**
-   * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
+   * Bootstrap site-admin bearer token (`SHELF_ADMIN_TOKEN`).
    * Grants site-admin API access when no admin user exists yet; never
    * mint sessions from it. Distinct from `secret` (session signing).
    */
@@ -190,7 +205,7 @@ export interface ShelfConfig {
   /**
    * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
    * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
-   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   * buckets. Hosts map it from `SHELF_TRUST_PROXY` with {@link parseTrustProxy}.
    */
   trustProxy?: TrustProxy;
   /**
@@ -297,6 +312,14 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   ]),
 });
 
+/** An `https:` URL or a path on this server (one leading `/`, never `//`). */
+const PUBLIC_LINK_HREF = /^(?:https:\/\/[^\s]+|\/(?!\/)[^\s]*)$/u;
+
+const authPublicLinkSchema: z.ZodType<AuthPublicLink> = z.object({
+  href: z.string().regex(PUBLIC_LINK_HREF, "must be an https URL or a path starting with /"),
+  label: z.string().min(1),
+});
+
 const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   title: z.string().min(1).optional(),
   subtitle: z.string().optional(),
@@ -305,6 +328,7 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   submitLabel: z.string().min(1).optional(),
   ssoLabelTemplate: z.string().min(1).optional(),
   helpText: z.string().optional(),
+  publicLink: authPublicLinkSchema.optional(),
   footerText: z.string().optional(),
 });
 
@@ -324,7 +348,7 @@ const MAX_TRUSTED_HOPS = 10;
 const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
 
 /**
- * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * Map a `SHELF_TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
  * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
  * of IPs or CIDRs (checked by {@link validateConfig}).
  */
@@ -581,7 +605,7 @@ export interface ShelfNotificationsOptions {
 export interface ShelfCompareOptions {
   /**
    * Worker threads for pixel diffs: default CPU count minus one (min 1), `0` diffs on the main
-   * thread. Takes precedence over `STORYSHELF_DIFF_WORKERS`.
+   * thread. Takes precedence over `SHELF_DIFF_WORKERS`.
    */
   threads?: number;
 }
@@ -591,7 +615,7 @@ export interface ShelfImagesOptions {
   /**
    * Image library for diffs, diff overlays and AI thumbnails: `"pngjs"` (default, pure JavaScript,
    * runs anywhere) or `"sharp"` (native, several times faster on large PNGs; needs the optional
-   * `sharp` package installed). Falls back to `STORYSHELF_IMAGE_ENGINE`. The pixel comparison is
+   * `sharp` package installed). Falls back to `SHELF_IMAGE_ENGINE`. The pixel comparison is
    * pixelmatch either way, so verdicts match.
    */
   engine?: "pngjs" | "sharp";
@@ -633,6 +657,12 @@ export interface ShelfOptions {
   design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
+  /**
+   * Server-wide git connections and approved repository links managed by configuration (ADR 0054,
+   * decision 9): `githubApp(...)`, `gitlabGroup(...)` or `gitFromEnv(env)` from
+   * `@storyshelf/core/integrations`. A configured connection wins over a stored one with its id.
+   */
+  git?: ShelfGitOptions;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
@@ -659,8 +689,15 @@ export interface ResolvedNotificationsOptions extends Omit<
  * hand-built options object (tests, embedders) reads as "none".
  */
 export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  /** Design providers offered to projects: registered and available (issue #1126). */
   design?: DesignProvider[];
+  /** `notifiers` holds only available providers (issue #1126). */
   notifications?: ResolvedNotificationsOptions;
+  /**
+   * Every integration kind with its standing (available, unavailable with a reason, or turned off),
+   * for the System page and deep health. Absent on a hand-built options object.
+   */
+  integrations?: readonly IntegrationStatus[];
 }
 
 /**
@@ -677,3 +714,19 @@ export {
   sequentialTransactionsWarning,
 } from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";
+export {
+  ALLOW_OLD_NAMES_ENV,
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  readS3Bucket,
+  readSetting,
+  refuseRenamedSettings,
+  renamedSettingsIn,
+  RENAMED_SETTINGS,
+  RenamedSettingError,
+  UNPREFIXED_ALLOWED,
+  type RenamedSetting,
+  type SettingName,
+  type SettingRename,
+  type SettingsEnv,
+} from "./env-settings/index.ts";

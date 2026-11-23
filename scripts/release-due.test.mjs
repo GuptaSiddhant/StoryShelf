@@ -71,6 +71,16 @@ describe("releasePlan", () => {
     assert.equal(releasePlan({ ...merged, openReleasePrs: 1, unconsumed: 1 }).action, "refresh");
   });
 
+  it("refreshes the open release by hand even when it consumes every changeset", () => {
+    const plan = releasePlan({
+      ...base,
+      event: "workflow_dispatch",
+      openReleasePrs: 1,
+      unconsumed: 0,
+    });
+    assert.equal(plan.action, "refresh");
+  });
+
   it("does nothing when the open release already consumes every changeset", () => {
     const plan = releasePlan({ ...base, event: "schedule", openReleasePrs: 1, unconsumed: 0 });
     assert.deepEqual(plan, {

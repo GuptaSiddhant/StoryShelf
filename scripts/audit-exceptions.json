@@ -1,0 +1,33 @@
+{
+  "_comment": "Tracked exceptions for scripts/audit-check.mjs (weekly audit, #47). Each is one advisory on one target, with a review date. Past that date the audit fails again until the owner re-reviews it. The reasons live in SECURITY.md, 'Known advisories'; every advisory here must appear there. Only the owner extends a date or adds an entry.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-w5hq-g745-h8pq",
+      "target": "workspace",
+      "package": "uuid",
+      "reviewBy": "2027-02-18",
+      "issue": 335
+    },
+    {
+      "advisory": "GHSA-w5hq-g745-h8pq",
+      "target": "storybook-8",
+      "package": "uuid",
+      "reviewBy": "2027-02-18",
+      "issue": 335
+    },
+    {
+      "advisory": "GHSA-82fw-gwwq-j7x9",
+      "target": "storybook-9",
+      "package": "@vitest/mocker",
+      "reviewBy": "2027-02-18",
+      "issue": 335
+    },
+    {
+      "advisory": "GHSA-qxg6-89mg-rqv8",
+      "target": "storybook-9",
+      "package": "@vitest/mocker",
+      "reviewBy": "2027-02-18",
+      "issue": 335
+    }
+  ]
+}

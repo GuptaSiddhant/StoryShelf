@@ -155,7 +155,7 @@ removed mode or target leaves stale baselines, which are not pruned yet.
   clock staggered one hour). Build purge is not scheduled; run it manually.
 - **Current limitation:** with `testing` enabled, branch GC is skipped and `POST /api/v1/admin/purge`
   answers `503` until lifecycle-aware retention lands (#374). Hosting-only deployments are unaffected.
-- **Manual:** `storyshelf purge` or `POST /api/v1/admin/purge`, which runs build purge and branch GC
+- **Manual:** `storyshelf-server purge` or `POST /api/v1/admin/purge`, which runs build purge and branch GC
   and returns `{ removedBuilds, removedBranches, removedBaselines }`.
 - **Switching `review` off** accepts, in one pass at save time, the project's `pending` builds that
   have no attempts and no snapshots, so no queue is left that nobody will clear.

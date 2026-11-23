@@ -1,7 +1,7 @@
-import pixelmatch from "pixelmatch";
 import type { ImageCodec, RgbaImage } from "./codec.ts";
+import { loadCodec } from "./codecs.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
-import { pngjsCodec } from "./pngjs.ts";
+import { importPeer } from "./peers.ts";
 
 /**
  * Compare baseline and current screenshots, returning pass/fail and a diff image.
@@ -9,24 +9,25 @@ import { pngjsCodec } from "./pngjs.ts";
  * @param baseline - Baseline PNG buffer.
  * @param current - Current capture PNG buffer.
  * @param options - Pixel threshold and ratio limits.
- * @param codec - Decodes and encodes the PNGs; pngjs unless an engine says otherwise.
+ * @param codec - Decodes and encodes the PNGs; pngjs (loaded on first use) unless an engine says otherwise.
  * @returns The diff result with pixel counts and an optional overlay image.
  */
 export async function diffImages(
   baseline: Buffer,
   current: Buffer,
   options: DiffOptions,
-  codec: ImageCodec = pngjsCodec,
+  codec?: ImageCodec,
 ): Promise<DiffResult> {
   const identical = identicalResult(baseline, current);
   if (identical) {
     return identical;
   }
+  const imageCodec = codec ?? (await loadCodec("pngjs"));
   const [baselineImage, currentImage] = await Promise.all([
-    codec.decode(baseline),
-    codec.decode(current),
+    imageCodec.decode(baseline),
+    imageCodec.decode(current),
   ]);
-  return await compareImages(baselineImage, currentImage, options, codec);
+  return await compareImages(baselineImage, currentImage, options, imageCodec);
 }
 
 /** Diff two decoded images; a size mismatch fails, or (with `failOnSizeChange: false`) diffs the overlap. */
@@ -155,6 +156,7 @@ async function compareRegions(
     threshold: options.pixelThreshold,
     includeAA: options.includeAntialiasing,
   };
+  const pixelmatch = await loadPixelmatch();
   const diffPixels = pixelmatch(baseline, current, undefined, width, height, matchOptions);
   if (diffPixels / (width * height) <= options.maxDiffRatio) {
     return { diffPixels, diffImage: null };
@@ -162,4 +164,17 @@ async function compareRegions(
   const overlay: RgbaImage = { width, height, data: new Uint8Array(width * height * 4) };
   pixelmatch(baseline, current, overlay.data, width, height, matchOptions);
   return { diffPixels, diffImage: await codec.encode(overlay) };
+}
+
+let pixelmatchModule: Promise<typeof import("pixelmatch").default> | undefined;
+
+/** `pixelmatch`, imported on first comparison and cached; a failed import is not cached. */
+export async function loadPixelmatch(): Promise<typeof import("pixelmatch").default> {
+  pixelmatchModule ??= importPeer("pixelmatch", async () => (await import("pixelmatch")).default);
+  try {
+    return await pixelmatchModule;
+  } catch (error) {
+    pixelmatchModule = undefined;
+    throw error;
+  }
 }

@@ -1,3 +1,4 @@
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, ListOptions, TxStore } from "../adapters/database.ts";
@@ -56,8 +57,8 @@ export function makeDatabase(): { db: DatabaseAdapter } {
 
   const insertRow = async <T extends Table>(
     table: T,
-    values: T["$inferInsert"],
-  ): Promise<T["$inferSelect"]> => {
+    values: InferInsertModel<T>,
+  ): Promise<InferSelectModel<T>> => {
     const row = { ...INSERT_DEFAULTS[getTableName(table)], ...withoutUndefined(values) };
     const key = (row["id"] ?? row["hash"]) as string;
     if (rowsOf(table).has(key)) {
@@ -76,38 +77,38 @@ export function makeDatabase(): { db: DatabaseAdapter } {
       }
     }
     rowsOf(table).set(key, row);
-    return row as T["$inferSelect"];
+    return row as InferSelectModel<T>;
   };
 
   const updateRow = async <T extends Table>(
     table: T,
     id: string,
-    values: Partial<T["$inferInsert"]>,
-  ): Promise<T["$inferSelect"]> => {
+    values: Partial<InferInsertModel<T>>,
+  ): Promise<InferSelectModel<T>> => {
     const current = rowsOf(table).get(id) as Record<string, unknown> | undefined;
     if (current === undefined) {
       throw new Error("row not found");
     }
     const merged = withoutUndefined({ ...current, ...values });
     rowsOf(table).set(id, merged);
-    return merged as T["$inferSelect"];
+    return merged as InferSelectModel<T>;
   };
 
   const getRow = async <T extends Table>(
     table: T,
     id: string,
-  ): Promise<T["$inferSelect"] | null> => {
+  ): Promise<InferSelectModel<T> | null> => {
     const found = rowsOf(table).get(id);
     if (found === undefined) {
       return null;
     }
-    return found as T["$inferSelect"];
+    return found as InferSelectModel<T>;
   };
 
   const listRows = async <T extends Table>(
     table: T,
     opts: ListOptions = {},
-  ): Promise<T["$inferSelect"][]> => {
+  ): Promise<InferSelectModel<T>[]> => {
     let current = [...rowsOf(table).values()];
     if (opts.where) {
       const { where } = opts;
@@ -130,7 +131,7 @@ export function makeDatabase(): { db: DatabaseAdapter } {
         pickKeys(row as Record<string, unknown>, keep),
       ) as typeof current;
     }
-    return current as T["$inferSelect"][];
+    return current as InferSelectModel<T>[];
   };
 
   const countRows = async (table: Table, where?: SQL): Promise<number> => {

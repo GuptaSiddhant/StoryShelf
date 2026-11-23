@@ -20,7 +20,9 @@
 #   auto-merge.
 # - new version (patch to minor): pushes the new `release/v<version>`, opens its pull request and
 #   closes the old one, deleting the old branch only if it still sits at the planned sha.
-# Without a refresh, a conflict after `main` moved had to be cleared by hand.
+# Without a refresh, a conflict after `main` moved had to be cleared by hand. A run started by hand
+# (workflow_dispatch) refreshes the open pull request even without new changesets, for a fix on
+# `main` that has none (CI or release scripts).
 #
 # pull_request_target runs this file from `main` and checks out `main`, never the pull request's
 # code. The branch is pushed with AUTOUPDATE_TOKEN when it is set, so CI runs on the release pull

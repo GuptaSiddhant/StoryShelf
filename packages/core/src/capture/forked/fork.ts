@@ -7,10 +7,10 @@ import type { ParentMessage } from "./protocol.ts";
 export const CAPTURE_WORKER_ROLE = "capture-worker";
 
 /** Environment variable carrying the parent's `testing.retries` to the child, which stamps it on the shard jobs it queues. */
-export const CAPTURE_RETRIES_ENV = "STORYSHELF_CAPTURE_RETRIES";
+export const CAPTURE_RETRIES_ENV = "SHELF_CAPTURE_RETRIES";
 
 /** Environment variable carrying the parent's `testing.shardSize` to the child, which plans big builds with it. */
-export const CAPTURE_SHARD_SIZE_ENV = "STORYSHELF_CAPTURE_SHARD_SIZE";
+export const CAPTURE_SHARD_SIZE_ENV = "SHELF_CAPTURE_SHARD_SIZE";
 
 /** Grace between SIGTERM and SIGKILL when the parent stops a child. */
 const KILL_ESCALATION_MS = 30_000;
@@ -52,7 +52,7 @@ export function forkCaptureChild(options: ForkOptions): ChildProcessHandle {
     throw new Error("child processes are not available in this runtime");
   }
   const child = childProcess.fork(options.entry, [], {
-    env: { ...process.env, ...options.env, STORYSHELF_ROLE: CAPTURE_WORKER_ROLE },
+    env: { ...process.env, ...options.env, SHELF_ROLE: CAPTURE_WORKER_ROLE },
     serialization: "json",
     stdio: ["inherit", "inherit", "inherit", "ipc"],
   });

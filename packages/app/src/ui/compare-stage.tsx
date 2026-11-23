@@ -43,10 +43,6 @@ const stageRoot = css`
   .stage__canvas {
     padding: var(--space-2);
   }
-  .stage__pane:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
   /*
    * Swipe and onion stack the panes in one cell, and the current pane is clipped (swipe) or faded
    * (onion), which clips or fades its own outline away. The ring goes on the grid, which neither touches.
@@ -65,12 +61,12 @@ const stageRoot = css`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.35rem 0.6rem;
+    padding: var(--space-1) var(--space-3);
     background: var(--surface-subtle);
     border-bottom: 1px solid var(--border);
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
@@ -201,7 +197,7 @@ const stageRoot = css`
     display: grid;
     place-items: center;
     width: 32px;
-    height: 32px;
+    height: var(--control-sm);
     transform: translate(-50%, -50%);
     background: var(--accent);
     color: var(--accent-contrast);

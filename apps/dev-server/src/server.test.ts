@@ -1,6 +1,6 @@
 import { createShelfApp } from "@storyshelf/app";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createLocalStorage } from "@storyshelf/storage-local";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

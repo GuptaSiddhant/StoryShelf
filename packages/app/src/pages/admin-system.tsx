@@ -19,12 +19,16 @@ import {
   PageHeader,
   SectionTitle,
   Stat,
+  StatGroup,
   Table,
   VStack,
+  statusLabel,
 } from "../ui/components.tsx";
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
+import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
-import { CaptureTargetsCard } from "./admin-system-targets.tsx";
+import { RuntimeStatusCard } from "./admin-system-status.tsx";
+import { CaptureTargetsCard, type UnreachableView } from "./admin-system-targets.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { RetentionPausedNotice } from "./retention-paused.tsx";
 /** Data for the site-admin System page (adapters, health, safe config). */
@@ -46,6 +50,8 @@ export interface AdminSystemData {
   capture?: CaptureHostSummary | null;
   /** The browsers the capture runner offers (ADR 0007); omitted without a runner list. */
   targets?: readonly RunnerTarget[] | undefined;
+  /** Targets that failed to launch or connect since they last rendered; absent when none. */
+  unreachable?: ReadonlyMap<string, UnreachableView> | undefined;
   /** The public origin and where it came from; omitted when the store has no resolver. */
   publicOrigin?: PublicOriginView | undefined;
   /** Notifiers are wired but no public origin resolves, so nothing is sent (ADR 0014, decision 11). */
@@ -54,6 +60,8 @@ export interface AdminSystemData {
   retentionPause?: RetentionPause | undefined;
   /** Projects whose default-branch builds count without the git host's confirmation. */
   unverifiedDefault?: readonly UnverifiedDefaultProject[] | undefined;
+  /** Integrations and whether projects are offered them (issue #1126); omitted when none is known. */
+  integrations?: IntegrationsView | undefined;
 }
 
 /** What the deployment has paused and why: notifications (no public URL) and build retention. */
@@ -64,9 +72,9 @@ function PausedNotices(props: {
   if (!notificationsPaused && !retentionPause) {
     return null;
   }
-  // A stack keeps the alerts apart; the margin keeps the last one off the card below.
+  // A stack keeps the alerts apart; the page column keeps the last one off the card below.
   return (
-    <div class="mb-1">
+    <div>
       <VStack>
         <NotificationsPausedNotice paused={notificationsPaused} />
         <RetentionPausedNotice pause={retentionPause} />
@@ -116,7 +124,7 @@ function AdapterRow(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { adapter } = props;
   return (
-    <tr key={`${adapter.category}/${adapter.kind}`}>
+    <tr key={`${adapter.category}/${adapter.kind}/${adapter.name}`}>
       <td>
         <strong>{adapter.name}</strong>
         {adapter.description ? <Meta as="div">{adapter.description}</Meta> : null}
@@ -176,7 +184,10 @@ function AdapterTable(props: AdapterTableProps): HtmlEscapedString | Promise<Htm
         </thead>
         <tbody>
           {report.adapters.map((adapter) => (
-            <AdapterRow key={`${adapter.category}/${adapter.kind}`} adapter={adapter} />
+            <AdapterRow
+              key={`${adapter.category}/${adapter.kind}/${adapter.name}`}
+              adapter={adapter}
+            />
           ))}
         </tbody>
       </table>
@@ -208,11 +219,11 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
   return (
     <Card>
       <SectionTitle>Server</SectionTitle>
-      <div class="grid grid--3">
-        <Stat label="Status" value={report.status} />
+      <StatGroup>
+        <Stat label="Status" value={statusLabel(report.status)} />
         <Stat label="Uptime" value={formatUptime(report.uptimeSecs)} />
         <Stat label="Version" value={report.version} />
-      </div>
+      </StatGroup>
       <Meta>
         Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Purge TTL{" "}
         {formatOptional(config.purgeTtlDays)} days · Branch TTL{" "}
@@ -250,16 +261,16 @@ function CredentialsCard(props: {
       <Meta>
         Webhook secrets, git tokens and notification secrets are encrypted with the server secret.
       </Meta>
-      <div class="grid grid--3">
+      <StatGroup>
         <Stat label="Current secret" value={String(probe.current)} />
         <Stat label="Previous secret" value={String(probe.previous)} />
         <Stat label="Unreadable" value={String(probe.unreadable.length)} />
-      </div>
+      </StatGroup>
       {probe.unreadable.length > 0 ? (
         <Alert tone="danger" title="Some credentials cannot be decrypted">
           No configured secret matches {probe.unreadable.length} stored credential(s) (
-          {[...new Set(probe.unreadable.map((row) => row.source))].join(", ")}). Check that SECRET
-          and SECRET_PREVIOUS are correct, or recreate them.
+          {[...new Set(probe.unreadable.map((row) => row.source))].join(", ")}). Check that
+          SHELF_SECRET and SHELF_SECRET_PREVIOUS are correct, or recreate them.
         </Alert>
       ) : null}
       {rotating && probe.previous > 0 ? (
@@ -277,8 +288,8 @@ function CredentialsCard(props: {
       ) : (
         <Meta>
           {rotating
-            ? "All credentials use the current secret. Remove SECRET_PREVIOUS."
-            : "To rotate, set SECRET to the new value and SECRET_PREVIOUS to the old one."}
+            ? "All credentials use the current secret. Remove SHELF_SECRET_PREVIOUS."
+            : "To rotate, set SHELF_SECRET to the new value and SHELF_SECRET_PREVIOUS to the old one."}
         </Meta>
       )}
     </Card>
@@ -291,7 +302,7 @@ function HostingOnlyNotice(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { hiddenSnapshots } = props;
   return (
-    <div class="mt-1">
+    <div>
       <Alert tone="info" title="Testing is off: Storybook hosting only">
         This instance publishes and serves Storybooks, but does not capture, compare or keep
         baselines, and no testing status is posted. Set the <code>testing</code> option to turn
@@ -320,20 +331,63 @@ function TestingNotice(props: {
 function CaptureCards(props: {
   data: AdminSystemData;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const { publicOrigin, targets } = props.data;
+  const { publicOrigin, targets, unreachable } = props.data;
   return (
     <>
       {publicOrigin ? (
-        <div class="mt-1">
+        <div>
           <PublicOriginCard origin={publicOrigin} />
         </div>
       ) : null}
-      {targets && targets.length > 0 ? (
-        <div class="mt-1">
-          <CaptureTargetsCard targets={targets} />
+      {(targets && targets.length > 0) || (unreachable && unreachable.size > 0) ? (
+        <div>
+          <CaptureTargetsCard targets={targets ?? []} unreachable={unreachable} />
         </div>
       ) : null}
     </>
+  );
+}
+
+function RuntimeSection(props: {
+  rows: HealthReport["statuses"];
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <div class="mt-1">
+      <RuntimeStatusCard rows={props.rows} />
+    </div>
+  );
+}
+
+/** The integrations card, anchored for the settings pages' link; absent when no status is known. */
+function IntegrationsSection(props: {
+  view: IntegrationsView | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> | null {
+  const { view } = props;
+  return view && view.statuses.length > 0 ? (
+    <div id="integrations">
+      <IntegrationsCard view={view} />
+    </div>
+  ) : null;
+}
+
+/** The header's links: System → Git, AI usage when AI is on, and a recheck. */
+function SystemActions(props: {
+  aiEnabled: boolean;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  return (
+    <HStack>
+      <Button variant="secondary" size="sm" href="/admin/git">
+        Git
+      </Button>
+      {props.aiEnabled ? (
+        <Button variant="secondary" size="sm" href="/admin/ai">
+          AI usage
+        </Button>
+      ) : null}
+      <Button variant="secondary" size="sm" href="/admin">
+        Recheck
+      </Button>
+    </HStack>
   );
 }
 
@@ -351,29 +405,20 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
             {formatUptime(report.uptimeSecs)}
           </>
         }
-        actions={
-          <HStack>
-            {data.aiEnabled ? (
-              <Button variant="secondary" size="sm" href="/admin/ai">
-                AI usage
-              </Button>
-            ) : null}
-            <Button variant="secondary" size="sm" href="/admin">
-              Recheck
-            </Button>
-          </HStack>
-        }
+        actions={<SystemActions aiEnabled={data.aiEnabled === true} />}
       />
       <PausedNotices data={data} />
       <TestingNotice data={data} />
       <ServerFacts data={data} />
       <CaptureCards data={data} />
+      <RuntimeSection rows={report.statuses} />
       {credentials ? (
-        <div class="mt-1">
+        <div>
           <CredentialsCard probe={credentials} config={config} />
         </div>
       ) : null}
-      <div class="mt-1">
+      <IntegrationsSection view={data.integrations} />
+      <div>
         <Card>
           <SectionTitle>Adapters</SectionTitle>
           <Meta>

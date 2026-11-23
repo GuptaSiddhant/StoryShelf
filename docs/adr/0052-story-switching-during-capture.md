@@ -9,7 +9,7 @@ Statements marked `[inferred]` were not read in the code and must be confirmed b
 ## Context
 
 A capture loads a fresh document for every story and viewport. `runCapture`
-(`packages/runner-playwright/src/screenshot.ts`) calls `page.goto(buildUrl(...), { waitUntil:
+(`packages/runner/src/screenshot.ts`) calls `page.goto(buildUrl(...), { waitUntil:
 "networkidle" })`, waits for Storybook's own events (`settle.ts`), optionally runs the play function,
 runs axe, masks ignore regions, sizes the page and takes the screenshot. Every story therefore pays
 for the document, the preview bundle's parse and run, and Storybook's start-up.
@@ -130,11 +130,10 @@ A session also ends, and the next story gets a fresh load, when any of these is 
 - The attempt log records, per build: how many captures were switched, how many were confirmed on a
   fresh page, and each session end with its reason. No snapshot column is added.
 
-### 6. Both runners
+### 6. The runner
 
-- The Playwright and Puppeteer runners implement the same session rules with the same in-page
-  functions `[inferred: the Puppeteer files mirror the Playwright ones]`.
-- Each runner passes the gate on its own. A runner that has not passed reports that it cannot
+- The Playwright runner implements the session rules with the in-page functions.
+- The runner passes the gate on its own. A runner that has not passed reports that it cannot
   switch (decision 2).
 
 ### 7. Remote browsers

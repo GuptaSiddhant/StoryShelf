@@ -7,7 +7,7 @@
  * @param serverUrl - Server URL, e.g. `https://shelf.example.com`; trailing slashes are dropped and
  *   a path prefix (`https://host/shelf`) is kept
  * @param token - Optional bearer token (CI or admin token); sent as `Authorization: Bearer <token>`
- * @returns Namespaced client with `projects`, `builds`, `tokens`, and `admin` helpers
+ * @returns Namespaced client with `projects`, `builds` and `tokens` helpers
  */
 export function createClient(serverUrl: string, token?: string): Client {
   const baseUrl = normalizeBaseUrl(serverUrl);
@@ -16,6 +16,7 @@ export function createClient(serverUrl: string, token?: string): Client {
     buildRequestHeaders(authHeaders, contentType);
 
   return {
+    health: async () => (await fetchJson(`${baseUrl}/api/v1/health`, {})) as ServerHealth,
     projects: createProjectsApi(baseUrl, authHeaders, requestHeaders),
   };
 }
@@ -38,10 +39,13 @@ export function apiErrorText(body: string): string {
 export class RequestError extends Error {
   override readonly name = "RequestError";
   readonly status: number;
+  /** The server's `Retry-After`, in milliseconds, when it sent a valid one. */
+  readonly retryAfterMs?: number;
 
-  constructor(status: number, body: string) {
+  constructor(status: number, body: string, retryAfterMs?: number) {
     super(`Request failed (${status}): ${body}`);
     this.status = status;
+    if (retryAfterMs !== undefined) this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -111,12 +115,58 @@ export interface PackageUsageInput {
 export interface BuildCreated {
   build: { id: string };
   uploadUrl: string;
+  /** Path of the build page; absent on servers that predate the field. */
+  buildUrl?: string;
   baselineSha?: string | null;
   /** False when the server has no `testing` option; absent on servers that predate the field. */
   testing?: boolean;
 }
 
+/** The parts of `GET …/builds/:buildId` that `upload --wait` reads; the server adds the last two (ADR 0053). */
+export interface BuildState {
+  id: string;
+  status: string;
+  changedCount: number;
+  /** JSON array of the build's Storybook test results; null when none ran. */
+  testResults?: string | null;
+  /** The newer build that replaced this one, when it was cancelled as superseded (ADR 0045). */
+  supersededByBuildId?: string | null;
+  /** Absent on servers that predate the field. */
+  publishing?: "pending" | "success" | "failure" | "unavailable";
+  /** Stories with a snapshot over the catalog's stories; null when nothing captures; absent on older servers. */
+  capture?: { done: number; total: number | null } | null;
+}
+
+/** The absolute build page URL: the server URL joined to `buildUrl`, or `null` without both. */
+export function buildPageUrl(
+  serverUrl: string | undefined,
+  buildUrl: string | undefined,
+): string | null {
+  if (serverUrl === undefined || buildUrl === undefined || !buildUrl.startsWith("/")) return null;
+  return `${normalizeBaseUrl(serverUrl)}${buildUrl}`;
+}
+
+/** The line that ends an upload: the build page link, else the build id (older servers). */
+export function describeBuildLink(
+  serverUrl: string | undefined,
+  build: { id: string },
+  buildUrl: string | undefined,
+): string {
+  const link = buildPageUrl(serverUrl, buildUrl);
+  return link === null ? `Build created: ${build.id}` : `View the build: ${link}`;
+}
+
+/** The open liveness answer of `GET /api/v1/health`; fields newer than the server are absent. */
+export interface ServerHealth {
+  /** Whether the server has sign-in; false means development mode, where every operation is permitted. */
+  auth?: boolean;
+  testing?: boolean;
+  version?: string;
+}
+
 interface Client {
+  /** Probe the server's open health endpoint (no token needed). */
+  health: () => Promise<ServerHealth>;
   projects: {
     create: (json: {
       name: string;
@@ -132,6 +182,8 @@ interface Client {
     };
     builds: {
       createJson: (slug: string, json: BuildCreateInput) => Promise<BuildCreated>;
+      /** The build row with its publishing and capture state: what `upload --wait` polls. */
+      get: (slug: string, buildId: string) => Promise<BuildState>;
       /** The branch's builds still working, as `{ id, sha }` (404 on an old server or testing off). */
       inFlight: (slug: string, branch: string) => Promise<{ id: string; sha: string }[]>;
       uploadZip: (uploadUrl: string, body: NodeJS.ReadableStream) => Promise<unknown>;
@@ -148,16 +200,28 @@ interface Client {
       postAffected: (slug: string, buildId: string, json: AffectedInput) => Promise<unknown>;
       postUsage: (slug: string, buildId: string, usage: PackageUsageInput[]) => Promise<unknown>;
       retry: (slug: string, buildId: string) => Promise<unknown>;
+      /** Cancel older unfinished builds (`dryRun` only lists them). */
+      cancelOlder: (slug: string, json: CancelOlderInput) => Promise<CancelOlderResult>;
       /** The build a skip on `branch` for `sha` would repeat, or null (a hint, never a promise). */
       skipSource: (slug: string, branch: string, sha: string) => Promise<SkipSource | null>;
       /** Record a commit that changed no story; a `409` (`RequestError`) means upload normally. */
       createSkipped: (slug: string, json: SkippedBuildInput) => Promise<SkippedBuildCreated>;
     };
-    admin: {
-      purge: (json: { ttlDays?: number }) => Promise<unknown>;
-      checkStorage: (json: { sample?: number }) => Promise<unknown>;
-    };
   };
+}
+
+/** Body of `POST …/builds/cancel`. */
+export interface CancelOlderInput {
+  branch?: string;
+  keepNewest?: number;
+  dryRun?: boolean;
+}
+
+/** Answer of `POST …/builds/cancel`: the cancelled IDs (or those a dry run would cancel). */
+export interface CancelOlderResult {
+  cancelled: string[];
+  count: number;
+  dryRun: boolean;
 }
 
 function buildAuthHeaders(token?: string): Record<string, string> {
@@ -199,17 +263,26 @@ async function readJson(url: string, res: Response): Promise<unknown> {
   }
 }
 
+/** `Retry-After` in milliseconds: a count of seconds (an HTTP date is not honoured), else undefined. */
+function retryAfterOf(res: Response): number | undefined {
+  const seconds = Number(res.headers?.get("retry-after"));
+  return Number.isFinite(seconds) && seconds >= 0 && res.headers?.get("retry-after") !== null
+    ? seconds * 1000
+    : undefined;
+}
+
 /** The error for a failed status: an HTML page is described, not read, and its body released. */
 async function failedRequest(
   url: string,
   res: Response,
   contentType: string,
 ): Promise<RequestError> {
+  const retryAfterMs = retryAfterOf(res);
   if (!/html/iu.test(contentType)) {
-    return new RequestError(res.status, apiErrorText(await res.text()));
+    return new RequestError(res.status, apiErrorText(await res.text()), retryAfterMs);
   }
   await res.body?.cancel().catch(() => {});
-  return new RequestError(res.status, notJsonMessage(url, contentType));
+  return new RequestError(res.status, notJsonMessage(url, contentType), retryAfterMs);
 }
 
 /** What to tell the user when a JSON endpoint answered with something else (origin only, no path). */
@@ -318,6 +391,18 @@ function createInFlightApi(
   };
 }
 
+function cancelOlderApi(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): (slug: string, json: CancelOlderInput) => Promise<CancelOlderResult> {
+  return async (slug, json) =>
+    (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/cancel`, {
+      method: "POST",
+      headers: requestHeaders("application/json"),
+      body: JSON.stringify(json),
+    })) as CancelOlderResult;
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -333,6 +418,10 @@ function createBuildsApi(
         body: JSON.stringify(json),
       })) as BuildCreated,
     ...createInFlightApi(baseUrl, requestHeaders),
+    get: async (slug: string, buildId: string) =>
+      (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${encodeURIComponent(buildId)}`, {
+        headers: requestHeaders(),
+      })) as BuildState,
     uploadZip: async (uploadUrl: string, body: NodeJS.ReadableStream) => {
       const init = {
         method: "PUT",
@@ -349,6 +438,7 @@ function createBuildsApi(
         headers: requestHeaders("application/json"),
         body: JSON.stringify({}),
       }),
+    cancelOlder: cancelOlderApi(baseUrl, requestHeaders),
     postUsage: async (slug: string, buildId: string, usage: PackageUsageInput[]) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/usage`, {
         method: "POST",
@@ -357,26 +447,6 @@ function createBuildsApi(
       }),
     postAffected: async (slug: string, buildId: string, json: AffectedInput) =>
       await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/affected`, {
-        method: "POST",
-        headers: requestHeaders("application/json"),
-        body: JSON.stringify(json),
-      }),
-  };
-}
-
-function createAdminApi(
-  baseUrl: string,
-  requestHeaders: (contentType?: string) => Record<string, string>,
-): Client["projects"]["admin"] {
-  return {
-    checkStorage: async (json: { sample?: number }) =>
-      await fetchJson(`${baseUrl}/api/v1/admin/check-storage`, {
-        method: "POST",
-        headers: requestHeaders("application/json"),
-        body: JSON.stringify(json),
-      }),
-    purge: async (json: { ttlDays?: number }) =>
-      await fetchJson(`${baseUrl}/api/v1/admin/purge`, {
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify(json),
@@ -417,7 +487,6 @@ function createProjectsApi(
       }),
     tokens: createTokensApi(baseUrl, requestHeaders),
     builds: createBuildsApi(baseUrl, authHeaders, requestHeaders),
-    admin: createAdminApi(baseUrl, requestHeaders),
   };
 }
 
@@ -460,28 +529,6 @@ export async function postJson<TData>(
  * @returns Parsed response body
  */
 export async function postForm<TData>(
-  url: string,
-  form: FormData,
-  headers: Record<string, string> = {},
-): Promise<TData> {
-  const response = await fetch(url, { method: "POST", headers, body: form });
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}): ${apiErrorText(await response.text())}`);
-  }
-  return (await response.json()) as TData;
-}
-
-/**
- * POST a `FormData` body with future progress reporting and parse the JSON response.
- * Currently behaves like {@link postForm}; the name is kept for CLI compatibility
- * and to allow streaming progress hooks without a breaking change.
- *
- * @param url - Absolute request URL
- * @param form - Multipart form payload
- * @param headers - Extra headers (e -g - auth)
- * @returns Parsed response body
- */
-export async function postFormWithProgress<TData>(
   url: string,
   form: FormData,
   headers: Record<string, string> = {},

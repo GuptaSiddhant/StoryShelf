@@ -1,17 +1,22 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { CatalogLoader } from "@storyshelf/core/capture";
+import type { Build } from "@storyshelf/core/schema";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
+import { SHARED_READ_ONLY_MEMBERSHIP } from "./accounts.ts";
 import {
   baselines,
   buildComponents,
   BUILD_PURGED,
   builds,
   captureAttempts,
+  buildLabels,
   captureLogs,
   catalogEntries,
+  labelTypes,
   comments,
   otherProject,
   project,
+  backlogBuilds,
   skippedBuilds,
   snapshots,
 } from "./dataset.ts";
@@ -19,9 +24,10 @@ import {
 /**
  * Which data a page story renders over: `populated` is the "Design system" project with builds
  * in every state, `empty` has one project and no builds, `blank` has no projects at all, and
- * `skipped-only` has a project whose every build was skipped.
+ * `skipped-only` has a project whose every build was skipped, and `backlog` a project with
+ * seven unfinished builds queued.
  */
-export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only";
+export type StoryDataset = "populated" | "empty" | "blank" | "skipped-only" | "backlog";
 
 interface Seeded {
   db: DatabaseAdapter;
@@ -55,6 +61,8 @@ async function insertBuilds(db: DatabaseAdapter): Promise<void> {
   await insertAll(db, db.tables.comments, comments);
   await insertAll(db, db.tables.captureAttempts, captureAttempts);
   await insertAll(db, db.tables.captureLogs, captureLogs);
+  await insertAll(db, db.tables.labelTypes, labelTypes);
+  await insertAll(db, db.tables.buildLabels, buildLabels);
 }
 
 /** What every populated build publishes, except the build whose Storybook retention removed. */
@@ -64,14 +72,27 @@ const PUBLISHED: CatalogLoader = {
   refresh: async () => await Promise.resolve({ v: 1, entries: catalogEntries }),
 };
 
+/** The builds of a dataset that has only these, or null for the fully populated one. */
+function onlyBuilds(dataset: StoryDataset): Build[] | null {
+  if (dataset === "skipped-only") return skippedBuilds();
+  return dataset === "backlog" ? backlogBuilds() : null;
+}
+
+/** Both projects, and the read-only account's viewer grant on "Design system". */
+async function insertProjects(db: DatabaseAdapter): Promise<void> {
+  await insertAll(db, db.tables.projects, [project, otherProject]);
+  await insertAll(db, db.tables.projectMembers, [SHARED_READ_ONLY_MEMBERSHIP]);
+}
+
 /** A fresh in-memory database holding the chosen dataset, and the catalog its builds publish. */
 export async function seedStoryDatabase(dataset: StoryDataset): Promise<Seeded> {
   const { db } = makeDatabase();
   if (dataset === "blank") return { db, catalog: NO_CATALOG };
-  await insertAll(db, db.tables.projects, [project, otherProject]);
+  await insertProjects(db);
   if (dataset === "empty") return { db, catalog: NO_CATALOG };
-  if (dataset === "skipped-only") {
-    await insertAll(db, db.tables.builds, skippedBuilds());
+  const only = onlyBuilds(dataset);
+  if (only) {
+    await insertAll(db, db.tables.builds, only);
     return { db, catalog: PUBLISHED };
   }
   await insertBuilds(db);

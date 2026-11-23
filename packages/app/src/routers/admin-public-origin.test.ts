@@ -163,11 +163,34 @@ describe("public origin on the System page", () => {
     );
   });
 
+  it("opens the origin form from the page as a dialog fragment, or as a page of its own", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    await report(app, token, { origin: ORIGIN });
+    const page = await (await app.request("/admin")).text();
+    expect(page).toContain('href="/admin/public-origin/edit"');
+    expect(page).not.toContain('action="/admin/public-origin"');
+    const fragment = await (
+      await app.request("/admin/public-origin/edit", { headers: { "HX-Request": "true" } })
+    ).text();
+    expect(fragment).toContain('id="edit-origin-form"');
+    expect(fragment).toContain(`value="${ORIGIN}"`);
+    expect(fragment).not.toContain("<html");
+    expect(await (await app.request("/admin/public-origin/edit")).text()).toContain("<html");
+  });
+
+  it("serves no origin form to a member, and none while the configuration answers", async () => {
+    const member = await seedApp({ role: "member" });
+    expect((await member.request("/admin/public-origin/edit")).status).toBe(403);
+    const fixed = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
+    expect((await fixed.request("/admin/public-origin/edit")).status).toBe(404);
+  });
+
   it("stops asking once the configuration or the platform answers", async () => {
     const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
     const html = await (await app.request("/admin")).text();
     expect(html).toContain("configured.example.com");
-    expect(html).toContain("configured (PUBLIC_BASE_URL)");
+    expect(html).toContain("configured (SHELF_PUBLIC_BASE_URL)");
     expect(html).not.toContain("data-report-origin");
     // Nothing to confirm: no stored-origin form and no entry form either (#315).
     expect(html).not.toContain('action="/admin/public-origin"');
@@ -195,7 +218,7 @@ describe("public origin on the System page", () => {
         const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
         expect(response.status).toBeLessThan(400);
         expect(flashOf(response)).toEqual({
-          message: expect.stringContaining("PUBLIC_BASE_URL") as string,
+          message: expect.stringContaining("SHELF_PUBLIC_BASE_URL") as string,
           tone: "warning",
         });
         expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
