@@ -2,7 +2,8 @@
  * Run by `peer-isolation.test.ts` in a fresh Node with the testing-only libraries unresolvable:
  * boot `createShelfApp` with `testing` off or on (argv[2]), then print a JSON report on stdout.
  */
-import { BuildModel } from "@storyshelf/core/models";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import AdmZip from "adm-zip";
 import { Writable } from "node:stream";
@@ -11,6 +12,8 @@ import { pino } from "pino";
 import { createShelfApp } from "./index.tsx";
 import { stubRunner } from "./test-runner.ts";
 
+/** The consumer's idle poll is 15 s (+ jitter), and this job is queued from outside the app's own queue. */
+const NOTIFY_WAIT_MS = 30_000;
 const testing = process.argv[2] === "testing";
 /** Error-level log lines, so a consumer that stops at startup shows in the report. */
 const errors: string[] = [];
@@ -64,6 +67,14 @@ if (!testing) {
   });
   report["upload"] = upload.status;
   report["published"] = await publishedWithin(build.id, 10_000);
+  // A `notify` job for a channel that is gone: the handler acks it (nothing is left to show), so it
+  // ends `done` only when the notify consumer started without the image libraries.
+  const notifyId = await createDatabaseCaptureQueue(db, { kinds: ["notify"] }).enqueueJob({
+    kind: "notify",
+    buildId: build.id,
+    data: { channelId: "gone" },
+  });
+  report["notified"] = await notifiedWithin(notifyId, NOTIFY_WAIT_MS);
 }
 report["errors"] = errors;
 async function publishedWithin(buildId: string, ms: number): Promise<boolean> {
@@ -76,6 +87,16 @@ async function publishedWithin(buildId: string, ms: number): Promise<boolean> {
   }
   await sleep(100);
   return await publishedWithin(buildId, ms - 100);
+}
+async function notifiedWithin(jobId: string, ms: number): Promise<boolean> {
+  if ((await new CaptureJobModel(db).get(jobId))?.status === "done") {
+    return true;
+  }
+  if (ms <= 0) {
+    return false;
+  }
+  await sleep(100);
+  return await notifiedWithin(jobId, ms - 100);
 }
 await app.lifecycle.teardown();
 process.stdout.write(`REPORT ${JSON.stringify(report)}\n`);

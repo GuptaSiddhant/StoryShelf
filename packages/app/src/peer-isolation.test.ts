@@ -40,9 +40,10 @@ describe(
       });
     });
 
-    it("starts its job consumers and publishes a queued zip without the image peers", () => {
+    it("starts its job consumers, publishes a queued zip and runs a notify job without the image peers", () => {
       expect(boot("hosting", [...TESTING_ONLY, "sharp"])).toMatchObject({
         published: true,
+        notified: true,
         errors: [],
       });
     });
