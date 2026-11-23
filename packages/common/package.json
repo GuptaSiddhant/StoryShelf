@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/common",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Shared building blocks for StoryShelf packages: settings, guarded outbound HTTP, secret redaction, tracing helpers and errors. Depends only on @opentelemetry/api.",
   "keywords": [
     "http",

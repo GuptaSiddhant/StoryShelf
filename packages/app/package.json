@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Self-hosted visual testing and review for Storybook: the StoryShelf app, with a Hono HTTP API and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
