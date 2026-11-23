@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
+import { createBuildStatePublisher } from "../build-state/publisher.ts";
 import { createShelfLogger } from "../logger.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
@@ -13,8 +14,8 @@ import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { storybookZipPath } from "../utils/paths.ts";
-import { createBuildStatePublisher } from "./build-state/publisher.ts";
 import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
 import { executeCaptureJob, type ShardJob } from "./orchestrator.ts";
@@ -59,6 +60,7 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 
 const runner: CaptureRunner = {
   metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+  images: pngImageEngine(),
   cancel: async () => {},
   render: async (input) => {
     for (const story of input.stories) {

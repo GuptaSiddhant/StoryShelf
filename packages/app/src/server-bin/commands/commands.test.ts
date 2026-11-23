@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ShelfApp } from "../../app-types.ts";
 import { instanceDir, recordingIo, recordRelease, tablesOf } from "../__fixtures__/instance-dir.ts";
@@ -118,6 +120,48 @@ export default defineShelfInstance(async () => { throw new Error("SHELF_SECRET i
     expect(io.stdout.join("\n")).toContain(
       "✗ The instance factory failed: SHELF_SECRET is too short",
     );
+  });
+
+  it("names a missing peer and its install line, and still reports the installed packages", async () => {
+    const { dir } = instanceDir({ source: 'import "@libsql/client";\nexport default 1;\n' });
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@storyshelf/core": "0.14.0" } }),
+    );
+    mkdirSync(join(dir, "node_modules/@storyshelf/core"), { recursive: true });
+    writeFileSync(
+      join(dir, "node_modules/@storyshelf/core/package.json"),
+      JSON.stringify({ name: "@storyshelf/core", version: "0.14.0" }),
+    );
+    const io = recordingIo();
+    expect(await runServerBin(["doctor", "--dir", dir], io, {})).toBe(1);
+    const text = io.stdout.join("\n");
+    expect(text).toContain("✓ One copy of @storyshelf/core is installed");
+    expect(text).toContain("✗ ");
+    expect(text).toContain('Install it: npm install @libsql/client@"^0.18.0"');
+  });
+
+  it("fails on mixed @storyshelf versions before importing the instance", async () => {
+    const { dir } = instanceDir();
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@storyshelf/core": "0.14.0", "@storyshelf/db": "0.13.0" },
+      }),
+    );
+    for (const [name, version] of [
+      ["core", "0.14.0"],
+      ["db", "0.13.0"],
+    ] as const) {
+      mkdirSync(join(dir, `node_modules/@storyshelf/${name}`), { recursive: true });
+      writeFileSync(
+        join(dir, `node_modules/@storyshelf/${name}/package.json`),
+        JSON.stringify({ name: `@storyshelf/${name}`, version }),
+      );
+    }
+    const io = recordingIo();
+    expect(await runServerBin(["doctor", "--dir", dir], io, {})).toBe(1);
+    expect(io.stdout.join("\n")).toContain("✗ Mixed @storyshelf/* versions");
   });
 
   it("fails when there is no instance module", async () => {

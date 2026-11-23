@@ -1,6 +1,6 @@
 /** The capture consumer over the database queue on node:sqlite: real timers, a short cadence. */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createCaptureConsumer, createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createCaptureConsumer, createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { describe, expect, it, vi } from "vitest";
 import { createSqliteDatabase } from "./index.ts";

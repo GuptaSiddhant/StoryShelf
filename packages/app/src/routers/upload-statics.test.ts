@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { SCRATCH_DIRNAME } from "@storyshelf/core/capture";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
+import { SCRATCH_DIRNAME } from "@storyshelf/core/publish";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { contentKey, storybookDir, storybookZipPath } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";

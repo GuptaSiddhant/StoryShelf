@@ -157,6 +157,7 @@ jobs:
         env:
           DRY_RUN_SECRET: dry-run-secret-of-at-least-32-characters
           FILLED: ${{ steps.prev.outputs.ready }}
+          PREV: ${{ steps.plan.outputs.prev }}
         run: |
           set -e
           wait_healthy() {
@@ -168,9 +169,15 @@ jobs:
           }
           docker volume create demo-data
           if [ "$FILLED" = true ]; then
-            # The previous release still reads the names from before #1308.
-            docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SECRET="$DRY_RUN_SECRET" \
-              -e PORT=3000 -e DATA_DIR=/data demo-prev
+            # Releases before 0.15.0 read the names from before #1308; 0.15.0 and later read only
+            # the `SHELF_*` names and refuse the old ones.
+            if [ "$(echo "${PREV#v}" | awk -F. '{ print ($1 == 0 && $2 < 15) }')" = 1 ]; then
+              docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SECRET="$DRY_RUN_SECRET" \
+                -e PORT=3000 -e DATA_DIR=/data demo-prev
+            else
+              docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SHELF_SECRET="$DRY_RUN_SECRET" \
+                -e PORT=3000 -e SHELF_DATA_DIR=/data -e SHELF_AUTH=none demo-prev
+            fi
             wait_healthy prev
             docker stop prev && docker rm prev
           fi

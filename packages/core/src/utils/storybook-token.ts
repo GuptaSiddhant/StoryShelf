@@ -1,3 +1,11 @@
+// The prefixes and the token's regex source live in `@storyshelf/common/redact`, which redacts them from
+// logs; this module stays the owner of signing, verifying and key derivation.
+import {
+  STORYBOOK_EXCHANGE_PREFIX,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+  STORYBOOK_TOKEN_SOURCE,
+} from "@storyshelf/common/redact";
 /**
  * Signed Storybook tokens (ADR 0007, decision 5; ADR 0051, decision 4): the single owner of everything
  * about the path prefixes of the URLs that read one build's published Storybook with a token
@@ -11,16 +19,12 @@
 import { createHmac } from "node:crypto";
 import type { SecretInput } from "./encrypt.ts";
 import { timingSafeEqualString } from "./hash.ts";
-
-/** The path prefix every signed Storybook URL starts with; `/_/` is the unrelated short link. */
-export const STORYBOOK_TOKEN_PREFIX = "/_s/";
-/** The path prefix of a read grant (ADR 0051, decision 4): `/_r/<token>/`, never `/_s/`. */
-export const STORYBOOK_READ_PREFIX = "/_r/";
-/**
- * The path prefix of the exchange on a content host (ADR 0051, decision 5): `/_x/<token>/`. It exists
- * on content hosts only and is never `/_r/` or `/_s/`.
- */
-export const STORYBOOK_EXCHANGE_PREFIX = "/_x/";
+export {
+  STORYBOOK_EXCHANGE_PREFIX,
+  STORYBOOK_READ_PREFIX,
+  STORYBOOK_TOKEN_PREFIX,
+  STORYBOOK_TOKEN_SOURCE,
+};
 /**
  * The cookie a content host sets after the exchange (ADR 0051, decision 5). The `__Host-` prefix forces
  * `Secure`, `Path=/` and no `Domain`, so it stays on the one host. Its value is a sealed `cookie`
@@ -33,8 +37,6 @@ export const STORYBOOK_READ_TTL = 3600;
 export const STORYBOOK_EXCHANGE_TTL = 60;
 /** Lifetime of the sealed value of a content host's grant cookie, in seconds (1 hour). */
 export const STORYBOOK_COOKIE_TTL = 3600;
-/** Regex source of a token, shared by the shape check and the log redaction. */
-export const STORYBOOK_TOKEN_SOURCE = "[A-Za-z0-9_-]{8,200}\\.[A-Za-z0-9_-]{43}";
 
 /** Floor of a derived lifetime, in seconds (2 hours). */
 export const DEFAULT_STORYBOOK_URL_TTL = 7200;

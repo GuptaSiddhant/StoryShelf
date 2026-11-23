@@ -2,17 +2,17 @@
 
 import type {
   CaptureTarget,
-  RemoteTarget,
   RenderedSnapshot,
   StoryEntry,
   StorySourceAdapter,
   Viewport,
 } from "@storyshelf/core/adapter/capture-runner";
-import type { StoryParameters } from "@storyshelf/core/capture";
+import type { StoryParameters } from "@storyshelf/core/adapter/capture-runner";
 import type { Logger } from "@storyshelf/core/logger";
-import type { SessionGate } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
 import type { PagePool } from "./pages.ts";
+import type { RemoteTarget } from "./remote/remote-browser.ts";
+import type { SessionGate } from "./remote/session-gate.ts";
 
 /** Input for a Playwright capture run over a built Storybook directory. */
 export interface PlaywrightRenderInput {

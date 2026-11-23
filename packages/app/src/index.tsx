@@ -11,7 +11,6 @@ import {
   sequentialTransactionsWarning,
 } from "@storyshelf/core/config";
 import type { ResolvedShelfOptions, ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
-import { configureImages } from "@storyshelf/core/diff";
 import type { Logger } from "@storyshelf/core/logger";
 /**
  * StoryShelf app: compose database, storage, capture, auth, and notifier
@@ -83,6 +82,7 @@ import { registerNotificationSubscriptions } from "./routers/notification-subscr
 import { registerPreviewToken } from "./routers/preview-token.ts";
 import { registerProfile } from "./routers/profile.ts";
 import { registerProjects } from "./routers/projects.ts";
+import { registerPush } from "./routers/push.ts";
 import { registerReadGrants } from "./routers/read-grants.ts";
 import { registerReviewForms } from "./routers/review-forms.ts";
 import { registerSignedStorybook } from "./routers/signed-storybook.ts";
@@ -201,9 +201,10 @@ export function createShelfApp(
 ): ShelfApp {
   noteAppConstructed();
   const options = resolveShelfOptions(rawOptions);
-  configureImages({
-    engine: options.testing?.images?.engine,
-    threads: options.testing?.compare?.threads,
+  // The runner's image engine; with no `testing` nothing image-related loads (#1365).
+  options.testing?.runner.images.configure({
+    engine: options.testing.images?.engine,
+    threads: options.testing.compare?.threads,
   });
   configureOutbound(options.config?.outbound);
   throwOnInvalidAdapters(options);
@@ -369,6 +370,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
     design,
     notifiers,
     publicOrigin,
+    push,
   } = wiring;
   app.use(
     "*",
@@ -392,6 +394,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       publicOrigin,
       design,
       notifiers,
+      push,
       integrations: options.integrations,
       gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
@@ -429,6 +432,7 @@ function registerNotificationRoutes(app: ShelfRouter): void {
   registerNotificationChannels(app);
   registerNotificationSubscriptions(app);
   registerSystemChannels(app);
+  registerPush(app);
 }
 
 /** Register the auth flow: engine mount, relying-party documents, profile. */
@@ -558,7 +562,7 @@ function registerDocs(app: ShelfRouter): void {
  *
  * `createShelfApp` plus the option/config types needed to call it. Adapter
  * interfaces live under `core/adapter/*`; runtime helpers under `core/logger`,
- * `core/capture`, `core/paths`, `core/urls`, `core/diff`; tables and row types
+ * `core/capture`, `core/paths`, `core/urls`; tables and row types
  * under `core/schema`. Importing the barrel must never pull Node-only modules
  * into edge bundles beyond what Hono itself needs.
  */

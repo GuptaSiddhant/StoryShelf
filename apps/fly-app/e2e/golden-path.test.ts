@@ -16,7 +16,7 @@ import {
   inPageRunAxe,
   loadAxeSource,
   resolveA11yRun,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/runner/a11y";
 import { execFile } from "node:child_process";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

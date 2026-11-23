@@ -36,8 +36,8 @@ Everything else lives under a subpath:
 - `persistCapture(context)` (`core/capture`) writes screenshots, diffs them against baselines, inherits unaffected stories (`inherited: true`), and finalizes a build from a renderer's captures.
 - `StorybookAdapter.loadDependencyGraph(sourceDir)` (`core/capture`) — optional `StorySourceAdapter` hook reading the build's `preview-stats.json` for affected tracing; sources without it render everything.
 - `Ai`, `AiError` (`core/ai`) — the AI singleton surface behind `ShelfOptions.ai` (not an adapter, like `Auth`); `@storyshelf/ai` implements it. `core/insights` holds the pure evidence builders, redaction, result envelopes and budget math. See the [AI insights guide](/ai/).
-- `diffImages(baseline, current, options)` (`core/diff`) performs the pixel-level comparison.
-- `createDatabaseCaptureQueue(db, options)` (`core/capture`) is the job queue on the app's own database (`capture_jobs`), and `createCaptureConsumer({ queue, capture, handlers, config })` the consumer that runs its jobs, with a handler per job kind.
+- `ImageEngine` (`core/adapter/capture-runner`) is the contract for the pixel-level comparison; the runner supplies it as `CaptureRunner.images` (`@storyshelf/runner/images`).
+- `createDatabaseCaptureQueue(db, options)` (`core/jobs`) is the job queue on the app's own database (`capture_jobs`), and `createCaptureConsumer({ queue, handlers, config })` the consumer that runs its jobs, with a handler per job kind (`createCaptureHandler` from `core/capture` for `capture`).
 - `createUrlBuilder(baseUrl, publishedBaseDomain?)` (`core/urls`) builds application and published Storybook URLs.
 
 ## Adapter contracts

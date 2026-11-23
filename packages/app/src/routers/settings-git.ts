@@ -4,7 +4,7 @@
  * delivery works with testing off) and project-admin only.
  */
 import { cappedOutputs, isCommentMode, type StateOutputs } from "@storyshelf/core/adapter/notifier";
-import { postsComments, requestRepositoryLink } from "@storyshelf/core/capture";
+import { postsComments, requestRepositoryLink } from "@storyshelf/core/build-state";
 import {
   GitRepositoryLinkModel,
   connectionHost,

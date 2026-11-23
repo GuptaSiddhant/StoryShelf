@@ -1,3 +1,6 @@
+import { createNotifyEnqueuer } from "../../build-state/notify-job.ts";
+import { createBuildStatePublisher } from "../../build-state/publisher.ts";
+import type { BuildStatePublisher } from "../../build-state/types.ts";
 /**
  * Entry helper for a forked capture child (`testing.workerEntry`). The app is the consumer: it
  * polls the database queue, holds the slots and the lease, and pushes each leased job here over
@@ -11,28 +14,25 @@
  * await runCaptureChild({ db, storage, runner, scratchDir });
  * ```
  */
+import type { ShelfCompareOptions, ShelfImagesOptions } from "../../config.ts";
+import type { ConsumerJob, KindHandler } from "../../jobs/consumer/types.ts";
+import { createDatabaseCaptureQueue, DEFAULT_RETRIES } from "../../jobs/db-queue/index.ts";
 import { createShelfLogger, type Logger } from "../../logger.ts";
-import { createNotifyEnqueuer } from "../build-state/notify-job.ts";
-import { createBuildStatePublisher } from "../build-state/publisher.ts";
-import type { BuildStatePublisher } from "../build-state/types.ts";
-import {
-  createCaptureHandler,
-  originOf,
-  type CaptureHandlerOptions,
-} from "../consumer/capture-handler.ts";
-import { applyImageSettings, ensureImageEngine } from "../consumer/startup.ts";
-import type { CaptureConsumerOptions, ConsumerJob, KindHandler } from "../consumer/types.ts";
-import { createDatabaseCaptureQueue, DEFAULT_RETRIES } from "../db-queue/index.ts";
+import { createCaptureHandler, originOf, type CaptureHandlerOptions } from "../capture-handler.ts";
+import { applyImageSettings, ensureImageEngine } from "../image-engine.ts";
 import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
 import { isParentMessage, type ChildMessage } from "./protocol.ts";
 
 /** Handler options minus the shard hand-out, which the child wires to the database queue. */
-export type CaptureChildOptions = Omit<CaptureHandlerOptions, "enqueue" | "logger"> &
-  Pick<CaptureConsumerOptions, "images" | "compare"> & {
-    logger?: Logger;
-    /** Retries stamped on shard jobs (default: the parent's `testing.retries`, handed down in the environment). */
-    retries?: number;
-  };
+export type CaptureChildOptions = Omit<CaptureHandlerOptions, "enqueue" | "logger"> & {
+  logger?: Logger;
+  /** Image engine, as the server's `testing.images` option; the child fails when it cannot load. */
+  images?: ShelfImagesOptions;
+  /** Diff pool size, as the server's `testing.compare` option. */
+  compare?: ShelfCompareOptions;
+  /** Retries stamped on shard jobs (default: the parent's `testing.retries`, handed down in the environment). */
+  retries?: number;
+};
 
 /** The slice of `process` the child uses; injectable so the lifecycle is testable. */
 export interface ChildHost {
@@ -63,8 +63,8 @@ export async function runCaptureChild(
     throw new Error("runCaptureChild must run in a forked process; set testing.workerEntry");
   }
   const logger = options.logger ?? createShelfLogger();
-  applyImageSettings(options.images, options.compare);
-  await ensureImageEngine(logger);
+  applyImageSettings(options.runner.images, options.images, options.compare);
+  await ensureImageEngine(options.runner.images, logger);
   const forward = forwarder(host);
   const child = new CaptureChild(buildHandler(options, host.env, logger, forward), logger, forward);
   const stopped = wireHost(host, child);

@@ -1,4 +1,4 @@
-import { HttpError, httpJson } from "@storyshelf/core/utils";
+import { HttpError, httpJson } from "@storyshelf/common/http";
 import type { McpConfig } from "./config.ts";
 
 /** Thin JSON client over the StoryShelf `/api/v1` surface (read + comment only). */

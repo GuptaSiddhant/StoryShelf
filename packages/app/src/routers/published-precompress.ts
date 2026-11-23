@@ -4,7 +4,7 @@
  * background and bounded: one build at a time per storage, a short backlog, one file at a time.
  */
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
-import { loadManifest } from "@storyshelf/core/capture";
+import { loadManifest } from "@storyshelf/core/catalog";
 import type { Logger } from "@storyshelf/core/logger";
 import { contentKey, mimeFor, storybookDir } from "@storyshelf/core/utils";
 import type { VariantEncoding } from "./accept-encoding.ts";

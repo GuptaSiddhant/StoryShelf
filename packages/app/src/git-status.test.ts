@@ -1,4 +1,4 @@
-import type { BuildStatePublisher } from "@storyshelf/core/capture";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import { BuildModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";

@@ -4,7 +4,12 @@
  * and no passing status. Through the real app: the build API, the capture queue and the channel.
  */
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
-import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
+import {
+  makeDatabase,
+  makeFakeStateNotifier,
+  makeStorage,
+  fakeImageEngine,
+} from "@storyshelf/core/test-helpers";
 import AdmZip from "adm-zip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,6 +35,7 @@ function runner(): CaptureRunner {
   ]);
   return {
     metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: fakeImageEngine(),
     render: vi.fn(async () => {
       await Promise.resolve();
       return {

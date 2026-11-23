@@ -8,6 +8,7 @@ import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
+import { stubRunner } from "./test-runner.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -86,7 +87,7 @@ describe("background retention", () => {
       const options = {
         database: db,
         storage,
-        ...(testing ? { testing: {} } : {}),
+        ...(testing ? { testing: { runner: stubRunner() } } : {}),
       } as ResolvedShelfOptions;
       const runtime = {
         config: { branchGcIntervalMs: 120_000 },

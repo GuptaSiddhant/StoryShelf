@@ -81,6 +81,18 @@ export default defineShelfInstance(async () => {
     ).rejects.toThrow(/no instance definition/u);
   });
 
+  it("turns a missing known peer into the subpath, the range and the install line", async () => {
+    const source = 'import "@libsql/client";\nexport default 1;\n';
+    await expect(loadInstance(instanceDir({ source }).dir)).rejects.toThrow(
+      /@libsql\/client is not installed \(needed by @storyshelf\/db\/sqlite\/turso\)\. Install it: npm install @libsql\/client@"\^0\.18\.0"/u,
+    );
+  });
+
+  it("leaves any other failed import as it was", async () => {
+    const source = 'import "left-pad-that-does-not-exist";\nexport default 1;\n';
+    await expect(loadInstance(instanceDir({ source }).dir)).rejects.toThrow(/left-pad-that/u);
+  });
+
   it("recognises only app-shaped values", () => {
     expect(isShelfApp(null)).toBe(false);
     expect(isShelfApp({ fetch: () => 1 })).toBe(false);

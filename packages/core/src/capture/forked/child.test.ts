@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { makeDatabase } from "../../test-helpers/fake-database.ts";
+import { pngImageEngine } from "../../test-helpers/png-image-engine.ts";
 import { CAPTURE_RETRIES_ENV, CAPTURE_SHARD_SIZE_ENV } from "./fork.ts";
 
 const dispatch = vi.hoisted(() => ({
@@ -77,7 +78,7 @@ function options(overrides: Record<string, unknown> = {}) {
     db,
     logger: silent as never,
     storage: {} as never,
-    runner: { cancel: vi.fn(async () => {}), render: vi.fn() } as never,
+    runner: { cancel: vi.fn(async () => {}), render: vi.fn(), images: pngImageEngine() } as never,
     scratchDir: ".tmp/child-test",
     ...overrides,
   };
@@ -199,7 +200,7 @@ describe("runCaptureChild", () => {
 
   it("cancels the render of a run when the parent says so", async () => {
     const cancel = vi.fn(async () => {});
-    const opts = options({ runner: { cancel, render: vi.fn() } });
+    const opts = options({ runner: { cancel, render: vi.fn(), images: pngImageEngine() } });
     dispatch.run.mockReset().mockImplementation(async () => {
       await sleep(60);
     });

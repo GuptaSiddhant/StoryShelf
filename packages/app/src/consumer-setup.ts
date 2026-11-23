@@ -8,7 +8,7 @@ import {
   type CaptureConsumerOptions,
   type ConsumerMetrics,
   type ConsumerStopOptions,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/jobs";
 import { captureMetrics } from "@storyshelf/core/telemetry";
 
 /** One consumer from options that are only worked out on the first `start()`. */

@@ -3,7 +3,7 @@
  * first one's builds, and a job whose holder died is finished by another instance once its lease
  * expired.
  */
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, CaptureJobModel } from "@storyshelf/core/models";
 import {

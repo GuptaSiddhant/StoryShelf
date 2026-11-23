@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StoryEntry } from "./adapter.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { planShards, totalCaptures, type EngineWork } from "./shard-plan.ts";
 
 const story = (id: string): StoryEntry => ({ id, title: "T", name: id, type: "story" });

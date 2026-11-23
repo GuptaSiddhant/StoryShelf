@@ -1,6 +1,6 @@
 import { createShelfAuth } from "@storyshelf/auth";
 import { UserModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
 import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
@@ -34,6 +34,7 @@ function brokenLifecycle(message: string): {
 function inProcessRunner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    images: fakeImageEngine(),
     render: async () => ({ captures: [], failures: [] }),
     cancel: async () => {},
   } as never;

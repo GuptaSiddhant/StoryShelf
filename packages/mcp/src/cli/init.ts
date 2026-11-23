@@ -1,4 +1,4 @@
-import { readSetting } from "@storyshelf/core/config";
+import { readSetting } from "@storyshelf/common/settings";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { printError, printLine } from "./output.ts";

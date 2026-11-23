@@ -5,9 +5,9 @@ import {
   cleanIgnoreSelectors,
   getScreenshotPlan,
   ignoreStylesheet,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/adapter/capture-runner";
 import type { Page } from "playwright-core";
-import { checkA11y } from "./a11y.ts";
+import { checkA11y } from "./a11y/a11y.ts";
 import { capturePhase, TransientCaptureError } from "./capture-retry.ts";
 import { acquirePage, type PageLease } from "./pages.ts";
 import { runPlay } from "./play.ts";

@@ -7,13 +7,13 @@
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { NotifierProvider, StateNotifierAdapter } from "../adapters/notifier/provider.ts";
+import { stateTargets } from "../build-state/deliver.ts";
 import type { Logger } from "../logger.ts";
 import type { BuildModel } from "../models/build.ts";
 import type { GitConnectionModel } from "../models/git-connection.ts";
 import type { BranchVerification, Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { SecretInput } from "../utils/encrypt.ts";
-import { stateTargets } from "./build-state/deliver.ts";
 
 /** What checking a claim needs: the project's git channels and the key that decrypts their secrets. */
 export interface StandingDeps {

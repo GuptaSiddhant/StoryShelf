@@ -1,13 +1,15 @@
 /** The runner's `browsers` option: what an operator lists, and the local targets it flattens to. */
 import {
   isBrowserName,
-  isRemoteBrowser,
-  remoteTargetsOf,
   type BrowserName,
-  type RemoteBrowser,
-  type RemoteTarget,
   type RunnerTarget,
 } from "@storyshelf/core/adapter/capture-runner";
+import {
+  isRemoteBrowser,
+  remoteTargetsOf,
+  type RemoteBrowser,
+  type RemoteTarget,
+} from "./remote/remote-browser.ts";
 
 /** Options of {@link local}. */
 export interface LocalOptions {

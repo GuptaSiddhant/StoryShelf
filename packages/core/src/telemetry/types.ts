@@ -1,12 +1,2 @@
-import type { Attributes } from "@opentelemetry/api";
-
-/** Attributes attached to a span or metric measurement. */
-export type SpanAttributes = Attributes;
-
-/** Options for the Hono HTTP middleware (the app's `http-telemetry.ts`). */
-export interface HttpMiddlewareOptions {
-  /** Service name in spans/metrics. Defaults to `OTEL_SERVICE_NAME` resolution. */
-  serviceName?: string;
-  /** Service version in spans/metrics. Defaults to the package version. */
-  serviceVersion?: string;
-}
+/** Moved to `@storyshelf/common/tracing` (#1334); re-exported so core's subpaths keep their names. */
+export type { HttpMiddlewareOptions, SpanAttributes } from "@storyshelf/common/tracing";

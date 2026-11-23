@@ -1,5 +1,5 @@
 /** Project records and slug management. */
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import { isReservedLabel, isUlidShape } from "../content-hosts.ts";
@@ -116,13 +116,15 @@ export class ProjectModel {
   }
 
   private async uniqueSlugFrom(base: string): Promise<string> {
+    // Read the base and its numbered successors (a slug is `[a-z0-9-]`, so `base%` is a plain
+    // prefix); looking only at the base would hand out `base-2` again once it exists.
     const existing = (await this.db.list(this.tables.projects, {
-      where: eq(col(this.tables.projects, "slug"), base),
+      where: like(col(this.tables.projects, "slug"), `${base}%`),
     })) as unknown as Project[];
-    if (existing.length === 0) {
+    const taken = new Set(existing.map((p) => p.slug));
+    if (!taken.has(base)) {
       return base;
     }
-    const taken = new Set(existing.map((p) => p.slug));
     let suffix = 2;
     while (taken.has(`${base}-${suffix}`)) {
       suffix += 1;

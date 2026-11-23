@@ -14,11 +14,6 @@
 //
 // Usage (from the scratch directory): node mixed-queue-previous.mjs <sqlite|postgres> <seconds> <log>
 // Env: DATABASE_URL (postgres) or DATA_DIR (sqlite).
-import {
-  createCaptureConsumer,
-  createDatabaseCaptureQueue,
-  createNotifyHandler,
-} from "@storyshelf/core/capture";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { appendFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -27,13 +22,42 @@ const [dialect, seconds, log] = process.argv.slice(2);
 const dataDir = process.env["DATA_DIR"] ?? ".data";
 const RELEASE = "previous";
 
+/** 0.15.0 folded the database packages into `@storyshelf/db/<dialect>`; older releases ship `@storyshelf/db-<dialect>`. */
+function importDatabase(dialectName) {
+  return import(`@storyshelf/db/${dialectName}`).catch((error) =>
+    error?.code === "ERR_MODULE_NOT_FOUND"
+      ? import(`@storyshelf/db-${dialectName}`)
+      : Promise.reject(error),
+  );
+}
+
+/**
+ * 0.16.0 moved the queue and consumer to `@storyshelf/core/jobs` and the notify job to
+ * `@storyshelf/core/build-state` (#1364); older releases export them from `@storyshelf/core/capture`.
+ */
+async function importJobs() {
+  try {
+    const [jobs, buildState] = await Promise.all([
+      import("@storyshelf/core/jobs"),
+      import("@storyshelf/core/build-state"),
+    ]);
+    return { ...jobs, ...buildState };
+  } catch (error) {
+    if (error?.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") throw error;
+    return import("@storyshelf/core/capture");
+  }
+}
+
+const { createCaptureConsumer, createDatabaseCaptureQueue, createNotifyHandler } =
+  await importJobs();
+
 async function openDatabase() {
   if (dialect === "sqlite") {
-    const { createSqliteDatabase } = await import("@storyshelf/db-sqlite");
+    const { createSqliteDatabase } = await importDatabase("sqlite");
     return createSqliteDatabase(`${dataDir}/shelf.db`);
   }
   if (dialect === "postgres") {
-    const { createPostgresDatabase } = await import("@storyshelf/db-postgres");
+    const { createPostgresDatabase } = await importDatabase("postgres");
     return createPostgresDatabase({ url: process.env["DATABASE_URL"] });
   }
   throw new Error(`unknown dialect: ${dialect}`);

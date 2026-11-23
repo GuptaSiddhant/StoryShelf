@@ -1,5 +1,4 @@
-/** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
-import { publishingOf, publishingOfBuild, type Catalog } from "@storyshelf/core/capture";
+import type { Catalog } from "@storyshelf/core/catalog";
 import {
   BuildModel,
   changesetOf,
@@ -8,6 +7,8 @@ import {
   UserModel,
   type BuildChangeset,
 } from "@storyshelf/core/models";
+/** Data behind the review section of the build page (ADR 0013): verdicts, changeset and comments. */
+import { publishingOf, publishingOfBuild } from "@storyshelf/core/publish";
 import type { Build, Comment, Project } from "@storyshelf/core/schema";
 import { assignedReviewersOf, type AssignedReviewer } from "../review-assignment.ts";
 import { getStore } from "../store.ts";

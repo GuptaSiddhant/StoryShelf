@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RenderedSnapshot } from "../adapters/capture-runner.ts";
-import type { StoryEntry } from "./adapter.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { renderIsolating, type PassOutcome } from "./isolate.ts";
 
 function stories(count: number): StoryEntry[] {

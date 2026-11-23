@@ -1,4 +1,4 @@
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 /**
  * Two OS processes claim from one local SQLite file at the same time (ADR 0006: local-file SQLite

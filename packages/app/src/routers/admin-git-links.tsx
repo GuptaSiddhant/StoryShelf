@@ -4,7 +4,7 @@
  * reconnects or refuses it. The dialogs answer HTMX with their body and a plain request with a page
  * (ADR 0012, decision 10). Coverage is shown to site admins only; a project admin never learns it.
  */
-import { approveRepositoryLink } from "@storyshelf/core/capture";
+import { approveRepositoryLink } from "@storyshelf/core/build-state";
 import { resolveLinkCoverage } from "@storyshelf/core/integrations";
 import { GitLinkStateError, GitRepositoryLinkModel, ProjectModel } from "@storyshelf/core/models";
 import type { GitRepositoryLinkRow } from "@storyshelf/core/schema";

@@ -5,14 +5,11 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import {
-  createCatalogLoader,
-  type BuildStatePublisher,
-  type CatalogLoader,
-} from "@storyshelf/core/capture";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
+import { createCatalogLoader, type CatalogLoader } from "@storyshelf/core/catalog";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { IntegrationStatus } from "@storyshelf/core/integrations";
-import type { GitLinkConfig } from "@storyshelf/core/integrations";
+import type { GitLinkConfig, Vapid } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
 import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -46,14 +43,19 @@ export interface Store {
   buildState?: BuildStatePublisher;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
-  /** The capture runner (`options.testing.runner`); its targets decide which browsers a project may pick. */
-  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  /**
+   * The capture runner (`options.testing.runner`): its targets decide which browsers a project may
+   * pick, and its image engine re-diffs, thumbnails and reports on the health page.
+   */
+  runner?: Pick<CaptureRunner, "metadata" | "images"> | undefined;
   /** The public origin: configured, detected from the platform, or reported by an admin (ADR 0007). */
   publicOrigin?: PublicOriginResolver | undefined;
   /** Design providers (Figma, …); empty when none is wired. */
   design: DesignProvider[];
   /** Notifiers offered to projects: registered and available (issue #1126). */
   notifiers: NotifierProvider[];
+  /** The web push identity (ADR 0048); absent ⇒ push is off. */
+  push?: Vapid | undefined;
   /**
    * Every integration kind with its standing (issue #1126); absent in hand-built stores, which
    * read as "everything wired is available".

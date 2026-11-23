@@ -8,15 +8,14 @@ import type {
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { isFlakyStory, type StoryEntry, type Viewport } from "../adapters/story-source.ts";
 /** The browser loop: one partition + render pass per engine, sequentially. */
-import { currentImageEngine } from "../diff/index.ts";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
-import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { primaryTargetOf, resolveBrowsers } from "./browsers.ts";
@@ -323,7 +322,7 @@ async function renderPass(
     captured: spooled.length + rendered.captures.length,
     failed: rendered.failures.length,
     expected,
-    imageEngine: currentImageEngine(),
+    imageEngine: input.runner.images.state().engine,
   });
   const { environment } = rendered;
   return {

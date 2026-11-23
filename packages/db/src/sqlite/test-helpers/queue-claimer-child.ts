@@ -3,7 +3,7 @@
  * schema already set up by the parent), waits for "go", then claims and acks jobs until the queue
  * is empty, and reports every build id it claimed. Exits when the parent disconnects.
  */
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createSqliteDatabase } from "../index.ts";
 
 const path = process.argv[2];

@@ -7,12 +7,11 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import {
   createBuildStatePublisher,
-  createCaptureConsumer,
-  createDatabaseCaptureQueue,
   createNotifyEnqueuer,
   createNotifyHandler,
   type BuildStateDeps,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/build-state";
+import { createCaptureConsumer, createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { BuildModel, NotificationChannelModel, ProjectModel } from "@storyshelf/core/models";
 import { makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";

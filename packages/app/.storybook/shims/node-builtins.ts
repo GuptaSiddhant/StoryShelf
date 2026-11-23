@@ -45,6 +45,12 @@ export const createDecipheriv = fn("crypto.createDecipheriv");
 export const randomBytes = fn("crypto.randomBytes");
 export const randomUUID = fn("crypto.randomUUID");
 export const timingSafeEqual = fn("crypto.timingSafeEqual");
+// Web push (core's `integrations/push`): reached through `@storyshelf/core/integrations`, never called by a story.
+export const createECDH = fn("crypto.createECDH");
+export const hkdfSync = fn("crypto.hkdfSync");
+export const createPublicKey = fn("crypto.createPublicKey");
+export const sign = fn("crypto.sign");
+export const verify = fn("crypto.verify");
 export const crc32 = fn("zlib.crc32");
 export const inflateRawSync = fn("zlib.inflateRawSync");
 export const setImmediate = fn("timers/promises.setImmediate");
