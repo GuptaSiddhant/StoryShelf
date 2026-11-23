@@ -6,6 +6,8 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/*/bench/**",
+        "$TURBO_ROOT$/packages/*/*.ts",
         "$TURBO_ROOT$/apps/server-image/*.ts",
         "$TURBO_ROOT$/apps/fly-app/*.ts",
         "$TURBO_ROOT$/apps/dev-server/src/**"

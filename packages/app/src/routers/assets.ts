@@ -1,6 +1,9 @@
 import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { assetManifest } from "../asset-manifest.ts";
+import { registerManifest } from "./manifest.ts";
+import { registerOfflineDevicePage } from "./offline-device.ts";
+import { registerServiceWorker } from "./service-worker.ts";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
@@ -34,9 +37,21 @@ function serveHashed(c: Context, asset: Asset, requestedHash: string): Response 
   });
 }
 
-/** Register the static-asset routes (HTMX bundle, shell script, icon sprite, mark and favicon). */
+/** The installable-app routes (ADR 0048): web app manifest, service worker, offline device page. */
+function registerInstallableApp(app: ShelfRouter): void {
+  registerManifest(app);
+  registerServiceWorker(app);
+  registerOfflineDevicePage(app);
+}
+
+/**
+ * Register the static-asset routes (HTMX bundle, shell script, icon sprite, mark, maskable mark and
+ * favicon) and the installable-app routes: the web app manifest, the service worker and the offline
+ * device page (ADR 0048).
+ */
 export function registerAssets(app: ShelfRouter): void {
-  const { client, favicon, htmx, icons, mark } = assetManifest;
+  registerInstallableApp(app);
+  const { client, favicon, htmx, icons, mark, maskable } = assetManifest;
   app.get(String.raw`/assets/:file{htmx-[a-f0-9]+\.js}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^htmx-|\.js$/gu, "");
     return serveHashed(c, { ...htmx, contentType: "application/javascript" }, hash);
@@ -48,6 +63,10 @@ export function registerAssets(app: ShelfRouter): void {
   app.get(String.raw`/assets/:file{icons-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^icons-|\.svg$/gu, "");
     return serveHashed(c, { ...icons, contentType: "image/svg+xml" }, hash);
+  });
+  app.get(String.raw`/assets/:file{mark-maskable-[a-f0-9]+\.svg}`, (c) => {
+    const hash = (c.req.param("file") ?? "").replaceAll(/^mark-maskable-|\.svg$/gu, "");
+    return serveHashed(c, { ...maskable, contentType: "image/svg+xml" }, hash);
   });
   app.get(String.raw`/assets/:file{mark-[a-f0-9]+\.svg}`, (c) => {
     const hash = (c.req.param("file") ?? "").replaceAll(/^mark-|\.svg$/gu, "");

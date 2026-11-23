@@ -1,0 +1,79 @@
+/** Dependencies and handles of build-state delivery (ADR 0014, decisions 5 and 7). */
+import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { BuildStateFlags } from "../adapters/notifier/build-state.ts";
+import type { StateOutputs } from "../adapters/notifier/outputs.ts";
+import type { NotifierProvider, StateNotifierProvider } from "../adapters/notifier/provider.ts";
+import type { NotificationChannel } from "../adapters/notifier/types.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import type { ShelfConfig } from "../config.ts";
+import type { Logger } from "../logger.ts";
+import type { GitConnectionModel } from "../models/git-connection.ts";
+import type { Project } from "../schema/project.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
+
+/** What delivering a build's state needs. */
+export interface BuildStateDeps {
+  db: DatabaseAdapter;
+  /** Read to tell whether the build's Storybook is published; without it publishing reads as pending. */
+  storage?: StorageAdapter | undefined;
+  /** Notifier providers; only the `state` ones (git hosts) take part. */
+  notifiers: readonly NotifierProvider[];
+  /** Server secret that decrypts channel tokens. */
+  secret: SecretInput;
+  /** The published-Storybook domain for Storybook links. */
+  config: Pick<ShelfConfig, "publishedBaseDomain" | "storybookHosting" | "publicBaseUrl">;
+  /**
+   * The resolved public origin (ADR 0007, decision 6): the origin every link starts with. While it
+   * resolves to nothing, no state is requested or delivered (ADR 0014, decision 11).
+   */
+  publicOrigin: () => Promise<string | undefined>;
+  /** Which statuses a project's builds show: `testing` from the server options, review from the project. */
+  flags: (project: Project) => BuildStateFlags;
+  logger: Logger;
+  /**
+   * The server's git connections (ADR 0054). With them, a project's approved repository links are
+   * delivered through their connection beside its per-project git channels; without, links post
+   * nothing.
+   */
+  gitConnections?: GitConnectionModel | undefined;
+}
+
+/**
+ * A channel with the provider that delivers to it. A repository link is delivered as a channel
+ * built from the link and its connection (`id` is the link's), with `link` set.
+ */
+export interface StateTarget {
+  channel: NotificationChannel;
+  provider: StateNotifierProvider;
+  /** Set for a repository link: its id and what it posts besides the gate. */
+  link?: { id: string; outputs: StateOutputs } | undefined;
+}
+
+/** Where a `notify` job or a request delivers: a per-project channel or a repository link. */
+export type TargetRef = { channelId: string } | { linkId: string };
+
+/**
+ * Why a delivery wrote nothing. A link that is not approved (pending, refused, broken), whose
+ * connection is gone, or that this delivery found broken (`link-broken`) posts nothing.
+ */
+export type SkipReason =
+  | "no-build"
+  | "no-channel"
+  | "disabled"
+  | "no-provider"
+  | "no-origin"
+  | "link-not-approved"
+  | "no-connection"
+  | "link-broken";
+
+/**
+ * Asks for a build's current state to be shown on its project's git channels. Never rejects: the
+ * request that triggered it must not fail because a git host did.
+ */
+export interface BuildStatePublisher {
+  /**
+   * With `channelId` (or `linkId`), only that channel (or link) is asked: an operator retry, or a
+   * link just approved. Else every git channel and approved link of the project.
+   */
+  request(buildId: string, only?: { channelId?: string; linkId?: string }): Promise<void>;
+}

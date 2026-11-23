@@ -63,12 +63,14 @@ function filesUnder(): { file: string; text: string }[] {
 
 const FILES = filesUnder();
 const OLD_NAMES = new Set<string>(Object.values(RENAMED_SETTINGS).flat());
-const ALIAS_TABLE = "packages/core/src/env-settings/renames.ts";
+const ALIAS_TABLE = "packages/common/src/settings/renames.ts";
 const CLI_ALIAS_TABLE = "packages/cli/src/settings.ts";
 
 describe("environment variable naming ratchet", () => {
   it("scans the product source", () => {
     expect(FILES.some(({ file }) => file === "apps/server-image/env.ts")).toBe(true);
+    // `@storyshelf/common` owns the reader and the renamed table; the ratchet scans it like any package.
+    expect(FILES.some(({ file }) => file === "packages/common/src/settings/read.ts")).toBe(true);
     expect(FILES.length).toBeGreaterThan(200);
   });
 

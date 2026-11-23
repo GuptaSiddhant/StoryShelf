@@ -6,8 +6,8 @@
  * token (the usual case, and every target without a signed URL) is one render call, as before.
  */
 import type { CaptureTarget, CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { PER_CAPTURE_BUDGET_MS, STORYBOOK_URL_TTL_GRACE } from "../utils/storybook-token.ts";
-import type { StoryEntry } from "./adapter.ts";
 import { renderBudgetMs, renderWithTimeout } from "./render.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";

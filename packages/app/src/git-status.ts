@@ -4,7 +4,7 @@ import {
   requestOpenBuildStates,
   tryRequestOpenBuildStates,
   type OpenBuildRequest,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/build-state";
 import { BuildModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";

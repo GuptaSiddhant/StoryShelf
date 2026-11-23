@@ -4,7 +4,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   databaseQueueMultiInstanceSuite,

@@ -1,5 +1,5 @@
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import {
   BuildModel,
   CaptureJobModel,

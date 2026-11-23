@@ -5,13 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Answers } from "./answers.ts";
 import { writeFiles } from "./writers.ts";
 
+vi.mock("../manifest.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../manifest.ts")>()),
+  // Pin the version so a release does not churn the snapshots; the peer ranges stay the manifest's.
+  ownVersion: () => "0.3.2",
+}));
+
 let out = "";
 let printed = "";
 
 beforeEach(() => {
   out = mkdtempSync(join(tmpdir(), "storyshelf-init-writers-"));
   printed = "";
-  vi.stubGlobal("__PKG_VERSION__", "0.3.2");
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
     printed += String(chunk);
     return true;

@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { ContentCollectingError, recordContentUses } from "@storyshelf/core/capture";
 import { contentHostSuffix, DEFAULT_MAX_UPLOAD_BYTES } from "@storyshelf/core/config";
 import { BuildModel, PackageUsageModel } from "@storyshelf/core/models";
+import { ContentCollectingError, recordContentUses } from "@storyshelf/core/publish";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import {
   CONTENT_HASH_PATTERN,
@@ -115,6 +115,7 @@ import { registerComments } from "./comments.ts";
 import { flashHx } from "./flash.ts";
 import { resolveAuthorizedProject } from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
+import { registerOffline } from "./offline.ts";
 import {
   badRequest,
   buildSchema,
@@ -302,6 +303,7 @@ export function registerBuilds(app: ShelfRouter): void {
 
   registerSnapshots(app);
   registerStoryStatus(app);
+  registerOffline(app);
   registerComments(app);
   registerBuildReviews(app);
   registerBuildChangeset(app);

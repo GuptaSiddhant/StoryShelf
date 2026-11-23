@@ -174,7 +174,7 @@ snippet) and `HttpRequestOptions` (`method`, `headers`, `json`, `timeoutMs` defa
 ## Amendment, 2026-11-11 (other story sources; owner)
 
 - **Correction to decision 3.** Decision 3 says another explorer can be added "without changing the
-  pipeline". That is not true today. `StorySourceAdapter` exists (`packages/core/src/capture/adapter.ts:126`),
+  pipeline". That is not true today. `StorySourceAdapter` exists (`packages/core/src/adapters/story-source.ts:126`),
   but `new StorybookAdapter()` is hard-coded at these production sites:
   - `packages/core/src/capture/orchestrator.ts:258` and `packages/core/src/capture/tests.ts:112`;
   - `packages/runner/src/pipeline.ts:249` and `:297`, and `packages/runner/src/tests.ts:137`;

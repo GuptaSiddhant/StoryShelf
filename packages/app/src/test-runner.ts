@@ -1,9 +1,11 @@
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
+import { fakeImageEngine } from "@storyshelf/core/test-helpers";
 
 /** A capture runner that renders nothing: turns `testing` on in app tests without a browser. */
 export function stubRunner(): CaptureRunner {
   return {
     metadata: { name: "stub", version: "0.0.0", kind: "stub", category: "capture-runner" },
+    images: fakeImageEngine(),
     render: async () => {
       await Promise.resolve();
       return { captures: [], failures: [] };

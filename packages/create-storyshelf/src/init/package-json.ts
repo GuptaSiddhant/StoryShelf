@@ -1,5 +1,4 @@
-declare const __PKG_VERSION__: string;
-
+import { ownVersion, peerRange } from "../manifest.ts";
 import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_ENTRY } from "../scaffold.ts";
 import {
   needsCompose,
@@ -12,31 +11,17 @@ import {
   type StorageChoice,
 } from "./answers.ts";
 
-/** DB peer SDK pins (must match `@storyshelf/db` peerDependencies). */
-const LIBSQL_CLIENT_SDK = "^0.15.0";
-const BETTER_SQLITE3_SDK = "^12.0.0";
-const POSTGRES_SDK = "^3.4.0";
-const PG_SDK = "^8.0.0";
-const NEON_SDK = "^1.1.0";
-const VERCEL_POSTGRES_SDK = "^0.10.0";
-const PGLITE_SDK = "^0.5.8";
-const MYSQL2_SDK = "^3.9.0";
-const PLANETSCALE_SDK = "^1.19.0";
-const TIDBCLOUD_SDK = "^0.1.0";
-/** Email peer SDK pin, installed only for SMTP (the optional `nodemailer` peer of @storyshelf/core). */
-const NODEMAILER_SDK = "^10.0.12";
-
 /** One package holds every database adapter, one subpath each. */
 const DB_PACKAGE = "@storyshelf/db";
 
 /** Local storage is built into `@storyshelf/core/storage/local` (ADR 0049), so it has no package. */
 const STORAGE_PACKAGE = "@storyshelf/storage";
 
-/** The cloud SDKs a backend needs: optional peers of `@storyshelf/storage`, so the scaffold installs them (must match its peerDependencies). */
-const STORAGE_SDKS: Record<Exclude<StorageChoice, "local">, Record<string, string>> = {
-  s3: { "@aws-sdk/client-s3": "^3.700.0", "@aws-sdk/lib-storage": "3.700.0" },
-  azure: { "@azure/identity": "^4.14.1", "@azure/storage-blob": "^12.26.0" },
-  gcs: { "@google-cloud/storage": "^7.13.0" },
+/** The cloud SDKs a backend needs: optional peers of `@storyshelf/storage`, which the scaffold installs. */
+const STORAGE_SDKS: Record<Exclude<StorageChoice, "local">, readonly string[]> = {
+  s3: ["@aws-sdk/client-s3", "@aws-sdk/lib-storage"],
+  azure: ["@azure/identity", "@azure/storage-blob"],
+  gcs: ["@google-cloud/storage"],
 };
 
 const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
@@ -45,36 +30,33 @@ const AUTH_PACKAGE: Record<AuthChoice, string | null> = {
   oauth: "@storyshelf/auth",
 };
 
-/** The peer SDK a database preset needs, as package name and pinned range. */
-const DB_SDK: Partial<Record<DatabaseChoice, readonly [string, string]>> = {
-  turso: ["@libsql/client", LIBSQL_CLIENT_SDK],
-  "better-sqlite3": ["better-sqlite3", BETTER_SQLITE3_SDK],
-  postgres: ["postgres", POSTGRES_SDK],
-  pg: ["pg", PG_SDK],
-  neon: ["@neondatabase/serverless", NEON_SDK],
-  "neon-http": ["@neondatabase/serverless", NEON_SDK],
-  vercel: ["@vercel/postgres", VERCEL_POSTGRES_SDK],
-  pglite: ["@electric-sql/pglite", PGLITE_SDK],
-  mysql: ["mysql2", MYSQL2_SDK],
-  planetscale: ["@planetscale/database", PLANETSCALE_SDK],
-  tidb: ["@tidbcloud/serverless", TIDBCLOUD_SDK],
+/** The optional peer SDK a database preset needs, from the peers of `@storyshelf/db`. */
+const DB_SDK: Partial<Record<DatabaseChoice, string>> = {
+  turso: "@libsql/client",
+  "better-sqlite3": "better-sqlite3",
+  postgres: "postgres",
+  pg: "pg",
+  neon: "@neondatabase/serverless",
+  "neon-http": "@neondatabase/serverless",
+  vercel: "@vercel/postgres",
+  pglite: "@electric-sql/pglite",
+  mysql: "mysql2",
+  planetscale: "@planetscale/database",
+  tidb: "@tidbcloud/serverless",
 };
 
 /** The given StoryShelf packages, all at the version of this CLI. */
 function ownPackages(names: readonly string[]): Record<string, string> {
-  // Follow-up #1332: take these pins from the generated version manifest instead of `__PKG_VERSION__`.
-  const version = __PKG_VERSION__ ?? "0.0.0";
+  const version = ownVersion();
   return Object.fromEntries(names.map((name) => [name, version]));
 }
 
-/** The app, the database package and, with observability or SMTP, the packages those add. */
+/** The app, core (a peer of every adapter, so never left to chance), the database package and observability. */
 function coreNames(answers: Answers): string[] {
-  const names = ["@storyshelf/app", DB_PACKAGE];
-  const withCore =
-    wantsObservability(answers) || wantsNotifications(answers) || answers.storage === "local";
   return [
-    ...names,
-    ...(withCore ? ["@storyshelf/core"] : []),
+    "@storyshelf/app",
+    "@storyshelf/core",
+    DB_PACKAGE,
     ...(wantsObservability(answers) ? ["@storyshelf/observability"] : []),
   ];
 }
@@ -89,14 +71,25 @@ function featureNames(answers: Answers): string[] {
   ];
 }
 
+/** The peer SDKs the answers need, at the range their owner declares in the manifest. */
+function sdkPins(answers: Answers): Record<string, string> {
+  const db = DB_SDK[answers.database];
+  const pins: [string, string][] = [];
+  if (db !== undefined) pins.push([db, peerRange(DB_PACKAGE, db)]);
+  if (answers.storage !== "local") {
+    for (const sdk of STORAGE_SDKS[answers.storage])
+      pins.push([sdk, peerRange(STORAGE_PACKAGE, sdk)]);
+  }
+  if (wantsNotifications(answers))
+    pins.push(["nodemailer", peerRange("@storyshelf/core", "nodemailer")]);
+  return Object.fromEntries(pins);
+}
+
 function buildDeps(answers: Answers): Record<string, string> {
-  const sdk = DB_SDK[answers.database];
   return {
     ...ownPackages(coreNames(answers)),
-    ...(sdk ? { [sdk[0]]: sdk[1] } : {}),
     ...ownPackages(featureNames(answers)),
-    ...(answers.storage === "local" ? {} : STORAGE_SDKS[answers.storage]),
-    ...(wantsNotifications(answers) ? { nodemailer: NODEMAILER_SDK } : {}),
+    ...sdkPins(answers),
   };
 }
 

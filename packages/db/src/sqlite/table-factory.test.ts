@@ -195,6 +195,9 @@ describe("SQLite table factory (spike #800)", () => {
     expectTypeOf(sqliteTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.gitRepositoryLinks.$inferSelect
     >();
+    expectTypeOf(sqliteTableOf(ns.pushSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.pushSubscriptions.$inferSelect
+    >();
   });
 
   it("maps json<T> to TEXT that parses on read", async () => {

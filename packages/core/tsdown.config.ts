@@ -10,7 +10,7 @@ const config = libConfig({
   "adapter/setup": "./src/adapters/setup.ts",
   "adapter/database": "./src/adapters/database.ts",
   "adapter/storage": "./src/adapters/storage.ts",
-  "adapter/capture-runner": "./src/adapters/capture-runner.ts",
+  "adapter/capture-runner": "./src/capture/runner-kit.ts",
   "adapter/design": "./src/adapters/design.ts",
   "adapter/oauth": "./src/adapters/oauth.ts",
   "adapter/capture-queue": "./src/adapters/capture-queue.ts",
@@ -20,10 +20,12 @@ const config = libConfig({
   "storage/local": "./src/storage/local/index.ts",
   logger: "./src/logger.ts",
   capture: "./src/capture/index.ts",
+  jobs: "./src/jobs/index.ts",
+  publish: "./src/publish/index.ts",
+  "build-state": "./src/build-state/index.ts",
+  catalog: "./src/catalog/index.ts",
   config: "./src/config.ts",
   db: "./src/db/index.ts",
-  diff: "./src/diff/index.ts",
-  "diff/worker": "./src/diff/worker.ts",
   models: "./src/models/index.ts",
   retention: "./src/retention/purge.ts",
   orm: "./src/orm/index.ts",
@@ -38,6 +40,4 @@ const config = libConfig({
   "test-helpers": "./src/test-helpers/index.ts",
 });
 
-// `diff/worker` is built only so the diff pool can spawn it via `new URL("worker.mjs", import.meta.url)`;
-// it stays out of the public `exports` map.
-export default { ...config, exports: { devExports: "source", exclude: ["diff/worker"] } };
+export default config;

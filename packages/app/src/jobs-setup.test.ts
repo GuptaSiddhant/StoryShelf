@@ -1,6 +1,6 @@
 import type { StateNotifierProvider } from "@storyshelf/core/adapter/notifier";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import {

@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/observability",
-  "version": "0.14.0",
-  "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over @storyshelf/core adapters.",
+  "version": "0.16.0",
+  "description": "StoryShelf observability: OpenTelemetry tracing, metrics, and log correlation over StoryShelf adapters.",
   "keywords": [
     "metrics",
     "observability",
@@ -67,7 +67,7 @@
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
-    "@storyshelf/core": "workspace:*",
+    "@storyshelf/common": "workspace:*",
     "hono": "catalog:"
   },
   "devDependencies": {

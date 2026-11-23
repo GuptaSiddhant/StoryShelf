@@ -200,6 +200,9 @@ describe("MySQL table factory (spike #800)", () => {
     expectTypeOf(mysqlTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.gitRepositoryLinks.$inferSelect
     >();
+    expectTypeOf(mysqlTableOf(ns.pushSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.pushSubscriptions.$inferSelect
+    >();
   });
 
   it("maps json<T> to TEXT that parses on read", async () => {

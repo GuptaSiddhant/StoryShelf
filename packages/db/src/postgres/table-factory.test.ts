@@ -232,6 +232,9 @@ describe("Postgres table factory (spike #800)", () => {
     expectTypeOf(pgTableOf(ns.gitRepositoryLinks, resolve).$inferSelect).toEqualTypeOf<
       typeof schema.gitRepositoryLinks.$inferSelect
     >();
+    expectTypeOf(pgTableOf(ns.pushSubscriptions, resolve).$inferSelect).toEqualTypeOf<
+      typeof schema.pushSubscriptions.$inferSelect
+    >();
   });
 
   it("maps json<T> to TEXT that parses on read", async () => {

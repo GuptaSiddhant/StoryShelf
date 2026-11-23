@@ -11,7 +11,8 @@ Commands:
   purge           Purge expired builds (--ttl-days)
   check-storage   Read-only: report blobs the database references but storage lacks
                   (--sample <n>; exits 1 when something is missing)
-  doctor          Check the instance module, its settings and the schema level (no side effects)
+  doctor          Check the installed @storyshelf/* packages and their peers, the instance module, its
+                  settings and the schema level (no side effects)
 
 purge, check-storage and doctor never migrate and start no job consumer, timer or replay.
 

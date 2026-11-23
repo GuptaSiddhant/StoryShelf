@@ -13,7 +13,7 @@ Capture is CPU/IO-heavy and long-running (minutes to tens of minutes). It must n
 
 ### Database queue (`capture_jobs`)
 
-`createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/capture`, `core/src/capture/db-queue/`)
+`createDatabaseCaptureQueue(db, options)` (`@storyshelf/core/jobs`, `core/src/jobs/db-queue/`)
 is a `PollableCaptureQueue` on the app's own database and the app's only production queue (ADR 0006;
 there is no in-memory queue). The claim algorithm needs only one primitive from
 the adapter, a unique-key insert whose conflict can be told apart (the `claimFinalize` pattern):
@@ -41,10 +41,13 @@ visible_at LIMIT 1`, a range scan of `capture_jobs_poll_idx`. Only candidates ha
 5. **Cancel.** `cancel(jobId | buildId)` ends a queued job at once and flags a running one on its
    job and attempt rows; a build id covers every job kind of the build (capture, publish, notify).
 
-**Consumer** (`createCaptureConsumer`, `core/src/capture/consumer/`). Consumes any
+**Consumer** (`createCaptureConsumer`, `@storyshelf/core/jobs`, `core/src/jobs/consumer/`). Consumes any
 `PollableCaptureQueue` (this queue and the IPC queue of a forked child) and runs a
-handler per job `kind`: `capture` is wired to `createDispatchJob`; `publish` and `notify` register
-through `handlers`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
+handler per job `kind`, all registered through `handlers`: `capture` is `createCaptureHandler`
+(`core/src/capture/capture-handler.ts`, wired to `createDispatchJob`), `publish` and `notify` come
+from `/publish` and `/build-state`. Before it polls, the consumer awaits each handler's `prepare`
+(the capture handler's loads the image engine, so a consumer without `capture` never touches it);
+a rejection stops `start()`; on the database queue the consumer calls `claimOnly` with its handler kinds, so a poll never
 claims a kind it cannot run (a queue that does not filter by kind fails such a job with `no handler
 registered for job kind "<kind>"`). Every payload carries a version `v` (absent = 1); a job newer
 than the handler's `payloadVersion` is handed back (`handBack`: queued again after a delay, attempt
@@ -86,6 +89,6 @@ one SQLite file, plus gated live runs on Postgres, MySQL and Turso.
 
 ### Clock
 
-Every lease is an absolute timestamp on the clock of the copy that wrote it. `isoAt` (`packages/core/src/capture/db-queue/clock.ts`) stamps each `visible_at`, claim, renewal and expiry check from that copy's runtime `now`, and every copy compares another copy's lease with its own `now`. The queue therefore assumes the copies' clocks agree. Run every copy with NTP or the platform's time sync.
+Every lease is an absolute timestamp on the clock of the copy that wrote it. `isoAt` (`packages/core/src/jobs/db-queue/clock.ts`) stamps each `visible_at`, claim, renewal and expiry check from that copy's runtime `now`, and every copy compares another copy's lease with its own `now`. The queue therefore assumes the copies' clocks agree. Run every copy with NTP or the platform's time sync.
 
 A holder renews its lease to `its now + leaseMs` every `min(30 s, leaseMs / 3)` (`keeper.ts`), so its last renewal is up to one interval old. If two copies' clocks differ by `leaseMs − renewal interval` or more, a copy can see a live holder's lease as expired and take the job over. With the default lease of 300 s that is about 270 s. Ordinary clock drift is far below that, but a host that has drifted by minutes must be fixed before it runs a copy.

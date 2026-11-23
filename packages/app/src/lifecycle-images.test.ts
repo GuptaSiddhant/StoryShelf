@@ -1,23 +1,35 @@
+import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import type { ServerRuntime } from "./runtime.ts";
+import { stubRunner } from "./test-runner.ts";
 
-// The lifecycle only needs these two image hooks; the engine that cannot load is simulated here.
-vi.mock("@storyshelf/core/diff", () => ({
-  shutdownDiffPool: async (): Promise<void> => {},
-  verifyImageEngine: async (): Promise<never> => {
-    throw new Error('images.engine "sharp" needs the optional `sharp` package');
-  },
-}));
+// The lifecycle reaches images only through the runner's engine; one that cannot load is simulated here.
+function runnerWithBrokenImages(): CaptureRunner {
+  const runner = stubRunner();
+  return {
+    ...runner,
+    images: {
+      ...runner.images,
+      verify: async (): Promise<never> => {
+        throw new Error('images.engine "sharp" needs the optional `sharp` package');
+      },
+    },
+  };
+}
 
 it("fails readiness, under the images category, when the image engine cannot load", async () => {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage } as unknown as ResolvedShelfOptions;
+  const options = {
+    database: db,
+    storage,
+    testing: { runner: runnerWithBrokenImages() },
+  } as unknown as ResolvedShelfOptions;
   const runtime = {
     config: { branchTtlDays: null },
     logger: pino({ level: "silent" }),

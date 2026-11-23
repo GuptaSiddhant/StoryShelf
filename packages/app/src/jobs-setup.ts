@@ -1,17 +1,12 @@
+import { NOTIFY_MAX_ATTEMPTS, type BuildStatePublisher } from "@storyshelf/core/build-state";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 /**
  * Background jobs of the app (ADR 0006): the one database queue, the handlers of its job kinds
  * (`capture` with `testing`, `publish` on a long-running host, `notify` and `review-request` on a queue of its own) and the one consumer that runs
  * them.
  */
-import {
-  DEFAULT_RETRIES,
-  NOTIFY_MAX_ATTEMPTS,
-  type BuildStatePublisher,
-  type CaptureConsumer,
-  type KindHandler,
-} from "@storyshelf/core/capture";
-import type { ResolvedShelfOptions } from "@storyshelf/core/config";
-import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
+import { DEFAULT_RETRIES, type CaptureConsumer, type KindHandler } from "@storyshelf/core/jobs";
 import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
 import { setupCapture, type CaptureWiring } from "./capture-setup.ts";

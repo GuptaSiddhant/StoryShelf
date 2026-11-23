@@ -23,7 +23,7 @@ interface DiffResult {
 }
 ```
 
-Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0008). The engine (codecs, worker pool) is internal to `core/diff`; `@storyshelf/image` is a deprecated re-export.
+Uses `pixelmatch` for pixel comparison and a PNG codec for decode/encode: `pngjs` by default, or opt-in `sharp` (`testing.images.engine`, ADR 0008). The engine (codecs, worker pool, pixel diff) lives in `@storyshelf/runner/images`, whose dependencies are `pngjs` and `pixelmatch`; `sharp` is an optional peer of the runner (#1365). Core holds only the contract: `ImageEngine` (`configure`, `verify`, `compare`, `downscale`, `state`, `shutdown`), `DiffOptions`, `DiffResult` and `DEFAULT_DIFF_OPTIONS` in `core/adapter/capture-runner`, and every comparison goes through `CaptureRunner.images`. The app configures it from `testing.images`/`testing.compare` and verifies it at setup; the capture consumer verifies it before its first poll. `no-image-libraries.test.ts` fails if core imports `pngjs`, `pixelmatch` or `sharp` outside its test double.
 
 ### Diff Overlay
 

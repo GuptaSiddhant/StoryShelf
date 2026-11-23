@@ -1,4 +1,3 @@
-import type { HeldConnection } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser } from "playwright-core";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -12,6 +11,7 @@ import {
   safeCloseBrowser,
   trackRun,
 } from "./browser.ts";
+import type { HeldConnection } from "./remote/remote-lease.ts";
 
 const browserOf = (): Browser => ({ close: vi.fn(async () => await Promise.resolve()) }) as never;
 const leaseOf = (end = vi.fn(async () => await Promise.resolve())): HeldConnection =>

@@ -68,8 +68,10 @@ function triggerVerdict(input) {
 /**
  * What the release workflow does: open a release pull request, refresh the open one, or nothing.
  * A refresh only happens when exactly one release pull request is open and `main` has changesets
- * it does not consume; the trigger does not matter, because the branch is only ever rewritten
- * by the workflow (ADR 0043). More than one open release pull request is left for the owner.
+ * it does not consume, whatever the trigger, because the branch is only ever rewritten by the
+ * workflow (ADR 0043). A run started by hand also refreshes it, so a fix to `main` that carries no
+ * changeset (CI, release scripts) reaches the release branch. More than one open release pull
+ * request is left for the owner.
  *
  * @param {Parameters<typeof releaseDue>[0]} input See {@link releaseDue}.
  * @returns {{ action: "open" | "refresh" | "none", due: boolean, reason: string }} The plan.
@@ -78,6 +80,9 @@ export function releasePlan(input) {
   if (input.pending > 0 && input.openReleasePrs === 1) {
     if ((input.unconsumed ?? 0) > 0) {
       return { action: "refresh", due: true, reason: "main has changesets the release PR lacks" };
+    }
+    if (input.event === "workflow_dispatch") {
+      return { action: "refresh", due: true, reason: "a refresh was requested by hand" };
     }
     return { action: "none", due: false, reason: "the open release pull request is current" };
   }

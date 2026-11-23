@@ -21,7 +21,7 @@ import {
   type DatabaseCaptureQueue,
   type DatabaseCaptureQueueOptions,
   type DatabaseJob,
-} from "../capture/db-queue/index.ts";
+} from "../jobs/db-queue/index.ts";
 import { attemptRowId, CaptureJobModel } from "../models/capture-job.ts";
 import type { CaptureJobKind } from "../schema/capture-job.ts";
 

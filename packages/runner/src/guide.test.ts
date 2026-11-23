@@ -31,7 +31,7 @@ describe("the self-hosted farm guide", () => {
   });
 
   it("states the fingerprint's font list size the code has", async () => {
-    const { FONT_PROBE_FAMILIES } = await import("@storyshelf/core/utils");
+    const { FONT_PROBE_FAMILIES } = await import("./remote/remote-environment.ts");
     expect(await readFile(GUIDE, "utf8")).toContain(`list of ${FONT_PROBE_FAMILIES.length} common`);
   });
 

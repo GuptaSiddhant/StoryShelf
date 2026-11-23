@@ -1,6 +1,6 @@
 /** Localizing a browser crash to the story that caused it, instead of failing every story with it. */
 import type { RenderFailure, RenderedSnapshot } from "../adapters/capture-runner.ts";
-import type { StoryEntry } from "./adapter.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 
 /**
  * Render one engine's stories, narrowing a crash down to the story that caused it.

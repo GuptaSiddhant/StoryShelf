@@ -6,10 +6,11 @@ import {
   type StoryEntry,
   type TestOutcome,
 } from "@storyshelf/core/adapter/capture-runner";
-import { StorybookAdapter } from "@storyshelf/core/capture";
-import { createPageLimiter, isTimeoutError, type SessionGate } from "@storyshelf/core/utils";
+import { StorybookAdapter } from "@storyshelf/core/adapter/capture-runner";
 import type { Browser, Page } from "playwright-core";
 import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { isTimeoutError } from "./concurrency/adaptive-concurrency.ts";
+import { createPageLimiter } from "./concurrency/page-limiter.ts";
 import { acquirePage } from "./pages.ts";
 import {
   assertReachable,
@@ -18,6 +19,7 @@ import {
   planRun,
   serve,
 } from "./pipeline.ts";
+import type { SessionGate } from "./remote/session-gate.ts";
 import { waitForSettled, type SettleReport } from "./settle.ts";
 import type { ActiveRun, PlaywrightTestsInput, TargetDriver } from "./types.ts";
 

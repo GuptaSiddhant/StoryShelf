@@ -44,6 +44,10 @@ createCaptureRunner({
 - `playwright-core` never downloads browsers. Provision them once per machine or image, pinned to the `playwright-core` version: `npx -y playwright@<version> install --with-deps chromium firefox webkit`.
 - Declaring an engine does not prove it is installed. When the server starts, the runner checks each target without launching anything (the install marker next to Playwright's `executablePath()`, or the system Chrome for a channel), and reports it as `ready` or `unavailable` with a reason on **System → Capture browsers**. A launch that fails anyway marks its target unavailable and fails the job at once with the launch error, instead of being retried as a story crash.
 
+## Image engine
+
+The runner owns every image library: `images: createImageEngine()` from the `/images` subpath is the `ImageEngine` that core's capture, re-diff and AI evidence use through `CaptureRunner.images` (pixelmatch for the comparison, a worker-thread pool, overlays and thumbnails). `pngjs` and `pixelmatch` are dependencies of this package, so nothing extra is installed for the default engine; `sharp` is an optional peer, installed next to the runner for `testing.images.engine: "sharp"` ([Image engines](https://storyshelf.js.org/guides/image-engines/)). Core holds only the contract and imports none of these libraries.
+
 ## Remote browsers
 
 An entry can also be a **remote service**, from the `/remote` subpath: the runner then connects to a browser on another machine instead of launching one, and offers `<engine>@<name>` targets (`chromium@grid`) with their own baselines. The vendor presets (`azurePlaywright`, `browserstack`) are experimental: not verified against live infrastructure.

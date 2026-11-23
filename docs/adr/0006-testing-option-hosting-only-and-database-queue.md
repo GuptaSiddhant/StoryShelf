@@ -140,7 +140,7 @@ hand, and mixed versions are unsupported. A test double may remain.
 
 ### 5. No separate worker; the consumer runs in the app
 
-There is no `@storyshelf/worker`. The consumer lives in `@storyshelf/core/capture` and runs in
+There is no `@storyshelf/worker`. The consumer lives in `@storyshelf/core/jobs` (in `/capture` until #1364) and runs in
 every app instance with `testing`: poll, heartbeat/progress lease, retry with backoff, final-attempt
 rule, cancel the local run on lease loss, drain on SIGTERM. A slot is taken before polling; a
 failing job waits `1000 ms * 2^attempts` (max 30 s); `attempt >= maxAttempts` is the last attempt,

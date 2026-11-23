@@ -1,4 +1,4 @@
-import { withSpan } from "@storyshelf/core/telemetry";
+import { withObservabilitySpan as withSpan } from "@storyshelf/common/tracing";
 import { afterEach, describe, expect, it } from "vitest";
 import { otelLogMixin } from "./logs.ts";
 import { installTestTelemetry, type TestTelemetry } from "./test-setup.ts";

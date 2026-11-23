@@ -122,6 +122,28 @@ describe("ProjectModel", () => {
   });
 });
 
+describe("ProjectModel slug numbering", () => {
+  it("gives each project of the same name the next free numbered slug", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    const make = async (): Promise<string> =>
+      (await model.create({ name: "Test", gitRepository: "o/r" })).slug;
+    const slugs = [await make(), await make(), await make(), await make()];
+    expect(slugs).toEqual(["test", "test-2", "test-3", "test-4"]);
+  });
+
+  it("fills a gap and never reuses a taken numbered slug", async () => {
+    const { db } = makeDatabase();
+    const model = new ProjectModel(db, { projects: db.tables.projects });
+    const first = await model.create({ name: "Test", gitRepository: "o/r" });
+    const second = await model.create({ name: "Test", gitRepository: "o/r" });
+    await model.remove(first.id);
+    expect((await model.create({ name: "Test", gitRepository: "o/r" })).slug).toBe("test");
+    expect(second.slug).toBe("test-2");
+    expect((await model.create({ name: "Test", gitRepository: "o/r" })).slug).toBe("test-3");
+  });
+});
+
 describe("ProjectModel slugs and hosts (ADR 0051)", () => {
   it.each([
     ["admin", "admin-project"],

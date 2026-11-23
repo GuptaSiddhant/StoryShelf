@@ -5,13 +5,13 @@
  * consume (OpenAPI generation, stub-table tests) from touching `capture_jobs`.
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import {
   createDatabaseCaptureQueue,
   DATABASE_QUEUE_METADATA,
   type DatabaseCaptureQueue,
   type DatabaseJob,
-} from "@storyshelf/core/capture";
-import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+} from "@storyshelf/core/jobs";
 import type { CaptureJobKind } from "@storyshelf/core/schema";
 
 /** What a kind does when a job of it failed because its last attempt lost its lease. */

@@ -99,7 +99,7 @@ semantics.
 ### 4. Retry limits are per queue
 
 `testing.retries` is the retry limit of the main queue. Other queues declare their own constant
-next to their handler (`NOTIFY_MAX_ATTEMPTS` in `packages/core/src/capture/build-state/notify-job.ts`).
+next to their handler (`NOTIFY_MAX_ATTEMPTS` in `packages/core/src/build-state/notify-job.ts`).
 A lost lease, a failed attempt and a child crash count against the same limit within a queue.
 
 ## Not decided here

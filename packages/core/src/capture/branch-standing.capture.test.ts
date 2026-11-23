@@ -14,6 +14,7 @@ import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import type { Build } from "../schema/build.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { createUrlBuilder } from "../urls.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { executeCaptureJob } from "./orchestrator.ts";
@@ -40,6 +41,7 @@ function runner(): CaptureRunner {
   const header = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   return {
     metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     render: vi.fn(async () => {
       await Promise.resolve();
       return {

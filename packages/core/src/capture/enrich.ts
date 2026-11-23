@@ -1,7 +1,7 @@
 /** Orchestrator pre-pass: learn each story's modes before building the capture matrix. */
 import type { Logger } from "pino";
 import type { CaptureTarget, CaptureRunner } from "../adapters/capture-runner.ts";
-import type { StoryEntry, Viewport } from "./adapter.ts";
+import type { StoryEntry, Viewport } from "../adapters/story-source.ts";
 import { filterModes, MAX_MODES_PER_STORY } from "./modes.ts";
 import { renderBudgetMs } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";

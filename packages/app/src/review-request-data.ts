@@ -3,7 +3,7 @@
  * (`eventId` + target), the parse of a stored job's data, and the enqueuer that skips a request the
  * build already has a job for. References only: never an address, URL or secret.
  */
-import { NOTIFY_MAX_ATTEMPTS } from "@storyshelf/core/capture";
+import { NOTIFY_MAX_ATTEMPTS } from "@storyshelf/core/build-state";
 import { CaptureJobModel } from "@storyshelf/core/models";
 import type { JobQueue } from "./job-queue.ts";
 import type { NotifyDeps, ReviewRequestJob, ReviewTarget } from "./notify.ts";
@@ -13,7 +13,7 @@ export function reviewRequestKey(eventId: string, target: ReviewTarget): string 
   const who =
     target.kind === "channel"
       ? `channel:${target.channelId}`
-      : `user:${target.userId}:${target.provider}`;
+      : `user:${target.userId}:${target.provider}${target.deviceId === undefined ? "" : `:${target.deviceId}`}`;
   return `${eventId}|${who}`;
 }
 
@@ -40,6 +40,7 @@ function isTarget(value: unknown): value is ReviewTarget {
     : record["kind"] === "user" &&
         typeof record["userId"] === "string" &&
         typeof record["provider"] === "string" &&
+        (record["deviceId"] === undefined || typeof record["deviceId"] === "string") &&
         ["subscription", "default", "assigned"].includes(String(record["route"]));
 }
 

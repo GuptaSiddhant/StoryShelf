@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/auth",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "description": "Better Auth engine for StoryShelf: opaque DBAdapter bridge, shelf factory, and auth presets.",
   "keywords": [
     "auth",
@@ -54,11 +54,11 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.14",
     "@better-auth/sso": "1.7.14",
-    "@storyshelf/core": "workspace:*",
     "better-auth": "1.7.14",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@storyshelf/core": "workspace:*",
     "@storyshelf/db": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -70,7 +70,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "drizzle-orm": "^1.0.0-rc.6"
+    "@storyshelf/core": "workspace:*"
   },
   "engines": {
     "node": ">=24"

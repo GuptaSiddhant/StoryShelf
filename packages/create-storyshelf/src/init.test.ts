@@ -13,11 +13,16 @@ vi.mock("prompts", () => ({
 import prompts from "prompts";
 import { runInit } from "./init.ts";
 
+vi.mock("./manifest.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./manifest.ts")>()),
+  // Pin the version so a release does not churn the snapshots; the peer ranges stay the manifest's.
+  ownVersion: () => "0.3.2",
+}));
+
 beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), "storyshelf-server-init-"));
   dir = join(tmpRoot, "my-server");
   vi.mocked(prompts).mockReset();
-  vi.stubGlobal("__PKG_VERSION__", "0.3.2");
 });
 
 afterEach(() => {

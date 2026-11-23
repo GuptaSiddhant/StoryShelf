@@ -3,7 +3,7 @@
  * rollback really undoes the end of the job and a second settler really waits for the first.
  */
 import type { DatabaseAdapter, TxStore } from "@storyshelf/core/adapter/database";
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import { CaptureJobModel } from "@storyshelf/core/models";
 import { describe, expect, it } from "vitest";

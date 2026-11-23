@@ -1,6 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { peerRange } from "../manifest.ts";
 import type { Answers } from "./answers.ts";
 import { generatePackageJson } from "./package-json.ts";
+
+vi.mock("../manifest.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../manifest.ts")>()),
+  // Pin the version so a release does not churn the snapshots; the peer ranges stay the manifest's.
+  ownVersion: () => "0.3.2",
+}));
 
 interface Generated {
   name: string;
@@ -9,14 +16,6 @@ interface Generated {
   devDependencies: Record<string, string>;
   engines: Record<string, string>;
 }
-
-beforeEach(() => {
-  vi.stubGlobal("__PKG_VERSION__", "0.3.2");
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 function pkg(overrides: Partial<Answers> = {}): Generated {
   return JSON.parse(
@@ -47,11 +46,6 @@ describe("generatePackageJson", () => {
     const { dependencies } = pkg({ notifications: true });
     expect(dependencies["@storyshelf/app"]).toBe("0.3.2");
     expect(dependencies["@storyshelf/core"]).toBe("0.3.2");
-  });
-
-  it("falls back to 0.0.0 when the build did not define the version", () => {
-    vi.stubGlobal("__PKG_VERSION__", null);
-    expect(pkg().dependencies["@storyshelf/app"]).toBe("0.0.0");
   });
 
   it("does not write @hono/node-server: storyshelf-server serves through @storyshelf/app", () => {
@@ -127,14 +121,24 @@ describe("generatePackageJson", () => {
     expect(pkg({ auth: "oauth" }).dependencies["@storyshelf/auth"]).toBeDefined();
   });
 
-  it("adds nodemailer only when SMTP is chosen, and core only for SMTP or local storage", () => {
-    const { dependencies } = pkg({ notifications: true });
-    expect(dependencies["nodemailer"]).toBeDefined();
-    expect(dependencies["@storyshelf/core"]).toBeDefined();
-    const off = pkg({ notifications: false, storage: "s3" }).dependencies;
-    expect(off["nodemailer"]).toBeUndefined();
-    expect(off["@storyshelf/core"]).toBeUndefined();
-    expect(pkg({ notifications: false }).dependencies["@storyshelf/core"]).toBeDefined();
+  it("adds nodemailer only when SMTP is chosen", () => {
+    expect(pkg({ notifications: true }).dependencies["nodemailer"]).toBeDefined();
+    expect(pkg({ notifications: false, storage: "s3" }).dependencies["nodemailer"]).toBeUndefined();
+  });
+
+  it("always writes @storyshelf/core: it is a peer of every adapter, not pulled in transitively", () => {
+    for (const storage of ["local", "s3"] as const) {
+      expect(pkg({ storage, notifications: false }).dependencies["@storyshelf/core"]).toBe("0.3.2");
+    }
+  });
+
+  it("writes every SDK at the range its owner declares in the version manifest", () => {
+    const deps = pkg({ database: "turso", storage: "s3", notifications: true }).dependencies;
+    expect(deps["@libsql/client"]).toBe(peerRange("@storyshelf/db", "@libsql/client"));
+    expect(deps["@aws-sdk/lib-storage"]).toBe(
+      peerRange("@storyshelf/storage", "@aws-sdk/lib-storage"),
+    );
+    expect(deps["nodemailer"]).toBe(peerRange("@storyshelf/core", "nodemailer"));
   });
 
   it("adds the observability packages only when asked", () => {

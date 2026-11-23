@@ -4,6 +4,8 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import { parseDesignUrl, type DesignProvider } from "../adapters/design.ts";
 import type { NotifierProvider } from "../adapters/notifier/provider.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { DEFAULT_VIEWPORTS, isDisabledStory } from "../adapters/story-source.ts";
+import type { DiscoverOptions, Viewport } from "../adapters/story-source.ts";
 import { BuildModel, type BuildTables } from "../models/build.ts";
 import {
   emitAttemptLog,
@@ -13,6 +15,9 @@ import {
 import type { CaptureLogTables } from "../models/capture-log.ts";
 import type { GitConnectionModel } from "../models/git-connection.ts";
 import type { ProjectTables } from "../models/project.ts";
+import type { ExtractionLimits } from "../publish/limits.ts";
+import { removeJobScratch } from "../publish/scratch.ts";
+import { persistStorybookStatics } from "../publish/statics.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { parentContext, withSpan } from "../tracing.ts";
@@ -20,8 +25,6 @@ import type { SecretInput } from "../utils/encrypt.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookDir as storybookDirKey } from "../utils/paths.ts";
 import { roundedTimings, runWithTimings, timed } from "../utils/timing.ts";
-import { DEFAULT_VIEWPORTS, isDisabledStory } from "./adapter.ts";
-import type { DiscoverOptions, Viewport } from "./adapter.ts";
 import { affectedPathsFor } from "./affected.ts";
 import { settleBranchStanding } from "./branch-standing.ts";
 import { assertSupportedBrowsers, resolveBrowsers } from "./browsers.ts";
@@ -33,12 +36,9 @@ import { captureAcrossBrowsers, type MatrixInput } from "./matrix.ts";
 import { parseModesAllowlist } from "./modes.ts";
 import { persistCapture, type PipelineTables } from "./pipeline.ts";
 import type { CaptureProgress } from "./progress.ts";
-import type { ExtractionLimits } from "./publish/limits.ts";
-import { removeJobScratch } from "./scratch.ts";
 import { fanOutCapture } from "./shards/fan-out.ts";
 import { resolveViewports } from "./sizing.ts";
 import { detectUnstableRenders } from "./stability.ts";
-import { persistStorybookStatics } from "./statics.ts";
 import { storybookUrlSource } from "./storybook-urls.ts";
 import { StorybookAdapter } from "./storybook.ts";
 import { loadTarget } from "./target.ts";
@@ -382,6 +382,7 @@ async function runCapturePhases(
               db: options.db,
               tables: options.tables,
               storage: options.storage,
+              images: options.runner.images,
               project,
               build,
               viewports,
