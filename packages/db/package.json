@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/db",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "description": "Database adapters for StoryShelf: SQLite (node:sqlite default), Postgres and MySQL/MariaDB, with their driver and cloud presets, one subpath each.",
   "keywords": [
     "database",

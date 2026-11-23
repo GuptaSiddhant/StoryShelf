@@ -1,6 +1,6 @@
 {
   "name": "create-storyshelf",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "description": "Scaffold a StoryShelf server: npm create storyshelf.",
   "keywords": [
     "create",
