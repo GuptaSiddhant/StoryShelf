@@ -18,7 +18,7 @@ Three jobs only: serve opted-in Storybooks offline, show the offline home page, 
 - A failed navigation outside `/offline` shows the offline home page, never a stale app page.
 - `notificationclick` opens only URLs on the worker's own origin (`clickTarget`).
 
-`POST /auth/logout` sets `Clear-Site-Data: "cache", "storage"` (`routers/auth.ts`), which clears Cache Storage and IndexedDB and unregisters the worker. Before it, the worker unsubscribes the device's push endpoint and sends it in the `x-push-endpoint` header so the server forgets the row.
+`POST /auth/logout` sets `Clear-Site-Data: "cache", "storage"` (`routers/auth.ts`). A browser that honours the header clears Cache Storage and IndexedDB and unregisters the worker; not every browser does, and the worker deletes nothing itself, so there the copies stay until the next sync drops them or `maxOfflineDays` stops serving them. Before it, the worker unsubscribes the device's push endpoint and sends it in the `x-push-endpoint` header so the server forgets the row.
 
 ## Offline sync
 
