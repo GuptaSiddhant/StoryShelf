@@ -53,7 +53,7 @@ volumes:
   storyshelf-data:
 ```
 
-The variables above are read by `apps/fly-app/instance.ts`, which also reads `SHELF_DATA_DIR`, `PORT`, `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
+The variables above are read by `apps/fly-app/instance.ts`, which also reads `SHELF_DATA_DIR`, `PORT`, `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD` (with `SHELF_SECRET`, required when `FLY_APP_NAME` is set, or boot throws; `SHELF_ALLOW_NO_AUTH=1` opts out, #1360), `SHELF_ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
 
 ### Behind a proxy
 
