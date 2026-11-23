@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rolldown -c rolldown.config.ts",
     "start": "node dist/bin.mjs serve",
-    "lint": "oxlint --type-aware --type-check instance.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts e2e/golden-path.test.ts demo-viewer.ts demo-viewer-db.ts demo-viewer.test.ts && oxlint sprite",
+    "lint": "oxlint --type-aware --type-check instance.ts require-auth.ts require-auth.test.ts ai.ts ai.test.ts vitest.config.ts sprite.ts sprite.test.ts storage.ts storage.test.ts migrate.ts migrate.test.ts migrate-to-s3.ts e2e/golden-path.test.ts demo-viewer.ts demo-viewer-db.ts demo-viewer.test.ts && oxlint sprite",
     "test": "vitest run",
     "test:e2e": "SHELF_E2E=1 vitest run e2e/golden-path.test.ts",
     "dev": "node --conditions=source --experimental-transform-types ../../packages/app/src/server-bin/bin.ts serve --entry instance.ts"
