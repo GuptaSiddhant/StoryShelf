@@ -74,7 +74,7 @@ flowchart TB
         models["Models\ncore/models/*\n(constructor-injected)"]
         schema["Schema\ncore/schema/* + ddl.ts"]
         capture["Capture\ncore/capture/*\norchestrator / pipeline / queue\nstorybook discovery"]
-        diff["Diff\ncore/diff\npixelmatch + pngjs"]
+        diff["Image engine contract\ncore/adapter/capture-runner\n(runner/images: pixelmatch + pngjs)"]
         retention["Retention\ncore/retention/purge.ts"]
         utils["Utils\ncore/utils + paths + urls\nlogger (pino) + config"]
     end
@@ -251,7 +251,7 @@ sequenceDiagram
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
     participant Runner as CaptureRunner<br/>runner
-    participant Diff as Diff Engine<br/>core/diff (pixelmatch)
+    participant Diff as Image Engine<br/>runner.images (pixelmatch)
     participant Git as Git notifier (state delivery)
 
     CI->>CLI: storyshelf upload --token=xxx
@@ -291,7 +291,7 @@ sequenceDiagram
     Orc->>Orc: partition failures → blockingFailed vs flakyFailed (isFlakyStory)
     Orc->>Diff: persistCapture({ db, storage, project, build, viewports, captures })
     Diff->>FS: storage.read(baseline) — per-branch fallback
-    Diff->>Diff: diffImages(baseline, current, { pixelThreshold, maxDiffRatio })
+    Diff->>Diff: compare(baseline, current, { pixelThreshold, maxDiffRatio })
     Diff->>FS: storage.write(screenshots/{story}/{viewport}.png)
     Diff->>FS: storage.write(diffs/{story}/{viewport}.png) if changed
     Diff->>DB: snapshots upsert (status: new/unchanged/changed)

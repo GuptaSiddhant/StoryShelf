@@ -8,6 +8,7 @@ import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
 import { parseTestResults, summarizeTests } from "../models/test-results.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { runProjectTests, type RunTestsInput } from "./tests.ts";
 
 let dir: string;
@@ -73,6 +74,7 @@ async function setup(
   const recordLog = vi.fn(async () => {});
   const runner = {
     metadata: { name: "fake", version: "0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     render: vi.fn(),
     cancel: vi.fn(),
     ...(runTests ? { runTests } : {}),

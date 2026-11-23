@@ -16,7 +16,7 @@ import {
   CaptureLogModel,
   ProjectModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { alreadyAlerted } from "./capture-alerts.ts";
@@ -38,6 +38,7 @@ const logger = createShelfLogger({ level: "silent" });
 function runner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    images: fakeImageEngine(),
     render: vi.fn(async () => ({ captures: [], failures: [] })),
     cancel: vi.fn(async () => {}),
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;

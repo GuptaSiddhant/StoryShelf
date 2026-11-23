@@ -39,14 +39,14 @@ async function adminReport(
   deps: AdminPageDeps,
   credentials: CredentialProbe | null,
 ): ReturnType<typeof collectHealthReport> {
-  const { config, publicOrigin } = getStore();
+  const { config, publicOrigin, runner } = getStore();
   return await collectHealthReport(
     deps.sources,
     deps.getSettled(),
     deps.bootTimeMs,
     deps.version,
     credentials,
-    await collectStatusRows({ env: process.env, config, publicOrigin }),
+    await collectStatusRows({ env: process.env, config, publicOrigin, images: runner?.images }),
   );
 }
 

@@ -11,7 +11,7 @@
  * When the engine exports `diffImagesAsync` it is measured too (pooled, 4 in flight).
  *
  * --entry <file> imports any diff module (e.g. an older engine for before/after runs).
- * --dist imports the built `packages/core/dist/diff.mjs` instead of the TS source.
+ * --dist imports the built `packages/runner/dist/images/index.mjs` instead of the TS source.
  */
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -19,8 +19,8 @@ import { monitorEventLoopDelay, performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const core = join(root, "packages/core");
-const require = createRequire(join(core, "package.json"));
+const runner = join(root, "packages/runner");
+const require = createRequire(join(runner, "package.json"));
 const pixelmatch = (await import(pathToFileURL(require.resolve("pixelmatch")).href)).default;
 const { PNG } = require("pngjs");
 
@@ -30,8 +30,8 @@ const entryArg = args[args.indexOf("--entry") + 1];
 const entry = args.includes("--entry")
   ? entryArg
   : args.includes("--dist")
-    ? join(core, "dist/diff.mjs")
-    : join(core, "src/diff/index.ts");
+    ? join(runner, "dist/images/index.mjs")
+    : join(runner, "src/images/index.ts");
 const diff = await import(pathToFileURL(entry).href);
 const OPTIONS = {
   pixelThreshold: 0.1,

@@ -31,7 +31,7 @@ describe("missingPeerHint", () => {
   });
 
   it("names the package when the peer serves all of it", () => {
-    expect(missingPeerHint(notFound("sharp"))).toContain("needed by @storyshelf/core)");
+    expect(missingPeerHint(notFound("sharp"))).toContain("needed by @storyshelf/runner)");
   });
 
   it("accepts the CommonJS code too", () => {

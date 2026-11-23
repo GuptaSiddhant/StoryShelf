@@ -63,8 +63,8 @@ export async function runCaptureChild(
     throw new Error("runCaptureChild must run in a forked process; set testing.workerEntry");
   }
   const logger = options.logger ?? createShelfLogger();
-  applyImageSettings(options.images, options.compare);
-  await ensureImageEngine(logger);
+  applyImageSettings(options.runner.images, options.images, options.compare);
+  await ensureImageEngine(options.runner.images, logger);
   const forward = forwarder(host);
   const child = new CaptureChild(buildHandler(options, host.env, logger, forward), logger, forward);
   const stopped = wireHost(host, child);

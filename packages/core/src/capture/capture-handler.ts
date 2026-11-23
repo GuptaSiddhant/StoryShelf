@@ -111,7 +111,9 @@ export function createCaptureHandler(options: CaptureHandlerOptions): KindHandle
   dispatchFor(fallbackRetries);
   return {
     // A consumer that cannot diff must not claim capture jobs.
-    prepare: ensureImageEngine,
+    prepare: async (logger) => {
+      await ensureImageEngine(options.runner.images, logger);
+    },
     accepts: isValidCaptureJob,
     superseded: async (job) => await isSuperseded(options, job),
     run: async (job, context) => {

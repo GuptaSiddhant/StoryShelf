@@ -6,6 +6,7 @@ import { abortableLease } from "../jobs/job-lease.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import {
   captureAcrossBrowsers,
@@ -45,6 +46,7 @@ function runnerOf(behaviour?: (input: RenderInput) => Promise<RenderResult | und
   const calls: RenderInput[] = [];
   const runner: CaptureRunner = {
     metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     cancel: async () => {},
     render: async (input) => {
       calls.push(input);

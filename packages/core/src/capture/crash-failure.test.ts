@@ -14,6 +14,7 @@ import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { failCrashedCapture } from "./crash-failure.ts";
 import type { DispatchDeps } from "./dispatch.ts";
@@ -59,6 +60,7 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 
 const runner: CaptureRunner = {
   metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+  images: pngImageEngine(),
   cancel: async () => {},
   render: async (input) => {
     for (const story of input.stories) {

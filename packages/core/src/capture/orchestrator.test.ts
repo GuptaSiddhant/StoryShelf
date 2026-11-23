@@ -18,6 +18,7 @@ import { ProjectModel } from "../models/project.ts";
 import { parseTestResults, summarizeTests } from "../models/test-results.ts";
 import { buildScratchDir } from "../publish/scratch.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookDir, storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
@@ -140,6 +141,7 @@ function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
     });
   const runner: CaptureRunner = {
     metadata: { name: "Fake Runner", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     render,
     cancel,
   };

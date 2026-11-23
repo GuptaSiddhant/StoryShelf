@@ -1,5 +1,6 @@
 import { PNG } from "pngjs";
 import { describe, expect, it } from "vitest";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { buildHealthEvidence } from "./evidence-health.ts";
 import { buildTriageEvidence, type SnapshotEvidence } from "./evidence.ts";
 
@@ -49,6 +50,7 @@ describe("buildTriageEvidence", () => {
       snapshots,
       comments: [],
       limits: { maxSnapshots: 4 },
+      images: pngImageEngine(),
     });
     expect(out.images).toHaveLength(3);
     expect(out.images[0]?.label).toContain("Button/C@desktop");
@@ -57,6 +59,16 @@ describe("buildTriageEvidence", () => {
     expect(out.text.indexOf("Button/C@")).toBeLessThan(out.text.indexOf("Button/B@"));
     expect(out.text).toContain("OMITTED_SNAPSHOTS 1");
   }, 30_000);
+
+  it("attaches no image without an image engine (no testing)", async () => {
+    const out = await buildTriageEvidence({
+      projectName: "P",
+      build,
+      snapshots: [snap({ screenshot: shot() })],
+      comments: [],
+    });
+    expect(out.images).toEqual([]);
+  });
 
   it("is deterministic for identical input", async () => {
     const input = {

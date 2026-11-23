@@ -135,3 +135,17 @@ dependencies, so one `docker run` keeps working.
 - Whether the official Docker image should default to `STORYSHELF_IMAGE_ENGINE=sharp` once `sharp`
   has run in production.
 - `compressionLevel` and `maxPixels` options.
+
+## Amendment 2026-11-23: the engine moves into the runner (#1365)
+
+Decision record #1361 (option A). Everything that touches pixels (codecs, the worker pool,
+`pixelmatch`, overlays and thumbnails) moves from `core/diff` to `@storyshelf/runner/images`, and the
+`@storyshelf/core/diff` subpath is removed. `pngjs` and `pixelmatch` are dependencies of the runner
+and `sharp` its optional peer, so core declares none of them. Core keeps the contract in
+`core/adapter/capture-runner`: `ImageEngine` (`configure`, `verify`, `compare`, `downscale`,
+`state`, `shutdown`), `DiffOptions`, `DiffResult` and `DEFAULT_DIFF_OPTIONS`. A runner supplies its
+engine as `CaptureRunner.images`; capture, rediff and triage evidence reach pixels only through it.
+`testing.images` and `testing.compare` keep their meaning: the app passes them to
+`runner.images.configure` and verifies the engine at setup (decision 5 unchanged). The worker entry
+(decision 6) is `packages/runner/src/images/worker.ts`. `no-image-libraries.test.ts` in core fails on
+an import of `pngjs`, `pixelmatch` or `sharp` outside core's own test double.

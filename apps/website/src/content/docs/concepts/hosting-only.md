@@ -25,7 +25,7 @@ Every route carries a class (`hosting`, `testing`, `review` or `both`) in one ta
 
 ## What it installs
 
-Hosting only installs no browser or image libraries. `axe-core` ships with `@storyshelf/runner`, and `pngjs` and `pixelmatch` are optional peers of `@storyshelf/core` that the runner brings, so a hosting-only install (core without the runner) holds none of them (about 3.9 MB less). With `testing` on and a peer missing, readiness fails with a message that names the package and the install line.
+Hosting only installs no browser or image libraries. `axe-core` ships with `@storyshelf/runner`, and the image engine (`pngjs`, `pixelmatch` and the optional `sharp`) lives in `@storyshelf/runner/images`, so a hosting-only install (core without the runner) holds none of them (about 3.9 MB less); core keeps only the `ImageEngine` contract. With `testing` on and a library missing, readiness fails with a message that names the package and the install line.
 
 ## Seeing the mode
 

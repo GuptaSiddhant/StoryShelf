@@ -66,10 +66,13 @@ rather than pushing and waiting.
 
 - `packages/core` — `@storyshelf/core`: adapter interfaces, models, capture pipeline, job queue,
   diff, retention, publishing (no HTTP). Must not import Hono. Hosting code lives in `jobs/`,
-  `publish/`, `build-state/` and `catalog/` (subpaths of the same names); `capture/` and `diff/` are
-  testing only, and `no-testing-imports.test.ts` fails if hosting code imports them. A runner
+  `publish/`, `build-state/` and `catalog/` (subpaths of the same names); `capture/` is testing
+  only, and `no-testing-imports.test.ts` fails if hosting code imports it. A runner
   imports `adapter/*`, `utils` and `logger`, never `/capture`: `adapter/capture-runner`
-  (`capture/runner-kit.ts`) re-exports the capture helpers it reuses (#1364).
+  (`capture/runner-kit.ts`) re-exports the capture helpers it reuses (#1364). Core imports no image
+  library: codecs, the worker pool and pixelmatch are `@storyshelf/runner/images`, core keeps the
+  `ImageEngine` contract (`CaptureRunner.images`), and `no-image-libraries.test.ts` fails on a
+  `pngjs`/`pixelmatch`/`sharp` import outside core's test double (#1365).
 - `packages/common` — `@storyshelf/common`: the lightweight code packages share (`/settings`, `/http`, `/redact`, `/tracing`, `/errors`, `/ids`, `/logger`). Its only runtime dependency is `@opentelemetry/api`; it never imports `@storyshelf/*`. Core re-exports everything that moved from its existing subpaths; `mcp` and `observability` import it directly and do not install core (#1334).
 - `packages/app` — `@storyshelf/app`: Hono app, `/api/v1`, server-rendered JSX/HTMX UI.
 - Adapters: `db` (`@storyshelf/db`: `/sqlite`, `/postgres`, `/mysql` subpaths; defaults node:sqlite/postgres.js/mysql2, cloud presets under each; drivers are optional peers), `storage`, `auth`, `affected`, `runner`,

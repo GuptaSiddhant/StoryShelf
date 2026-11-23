@@ -1,5 +1,6 @@
-/** Recompute a build's diffs against the baselines that apply now, without re-rendering. */
 import type { DatabaseAdapter } from "../adapters/database.ts";
+/** Recompute a build's diffs against the baselines that apply now, without re-rendering. */
+import type { ImageEngine } from "../adapters/image-engine.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import type { Logger } from "../logger.ts";
 import { NO_BASELINE } from "../models/baseline-status.ts";
@@ -24,6 +25,8 @@ import { diffStatus, PERSIST_CONCURRENCY } from "./pipeline.ts";
 export interface RediffDeps {
   db: DatabaseAdapter;
   storage: StorageAdapter;
+  /** The runner's image engine (`options.testing.runner.images`). */
+  images: ImageEngine;
   logger?: Logger;
 }
 
@@ -140,7 +143,7 @@ async function diffPatch(
     sourceSnapshotId: await sourceSnapshotId(deps.db, baseline),
   });
   const result = await diffStoredScreenshots(
-    deps.storage,
+    deps,
     project,
     baseline.screenshotPath === row.screenshotPath
       ? row.screenshotPath

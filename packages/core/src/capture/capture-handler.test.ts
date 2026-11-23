@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CaptureRunner } from "../adapters/capture-runner.ts";
-import { verifyImageEngine } from "../diff/index.ts";
 import { rig, stubLogger } from "../jobs/consumer/test-fixtures.ts";
 import { BuildModel } from "../models/build.ts";
 import { CaptureAttemptModel } from "../models/capture-attempt.ts";
@@ -8,15 +7,13 @@ import { CaptureJobModel } from "../models/capture-job.ts";
 import { CaptureLogModel } from "../models/capture-log.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { captureDispatchDeps, createCaptureHandler } from "./capture-handler.ts";
-
-// The handler's `prepare` verifies the image engine, which imports pngjs and pixelmatch (#1335).
-// Load them once here: a manual clock does not wait for real module loading.
-await verifyImageEngine();
 
 function runner(): CaptureRunner {
   return {
     metadata: { name: "r", version: "0", kind: "mock", category: "capture-runner" },
+    images: pngImageEngine(),
     render: vi.fn(async () => ({ captures: [], failures: [] })),
     cancel: vi.fn(async () => {}),
   } as unknown as CaptureRunner;

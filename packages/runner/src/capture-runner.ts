@@ -9,6 +9,7 @@ import type { AdapterLifecycle } from "@storyshelf/core/adapter/metadata";
 import { verifyLocalTargets } from "./availability.ts";
 import { cancelRuns, trackRun } from "./browser.ts";
 import { connectRemote } from "./connect.ts";
+import { createImageEngine } from "./images/index.ts";
 import { launchLocal, loadPlaywright } from "./launch.ts";
 import { extractAll, renderAll } from "./pipeline.ts";
 import type { RemoteTarget } from "./remote/remote-browser.ts";
@@ -82,6 +83,7 @@ export function createCaptureRunner(
         );
       }),
     cancel: cancelRuns,
+    images: createImageEngine(),
   };
 }
 

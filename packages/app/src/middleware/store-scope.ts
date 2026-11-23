@@ -35,7 +35,7 @@ export interface StoreScopeDeps {
   cancelBuildJobs?: (buildId: string) => Promise<boolean>;
   buildState?: BuildStatePublisher;
   captureConcurrency?: number;
-  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  runner?: Pick<CaptureRunner, "metadata" | "images"> | undefined;
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];

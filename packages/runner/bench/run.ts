@@ -11,13 +11,13 @@ import { readdirSync } from "node:fs";
 import { availableParallelism, cpus } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import type { ImageCodec, ImageEngine } from "../src/diff/codec.ts";
-import { loadCodec } from "../src/diff/codecs.ts";
-import { diffImages } from "../src/diff/engine.ts";
-import { DEFAULT_DIFF_OPTIONS } from "../src/diff/options.ts";
+import type { ImageCodec, ImageEngineName } from "../src/images/codec.ts";
+import { loadCodec } from "../src/images/codecs.ts";
+import { diffImages } from "../src/images/engine.ts";
+import { DEFAULT_DIFF_OPTIONS } from "../src/images/options.ts";
 
 const DIR = path.resolve(process.argv[2] ?? "../../apps/website/src/assets/screenshots");
-const ENGINES: ImageEngine[] = ["pngjs", "sharp"];
+const ENGINES: ImageEngineName[] = ["pngjs", "sharp"];
 const OPTIONS = { ...DEFAULT_DIFF_OPTIONS, maxDiffRatio: 0 };
 
 interface Raw {
@@ -91,7 +91,7 @@ async function median(run: () => Promise<unknown>, iterations: number): Promise<
   return times.toSorted((a, b) => a - b)[Math.floor(times.length / 2)] ?? 0;
 }
 
-async function codecs(): Promise<Record<ImageEngine, ImageCodec>> {
+async function codecs(): Promise<Record<ImageEngineName, ImageCodec>> {
   const [pngjs, sharpCodec] = await Promise.all([loadCodec("pngjs"), loadCodec("sharp")]);
   return { pngjs, sharp: sharpCodec };
 }

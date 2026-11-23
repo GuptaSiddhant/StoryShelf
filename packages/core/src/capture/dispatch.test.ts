@@ -17,6 +17,7 @@ import { NotificationChannelModel } from "../models/notification-channel.ts";
 import { ProjectModel } from "../models/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
 import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
@@ -82,6 +83,7 @@ function zipOfStories(count: number): Buffer {
 function fakeRunner(render: CaptureRunner["render"]): CaptureRunner {
   return {
     metadata: { name: "Fake Runner", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     render,
     cancel: async () => {},
   };

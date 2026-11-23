@@ -43,8 +43,11 @@ export interface Store {
   buildState?: BuildStatePublisher;
   /** Explicit `testing.concurrency`; unset means sized from the hardware. */
   captureConcurrency?: number;
-  /** The capture runner (`options.testing.runner`); its targets decide which browsers a project may pick. */
-  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  /**
+   * The capture runner (`options.testing.runner`): its targets decide which browsers a project may
+   * pick, and its image engine re-diffs, thumbnails and reports on the health page.
+   */
+  runner?: Pick<CaptureRunner, "metadata" | "images"> | undefined;
   /** The public origin: configured, detected from the platform, or reported by an admin (ADR 0007). */
   publicOrigin?: PublicOriginResolver | undefined;
   /** Design providers (Figma, …); empty when none is wired. */
