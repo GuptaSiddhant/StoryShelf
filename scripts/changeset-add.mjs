@@ -29,11 +29,18 @@ function fail(message) {
 
 /** Names of the published packages. */
 function publishedNames() {
-  return readdirSync(packagesDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => JSON.parse(readFileSync(join(packagesDir, entry.name, "package.json"), "utf8")))
-    .filter((pkg) => !pkg.private)
-    .map((pkg) => pkg.name);
+  return (
+    readdirSync(packagesDir, { withFileTypes: true })
+      // A folder left by a removed package (only `dist` or `node_modules` in a reused checkout) has no manifest.
+      .filter(
+        (entry) => entry.isDirectory() && existsSync(join(packagesDir, entry.name, "package.json")),
+      )
+      .map((entry) =>
+        JSON.parse(readFileSync(join(packagesDir, entry.name, "package.json"), "utf8")),
+      )
+      .filter((pkg) => !pkg.private)
+      .map((pkg) => pkg.name)
+  );
 }
 
 const VALUE_FLAGS = new Set(["--package", "--message"]);
