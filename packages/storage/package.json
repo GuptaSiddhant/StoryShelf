@@ -1,6 +1,6 @@
 {
   "name": "@storyshelf/storage",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Storage adapters for StoryShelf: S3-compatible, Google Cloud Storage, Azure Blob Storage and local disk, one subpath each.",
   "keywords": [
     "azure",
