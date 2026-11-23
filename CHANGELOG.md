@@ -31,6 +31,12 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
   - The old `ImageEngine` string type is now `ImageEngineName` in `@storyshelf/runner/images`; `configureDiffPool` is removed (use `configureImages`).
   - A hosting-only server shows the image engine as `off` on the System page.
 
+### Fixed
+
+- A third project with the same name no longer reuses the slug `name-2`
+
+  `ProjectModel.create` looked only for the bare slug, so once `test` existed every later project named "Test" was given `test-2` and the insert failed on the unique slug index. It now reads the numbered slugs too and takes the first free suffix.
+
 ## 0.15.1 (2026-11-23)
 
 ### Fixed
