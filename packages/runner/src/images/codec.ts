@@ -4,13 +4,12 @@
 export const IMAGE_ENGINES = ["pngjs", "sharp"] as const;
 
 /** A codec that can decode, encode and downscale PNGs. */
-export type ImageEngine = (typeof IMAGE_ENGINES)[number];
+export type ImageEngineName = (typeof IMAGE_ENGINES)[number];
 
-/** Environment variable that selects the engine when `images.engine` is not set. */
-export const IMAGE_ENGINE_ENV = "SHELF_IMAGE_ENGINE";
+export { IMAGE_ENGINE_ENV } from "@storyshelf/core/adapter/capture-runner";
 
 /** The engine used when nothing is configured: pure JavaScript, runs anywhere. */
-export const DEFAULT_IMAGE_ENGINE: ImageEngine = "pngjs";
+export const DEFAULT_IMAGE_ENGINE: ImageEngineName = "pngjs";
 
 /** Raw 8-bit RGBA pixels, row-major, `width * height * 4` bytes. */
 export interface RgbaImage {
@@ -21,7 +20,7 @@ export interface RgbaImage {
 
 /** Everything the engine needs from an image library. */
 export interface ImageCodec {
-  readonly name: ImageEngine;
+  readonly name: ImageEngineName;
   /** Decode a PNG to RGBA. */
   decode(png: Buffer): Promise<RgbaImage> | RgbaImage;
   /** Encode RGBA pixels as a PNG. */
@@ -31,7 +30,7 @@ export interface ImageCodec {
 }
 
 /** Narrow an arbitrary string to a known engine name. */
-export function isImageEngine(value: unknown): value is ImageEngine {
+export function isImageEngine(value: unknown): value is ImageEngineName {
   return IMAGE_ENGINES.some((engine) => engine === value);
 }
 
@@ -39,7 +38,7 @@ export function isImageEngine(value: unknown): value is ImageEngine {
  * The engine named by a raw setting (an option or the `SHELF_IMAGE_ENGINE` value); blank or
  * missing means the default. An unknown name throws so a typo cannot silently fall back.
  */
-export function resolveImageEngine(raw: string | undefined): ImageEngine {
+export function resolveImageEngine(raw: string | undefined): ImageEngineName {
   const value = raw?.trim();
   if (value === undefined || value === "") {
     return DEFAULT_IMAGE_ENGINE;

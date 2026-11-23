@@ -9,7 +9,8 @@
  *  1. pack every public package (manifests rewritten as the release does, then restored),
  *     and check each archive holds every export and bin target (#1265),
  *     and that `@storyshelf/app/node` imports from the installed scaffold with no side effects (#394),
- *     and that a hosting-only install of the app holds none of axe-core, pngjs and pixelmatch (#1335),
+ *     and that a hosting-only install of the app holds none of axe-core, pngjs, pixelmatch and sharp (#1335),
+ *     and that the runner, installed alone, loads its image engine with no library added (#1365),
  *  2. install the CLI, `create-storyshelf` and `@storyshelf/mcp` from their tarballs, each in its own
  *     empty directory outside this checkout; `create-storyshelf` must install with no dependency at all,
  *  3. run `npm create storyshelf` (`npm exec` on the tarball; answers: all defaults, so local accounts),
@@ -280,7 +281,8 @@ function assertS3OnlyInstall(scratch, tarballs) {
 
 /**
  * `@storyshelf/app` installed from its tarball with no runner (#1335): a hosting-only install must hold no
- * `axe-core`, `pngjs` or `pixelmatch` (the runner brings them), yet import the app and `./diff`. Logs the install size.
+ * `axe-core`, `pngjs`, `pixelmatch` or `sharp` (the runner brings them), yet import the app and core's
+ * image-engine contract. Logs the install size.
  */
 function assertHostingOnlyInstall(scratch, tarballs) {
   const dir = join(scratch, "hosting-only");
@@ -299,6 +301,7 @@ function assertHostingOnlyInstall(scratch, tarballs) {
     "axe-core",
     "pngjs",
     "pixelmatch",
+    "sharp",
     "@storyshelf/runner",
     "playwright-core",
   ]) {
@@ -308,12 +311,30 @@ function assertHostingOnlyInstall(scratch, tarballs) {
   }
   const check = [
     'await import("@storyshelf/app");',
-    'const diff = await import("@storyshelf/core/diff");',
-    'if (typeof diff.diffImagesAsync !== "function") throw new Error("bad exports");',
+    'const contract = await import("@storyshelf/core/adapter/capture-runner");',
+    'if (contract.DEFAULT_DIFF_OPTIONS?.pixelThreshold === undefined) throw new Error("bad exports");',
   ].join("\n");
   run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
   const size = run("du", ["-sk", join(dir, "node_modules")]).split("\t")[0];
-  log(`hosting-only install: node_modules is ${size} KB, with none of axe-core, pngjs, pixelmatch`);
+  log(
+    `hosting-only install: node_modules is ${size} KB, with none of axe-core, pngjs, pixelmatch, sharp`,
+  );
+}
+
+/**
+ * `@storyshelf/runner` installed alone from its tarball (#1365): its image engine loads with the PNG
+ * libraries the runner itself depends on, so an operator never adds `pngjs` or `pixelmatch`.
+ */
+function assertRunnerImagesAlone(scratch, tarballs) {
+  const dir = installAlone(scratch, "@storyshelf/runner", tarballs, "runner-alone");
+  const check = [
+    'const { createImageEngine } = await import("@storyshelf/runner/images");',
+    "const images = createImageEngine();",
+    'if ((await images.verify()) !== "pngjs") throw new Error("unexpected image engine");',
+    "await images.shutdown();",
+  ].join("\n");
+  run(process.execPath, ["--input-type=module", "-e", check], { cwd: dir });
+  log("the runner's image engine loads from its own install");
 }
 
 /** A clean directory holding only `name` installed from its tarball; returns the directory. */
@@ -679,6 +700,7 @@ async function main() {
     assertCommonAlone(scratch, tarballs);
     assertNoServerStack(scratch, tarballs);
     assertHostingOnlyInstall(scratch, tarballs);
+    assertRunnerImagesAlone(scratch, tarballs);
     const { cli, project } = await installFromTarballs(scratch, tarballs);
     server = await startServer(project);
     const ciToken = await createAndUpload(cli, server.url, copyStorybook(scratch));

@@ -1,18 +1,13 @@
-import { readSetting } from "../env-settings/read.ts";
+import type { ImageSettings } from "@storyshelf/core/adapter/capture-runner";
+import { readSetting } from "@storyshelf/core/config";
 /** Process-wide image settings, set once at app boot and read by the diff pool and thumbnails. */
-import { IMAGE_ENGINE_ENV, type ImageEngine, resolveImageEngine } from "./codec.ts";
+import { IMAGE_ENGINE_ENV, type ImageEngineName, resolveImageEngine } from "./codec.ts";
 import { loadCodec } from "./codecs.ts";
 import { loadPixelmatch } from "./engine.ts";
 
-/** What `createShelfApp` passes down: `images.engine` and `compare.threads`. */
-export interface ImageSettings {
-  /** Image library: `"pngjs"` (default) or `"sharp"`; falls back to `SHELF_IMAGE_ENGINE`. */
-  engine?: string;
-  /** Worker threads for diffs; `0` runs on the main thread. */
-  threads?: number;
-}
+export type { ImageSettings };
 
-let configuredEngine: ImageEngine | undefined;
+let configuredEngine: ImageEngineName | undefined;
 let configuredThreads: number | undefined;
 
 /**
@@ -30,14 +25,14 @@ export function setImageSettings(settings: ImageSettings): void {
 
 /** What the last {@link setImageSettings} resolved, without consulting the environment. */
 export function appliedImageSettings(): {
-  engine: ImageEngine | undefined;
+  engine: ImageEngineName | undefined;
   threads: number | undefined;
 } {
   return { engine: configuredEngine, threads: configuredThreads };
 }
 
 /** The engine in effect: the configured one, else the environment, else the default. */
-export function currentImageEngine(): ImageEngine {
+export function currentImageEngine(): ImageEngineName {
   return configuredEngine ?? resolveImageEngine(readSetting(process.env, IMAGE_ENGINE_ENV));
 }
 
@@ -51,7 +46,7 @@ export function configuredThreadCount(): number | undefined {
  * message naming it instead of the first diff. Call it only with `testing`: a hosting-only
  * deployment never loads an image library.
  */
-export async function verifyImageEngine(): Promise<ImageEngine> {
+export async function verifyImageEngine(): Promise<ImageEngineName> {
   const engine = currentImageEngine();
   await Promise.all([loadCodec(engine), loadPixelmatch()]);
   return engine;

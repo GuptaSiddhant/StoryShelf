@@ -6,7 +6,7 @@ import {
   MemberModel,
   TokenModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
 import type { ProjectRole } from "@storyshelf/core/types";
 import { sha256, storybookDir } from "@storyshelf/core/utils";
 import AdmZip from "adm-zip";
@@ -323,6 +323,7 @@ function failingRunner(release: Promise<null>) {
   const entered = Promise.withResolvers<null>();
   const runner: CaptureRunner = {
     metadata: { name: "failing", version: "0.0.0", kind: "stub", category: "capture-runner" },
+    images: fakeImageEngine(),
     render: async () => {
       entered.resolve(null);
       await release;

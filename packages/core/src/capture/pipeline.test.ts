@@ -9,6 +9,7 @@ import type { Baseline } from "../schema/baseline.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { diffPath } from "../utils/paths.ts";
 import { parseComparisonReference } from "./comparison-reference.ts";
 import { finalizeBuild, persistCapture, persistRendered, type CaptureContext } from "./pipeline.ts";
@@ -102,6 +103,7 @@ async function makeContext(options: {
       baselines: db.tables.baselines,
     },
     storage,
+    images: pngImageEngine(),
     project: mockProject,
     build,
     viewports: [DEFAULT_VIEWPORT],

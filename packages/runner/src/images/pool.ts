@@ -1,6 +1,6 @@
 /** A small `worker_threads` pool that runs `diffImages` off the main thread. */
 import type { Worker } from "node:worker_threads";
-import type { ImageEngine } from "./codec.ts";
+import type { ImageEngineName } from "./codec.ts";
 import { loadCodec } from "./codecs.ts";
 import { diffImages, identicalResult } from "./engine.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
@@ -14,7 +14,7 @@ export interface DiffPoolOptions {
   /** Worker module to spawn. */
   workerUrl: URL | string;
   /** Image engine the workers (and the in-thread fallback) use; pngjs when omitted. */
-  engine?: ImageEngine;
+  engine?: ImageEngineName;
   /**
    * Called once if the pool gives up on threads and runs every diff in-thread from then on. Defaults
    * to a process warning, since every later diff then blocks the event loop.
@@ -35,7 +35,7 @@ interface Pending {
   baseline: Buffer;
   current: Buffer;
   options: DiffOptions;
-  engine: ImageEngine;
+  engine: ImageEngineName;
   resolve: (result: DiffResult) => void;
   reject: (error: Error) => void;
 }
@@ -61,7 +61,7 @@ let exitHookInstalled = false;
 export class DiffPool {
   private readonly size: number;
   private readonly workerUrl: URL | string;
-  private readonly engine: ImageEngine;
+  private readonly engine: ImageEngineName;
   private readonly slots: Slot[] = [];
   private queue: Pending[] = [];
   private nextId = 0;

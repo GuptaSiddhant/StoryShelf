@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/core",
   "version": "0.15.0",
-  "description": "Self-hosted visual testing and review for Storybook: StoryShelf core, with adapter interfaces, models, capture pipeline, diff and retention (no HTTP).",
+  "description": "Self-hosted visual testing and review for Storybook: StoryShelf core, with adapter interfaces, models, capture pipeline and retention (no HTTP).",
   "keywords": [
     "chromatic-alternative",
     "self-hosted",
@@ -102,10 +102,6 @@
       "source": "./src/config.ts",
       "default": "./dist/config.mjs"
     },
-    "./diff": {
-      "source": "./src/diff/index.ts",
-      "default": "./dist/diff.mjs"
-    },
     "./insights": {
       "source": "./src/insights/index.ts",
       "default": "./dist/insights.mjs"
@@ -200,7 +196,6 @@
       "./capture": "./dist/capture.mjs",
       "./catalog": "./dist/catalog.mjs",
       "./config": "./dist/config.mjs",
-      "./diff": "./dist/diff.mjs",
       "./insights": "./dist/insights.mjs",
       "./integrations": "./dist/integrations.mjs",
       "./jobs": "./dist/jobs.mjs",
@@ -233,8 +228,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/utils/map-limit.test.ts src/capture/rediff.test.ts src/models/build.test.ts src/models/design-credentials.test.ts src/diff/pool.test.ts",
-    "bench": "node --conditions=source bench/run.ts"
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/utils/map-limit.test.ts src/capture/rediff.test.ts src/models/build.test.ts src/models/design-credentials.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
@@ -261,29 +255,16 @@
     "oxlint-tsgolint": "catalog:",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
-    "sharp": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
     "nodemailer": "^10.2.1",
-    "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0",
-    "sharp": ">=0.34.0",
     "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "nodemailer": {
-      "optional": true
-    },
-    "pixelmatch": {
-      "optional": true
-    },
-    "pngjs": {
-      "optional": true
-    },
-    "sharp": {
       "optional": true
     },
     "vitest": {

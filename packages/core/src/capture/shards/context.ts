@@ -34,6 +34,7 @@ export function contextOf(
     db: options.db,
     tables: options.tables,
     storage: options.storage,
+    images: options.runner.images,
     project: target.project,
     build: target.build,
     viewports: parts.viewports,

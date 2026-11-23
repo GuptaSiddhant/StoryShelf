@@ -10,7 +10,6 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { isFlakyStory, type StoryEntry, type Viewport } from "../adapters/story-source.ts";
 /** The browser loop: one partition + render pass per engine, sequentially. */
-import { currentImageEngine } from "../diff/index.ts";
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
@@ -323,7 +322,7 @@ async function renderPass(
     captured: spooled.length + rendered.captures.length,
     failed: rendered.failures.length,
     expected,
-    imageEngine: currentImageEngine(),
+    imageEngine: input.runner.images.state().engine,
   });
   const { environment } = rendered;
   return {

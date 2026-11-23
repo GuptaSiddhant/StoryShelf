@@ -134,5 +134,6 @@ export async function loadTriageEvidence(
     snapshots: items,
     comments: comments.map((c) => ({ author: "reviewer", body: c.body })),
     limits,
+    images: deps.images,
   });
 }

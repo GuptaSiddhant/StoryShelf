@@ -11,7 +11,6 @@ import {
 } from "@storyshelf/core/adapter/setup";
 import type { AdapterSetupResult } from "@storyshelf/core/adapter/setup";
 import type { ResolvedShelfOptions } from "@storyshelf/core/config";
-import { shutdownDiffPool, verifyImageEngine } from "@storyshelf/core/diff";
 import type { CaptureConsumer } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import { purgeAiData } from "@storyshelf/core/retention";
@@ -343,15 +342,16 @@ async function aiStep(
   }
 }
 /**
- * Load the image libraries now, so a missing peer (`sharp`, or the `pngjs` and `pixelmatch` the runner
- * brings) fails readiness instead of the first diff. Only with `testing`: hosting only loads none.
+ * Load the runner's image libraries now, so a missing one (`sharp`, or a broken install without
+ * `pngjs` or `pixelmatch`) fails readiness instead of the first diff. Only with `testing`: hosting
+ * only loads none.
  */
 async function runImagesSetup(options: ResolvedShelfOptions): Promise<AdapterSetupResult | null> {
   if (!options.testing) {
     return null;
   }
   try {
-    await verifyImageEngine();
+    await options.testing.runner.images.verify();
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -510,7 +510,7 @@ function createLifecycle(
       await drainWithinGrace(cell, teardownOptions?.graceMs);
       await settleInsightJobs();
       await options.ai?.teardown();
-      await shutdownDiffPool();
+      await options.testing?.runner.images.shutdown();
       const result = await runAdapterTeardowns(
         collectTeardowns(adapterSourcesOf(options)),
         ctx,

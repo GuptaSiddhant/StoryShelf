@@ -1,19 +1,21 @@
+import {
+  DIFF_WORKERS_ENV,
+  type ImageEngineState,
+  type ImageSettings,
+} from "@storyshelf/core/adapter/capture-runner";
+import { readSetting } from "@storyshelf/core/config";
 /** `diffImagesAsync`: `diffImages` on a lazily created, process-wide worker pool, plus `configureImages`. */
 import { availableParallelism } from "node:os";
-import { readSetting } from "../env-settings/read.ts";
-import type { ImageEngine } from "./codec.ts";
 import type { DiffOptions, DiffResult } from "./options.ts";
 import { DiffPool } from "./pool.ts";
 import {
   appliedImageSettings,
   configuredThreadCount,
   currentImageEngine,
-  type ImageSettings,
   setImageSettings,
 } from "./settings.ts";
 
-/** Environment variable overriding the pool size; `0` runs diffs in-thread. */
-export const DIFF_WORKERS_ENV = "SHELF_DIFF_WORKERS";
+export { DIFF_WORKERS_ENV };
 
 let pool: DiffPool | undefined;
 
@@ -56,16 +58,6 @@ export async function diffImagesAsync(
     engine: currentImageEngine(),
   });
   return await pool.run(baseline, current, options);
-}
-
-/** What the diff path runs on now (read-only; starts nothing). */
-export interface ImageEngineState {
-  /** The image library in effect: `pngjs` or `sharp`. */
-  engine: ImageEngine;
-  /** Configured worker threads (`0` = in-thread by choice). */
-  workers: number;
-  /** Whether diffs run on the calling thread: by choice, or because workers could not start. */
-  inThread: boolean;
 }
 
 /** The engine and pool size in effect, for the admin health report. Starts no worker. */

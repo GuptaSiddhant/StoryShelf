@@ -12,6 +12,7 @@ import { ProjectModel } from "../models/project.ts";
 import { buildScratchDir } from "../publish/scratch.ts";
 import type { Snapshot } from "../schema/snapshot.ts";
 import { makeDatabase, makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { storybookZipPath } from "../utils/paths.ts";
 import { verifyStorybookToken } from "../utils/storybook-token.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "./orchestrator.ts";
@@ -71,6 +72,7 @@ function scriptedRunner(
       category: "capture-runner",
       ...(targets ? { targets } : {}),
     },
+    images: pngImageEngine(),
     render,
     cancel: vi.fn(async () => {
       await Promise.resolve();
@@ -325,6 +327,7 @@ describe("unstable render detection across shards", () => {
     });
     const runner: CaptureRunner = {
       metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+      images: pngImageEngine(),
       render,
       cancel: vi.fn(async () => {
         await Promise.resolve();
@@ -349,6 +352,7 @@ describe("unstable render detection across shards", () => {
     await storage.write(storybookZipPath(project.id, main.id), twoStoryZip());
     const grey: CaptureRunner = {
       metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+      images: pngImageEngine(),
       cancel: async () => {},
       render: async (input) => {
         await Promise.resolve();

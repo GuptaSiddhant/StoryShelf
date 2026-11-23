@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { makeStorage } from "../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { diffStoredScreenshots, resolvePixelThreshold } from "./diff-record.ts";
 
 describe("resolvePixelThreshold", () => {
@@ -28,7 +29,7 @@ describe("diffStoredScreenshots", () => {
     const { storage } = makeStorage();
     const read = vi.spyOn(storage, "read");
     const result = await diffStoredScreenshots(
-      storage,
+      { storage, images: pngImageEngine() },
       project,
       "p1/content/abc.png",
       "p1/content/abc.png",
@@ -42,6 +43,8 @@ describe("diffStoredScreenshots", () => {
     const { storage, objects } = makeStorage();
     objects.set("a.png", Buffer.from("not a png"));
     objects.set("b.png", Buffer.from("not a png either"));
-    await expect(diffStoredScreenshots(storage, project, "a.png", "b.png")).rejects.toThrow();
+    await expect(
+      diffStoredScreenshots({ storage, images: pngImageEngine() }, project, "a.png", "b.png"),
+    ).rejects.toThrow();
   });
 });

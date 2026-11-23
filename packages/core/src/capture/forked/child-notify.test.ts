@@ -11,6 +11,7 @@ import type { BuildStatePublisher } from "../../build-state/types.ts";
 import { createCaptureConsumer } from "../../jobs/consumer/index.ts";
 import { createDatabaseCaptureQueue } from "../../jobs/db-queue/index.ts";
 import { createShelfLogger } from "../../logger.ts";
+import { pngImageEngine } from "../../test-helpers/png-image-engine.ts";
 
 // The capture itself is stubbed: a pushed job only asks the publisher the child built to show the
 // build's state, as a real capture does when its status changes.
@@ -40,7 +41,7 @@ function startChild(w: World) {
     {
       db: w.db,
       storage: w.storage,
-      runner: { cancel: vi.fn(async () => {}), render: vi.fn() } as never,
+      runner: { cancel: vi.fn(async () => {}), render: vi.fn(), images: pngImageEngine() } as never,
       scratchDir: ".tmp/child-notify-test",
       notifiers: [w.git.provider],
       secret: w.deps.secret,

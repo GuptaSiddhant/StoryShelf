@@ -1,3 +1,4 @@
+import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/adapter/capture-runner";
 /** Chooses between in-process and forked capture, and builds the forked handler. */
 import {
   canForkCaptureChild,
@@ -10,7 +11,6 @@ import {
   type ForkedCaptureHandler,
 } from "@storyshelf/core/capture";
 import type { ShelfTestingOptions } from "@storyshelf/core/config";
-import { DIFF_WORKERS_ENV, IMAGE_ENGINE_ENV } from "@storyshelf/core/diff";
 import type { KindHandler, ConsumerJob } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import { detectResources } from "@storyshelf/core/utils";

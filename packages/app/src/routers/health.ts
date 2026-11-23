@@ -82,14 +82,14 @@ export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
 
   app.post("/api/v1/health", async (c) => {
     requireSiteAdmin(c);
-    const { db, config, publicOrigin } = getStore();
+    const { db, config, publicOrigin, runner } = getStore();
     const report = await collectHealthReport(
       deps.sources,
       deps.getSettled(),
       deps.bootTimeMs,
       deps.version,
       await loadCredentialProbe(db, config),
-      await collectStatusRows({ env: process.env, config, publicOrigin }),
+      await collectStatusRows({ env: process.env, config, publicOrigin, images: runner?.images }),
     );
     const adapters: AdapterReport[] = report.adapters.map((adapter) => {
       const entry: AdapterReport = {

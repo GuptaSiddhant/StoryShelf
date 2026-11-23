@@ -382,6 +382,7 @@ async function runCapturePhases(
               db: options.db,
               tables: options.tables,
               storage: options.storage,
+              images: options.runner.images,
               project,
               build,
               viewports,

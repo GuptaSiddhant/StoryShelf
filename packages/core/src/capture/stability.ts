@@ -162,7 +162,7 @@ async function differs(
   capture: RenderedSnapshot,
 ): Promise<boolean> {
   const result = await diffStoredScreenshots(
-    input.storage,
+    { storage: input.storage, images: input.runner.images },
     input.project,
     row.screenshotPath,
     await storedPathOf(input, capture),
