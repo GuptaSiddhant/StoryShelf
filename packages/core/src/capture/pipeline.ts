@@ -1,7 +1,9 @@
 import type { Logger } from "pino";
 import { DEFAULT_BROWSER, type RenderedSnapshot } from "../adapters/capture-runner.ts";
 import { ReferenceGenerationConflict, type DatabaseAdapter } from "../adapters/database.ts";
+import type { ImageEngine } from "../adapters/image-engine.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import type { Viewport } from "../adapters/story-source.ts";
 import { BaselineWriteConflict } from "../models/baseline-conflict.ts";
 import type { BaselineMap } from "../models/baseline-map.ts";
 import { BaselinePromotionRefused } from "../models/baseline-promotion-refused.ts";
@@ -19,7 +21,6 @@ import { JobAbortedError } from "../utils/job-aborted.ts";
 import { mapLimit } from "../utils/map-limit.ts";
 import { diffPath } from "../utils/paths.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
-import type { Viewport } from "./adapter.ts";
 import type { InheritedStory } from "./affected.ts";
 import { freezeComparison, sourceSnapshotId } from "./comparison-reference.ts";
 import { diffStoredScreenshots, writeDiffOverlay } from "./diff-record.ts";
@@ -351,6 +352,8 @@ export interface CaptureContext {
   tables: PipelineTables;
   /** Storage adapter. */
   storage: StorageAdapter;
+  /** The runner's image engine: compares each capture with its baseline. */
+  images: ImageEngine;
   /** The project being captured. */
   project: Project;
   /** The build being captured. */
@@ -610,7 +613,7 @@ async function persistMigration(input: BaselineCapture, change: EnvironmentChang
 async function persistDiff(input: BaselineCapture): Promise<void> {
   const { ctx, capture, screenshot, baseline, change } = input;
   const result = await diffStoredScreenshots(
-    ctx.storage,
+    ctx,
     ctx.project,
     baseline.screenshotPath === screenshot ? screenshot : input.comparison.comparisonImagePath,
     screenshot,

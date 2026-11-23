@@ -132,12 +132,14 @@ settings and has `admin` on every project.
 
 | Action                                             | admin | approver | developer | viewer | anonymous     |
 | -------------------------------------------------- | ----- | -------- | --------- | ------ | ------------- |
-| View builds, library, components, diffs            | yes   | yes      | yes       | yes    | public builds |
+| View builds, library, components, diffs            | yes   | yes      | yes       | yes    | no            |
 | View the published Storybook                       | yes   | yes      | yes       | yes    | public builds |
 | Re-run or retry builds                             | yes   | yes      | yes       | no     | no            |
 | Comment on builds, stories and snapshots           | yes   | yes      | yes       | no     | no            |
 | Approve or reject snapshots and builds             | yes   | yes      | no        | no     | no            |
 | Manage members, tokens, webhooks, project settings | yes   | no       | no        | no     | no            |
+
+Public builds cover hosting and the Storybook preview only, not review (owner, 2026-11-20).
 
 ```ts
 function effectiveRole(user, project): "admin" | "approver" | "developer" | "viewer" | null {

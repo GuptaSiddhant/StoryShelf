@@ -1,9 +1,9 @@
 import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { AdapterMetadata } from "@storyshelf/core/adapter/metadata";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
-import type { ShelfConfig, ShelfOptions, UIConfig } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions, UIConfig } from "@storyshelf/core/config";
 import { validateConfig, validateUiConfig } from "@storyshelf/core/config";
-import { createVapid, createPushNotifier, type Vapid } from "@storyshelf/core/integrations/push";
+import { createVapid, createPushNotifier, type Vapid } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@storyshelf/core/models";
 
 /**
- * Resolved server runtime derived from {@link ShelfOptions}.
+ * Resolved server runtime derived from {@link ResolvedShelfOptions}.
  * Holds the validated config, UI branding, structured logger, and
  * computed helpers like whether auth is enabled and which notifiers are wired.
  */
@@ -37,7 +37,7 @@ export interface ServerRuntime {
  * (the notifier calls back, then the send ends: there is nothing left to retry).
  */
 function pushOf(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   logger: Logger,
 ): { vapid: Vapid; notifier: NotifierProvider } | undefined {
   const config = options.notifications?.vapid;
@@ -64,7 +64,10 @@ function pushOf(
   }
 }
 
-function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: ShelfOptions): void {
+function addOptionalSnapshots(
+  snap: Record<string, AdapterMetadata>,
+  options: ResolvedShelfOptions,
+): void {
   if (options.testing?.runner) {
     snap["captureRunner"] = options.testing.runner.metadata;
   }
@@ -78,7 +81,9 @@ function addOptionalSnapshots(snap: Record<string, AdapterMetadata>, options: Sh
  * @param options - Router options containing the wired adapters
  * @returns Metadata map keyed by adapter category (e.g. `database`, `notify:github`)
  */
-export function buildAdapterSnapshot(options: ShelfOptions): Record<string, AdapterMetadata> {
+export function buildAdapterSnapshot(
+  options: ResolvedShelfOptions,
+): Record<string, AdapterMetadata> {
   const snap: Record<string, AdapterMetadata> = {
     database: options.database.metadata,
     storage: options.storage.metadata,
@@ -104,7 +109,7 @@ function withPush(
 }
 
 /** Validate config/ui and derive runtime singletons from options. */
-export function resolveRuntime(options: ShelfOptions): ServerRuntime {
+export function resolveRuntime(options: ResolvedShelfOptions): ServerRuntime {
   // eslint-disable-next-line typescript/no-unnecessary-type-assertion -- ShelfConfig lacks index signature
   const rawConfig = options.config
     ? validateConfig(options.config as unknown as Record<string, unknown>)

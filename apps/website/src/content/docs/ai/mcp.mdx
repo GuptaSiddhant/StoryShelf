@@ -50,7 +50,7 @@ A `review-build` prompt chains these into a short review summary.
 
 2. **Scaffold the server** (or skip this and use the `npx` config below):
 
-   <PackageManagers type="dlx" pkg="storyshelf" args="mcp init" />
+   <PackageManagers type="dlx" pkg="@storyshelf/mcp" args="init" />
 
    It asks how agents connect (stdio or HTTP), your server URL and a default project, and writes a ready `.mcp.json`.
 
@@ -63,9 +63,9 @@ A `review-build` prompt chains these into a short review summary.
          "command": "npx",
          "args": ["-y", "@storyshelf/mcp"],
          "env": {
-           "STORYSHELF_URL": "https://shelf.example.com",
-           "STORYSHELF_SLUG": "web",
-           "STORYSHELF_TOKEN": "${STORYSHELF_TOKEN}"
+           "SHELF_URL": "https://shelf.example.com",
+           "SHELF_SLUG": "web",
+           "SHELF_TOKEN": "${SHELF_TOKEN}"
          }
        }
      }
@@ -83,8 +83,8 @@ Then ask your agent, for example: _"Review the latest build on `feat/header` and
 | Aspect   | stdio                                    | Streamable HTTP                                                                              |
 | -------- | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Best for | One developer's local agent              | A shared or remote agent                                                                     |
-| Start    | The agent launches `npx @storyshelf/mcp` | `npx storyshelf mcp serve` (scaffolded with `--http`) or `storyshelf-mcp --http --port 3333` |
-| Token    | `STORYSHELF_TOKEN` in the process env    | Each client sends `Authorization: Bearer <token>`; none is stored on the MCP server          |
+| Start    | The agent launches `npx @storyshelf/mcp` | `npx @storyshelf/mcp serve` (scaffolded with `--http`) or `storyshelf-mcp --http --port 3333` |
+| Token    | `SHELF_TOKEN` in the process env    | Each client sends `Authorization: Bearer <token>`; none is stored on the MCP server          |
 | Roles    | The token's role                         | Per caller, so different people get different permissions                                    |
 
 The HTTP endpoint is `/mcp`. It is stateless, answers `401` without a token, and rejects requests that carry a browser `Origin` unless you allow it with `--origin`. Bind it to `127.0.0.1` (the default) or put it behind TLS and your own network controls before exposing it.
@@ -104,4 +104,4 @@ An agent sees exactly what its token's role can see, and what it reads goes to _
 
 ## Reference
 
-Configuration: `STORYSHELF_URL` (required), `STORYSHELF_TOKEN` (or `SHELF_TOKEN`), `STORYSHELF_SLUG`, and the flags `--url`, `--slug`, `--token`, `--http`, `--port`, `--host`, `--origin`. Package details: [@storyshelf/mcp](/packages/mcp/).
+Configuration: `SHELF_URL` (required), `SHELF_TOKEN`, `SHELF_SLUG`, and the flags `--url`, `--slug`, `--token`, `--http`, `--port`, `--host`, `--origin`. Package details: [@storyshelf/mcp](/packages/mcp/).

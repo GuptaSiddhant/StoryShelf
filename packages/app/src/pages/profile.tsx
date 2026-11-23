@@ -5,14 +5,20 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
   Field,
   HStack,
+  Meta,
   PageHeader,
+  SectionTitle,
+  RelativeTime,
   Table,
   VStack,
+  statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -65,29 +71,16 @@ const profileAvatar = css`
   object-fit: cover;
 `;
 
-const profileAvatarFallback = css`
-  /* profile-avatar-fallback */
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 1.5rem;
-  font-weight: 700;
-`;
-
 const profileName = css`
   /* profile-name */
-  font-weight: 700;
-  font-size: 1.2rem;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xl);
 `;
 
 const profileMeta = css`
   /* profile-meta */
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 `;
 type SecurityState = NonNullable<ProfilePageState["security"]>;
 type PasskeyState = SecurityState["passkeys"][number];
@@ -95,7 +88,7 @@ type PasskeyState = SecurityState["passkeys"][number];
 /** Registered passkey rows with per-key remove actions. */
 const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
   return (
-    <Table dense label="Passkeys">
+    <Table dense label="Passkeys" empty={passkeys.length === 0 ? "No passkeys yet." : undefined}>
       <table>
         <thead>
           <tr>
@@ -113,8 +106,10 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                   <div>{key.name ?? "Unnamed key"}</div>
                   <div class={profileMeta}>{key.deviceType}</div>
                 </td>
-                <td>{new Date(key.createdAt).toLocaleDateString()}</td>
                 <td>
+                  <Time value={key.createdAt} format="date" />
+                </td>
+                <td class="nowrap">
                   <HStack>
                     {key.backedUp ? <Badge>Synced</Badge> : null}
                     <form
@@ -139,8 +134,8 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
 
 type SessionInfo = SecurityState["sessions"][number];
 
-/** One signed-in device with its revoke action. */
-const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
+/** One signed-in device with its revoke action (none for a read-only shared account). */
+const SessionRow: FC<{ session: SessionInfo; readOnly: boolean }> = ({ session, readOnly }) => {
   return (
     <tr>
       <td>
@@ -149,11 +144,13 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
           <span class="mono">{session.ipAddress ?? "—"}</span>
         </div>
       </td>
-      <td>{new Date(session.createdAt).toLocaleString()}</td>
-      <td>
+      <td class="nowrap">
+        <RelativeTime value={session.createdAt} />
+      </td>
+      <td class="nowrap">
         {session.current ? (
           <Badge>This device</Badge>
-        ) : (
+        ) : readOnly ? null : (
           <form
             method="post"
             action="/profile/sessions/revoke"
@@ -171,10 +168,14 @@ const SessionRow: FC<{ session: SessionInfo }> = ({ session }) => {
 };
 
 /** Active device sessions with per-device revoke and sign-out-others. */
-const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
+const SessionsSection: FC<{ security: SecurityState; readOnly: boolean }> = ({
+  security,
+  readOnly,
+}) => {
   return (
     <Card>
-      <PageHeader level={2} title="Devices" description="Where you are signed in" />
+      <SectionTitle>Devices</SectionTitle>
+      <Meta>Where you are signed in</Meta>
       <Table dense label="Devices">
         <table>
           <thead>
@@ -186,12 +187,12 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
           </thead>
           <tbody>
             {security.sessions.map((session) => (
-              <SessionRow key={session.id} session={session} />
+              <SessionRow key={session.id} session={session} readOnly={readOnly} />
             ))}
           </tbody>
         </table>
       </Table>
-      {security.sessions.length > 1 ? (
+      {security.sessions.length > 1 && !readOnly ? (
         <form
           method="post"
           action="/profile/sessions/revoke-others"
@@ -210,21 +211,14 @@ const SessionsSection: FC<{ security: SecurityState }> = ({ security }) => {
 const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   return (
     <Card>
-      <PageHeader
-        level={2}
-        title="Passkeys"
-        description="Sign in without a password using your device"
-      />
+      <SectionTitle>Passkeys</SectionTitle>
+      <Meta>Sign in without a password using your device</Meta>
       {security.passkeys.length < 2 ? (
         <Alert title="Add a backup key">
           Register a 2nd key so a lost device doesn&apos;t lock you out.
         </Alert>
       ) : null}
-      {security.passkeys.length === 0 ? (
-        <p class={profileMeta}>No passkeys yet.</p>
-      ) : (
-        <PasskeyTable passkeys={security.passkeys} />
-      )}
+      <PasskeyTable passkeys={security.passkeys} />
       <HStack>
         <Field label="Key name" name="keyName" type="text" placeholder="e.g. Security key" />
         <Button variant="primary" size="sm" type="button" data-passkey-register="true">
@@ -239,6 +233,67 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
   );
 };
 
+/** The display-name form. */
+const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
+  <Card>
+    <SectionTitle>Display name</SectionTitle>
+    <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
+    <form method="post" action="/profile" novalidate>
+      <Field label="Display name" name="displayName" type="text" required value={displayName} />
+      <Button variant="primary" type="submit">
+        Save name
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The password form, for local accounts. */
+const PasswordCard: FC = () => (
+  <Card>
+    <SectionTitle>Change password</SectionTitle>
+    <Meta>For local accounts only</Meta>
+    <form method="post" action="/profile/password" novalidate>
+      <Field
+        label="Current password"
+        name="currentPassword"
+        type="password"
+        required
+        autocomplete="current-password"
+      />
+      <Field
+        label="New password"
+        name="newPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Field
+        label="Confirm new password"
+        name="confirmPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+      />
+      <Button variant="primary" type="submit">
+        Change password
+      </Button>
+    </form>
+  </Card>
+);
+
+/** The display-name and password forms; a read-only shared account (#1274) gets neither. */
+const AccountForms: FC<{ displayName: string; isLocal: boolean; readOnly: boolean }> = ({
+  displayName,
+  isLocal,
+  readOnly,
+}) =>
+  readOnly ? null : (
+    <>
+      <DisplayNameCard displayName={displayName} />
+      {isLocal ? <PasswordCard /> : null}
+    </>
+  );
+
 /** Personal profile page (editable display name, password for local accounts). */
 // oxlint-disable-next-line eslint/max-lines-per-function -- profile page composes several sections, cohesive
 export function renderProfilePage(state: ProfilePageState): RenderedContent {
@@ -246,6 +301,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
   const avatar = safeImageUrl(user.avatarUrl);
   const displayName = dbUser?.displayNameOverride ?? user.name;
   const provider = dbUser?.authProvider ?? user.providerId ?? "oidc";
+  // A read-only shared account (#1274) sees its profile but none of the controls that change it.
+  const readOnly = user.readOnly === true;
   return (
     <DocumentLayout title="Profile" nav={{ active: "profile" }}>
       <PageHeader title="Profile" description="Your account and project memberships" />
@@ -261,78 +318,33 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             {avatar ? (
               <img class={profileAvatar} src={avatar} alt="" width="64" height="64" />
             ) : (
-              <span class={profileAvatarFallback} aria-hidden="true">
-                {user.name.slice(0, 1).toUpperCase()}
-              </span>
+              <Avatar name={user.name} size="xl" />
             )}
             <VStack>
               <div class={profileName}>{displayName}</div>
               <div class={profileMeta}>{user.email}</div>
               <HStack>
-                <Badge>{user.role}</Badge>
-                <Badge>via {provider}</Badge>
+                <Badge>{statusLabel(user.role)}</Badge>
+                <Badge>{statusLabel(`via ${provider}`)}</Badge>
               </HStack>
             </VStack>
           </HStack>
           <div class={profileMeta}>
-            Member since {dbUser?.createdAt ? new Date(dbUser.createdAt).toLocaleDateString() : "—"}{" "}
-            · Last login {dbUser?.lastLoginAt ? new Date(dbUser.lastLoginAt).toLocaleString() : "—"}
+            Member since {dbUser?.createdAt ? <Time value={dbUser.createdAt} format="date" /> : "—"}{" "}
+            · Last login {dbUser?.lastLoginAt ? <Time value={dbUser.lastLoginAt} /> : "—"}
           </div>
         </VStack>
       </Card>
 
-      <Card>
-        <PageHeader
-          level={2}
-          title="Display name"
-          description="Shown in comments and the header. Survives SSO refresh."
-        />
-        <form method="post" action="/profile" novalidate>
-          <Field label="Display name" name="displayName" type="text" required value={displayName} />
-          <Button variant="primary" type="submit">
-            Save name
-          </Button>
-        </form>
-      </Card>
+      <AccountForms displayName={displayName} isLocal={isLocal === true} readOnly={readOnly} />
 
-      {isLocal ? (
-        <Card>
-          <PageHeader level={2} title="Change password" description="For local accounts only" />
-          <form method="post" action="/profile/password" novalidate>
-            <Field
-              label="Current password"
-              name="currentPassword"
-              type="password"
-              required
-              autocomplete="current-password"
-            />
-            <Field
-              label="New password"
-              name="newPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Field
-              label="Confirm new password"
-              name="confirmPassword"
-              type="password"
-              required
-              autocomplete="new-password"
-            />
-            <Button variant="primary" type="submit">
-              Change password
-            </Button>
-          </form>
-        </Card>
-      ) : null}
+      {security ? <SessionsSection security={security} readOnly={readOnly} /> : null}
 
-      {security ? <SessionsSection security={security} /> : null}
-
-      {security?.passkeysEnabled ? <PasskeysSection security={security} /> : null}
+      {security?.passkeysEnabled && !readOnly ? <PasskeysSection security={security} /> : null}
 
       <Card>
-        <PageHeader level={2} title="Project memberships" description="Your role on each project" />{" "}
+        <SectionTitle>Project memberships</SectionTitle>
+        <Meta>Your role on each project</Meta>{" "}
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
         ) : (
@@ -354,7 +366,7 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                         <a href={`/projects/${m.projectSlug}`}>{m.projectName}</a>
                       </td>
                       <td>
-                        <Badge>{m.role}</Badge>
+                        <Badge>{statusLabel(m.role)}</Badge>
                       </td>
                       <td>{m.source}</td>
                     </tr>
@@ -367,11 +379,8 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
       </Card>
 
       <Card>
-        <PageHeader
-          level={2}
-          title="Notifications"
-          description="Email alerts per project. Fine-tune topics in each project's settings."
-        />
+        <SectionTitle>Notifications</SectionTitle>
+        <Meta>Email alerts per project. Fine-tune topics in each project's settings.</Meta>
         <NotificationsPausedNotice paused={state.notificationsPaused} />
         {memberships.length === 0 ? (
           <p class={profileMeta}>No project memberships.</p>
@@ -399,14 +408,16 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
                         </td>
                         <td>{subscribed ? <Badge>Email on</Badge> : <Badge>Off</Badge>}</td>
                         <td>
-                          <form method="post" action="/profile/notifications">
-                            {csrfField()}
-                            <input type="hidden" name="slug" value={m.projectSlug} />
-                            <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
-                            <Button variant="secondary" size="sm" type="submit">
-                              {subscribed ? "Disable" : "Enable"}
-                            </Button>
-                          </form>
+                          {readOnly ? null : (
+                            <form method="post" action="/profile/notifications">
+                              {csrfField()}
+                              <input type="hidden" name="slug" value={m.projectSlug} />
+                              <input type="hidden" name="enabled" value={subscribed ? "" : "1"} />
+                              <Button variant="secondary" size="sm" type="submit">
+                                {subscribed ? "Disable" : "Enable"}
+                              </Button>
+                            </form>
+                          )}
                         </td>
                       </tr>
                     );

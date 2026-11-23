@@ -6,8 +6,8 @@
  * token (the usual case, and every target without a signed URL) is one render call, as before.
  */
 import type { CaptureTarget, CaptureRunner, RenderResult } from "../adapters/capture-runner.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { PER_CAPTURE_BUDGET_MS, STORYBOOK_URL_TTL_GRACE } from "../utils/storybook-token.ts";
-import type { StoryEntry } from "./adapter.ts";
 import { renderBudgetMs, renderWithTimeout } from "./render.ts";
 import type { RenderRequest } from "./render.ts";
 import type { StorybookUrlSource } from "./storybook-urls.ts";
@@ -23,6 +23,11 @@ export interface SliceInput {
   captureCount: (story: StoryEntry) => number;
   /** An explicit budget limits each call; a signed URL may require a shorter timeout. */
   renderTimeoutMs: number | undefined;
+  /**
+   * Called before each slice starts; throws once the job was cancelled, lost its lease or passed its
+   * deadline, so no render starts for an abandoned job (the job's progress hook).
+   */
+  checkpoint?: (() => void) | undefined;
 }
 
 /**
@@ -38,6 +43,7 @@ export async function renderInSlices(input: SliceInput): Promise<RenderResult> {
   const slices = slicesOf(input);
   const results: RenderResult[] = [];
   for (const slice of slices) {
+    input.checkpoint?.();
     const requestedBudgetMs = renderBudgetMs(slice.expected, input.renderTimeoutMs);
     const ttl = input.storybookUrl?.ttlSeconds?.(input.browser, requestedBudgetMs);
     const budgetMs =

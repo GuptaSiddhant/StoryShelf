@@ -4,20 +4,23 @@ import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
-  Badge,
   Button,
   Card,
+  DialogLink,
   HStack,
   CheckField,
-  Field,
   FormActions,
   Meta,
-  RelativeTime,
   SectionTitle,
-  SelectField,
-  Table,
+  SummaryList,
   VStack,
+  formatAbsolute,
+  statusLabel,
+  type SummaryItem,
 } from "../ui/components.tsx";
+import { ADD_CHANNEL_DIALOG, EDIT_CHANNEL_DIALOG, type ChannelKind } from "./channel-forms.tsx";
+import { FormDialog } from "./dialog-form.tsx";
+import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
 import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
 
@@ -180,51 +183,6 @@ function reactsTo(channel: SettingsNotificationChannel): string {
   return channel.events.length === 0 ? "all events" : channel.events.join(", ");
 }
 
-/** When a channel last delivered, or that it never has. */
-const LastDelivered: FC<{ at: string | null }> = ({ at }) => (
-  <Meta as="span">
-    {at === null ? (
-      "Never delivered"
-    ) : (
-      <>
-        Last delivered <RelativeTime value={at} />
-      </>
-    )}
-  </Meta>
-);
-
-/** The health badge: failing with its time and error, ok, or no delivery yet. */
-const HealthStatus: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => {
-  if (channel.lastError === null) {
-    return channel.lastDeliveredAt === null ? (
-      <Badge tone="neutral">no delivery yet</Badge>
-    ) : (
-      <Badge tone="success">ok</Badge>
-    );
-  }
-  return (
-    <>
-      <Badge tone="danger">failing</Badge>
-      <span class="truncate max-w-cell">
-        <Meta as="span">
-          Failed {channel.lastErrorAt ? <RelativeTime value={channel.lastErrorAt} /> : null}
-        </Meta>
-      </span>
-      <span class="truncate max-w-cell" title={channel.lastError}>
-        <Meta as="span">{channel.lastError}</Meta>
-      </span>
-    </>
-  );
-};
-
-/** Delivery health, and when the channel last delivered. */
-const ChannelHealth: FC<{ channel: SettingsNotificationChannel }> = ({ channel }) => (
-  <VStack>
-    <HealthStatus channel={channel} />
-    <LastDelivered at={channel.lastDeliveredAt} />
-  </VStack>
-);
-
 /** Git channels only, admins only: ask again for the open builds' state on this channel. Disabled while notifications are paused. */
 const RetryForm: FC<{
   project: Project;
@@ -274,135 +232,126 @@ const DeleteForm: FC<{ project: Project; channel: SettingsNotificationChannel }>
   </form>
 );
 
-/** One channel table row; Retry and Delete (admins only) sit side by side under the delivery content. */
-const ChannelRow: FC<{
+/** The channel's health as the summary's state badge. */
+function healthOf(channel: SettingsNotificationChannel): NonNullable<SummaryItem["state"]> {
+  if (channel.lastError !== null) {
+    return { label: "Failing", tone: "danger" };
+  }
+  return channel.lastDeliveredAt === null
+    ? { label: "No delivery yet", tone: "neutral" }
+    : { label: "OK", tone: "success" };
+}
+
+/** The last outcome as text: the failure with its day, the last delivery, or never. */
+function lastOutcome(channel: SettingsNotificationChannel): string {
+  if (channel.lastError === null) {
+    return channel.lastDeliveredAt === null
+      ? "Never delivered"
+      : `Last delivered ${formatAbsolute(channel.lastDeliveredAt, "date")}`;
+  }
+  const when = channel.lastErrorAt ? ` ${formatAbsolute(channel.lastErrorAt, "date")}` : "";
+  return `Failed${when}: ${channel.lastError}`;
+}
+
+/** Provider, what it reacts to and its last delivery or error, as one line. */
+function detailsOf(channel: SettingsNotificationChannel): string {
+  return [statusLabel(channel.provider), reactsTo(channel), lastOutcome(channel)].join(" · ");
+}
+
+/** A channel's actions (admins only): Edit for message channels, Retry for git ones, Delete. */
+const ChannelActions: FC<{
   project: Project;
   channel: SettingsNotificationChannel;
-  isAdmin: boolean;
   paused: boolean;
-}> = ({ project, channel, isAdmin, paused }) => (
-  <tr key={channel.id} id={`channel-${channel.id}`} tabIndex={-1}>
-    <td>
-      <Badge tone="neutral">{channel.provider}</Badge>
-    </td>
-    <td class="truncate max-w-cell" title={targetOf(channel)}>
-      {targetOf(channel)}
-    </td>
-    <td>
-      <Meta as="span">{reactsTo(channel)}</Meta>
-    </td>
-    <td>
-      <VStack>
-        <ChannelHealth channel={channel} />
-        {isAdmin ? (
-          <HStack>
-            {channel.delivery === "state" && channel.enabled ? (
-              <RetryForm project={project} channel={channel} paused={paused} />
-            ) : null}
-            <DeleteForm project={project} channel={channel} />
-          </HStack>
-        ) : null}
-      </VStack>
-    </td>
-  </tr>
+}> = ({ project, channel, paused }) => (
+  <HStack>
+    {channel.delivery === "message" ? (
+      <DialogLink
+        dialogId={EDIT_CHANNEL_DIALOG}
+        href={`/projects/${project.slug}/settings/notifications/${channel.id}/edit`}
+        variant="secondary"
+        size="sm"
+        aria-label={`Edit ${targetOf(channel)}`}
+      >
+        Edit
+      </DialogLink>
+    ) : null}
+    {channel.delivery === "state" && channel.enabled ? (
+      <RetryForm project={project} channel={channel} paused={paused} />
+    ) : null}
+    <DeleteForm project={project} channel={channel} />
+  </HStack>
 );
 
-/** Channel list card: chat, email and git channels side by side, each with its delivery health. */
-const ChannelsCard: FC<{
+const AddChannelLink: FC<{ project: Project }> = ({ project }) => (
+  <DialogLink
+    dialogId={ADD_CHANNEL_DIALOG}
+    href={`/projects/${project.slug}/settings/notifications/new`}
+    variant="primary"
+    icon="plus"
+  >
+    Add channel
+  </DialogLink>
+);
+
+const ChannelDialogs: FC = () => (
+  <>
+    <FormDialog id={ADD_CHANNEL_DIALOG} title="Add channel" submitLabel="Add channel" />
+    <FormDialog id={EDIT_CHANNEL_DIALOG} title="Edit channel" submitLabel="Save channel" />
+  </>
+);
+
+/** Channels as a summary: chat, email and git channels side by side, each with its delivery health. */
+const ChannelsSection: FC<{
   project: Project;
   channels: SettingsNotificationChannel[];
+  messageKinds: ChannelKind[];
   isAdmin: boolean;
   paused: boolean;
-}> = ({ project, channels, isAdmin, paused }) => (
-  <Card>
-    <SectionTitle>Channels</SectionTitle>
-    <Meta>
-      Project admins route build events to Slack, Teams or email, and show each build's state on
-      GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
-      only in memory at delivery time. Git channels follow the build state, not a topic list, and
-      their delivery is best-effort: a failure shows here, and the next build state retries it.
-    </Meta>
-    {isAdmin && channels.some((channel) => channel.delivery === "state") ? (
+}> = ({ project, channels, messageKinds, isAdmin, paused }) => {
+  const canAdd = isAdmin && messageKinds.length > 0;
+  const add = canAdd ? <AddChannelLink project={project} /> : undefined;
+  return (
+    <VStack>
+      <SectionTitle>Channels</SectionTitle>
       <Meta>
-        Retry re-sends the current state of this project's open builds to one git channel. It never
-        replays chat, email or webhooks.
+        Project admins route build events to Slack, Teams or email, and show each build's state on
+        GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
+        only in memory at delivery time. Git channels follow the build state, not a topic list, and
+        their delivery is best-effort: a failure shows here, and the next build state retries it.
       </Meta>
-    ) : null}
-    <Table label="Channels">
-      <table>
-        <thead>
-          <tr>
-            <th>Provider</th>
-            <th>Target</th>
-            <th>Reacts to</th>
-            <th>Delivery</th>
-          </tr>
-        </thead>
-        <tbody>
-          {channels.map((channel) => (
-            <ChannelRow project={project} channel={channel} isAdmin={isAdmin} paused={paused} />
-          ))}
-        </tbody>
-      </table>
-    </Table>
-    {channels.length === 0 ? <Meta>No channels configured.</Meta> : null}
-  </Card>
-);
+      {isAdmin && channels.some((channel) => channel.delivery === "state") ? (
+        <Meta>
+          Retry re-sends the current state of this project's open builds to one git channel. It
+          never replays chat, email or webhooks.
+        </Meta>
+      ) : null}
+      <SummaryList
+        label="Channels"
+        items={channels.map((channel) => ({
+          id: channel.id,
+          anchor: `channel-${channel.id}`,
+          name: targetOf(channel),
+          state: healthOf(channel),
+          details: detailsOf(channel),
+          actions: isAdmin ? (
+            <ChannelActions project={project} channel={channel} paused={paused} />
+          ) : undefined,
+        }))}
+        emptyTitle="No channels configured"
+        add={add}
+      />
+      {channels.length > 0 ? add : null}
+      {canAdd ? <ChannelDialogs /> : null}
+    </VStack>
+  );
+};
 
-/** Channel creation card (admins only). */
-const CreateChannelCard: FC<{
-  project: Project;
-  providers: SettingsNotifyProvider[];
-  formState?: NotificationsFormState;
-}> = ({ project, providers, formState }) => (
-  <Card>
-    <SectionTitle level={3}>Add a message channel</SectionTitle>
-    <form
-      method="post"
-      action={`/projects/${project.slug}/settings/notifications`}
-      hx-post={`/projects/${project.slug}/settings/notifications`}
-      hx-target="body"
-    >
-      {csrfField()}
-      <SelectField
-        label="Provider"
-        name="provider"
-        options={providers.map((provider) => ({ value: provider.kind, label: provider.name }))}
-        hint={formState?.errors?.["provider"]}
-      />
-      <Field
-        label="Target"
-        name="target"
-        type="text"
-        required
-        placeholder="team@example.com or https://hooks.slack.com/…"
-        hint="Email address for email channels, webhook URL otherwise."
-        error={formState?.errors?.["target"]}
-      />
-      <Field
-        label="Events"
-        name="events"
-        placeholder="build.reviewing, build.approved"
-        hint="Comma-separated. Leave blank to receive all events."
-      />
-      <SelectField
-        label="Style"
-        name="style"
-        options={[
-          { value: "compact", label: "Compact" },
-          { value: "verbose", label: "Verbose" },
-        ]}
-      />
-      <FormActions>
-        <Button variant="primary" type="submit" icon="plus">
-          Add channel
-        </Button>
-      </FormActions>
-    </form>
-  </Card>
-);
-
-/** Notifications settings tab: channel list, create forms, and my preferences. */
+/**
+ * Notifications settings tab: channel list, create forms, and my preferences. Only the providers the
+ * server offers are listed (issue #1126); with none, a site admin sees one line naming what is
+ * missing (`unoffered`, site admins only) and a project admin sees nothing.
+ */
 export function renderSettingsNotifications(
   project: Project,
   channels: SettingsNotificationChannel[],
@@ -411,26 +360,38 @@ export function renderSettingsNotifications(
   isAdmin: boolean,
   formState?: NotificationsFormState,
   paused?: boolean,
+  unoffered?: readonly UnofferedIntegrationView[],
 ): unknown {
+  if (providers.length === 0) {
+    // A refused form (a stale page posting a kind no longer offered) still says why.
+    const refusal = formState?.globalError ?? formState?.errors?.["provider"];
+    return (
+      <>
+        {refusal ? <Alert tone="danger">{refusal}</Alert> : null}
+        <UnofferedNotice area="Notifications are" integrations={unoffered} />
+      </>
+    );
+  }
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
+  // The personal card's switches are about email: it shows only while email is offered.
+  const personal = providers.some((provider) => provider.kind === "email");
   return (
-    <div class="grid max-w-form">
+    <VStack>
+      <UnofferedNotice area="Some integrations are" integrations={unoffered} />
       <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <MyNotificationsCard project={project} mySubscription={mySubscription} />
-      <ChannelsCard
+      {personal ? <MyNotificationsCard project={project} mySubscription={mySubscription} /> : null}
+      <ChannelsSection
         project={project}
         channels={channels}
+        messageKinds={messageProviders.map(({ kind, name }) => ({ kind, name }))}
         isAdmin={isAdmin}
         paused={paused === true}
       />
-      {isAdmin && messageProviders.length > 0 ? (
-        <CreateChannelCard project={project} providers={messageProviders} formState={formState} />
-      ) : null}
       {isAdmin && gitProviders.length > 0 ? (
         <CreateGitChannelCard project={project} providers={gitProviders} formState={formState} />
       ) : null}
-    </div>
+    </VStack>
   );
 }

@@ -3,11 +3,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CaptureRunner } from "./adapters/capture-runner.ts";
 import type { ShelfOptions } from "./config.ts";
+import { githubApp } from "./integrations/git/connections/define.ts";
+import { TEST_PRIVATE_KEY } from "./integrations/git/test-key.ts";
 import {
   DEFAULT_SCRATCH_DIR,
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "./options.ts";
+import { makeFakeDesign } from "./test-helpers/fake-design.ts";
 
 const runner = { metadata: { kind: "r" } } as unknown as CaptureRunner;
 const base = {
@@ -16,6 +19,50 @@ const base = {
 } as unknown as ShelfOptions;
 
 describe("resolveShelfOptions", () => {
+  it("resolves the integration groups into lists (ADR 0049)", () => {
+    const design = makeFakeDesign().provider;
+    const resolved = resolveShelfOptions({
+      ...base,
+      design: (builtIn) => [...builtIn, design],
+      notifications: { notifiers: false, config: { fromName: "Shelf" } },
+    });
+    expect(resolved.design?.map((p) => p.metadata.kind)).toEqual(["figma", "fake"]);
+    expect(resolved.notifications?.notifiers).toEqual([]);
+    expect(resolved.notifications?.email).toEqual([]);
+    expect(resolved.notifications?.config).toEqual({ fromName: "Shelf" });
+  });
+
+  it("keeps only available providers and reports every kind (#1126)", () => {
+    const resolved = resolveShelfOptions({ ...base, design: false });
+    const kinds = resolved.notifications?.notifiers?.map((p) => p.metadata.kind) ?? [];
+    expect(kinds).toContain("slack-webhook");
+    expect(kinds).not.toContain("email");
+    expect(resolved.design).toEqual([]);
+    const byKind = new Map(resolved.integrations?.map((status) => [status.kind, status]));
+    expect(byKind.get("email")?.state).toBe("unavailable");
+    expect(byKind.get("figma")?.state).toBe("disabled");
+    expect(byKind.get("github")?.state).toBe("available");
+  });
+
+  it("throws at startup on a repeated provider kind, naming it", () => {
+    const design = makeFakeDesign("figma").provider;
+    expect(() => resolveShelfOptions({ ...base, design: [design, design] })).toThrow(
+      /design\[1\] \(".*"\): kind "figma" is already used/u,
+    );
+  });
+
+  it("checks the configured git connections and keeps them (ADR 0054)", () => {
+    const app = githubApp({ id: "gh", appId: 1, privateKey: TEST_PRIVATE_KEY });
+    const git = {
+      connections: [app],
+      links: [{ connection: "gh", project: "web", repository: "a/b" }],
+    };
+    expect(resolveShelfOptions({ ...base, git }).git).toBe(git);
+    expect(() => resolveShelfOptions({ ...base, git: { connections: [app, app] } })).toThrow(
+      /configured twice/u,
+    );
+  });
+
   it("defaults scratchDir for a hosting-only deployment: publishing extracts zips there", () => {
     expect(resolveShelfOptions(base).config?.scratchDir).toBe(DEFAULT_SCRATCH_DIR);
   });

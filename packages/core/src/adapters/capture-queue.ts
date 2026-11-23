@@ -40,7 +40,7 @@ export interface CaptureJob {
 
 /** A job polled from a queue with transport metadata. */
 export interface PollableJob extends CaptureJob {
-  /** Transport receipt handle (SQS, Redis pop token, etc.). */
+  /** Transport receipt handle, when the queue hands one out. */
   receipt?: string;
   /** Number of delivery attempts already made (0 = first delivery). */
   attempts?: number;
@@ -70,9 +70,9 @@ export type LeaseRenewal = "ok" | "lost" | "cancelled";
  * - the in-memory implementation (`InMemoryCaptureQueue`, in
  *   `capture/capture-queue.ts`) runs the job in-process on a long-lived
  *   Node server;
- * - a remote implementation (e.g. SQS, Cloudflare Queues, Azure Storage
- *   Queues) pushes the job and leaves execution to a separately-assembled
- *   worker that polls the queue and runs `executeCaptureJob`.
+ * - a remote implementation pushes the job to an external queue and leaves
+ *   execution to a separately-assembled worker that polls it and runs
+ *   `executeCaptureJob`.
  *
  * `status`/`active`/`recent` back the live queue view regardless of transport.
  */

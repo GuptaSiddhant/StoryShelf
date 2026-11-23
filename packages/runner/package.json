@@ -1,0 +1,110 @@
+{
+  "name": "@storyshelf/runner",
+  "version": "0.15.1",
+  "description": "Pure Playwright CaptureRunner implementation for StoryShelf: renders Storybook screenshots in-process (no db/storage coupling).",
+  "keywords": [
+    "playwright",
+    "screenshot",
+    "self-hosted",
+    "storybook",
+    "visual-testing"
+  ],
+  "homepage": "https://github.com/GuptaSiddhant/StoryShelf#readme",
+  "bugs": {
+    "url": "https://github.com/GuptaSiddhant/StoryShelf/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Siddhant Gupta",
+    "url": "https://guptasiddhant.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
+    "directory": "packages/runner"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./a11y": {
+      "source": "./src/a11y/index.ts",
+      "default": "./dist/a11y/index.mjs"
+    },
+    "./images": {
+      "source": "./src/images/index.ts",
+      "default": "./dist/images/index.mjs"
+    },
+    "./remote": {
+      "source": "./src/remote/index.ts",
+      "default": "./dist/remote/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./a11y": "./dist/a11y/index.mjs",
+      "./images": "./dist/images/index.mjs",
+      "./remote": "./dist/remote/index.mjs",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "bench": "node --conditions=source bench/run.ts",
+    "build": "tsdown",
+    "dev": "tsdown -w",
+    "fmt": "oxfmt ./src",
+    "lint": "oxlint --type-aware --type-check ./src",
+    "test": "vitest run",
+    "test:integration": "RUN_INTEGRATION=1 vitest run integration.test.ts passkey.integration.test.ts remote.integration.test.ts",
+    "prepublishOnly": "nub run build",
+    "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts src/concurrency/adaptive-concurrency.test.ts src/concurrency/page-limiter.test.ts src/remote/session-gate.test.ts src/images/pool.test.ts"
+  },
+  "dependencies": {
+    "axe-core": "4.13.0",
+    "pixelmatch": "^7.1.0",
+    "playwright-core": "1.63.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@hono/node-server": "catalog:",
+    "@storyshelf/app": "workspace:*",
+    "@storyshelf/auth": "workspace:*",
+    "@storyshelf/core": "workspace:*",
+    "@storyshelf/db": "workspace:*",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "catalog:",
+    "@types/pngjs": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "adm-zip": "catalog:",
+    "jsdom": "^30.0.1",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "sharp": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@storyshelf/core": "workspace:*",
+    "sharp": ">=0.34.0"
+  },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

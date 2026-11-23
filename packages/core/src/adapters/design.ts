@@ -6,7 +6,7 @@
  */
 import type { Buffer } from "node:buffer";
 import type { Logger } from "../logger.ts";
-import type { Adapter, AdapterMetadata } from "./metadata.ts";
+import type { Adapter, AdapterMetadata, IntegrationAvailability } from "./metadata.ts";
 import type { OAuthClient } from "./oauth.ts";
 
 /** Design-provider metadata: identity plus the copy the settings UI shows for its credential. */
@@ -62,6 +62,11 @@ export interface DesignProvider extends Adapter<DesignAdapterMetadata> {
   create(opts: { credential: string; authType?: DesignAuthType; logger?: Logger }): DesignClient;
   /** Present only when the operator configured OAuth for this provider. */
   readonly oauth?: OAuthClient;
+  /**
+   * Whether this server can serve the provider (issue #1126). Optional: absent means available.
+   * Evaluated once at startup and cached, so it must not do I/O.
+   */
+  availability?(): IntegrationAvailability;
 }
 
 /** Runtime — bound to a credential, talks to the vendor API. */

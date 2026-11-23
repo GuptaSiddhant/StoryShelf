@@ -232,8 +232,8 @@ when OTEL is enabled by the host (`createAi({ otel })`, defaulting to on when
 
 ### 9. Data model and jobs
 
-Three tables and one column, defined in `core/schema` and mirrored with migrations in `db-sqlite`,
-`db-postgres` and `db-mysql`:
+Three tables and one column, defined in `core/schema` and mirrored with migrations in `@storyshelf/db/sqlite`,
+`@storyshelf/db/postgres` and `@storyshelf/db/mysql`:
 
 - `projects.ai_profile TEXT NULL` (decision 4).
 - `insights`: `id` ULID, `project_id`, `build_id` NULL (health rows), `kind` (`triage` or `health`),

@@ -17,7 +17,7 @@ the old copies working.
 Facts read in the code on 2026-11-13:
 
 - **Migrations run at every boot and are not versioned.** `runMigrations`
-  (`packages/db-postgres/src/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
+  (`packages/db/src/postgres/migrate.ts`) runs the full DDL with `IF NOT EXISTS`, then a fixed list
   of idempotent `ALTER` statements. There is no record of which release last migrated
   `[inferred: no version table found]`.
 - **Postgres serialises migrations.** `runMigrationsLocked` holds a session-level advisory lock
@@ -230,3 +230,24 @@ A release with no schema change says "No schema changes."
   constant default is safe for old writers and is what the existing migrations already do.
 - **Rely on review instead of a check.** Rejected: the existing lists already contain boot-time
   drops, written when one copy was the only case.
+
+## Amendment 2026-11-21: no expand/contract until 2027 (#1309)
+
+Owner, 2026-11-21: "Till 2026, all breaking changes are allowed so no need to support old packages,
+env vars and properties or columns." Until **2027-01-01**, the public launch, decisions 1, 3, 5 and 6
+are suspended in this way:
+
+- A contract step (drop, rename, new `NOT NULL`, unique index, check, type narrowing), a new job kind
+  and a new status value may ship in the release that needs them. No expand/contract cycle, no
+  dual-write, no reader-first release.
+- The cost is that **an upgrade before 2027 is stop-the-world**. Stop every instance of the old
+  release, then start the new one; there is no rolling upgrade across a release with such a step.
+  The release notes say so whenever a release contains a contract step (decision 10).
+- Such a change ships as a `Breaking:` changeset whose body has a `Schema:` line naming the contract
+  step. A pull request that makes one carries the `schema-break` label. It skips the
+  `previous-release-db` job, which would fail on it by design, and the changeset check enforces the
+  `Breaking:` kind and the `Schema:` line (`docs/testing.md`).
+- The `previous-release-db` job stays for every other pull request: it still catches an *accidental*
+  break.
+
+From 2027-01-01 this ADR applies again as written.

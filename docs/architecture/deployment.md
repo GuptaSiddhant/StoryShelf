@@ -6,19 +6,23 @@
 
 ### Docker
 
-The server is one container. Capture runs **in-process** with the image's own Chromium: no Docker socket mount, no repository cloning. Its only state is the data directory (`DATA_DIR`, `/data` in the image).
+The server is one container. Capture runs **in-process** with the image's own Chromium: no Docker socket mount, no repository cloning. Its only state is the data directory (`SHELF_DATA_DIR`, `/data` in the image).
 
-The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/server.ts` started with `node dist/server.mjs`. The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
+The image is built from `apps/fly-app/Dockerfile`, a rolldown bundle of `apps/fly-app/instance.ts` (the module `storyshelf-server serve` loads) and the `storyshelf-server` bin, started with `storyshelf-server serve` (on `PATH` in the image). The build context must be the repository root. The official image (#887) and the cloud modules (ADR 0050) are coming; until then, build from this Dockerfile.
 
-The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_USERNAME` or `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR.
+The release workflow's image job builds `apps/server-image/Dockerfile` instead, and pushes one build to `ghcr.io/guptasiddhant/storyshelf` and to `docker.io/guptasiddhant/storyshelf` (#1027) under the same tags (`<version>`, `latest`, and the `-hosting` variants). Both registries therefore share one digest, and the provenance and SBOM attestations travel with the pushed manifest, so both carry them. Docker Hub is skipped with a notice while `DOCKERHUB_TOKEN` is unset, and the release still publishes to GHCR. `DOCKERHUB_USERNAME` is optional and defaults to `guptasiddhant`.
 
 The public website and the Fly demo follow stable releases only (ADR 0043): `release.yml` calls `website.yml` (built from the release tag) and `fly.yml` (the official image of that version when it exists, else a build from the tag) after the tag is created, and a push to `main` deploys neither. Both can be run by hand with `workflow_dispatch`; website PRs are still built and link-checked in `ci.yml`.
+
+A release pull request (`release/v*`) runs `release-dry-run.yml` before the owner merges it (#1097), so the blockers of a release show up while it is still a pull request. It publishes and deploys nothing. Three jobs: `images` (check name `release images build`) builds both variants of `apps/server-image/Dockerfile` for `linux/amd64,linux/arm64` (the arm64 build is the one CI never runs); `npm` runs `scripts/check-npm-packages.mjs`, which fails when a public package is not on npm yet (a first publish cannot use trusted publishing, so the message says to publish it once by hand and then run `scripts/npm-trust-all.mjs`) and, when the `NPM_TOKEN` secret is set, also checks each package's trusted publisher; `demo` fills a `/data` volume with the previous release's demo image, boots the image `fly.yml` will deploy (the official image when `FLY_OFFICIAL_IMAGE` is `true`, else `apps/fly-app/Dockerfile`) on that volume, and requires `/api/v1/health` to answer, which catches volume ownership and migration problems before Fly does. On any other pull request the jobs are skipped, so they can be required checks; `workflow_dispatch` runs them on any branch. `changeset` and `docs:check` are separate checks and are unchanged.
+
+The stable release pull request is kept current by `release-pr.yml` (ADR 0043, #1098). While one `release/v*` pull request is open and `main` has gained changesets its branch does not consume, the workflow prepares the release again on `main`. Release branches are append-only: nothing force-pushes them. An unchanged version adds one merge commit to the branch (parents: the open pull request's head, which is what the workflow last pushed, and `main`; tree: the freshly prepared release) and pushes it as a plain fast-forward, so the pull request keeps its number and auto-merge. If the branch moved since, the push is rejected and the job fails with a message. A changed bump (patch to minor) pushes a new `release/v<version>`, opens its pull request and closes the old one. The workflow never force-pushes any branch. `scripts/release-due.mjs` makes the open, refresh or nothing decision.
 
 ```sh
 docker build -f apps/fly-app/Dockerfile -t storyshelf .
 docker run -p 3000:3000 \
   -v storyshelf-data:/data \
-  -e SECRET=your-hmac-secret-of-at-least-32-chars \
+  -e SHELF_SECRET=your-hmac-secret-of-at-least-32-chars \
   storyshelf
 ```
 
@@ -35,32 +39,32 @@ services:
       - storyshelf-data:/data
     environment:
       # Signs sessions. Keep it stable across restarts.
-      - SECRET=your-hmac-secret-of-at-least-32-chars
-      # Site-admin API access (project creation, purge). Never the same value as SECRET.
-      - STORYSHELF_ADMIN_TOKEN=your-long-random-token
+      - SHELF_SECRET=your-hmac-secret-of-at-least-32-chars
+      # Site-admin API access (project creation, purge). Never the same value as SHELF_SECRET.
+      - SHELF_ADMIN_TOKEN=your-long-random-token
       # Optional: a daily purge of finished builds older than 30 days. Unset means no purge.
-      - PURGE_TTL_DAYS=30
+      - SHELF_PURGE_TTL_DAYS=30
       # Optional: concurrent captures on this instance.
-      - CAPTURE_CONCURRENCY=2
+      - SHELF_CAPTURE_CONCURRENCY=2
       # Behind a load balancer: the proxies allowed to name the client (see "Behind a proxy").
-      - TRUST_PROXY=1
+      - SHELF_TRUST_PROXY=1
 
 volumes:
   storyshelf-data:
 ```
 
-The variables above are read by `apps/fly-app/server.ts`, which also reads `DATA_DIR`, `PORT`, `PUBLIC_BASE_URL`, `AUTH_PASSWORD`, `ADMIN_TOKEN` and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
+The variables above are read by `apps/fly-app/instance.ts`, which also reads `SHELF_DATA_DIR`, `PORT`, `SHELF_PUBLIC_BASE_URL`, `SHELF_ADMIN_PASSWORD` (with `SHELF_SECRET`, required when `FLY_APP_NAME` is set, or boot throws; `SHELF_ALLOW_NO_AUTH=1` opts out, #1360), `SHELF_ADMIN_TOKEN`, `SHELF_INTEGRATIONS_DISABLED` (integration kinds projects are not offered, through `integrationsFromEnv`; the server image reads it too) and the sign-in page branding. The branch cleanup interval and TTL, and the published-Storybook subdomain domain, are `ShelfConfig` fields (`branchTtlDays`, `branchGcIntervalMs`, `publishedBaseDomain` in `core/src/config.ts`) that you set in your server's code: neither shipped server reads an environment variable for them. SSO providers are code-driven recipes, not environment variables; only a `{env:NAME}` reference inside the auth config resolves (see `/guides/auth/oidc`).
 
 ### Behind a proxy
 
-Rate limits (`/api/v1/*`, sign-in, the signed Storybook routes) count per client IP. By default that is the socket peer, so behind a load balancer every user shares the proxy's buckets, and one client can use up sign-in for all. `ShelfConfig.trustProxy` names the proxies that may report the client; both shipped servers map it from `TRUST_PROXY` (`parseTrustProxy` in `core/src/config.ts`):
+Rate limits (`/api/v1/*`, sign-in, the signed Storybook routes) count per client IP. By default that is the socket peer, so behind a load balancer every user shares the proxy's buckets, and one client can use up sign-in for all. `ShelfConfig.trustProxy` names the proxies that may report the client; both shipped servers map it from `SHELF_TRUST_PROXY` (`parseTrustProxy` in `core/src/config.ts`):
 
-| `TRUST_PROXY`               | Client IP                                                                                       | Use on                                                                                          |
-| --------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| unset, `false`, `0`         | the socket peer (no forwarded header is read)                                                   | a server clients reach directly                                                                 |
-| `1`, `2`, …                 | `X-Forwarded-For`, counting that many hops from the right                                       | one load balancer (`1`): ECS behind an ALB, Cloud Run, Azure Container Apps                     |
-| `10.0.0.0/16,2001:db8::/32` | `X-Forwarded-For`, read only when the peer is in the list; the rightmost entry outside the list | proxies with known addresses                                                                    |
-| `fly`                       | `Fly-Client-IP`                                                                                 | Fly.io (`apps/fly-app/server.ts` uses it when `FLY_APP_NAME` is set and `TRUST_PROXY` is unset) |
+| `SHELF_TRUST_PROXY`         | Client IP                                                                                       | Use on                                                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| unset, `false`, `0`         | the socket peer (no forwarded header is read)                                                   | a server clients reach directly                                                                         |
+| `1`, `2`, …                 | `X-Forwarded-For`, counting that many hops from the right                                       | one load balancer (`1`): ECS behind an ALB, Cloud Run, Azure Container Apps                             |
+| `10.0.0.0/16,2001:db8::/32` | `X-Forwarded-For`, read only when the peer is in the list; the rightmost entry outside the list | proxies with known addresses                                                                            |
+| `fly`                       | `Fly-Client-IP`                                                                                 | Fly.io (`apps/fly-app/instance.ts` uses it when `FLY_APP_NAME` is set and `SHELF_TRUST_PROXY` is unset) |
 
 One resolver (`createClientIpResolver`, `app/src/middleware/client-ip.ts`) serves every rate-limit bucket. A forwarded header from a peer that is not trusted is never read, and an entry that is not an IP never names a client. Count only the proxies you run: a count higher than the real chain lets a client pick its own bucket by sending `X-Forwarded-For`. Limits stay per process.
 
@@ -68,16 +72,16 @@ One resolver (`createClientIpResolver`, `app/src/middleware/client-ip.ts`) serve
 
 Published Storybook files can sit behind a CDN. What a CDN may keep is decided by the `Cache-Control` each answer carries, which the server sets per request. A CDN must obey it: do not add a default TTL, do not override `private`, and do not cache by URL when the response is `private`.
 
-| Route | Who gets it | `Cache-Control` | A shared cache (CDN) may store it |
-| --- | --- | --- | --- |
-| `/_/<buildId>/*` (a ULID short link) | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/projects/:slug/storybook/build/<buildId>/*` | the same | `public, max-age=31536000, immutable` | yes, indefinitely |
-| `/_/<slug>/` (the project's latest build) | the same | `public, max-age=60` | yes, for a minute |
-| `/_/<slug>/*` (a slug, not the root) | the same | `public, max-age=3600` | yes, for an hour |
-| a public build's Storybook landing page | the same | `public, no-cache` | revalidate only |
-| a private build, signed-in viewer with a role | `session` | `private, no-cache` | no |
-| `/_s/:token/*` (a signed URL) | the token holder | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no |
-| `/_r/:token/*` (a read grant) | the token holder | `private, no-store` | no |
+| Route                                         | Who gets it                                                 | `Cache-Control`                                                                                                  | A shared cache (CDN) may store it |
+| --------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `/_/<buildId>/*` (a ULID short link)          | a public build, or any build on an instance without sign-in | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/projects/:slug/storybook/build/<buildId>/*` | the same                                                    | `public, max-age=31536000, immutable`                                                                            | yes, indefinitely                 |
+| `/_/<slug>/` (the project's latest build)     | the same                                                    | `public, max-age=60`                                                                                             | yes, for a minute                 |
+| `/_/<slug>/*` (a slug, not the root)          | the same                                                    | `public, max-age=3600`                                                                                           | yes, for an hour                  |
+| a public build's Storybook landing page       | the same                                                    | `public, no-cache`                                                                                               | revalidate only                   |
+| a private build, signed-in viewer with a role | `session`                                                   | `private, no-cache`                                                                                              | no                                |
+| `/_s/:token/*` (a signed URL)                 | the token holder                                            | `private, no-store`; a capture grant may get `private, max-age=N` when `captureAssets.cacheMaxAgeSeconds` is set | no                                |
+| `/_r/:token/*` (a read grant)                 | the token holder                                            | `private, no-store`                                                                                              | no                                |
 
 Rules for the CDN:
 
@@ -98,26 +102,47 @@ Several instances can share one database and one storage adapter. Some state is 
 - the database, including the capture and publish job queue (`capture_jobs`): any instance may take a job, and a lease recovers work from an instance that stops;
 - published files and manifests in the storage adapter;
 - the AI token budget: usage is counted from the database, so the daily limit holds across instances;
-- sessions and signed URLs, provided every instance has the same `SECRET`. Set it once and share it.
+- sessions and signed URLs, provided every instance has the same `SHELF_SECRET`. Set it once and share it.
 
 **Per process** (each instance has its own copy):
 
 - the manifest cache (a bounded cache per storage adapter) and the catalog cache (`catalog.json` by build id): a cold instance reads storage once; the entries are immutable, so this never causes a stale answer;
 - the rate-limit buckets: a client's count lives in the instance it reaches;
 - the remote-browser connection limiter (`maxConnections`) and the render page limit;
-- the capture consumer: each instance runs its own, so `CAPTURE_CONCURRENCY` applies per instance.
+- the capture consumer: each instance runs its own, so `SHELF_CAPTURE_CONCURRENCY` applies per instance.
 
 What this means for configured limits with N instances:
 
-| Limit | Total across N instances |
-| --- | --- |
+| Limit                                           | Total across N instances                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `/api/v1/*`, sign-in and signed-URL rate limits | up to N × the configured count for one client, when a load balancer spreads that client over instances |
-| `CAPTURE_CONCURRENCY` | N × the value captures run at once; each capture drives a browser |
-| remote-browser `maxConnections` | N × the value connections to a remote service; divide a provider's session limit by N |
-| render pages per instance | N × the per-instance page limit |
-| AI token budget | not multiplied: it is counted from the database |
+| `SHELF_CAPTURE_CONCURRENCY`                     | N × the value captures run at once; each capture drives a browser                                      |
+| remote-browser `maxConnections`                 | N × the value connections to a remote service; divide a provider's session limit by N                  |
+| render pages per instance                       | N × the per-instance page limit                                                                        |
+| AI token budget                                 | not multiplied: it is counted from the database                                                        |
 
 Choose each per-instance value as the total limit divided by N. For rate limits, a load balancer that keeps one client on one instance (sticky sessions) keeps the count exact for that client.
+
+### Node host (`@storyshelf/app/node`)
+
+Every Node server (the product image `apps/server-image`, the Fly demo `apps/fly-app`, the dev server
+`apps/dev-server`) serves its app through `startServer({ app, port, handleSignals, shutdownTimeoutMs,
+beforeListen })` (`packages/app/src/node/`). It takes an app that already exists and owns the rest:
+readiness (`app.lifecycle.setup()`, then `beforeListen` for boot hooks such as the admin account and
+the demo viewer, then the port), the listener and its connections, and one bounded shutdown however it
+starts (a signal, `close()`, an abort, a failed start). The shutdown stops accepting, closes idle
+keep-alive sockets, lets requests in flight finish with `Connection: close` for at most half of
+`shutdownTimeoutMs` (default 30 s) and then destroys their sockets, and calls
+`app.lifecycle.teardown({ graceMs })` with the rest, less a reserve for closing adapters: the #912 job
+drain hands still-running jobs back to the queue within it. It resolves by the deadline and reports an
+incomplete shutdown (`incomplete: "timeout" | "teardown-failed"`). The module has no side effects at
+import, registers only its own SIGINT/SIGTERM handlers and removes them, and never calls
+`process.exit`: each executable exits after `await server.closed`. `@hono/node-server` is a runtime
+dependency of `@storyshelf/app` only.
+
+### AWS (Terraform module)
+
+The module in `deploy/terraform/aws` runs the published image on ECS Fargate; each task's `db-init` container creates the app database user and grants it `rds_iam` before the app starts. The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
 
 ### Development
 

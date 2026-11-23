@@ -5,13 +5,13 @@
  * consume (OpenAPI generation, stub-table tests) from touching `capture_jobs`.
  */
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import {
   createDatabaseCaptureQueue,
   DATABASE_QUEUE_METADATA,
   type DatabaseCaptureQueue,
   type DatabaseJob,
-} from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+} from "@storyshelf/core/jobs";
 import type { CaptureJobKind } from "@storyshelf/core/schema";
 
 /** What a kind does when a job of it failed because its last attempt lost its lease. */
@@ -43,7 +43,7 @@ export interface JobQueue {
  * of `testing.leaseSeconds` and the clock of `testing.queueClock` (production: real time).
  */
 export function createJobQueue(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   kinds: readonly CaptureJobKind[],
   retries: number,
 ): JobQueue {

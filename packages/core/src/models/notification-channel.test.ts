@@ -43,12 +43,46 @@ describe("NotificationChannelModel", () => {
     expect(NotificationChannelModel.eventsOf(channel)).toEqual([]);
   });
 
+  it("updates config and events, and the secret only when one is given", async () => {
+    const { db } = makeDatabase();
+    const created = await model(db).create({
+      projectId: "p1",
+      provider: "slack-webhook",
+      config: { style: "compact" },
+      secret: "https://hooks.slack.com/old",
+      events: ["build:reviewing"],
+    });
+    await model(db).update(created.id, { config: { style: "verbose" } });
+    const kept = await model(db).get(created.id);
+    expect(NotificationChannelModel.configOf(kept!)).toEqual({ style: "verbose" });
+    expect(NotificationChannelModel.eventsOf(kept!)).toEqual([]);
+    expect(model(db).decryptSecret(kept!)).toBe("https://hooks.slack.com/old");
+    await model(db).update(created.id, {
+      config: { style: "verbose" },
+      events: ["build:approved"],
+      secret: "https://hooks.slack.com/new",
+    });
+    const changed = await model(db).get(created.id);
+    expect(NotificationChannelModel.eventsOf(changed!)).toEqual(["build:approved"]);
+    expect(model(db).decryptSecret(changed!)).toBe("https://hooks.slack.com/new");
+  });
+
   it("lists project channels separately from system channels", async () => {
     const { db } = makeDatabase();
     await model(db).create({ projectId: "p1", provider: "log", config: {} });
     await model(db).create({ projectId: null, provider: "email", config: {} });
     expect(await model(db).list("p1")).toHaveLength(1);
     expect(await model(db).listSystem()).toHaveLength(1);
+  });
+
+  it("lists channels outside the given kinds, across projects and site-wide (#1126)", async () => {
+    const { db } = makeDatabase();
+    await model(db).create({ projectId: "p1", provider: "email", config: {} });
+    await model(db).create({ projectId: "p2", provider: "log", config: {} });
+    await model(db).create({ projectId: null, provider: "gone", config: {} });
+    const rows = await model(db).listOutsideProviders(["log", "slack-webhook"]);
+    expect(new Set(rows.map((row) => row.provider))).toEqual(new Set(["email", "gone"]));
+    expect(await model(db).listOutsideProviders([])).toHaveLength(3);
   });
 
   it("round-trips the secret and removes by id", async () => {
@@ -151,6 +185,26 @@ describe("NotificationChannelModel", () => {
         ),
       ).toEqual({ ok: true });
       expect(await NotificationChannelModel.validateInput(kinds, "gitlab", {})).toEqual({
+        ok: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it("refuses a private GitHub Enterprise API base and names the operator setting", async () => {
+    const kinds = [
+      { metadata: { kind: "github", schema: z.object({ apiUrl: z.string().optional() }) } },
+    ] as unknown as NotifierProvider[];
+    const restore = overrideOutboundResolver(async () => [{ address: "10.0.0.5", family: 4 }]);
+    try {
+      const result = await NotificationChannelModel.validateInput(kinds, "github", {
+        apiUrl: "https://ghes.internal/api/v3",
+      });
+      expect(result).toMatchObject({ ok: false, field: "config", issues: [{ path: "apiUrl" }] });
+      expect(JSON.stringify(result)).toContain("outbound.allowHosts");
+      expect(JSON.stringify(result)).not.toContain("10.0.0.5");
+      expect(await NotificationChannelModel.validateInput(kinds, "github", {})).toEqual({
         ok: true,
       });
     } finally {

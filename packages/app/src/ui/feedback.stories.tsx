@@ -1,5 +1,6 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
+import { onAPhone } from "../../.storybook/page.tsx";
 import { jsxStory } from "../../.storybook/render.tsx";
 import {
   Alert,
@@ -38,6 +39,21 @@ export const Badges = jsxStory(() => (
   </VStack>
 ));
 
+/** A status column: the quiet badge shares height, padding and icon slot with the pills. */
+export const QuietAlignedWithPills = jsxStory(() => (
+  <VStack gap="sm" align="start">
+    <Badge tone="quiet" icon>
+      Approved
+    </Badge>
+    <Badge tone="warning" icon>
+      Needs review
+    </Badge>
+    <Badge tone="danger" icon>
+      Failed
+    </Badge>
+  </VStack>
+));
+
 export const BuildStatusBadges = jsxStory(() => (
   <HStack>
     {[
@@ -50,6 +66,7 @@ export const BuildStatusBadges = jsxStory(() => (
       "failed",
       "pending",
       "cancelled",
+      "skipped",
     ].map((status) => (
       <Badge key={status} tone={statusTone(status)} icon>
         {statusLabel(status)}
@@ -104,4 +121,36 @@ export const MetaStyles = jsxStory(() => (
     <MetaText as="code">as code: abc1234</MetaText>
     <MetaText as="pre">{"as pre:\n  line one\n  line two"}</MetaText>
   </VStack>
+));
+
+/** Roles, providers and verdicts read in sentence case, like build statuses. */
+/** A long unbroken value wraps inside the 375px phone viewport instead of widening the page (#1259). */
+export const MetaCodeLongOnAPhone = onAPhone(
+  jsxStory(() => (
+    <MetaText as="code">
+      {
+        '{"buildId":"01M7YHE2SYBV237RNQ0SVGSPW8","attemptNo":1,"queue":"main","reason":"lease expired"}'
+      }
+    </MetaText>
+  )),
+);
+
+/** A link in running text is underlined, so colour is not the only cue (WCAG 1.4.1, #1259). */
+export const LinkInText = jsxStory(() => (
+  <VStack>
+    <MetaText>
+      Confirm the address on the <a href="/admin">System page</a> to turn notifications on.
+    </MetaText>
+    <Alert tone="info">
+      Some integrations are not offered. See <a href="/admin#integrations">System</a>.
+    </Alert>
+  </VStack>
+));
+
+export const SentenceCaseLabels = jsxStory(() => (
+  <HStack>
+    {["admin", "viewer", "via password", "github", "slack", "error", "resolved"].map((label) => (
+      <Badge key={label}>{statusLabel(label)}</Badge>
+    ))}
+  </HStack>
 ));

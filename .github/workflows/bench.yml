@@ -27,7 +27,7 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Install Playwright browsers (chromium)
-        working-directory: packages/runner-playwright
+        working-directory: packages/runner
         run: |
           nubx playwright-core install chromium
           if ! node --input-type=module -e "const { chromium } = await import('playwright-core'); await (await chromium.launch()).close()"; then
@@ -35,7 +35,7 @@ jobs:
           fi
 
       - name: Build workspace packages
-        run: nubx turbo build --filter=@storyshelf/app --filter=storyshelf --filter=@storyshelf/db-sqlite --filter=@storyshelf/storage-local --filter=@storyshelf/runner-playwright
+        run: nubx turbo build --filter=@storyshelf/app --filter=storyshelf --filter=@storyshelf/db --filter=@storyshelf/runner
 
       - name: Build fixture Storybook
         uses: ./.github/actions/build-fixture

@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { loadStorybookConfig } from "../config.ts";
 import { printLine } from "../output.ts";
+import { readSetting } from "../settings.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 
 /** Options for the `build` command. */
@@ -37,7 +38,7 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
     force: options.forceBuild,
-    affected: cfg?.affectedOnly !== false && process.env["STORYSHELF_FULL"] !== "1",
+    affected: cfg?.affectedOnly !== false && readSetting(process.env, "SHELF_FULL") !== "1",
     buildStats: options.buildStats ?? cfg?.buildStats ?? true,
   });
   await assertBuildOutput(cwd, buildDir);

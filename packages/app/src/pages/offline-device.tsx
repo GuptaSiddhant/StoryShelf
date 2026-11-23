@@ -9,6 +9,7 @@ import {
   EmptyState,
   HStack,
   PageHeader,
+  SectionTitle,
   Progress,
   SelectField,
   Table,
@@ -37,7 +38,7 @@ export interface OfflineDevicePageState {
 const note = css`
   /* offline-note */
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   margin: 0;
 `;
 
@@ -56,7 +57,8 @@ const StorageCard: FC<{ usage: OfflineUsage | undefined }> = (props) => {
   const used = usage?.usedBytes ?? 0;
   return (
     <Card>
-      <PageHeader level={2} title="Storage" description="Offline copies on this device only" />
+      <SectionTitle>Storage</SectionTitle>
+      <p class={note}>Offline copies on this device only</p>
       <VStack>
         <div data-offline-meter>
           <Progress value={used} max={cap} label="Offline storage used" />
@@ -155,16 +157,15 @@ const ProjectsCard: FC<{
   usage: OfflineUsage | undefined;
 }> = (props) => (
   <Card>
-    <PageHeader
-      level={2}
-      title="Projects"
-      description="The latest default-branch Storybook of each project you keep"
-      actions={
-        <Button variant="secondary" size="sm" type="button" data-offline-all>
-          Keep all my projects
-        </Button>
-      }
-    />
+    <HStack justify="between" align="start" wrap>
+      <VStack gap="sm">
+        <SectionTitle>Projects</SectionTitle>
+        <p class={note}>The latest default-branch Storybook of each project you keep</p>
+      </VStack>
+      <Button variant="secondary" size="sm" type="button" data-offline-all>
+        Keep all my projects
+      </Button>
+    </HStack>
     {props.projects.length === 0 ? (
       <EmptyState title="No projects to keep" description="Projects you can open appear here." />
     ) : (

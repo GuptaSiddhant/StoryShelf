@@ -1,5 +1,5 @@
 /** Pure evidence builders: already-loaded inputs in, delimited text + images out. */
-import { downscalePng } from "@storyshelf/image";
+import type { ImageEngine } from "../adapters/image-engine.ts";
 import type { AiEvidence } from "../ai.ts";
 import { type EvidenceLimits, resolveLimits } from "./limits.ts";
 import { capBytes, field, headTail } from "./text.ts";
@@ -36,6 +36,8 @@ export interface TriageEvidenceInput {
   snapshots: SnapshotEvidence[];
   comments: { author: string; body: string }[];
   limits?: Partial<EvidenceLimits>;
+  /** Downscales the screenshots (the runner's image engine); absent, no image is attached. */
+  images?: Pick<ImageEngine, "downscale"> | undefined;
 }
 
 /** Evidence plus bookkeeping the caller needs for hashing and rows. */
@@ -92,7 +94,7 @@ export async function buildTriageEvidence(input: TriageEvidenceInput): Promise<B
       .map((c) => `COMMENT ${field(c.author, 60)}: ${field(c.body, 300)}`),
     "</evidence>",
   ];
-  const images = await triageImages(listed, limits);
+  const images = input.images ? await triageImages(input.images, listed, limits) : [];
   return {
     text: capBytes(lines, limits.maxTextBytes),
     images,
@@ -103,6 +105,7 @@ export async function buildTriageEvidence(input: TriageEvidenceInput): Promise<B
 
 /** Downscaled screenshots of the listed snapshots, capped at `maxImages` (downscales only what is kept). */
 async function triageImages(
+  engine: Pick<ImageEngine, "downscale">,
   listed: SnapshotEvidence[],
   limits: { imageMaxEdge: number; maxImages: number },
 ): Promise<AiEvidence["images"]> {
@@ -112,7 +115,7 @@ async function triageImages(
   return await Promise.all(
     withScreenshots.map(async ({ item, screenshot }) => ({
       mediaType: "image/png" as const,
-      data: await downscalePng(screenshot, limits.imageMaxEdge),
+      data: await engine.downscale(screenshot, limits.imageMaxEdge),
       label: snapshotKey(item),
     })),
   );

@@ -11,9 +11,9 @@
  */
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
-import { dropUploadZip } from "../capture/publish/drop-zip.ts";
 import type { Logger } from "../logger.ts";
 import { SiteSettingsModel } from "../models/site-settings.ts";
+import { dropUploadZip } from "../publish/drop-zip.ts";
 import {
   RECLAIM_COPIES_PAGE,
   listPage,

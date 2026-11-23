@@ -3,14 +3,14 @@
  *
  * Core schema is now type-only — no runtime table definitions.
  * Table handles and the Drizzle schema object live in
- * `packages/db-sqlite` (shared by every `./*` preset subpath).
+ * `packages/db/src/sqlite` (shared by every `./*` preset subpath).
  * Row interfaces remain here for domain-layer typing.
  */
 
 /** Baseline row as stored in the `baselines` table. */
 export type { Baseline } from "./baseline.ts";
 /** Build row as stored in the `builds` table. */
-export type { Build } from "./build.ts";
+export type { BranchVerification, Build } from "./build.ts";
 /** A capture attempt and its log lines for a single build run. */
 export type { CaptureAttempt, CaptureLog, CaptureLogLevel } from "./capture-attempt.ts";
 export type { CaptureShard, CaptureShardKind, CaptureShardStatus } from "./capture-shard.ts";
@@ -28,6 +28,14 @@ export type { BuildReview } from "./build-review.ts";
 export type { BuildComponent } from "./build-component.ts";
 export { SCHEMA_META_ID, type SchemaMeta } from "./schema-meta.ts";
 export type { SiteSetting } from "./site-setting.ts";
+/** Git connection and project repository link rows. */
+export type {
+  ConfiguredGitConnection,
+  GitConnectionProvider,
+  GitConnectionRow,
+  GitRepositoryLinkRow,
+  GitRepositoryLinkState,
+} from "./git-connection.ts";
 /** Review comment row as stored in the `comments` table. */
 export type { Comment, CommentMention } from "./comment.ts";
 /** Build label and label type rows. */

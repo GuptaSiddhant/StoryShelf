@@ -1,7 +1,7 @@
 {
   "name": "@storyshelf/app",
-  "version": "0.11.0",
-  "description": "StoryShelf app: Hono app, API routes, and server-rendered UI over @storyshelf/core.",
+  "version": "0.15.1",
+  "description": "Self-hosted visual testing and review for Storybook: the StoryShelf app, with a Hono HTTP API and server-rendered UI over @storyshelf/core.",
   "keywords": [
     "chromatic-alternative",
     "hono",
@@ -23,6 +23,9 @@
     "url": "git+https://github.com/GuptaSiddhant/StoryShelf.git",
     "directory": "packages/app"
   },
+  "bin": {
+    "storyshelf-server": "./src/server-bin/bin.ts"
+  },
   "files": [
     "dist"
   ],
@@ -34,11 +37,19 @@
       "source": "./src/index.tsx",
       "default": "./dist/index.mjs"
     },
+    "./node": {
+      "source": "./src/node/index.ts",
+      "default": "./dist/node.mjs"
+    },
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "bin": {
+      "storyshelf-server": "./dist/bin.mjs"
+    },
     "exports": {
       ".": "./dist/index.mjs",
+      "./node": "./dist/node.mjs",
       "./package.json": "./package.json"
     },
     "access": "public"
@@ -55,27 +66,27 @@
     "storybook": "storybook dev -p 6006",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "RUN_INTEGRATION=1 vitest run subdomain-browser.integration.test.ts offline-browser.integration.test.ts",
+    "test:integration": "RUN_INTEGRATION=1 vitest run subdomain-browser.integration.test.ts git-return-browser.integration.test.ts offline-browser.integration.test.ts",
     "test:watch": "vitest",
     "test:flake": "vitest run --repeats=10 --maxWorkers=1 --no-file-parallelism src/jobs.integration.test.ts src/capture-status-fanout.test.ts src/routers/design.integration.test.ts src/routers/published-compression.test.ts"
   },
   "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@hono/otel": "catalog:",
     "@hono/swagger-ui": "^0.6.1",
     "@hono/zod-openapi": "^1.1.5",
+    "@opentelemetry/api": "catalog:",
     "@storyshelf/core": "workspace:*",
-    "@storyshelf/observability": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@opentelemetry/api": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@storybook/html-vite": "10.6.5",
     "@storyshelf/auth": "workspace:*",
-    "@storyshelf/db-sqlite": "workspace:*",
-    "@storyshelf/design-figma": "workspace:*",
+    "@storyshelf/db": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "adm-zip": "catalog:",

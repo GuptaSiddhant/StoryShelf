@@ -23,15 +23,18 @@ import type { AuthUser } from "@storyshelf/core/types";
 import { sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
+import { unofferedIntegrations, unofferedReason } from "../integrations.ts";
 import { notificationsPaused } from "../notifications-pause.ts";
 import {
   insightsShown,
   renderProjectSettingsPage,
   type SettingsFormState,
+  type SettingsUnoffered,
 } from "../pages/project-settings.tsx";
 import type { SettingsAiData } from "../pages/settings-ai.tsx";
 import type { DesignCredentialState } from "../pages/settings-design-credential.tsx";
 import type { SettingsDesignData, SettingsDesignProvider } from "../pages/settings-design.tsx";
+import type { SettingsGitData } from "../pages/settings-git.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
 import type { SettingsMember } from "../pages/settings-members.tsx";
 import type {
@@ -46,10 +49,12 @@ import {
   type SettingsTab,
 } from "../pages/settings-tabs.ts";
 import type { SettingsWebhook } from "../pages/settings-webhooks.tsx";
+import { filterVisible } from "../project-visibility.ts";
 import { getStore } from "../store.ts";
 import { runnerTargets } from "../targets.ts";
 import { notFound } from "./helpers.ts";
 import { isSiteAdmin } from "./insights.handlers.ts";
+import { loadGitSection } from "./settings-git-data.ts";
 import { loadSettingsInsights } from "./settings-insights.ts";
 /** Aggregated data for rendering a settings tab. */
 export interface SettingsData {
@@ -66,6 +71,7 @@ export interface SettingsData {
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
   isAdmin: boolean;
+  git: SettingsGitData | null;
 }
 
 /** Tokens without hashes for the settings UI. */
@@ -151,7 +157,9 @@ async function loadNotificationChannels(
   notifiers: readonly NotifierProvider[],
 ): Promise<SettingsNotificationChannel[]> {
   const rows = await new NotificationChannelModel(db, undefined, secret).list(projectId);
-  return rows.map((row) => ({
+  // A channel of a kind the server does not offer is hidden, not deleted; System lists it (#1126).
+  const offered = rows.filter((row) => unofferedReason(row.provider) === undefined);
+  return offered.map((row) => ({
     id: row.id,
     provider: row.provider,
     delivery: deliveryOf(notifiers, row.provider),
@@ -230,6 +238,8 @@ async function loadLinksSection(
   db: DatabaseAdapter,
   project: Project,
 ): Promise<{ links: SettingsLink[]; linkCandidates: SettingsLinkCandidate[] }> {
+  // Existing links name their upstream from the full list (they are this project's own
+  // settings); only the picker of new upstreams is limited to projects the viewer can open.
   const projects = await new ProjectModel(db).list();
   const byId = new Map(projects.map((candidate) => [candidate.id, candidate]));
   const rows = await new PackageUsageModel(db).listLinks(project.id);
@@ -239,7 +249,7 @@ async function loadLinksSection(
       ? [{ packageName: row.packageName, upstreamSlug: upstream.slug, upstreamName: upstream.name }]
       : [];
   });
-  const linkCandidates = projects
+  const linkCandidates = (await filterVisible(db, getStore(), projects))
     .filter((candidate) => candidate.id !== project.id)
     .map((candidate) => ({ slug: candidate.slug, name: candidate.name }));
   return { links, linkCandidates };
@@ -322,7 +332,15 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
   const linksSection = await loadLinksSection(db, project);
   const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
-  return { project, ...inventory, ...notifications, ...linksSection, design, isAdmin };
+  return {
+    project,
+    ...inventory,
+    ...notifications,
+    ...linksSection,
+    design,
+    isAdmin,
+    git: await loadGitSection(project),
+  };
 }
 
 /**
@@ -362,12 +380,27 @@ export async function renderSettingsPage(
       notifyProviders: data.notifyProviders,
       mySubscription: data.mySubscription,
       isAdmin: data.isAdmin,
+      canDeleteProject: data.isAdmin && isSiteAdmin(c),
+      git: data.git ?? undefined,
       notificationsPaused: data.notifyProviders.length > 0 && (await notificationsPaused()),
       ai: aiSettingsData(c),
       targets: await runnerTargets(),
+      unoffered: unofferedFor(c),
     },
     formState,
   );
+}
+
+/** What a site admin is told the server does not offer projects (issue #1126); nobody else is. */
+function unofferedFor(c: Context): SettingsUnoffered | undefined {
+  if (!isSiteAdmin(c)) {
+    return undefined;
+  }
+  return {
+    notifications: unofferedIntegrations("notifiers"),
+    design: unofferedIntegrations("design"),
+    git: true,
+  };
 }
 
 /** AI availability and profile choices for the settings AI tab. */
@@ -379,15 +412,6 @@ function aiSettingsData(c: Context): SettingsAiData {
     defaultProfile: ai?.defaultProfile() ?? "",
     isSiteAdmin: isSiteAdmin(c),
   };
-}
-
-/** Find a project by slug or throw 404. */
-export async function findProject(slug: string): Promise<Project> {
-  const project = await new ProjectModel(getStore().db).getBySlug(slug);
-  if (!project) {
-    notFound("Project not found");
-  }
-  return project;
 }
 
 /** Trim a form value to a string, dropping files and blanks. */

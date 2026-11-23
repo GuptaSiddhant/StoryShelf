@@ -6,9 +6,9 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import type { ConsumerJob, JobRunContext } from "@storyshelf/core/capture";
 import * as capture from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import type { ConsumerJob, JobRunContext } from "@storyshelf/core/jobs";
 import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   BuildModel,
@@ -16,7 +16,7 @@ import {
   CaptureLogModel,
   ProjectModel,
 } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { alreadyAlerted } from "./capture-alerts.ts";
@@ -38,6 +38,7 @@ const logger = createShelfLogger({ level: "silent" });
 function runner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    images: fakeImageEngine(),
     render: vi.fn(async () => ({ captures: [], failures: [] })),
     cancel: vi.fn(async () => {}),
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
@@ -46,10 +47,13 @@ function runner() {
 /** Wire capture for `testing` over a fresh in-memory database. */
 const SCRATCH = { scratchDir: ".tmp/capture-setup-test" };
 
-function wire(testing?: ShelfOptions["testing"], config: { scratchDir?: string } = SCRATCH) {
+function wire(
+  testing?: ResolvedShelfOptions["testing"],
+  config: { scratchDir?: string } = SCRATCH,
+) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const options = { database: db, storage, testing } as unknown as ShelfOptions;
+  const options = { database: db, storage, testing } as unknown as ResolvedShelfOptions;
   const jobs = createJobQueue(options, ["capture"], testing?.retries ?? 2);
   return {
     db,

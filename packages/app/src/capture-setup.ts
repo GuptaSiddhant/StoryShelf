@@ -8,17 +8,19 @@
 import type { CaptureQueue } from "@storyshelf/core/adapter/capture-queue";
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import {
   captureDispatchDeps,
-  DEFAULT_RETRIES,
-  type BuildStatePublisher,
+  reachabilityOf,
   type CaptureHandlerOptions,
 } from "@storyshelf/core/capture";
 import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
+import { DEFAULT_RETRIES } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
-import { currentTraceparent } from "@storyshelf/observability";
-import { notifyCaptureFailed, notifyCaptureStuck } from "./capture-alerts.ts";
+import type { GitConnectionModel } from "@storyshelf/core/models";
+import { currentTraceparent } from "@storyshelf/core/telemetry";
+import { notifyCaptureFailed, notifyCaptureStuck, notifyTargetChange } from "./capture-alerts.ts";
 import {
   alerting,
   handlerFor,
@@ -26,6 +28,7 @@ import {
   type CaptureAlerts,
   type CaptureHandler,
 } from "./capture-handlers.ts";
+import { reportingReachability } from "./capture-reachability.ts";
 import { recordShardRepeated } from "./consumer-setup.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import type { JobQueue } from "./job-queue.ts";
@@ -45,6 +48,8 @@ export interface CaptureWiring {
 /** What a capture hands its results to. */
 interface Delivery {
   notifiers: NotifierProvider[];
+  /** The server's git connections: approved repository links take part like git channels. */
+  gitConnections?: GitConnectionModel | undefined;
   buildState: BuildStatePublisher;
   /** The resolved public origin (ADR 0007): status links and targets that need a URL use it. */
   publicOrigin: () => Promise<string | undefined>;
@@ -63,7 +68,7 @@ function enqueuerFor(queue: CaptureQueue): (buildId: string, reqId?: string) => 
  * captures it queues. Shard jobs go back onto the same queue the capture came from.
  */
 export function setupCapture(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   delivery: Delivery,
   logger: Logger,
@@ -94,12 +99,12 @@ export function setupCapture(
   return {
     queue,
     enqueueCapture: enqueuerFor(queue),
-    handler: alerting(handler, retries, alert.failed),
+    handler: alerting(reporting(handler, options, config, delivery, logger), retries, alert.failed),
   };
 }
 
 function captureHandlerOptions(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   config: ShelfConfig,
   delivery: Delivery,
   logger: Logger,
@@ -117,6 +122,7 @@ function captureHandlerOptions(
     design: options.design,
     shardSize: options.testing?.shardSize,
     notifiers: delivery.notifiers,
+    gitConnections: delivery.gitConnections,
     buildState: delivery.buildState,
     publicOrigin: delivery.publicOrigin,
     config,
@@ -124,4 +130,23 @@ function captureHandlerOptions(
     maxRetries: options.testing?.retries,
     onShardRepeated: recordShardRepeated,
   };
+}
+
+/** Report launch outcomes to the runner's reachability record; a change alerts admins once. */
+function reporting(
+  handler: CaptureHandler,
+  options: ResolvedShelfOptions,
+  config: ShelfConfig,
+  delivery: Delivery,
+  logger: Logger,
+): CaptureHandler {
+  const runner = options.testing?.runner;
+  if (runner === undefined) {
+    return handler;
+  }
+  const reach = reachabilityOf(runner);
+  reach.onChange = async (change): Promise<void> => {
+    await notifyTargetChange(options, config, logger, change, delivery.publicOrigin);
+  };
+  return reportingReachability(handler, reach, options.database, logger);
 }

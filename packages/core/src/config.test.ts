@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maxOfflineDaysOf, parseTrustProxy, validateConfig } from "./config.ts";
+import { maxOfflineDaysOf, parseTrustProxy, uiConfigSchema, validateConfig } from "./config.ts";
 
 describe("validateConfig", () => {
   it("accepts the serverTiming opt-in", () => {
@@ -135,5 +135,34 @@ describe("trustProxy", () => {
       "10.0.0.0/16",
       "2001:db8::/32",
     ]);
+  });
+});
+
+const parsesAsPublicLink = (href: string): boolean =>
+  uiConfigSchema.safeParse({ auth: { publicLink: { href, label: "Browse" } } }).success;
+
+describe("ui.auth.publicLink", () => {
+  it("accepts an https URL or a path on this server", () => {
+    expect(parsesAsPublicLink("https://storyshelf.fly.dev/_/demo/")).toBe(true);
+    expect(parsesAsPublicLink("/_/demo-design-system/")).toBe(true);
+  });
+
+  it("refuses anything that could run script or leave for another scheme or host", () => {
+    for (const href of [
+      "javascript:alert(1)",
+      "data:text/html,x",
+      "http://example.com/",
+      "//evil.example/",
+      "",
+      "/a b",
+    ]) {
+      expect(parsesAsPublicLink(href), href).toBe(false);
+    }
+  });
+
+  it("needs a label", () => {
+    expect(
+      uiConfigSchema.safeParse({ auth: { publicLink: { href: "/x", label: "" } } }).success,
+    ).toBe(false);
   });
 });

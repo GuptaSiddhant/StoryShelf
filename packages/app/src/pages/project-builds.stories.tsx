@@ -32,3 +32,32 @@ export const NoBuildsYet = pageStory(() => renderProjectBuildsPage("design-syste
 export const TestingOff = pageStory(() => renderProjectBuildsPage("design-system"), {
   store: { testing: false },
 });
+
+/** Skipped builds are hidden by default; the "Show skipped (N)" switch is the only sign of them. */
+export const SkippedHiddenWithSwitch = pageStory(() => renderProjectBuildsPage("design-system"));
+
+export const SkippedShown = pageStory(() =>
+  renderProjectBuildsPage("design-system", { skipped: "1" }),
+);
+
+export const SkippedShownOnAPhone = onAPhone(
+  pageStory(() => renderProjectBuildsPage("design-system", { skipped: "1" })),
+);
+
+export const EveryBuildSkipped = pageStory(() => renderProjectBuildsPage("design-system"), {
+  dataset: "skipped-only",
+});
+
+export const EveryBuildSkippedShown = pageStory(
+  () => renderProjectBuildsPage("design-system", { skipped: "1" }),
+  { dataset: "skipped-only" },
+);
+
+/** Several unfinished builds are queued: the "Cancel older unfinished builds (N)" action shows. */
+export const BacklogCancelAction = pageStory(() => renderProjectBuildsPage("design-system"), {
+  dataset: "backlog",
+});
+
+export const BacklogCancelActionOnAPhone = onAPhone(
+  pageStory(() => renderProjectBuildsPage("design-system"), { dataset: "backlog" }),
+);

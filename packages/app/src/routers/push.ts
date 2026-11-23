@@ -4,7 +4,7 @@
  * keys; the answers never return them, and nothing here logs them.
  */
 import { createRoute, z } from "@hono/zod-openapi";
-import { MAX_ENDPOINT_LENGTH, pushChannelConfigSchema } from "@storyshelf/core/integrations/push";
+import { MAX_ENDPOINT_LENGTH, pushChannelConfigSchema } from "@storyshelf/core/integrations";
 import { PushSubscriptionModel } from "@storyshelf/core/models";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";

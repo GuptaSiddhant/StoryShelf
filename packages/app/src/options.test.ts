@@ -1,5 +1,5 @@
 import type { CaptureRunner } from "@storyshelf/core/adapter/capture-runner";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -10,6 +10,7 @@ const logger = pino({ level: "silent" });
 function runner(): CaptureRunner {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" },
+    images: fakeImageEngine(),
     render: async () => ({ captures: [], failures: [] }),
     cancel: async () => {},
   } as unknown as CaptureRunner;

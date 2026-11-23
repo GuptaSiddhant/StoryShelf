@@ -1,6 +1,6 @@
 import { htmxSource } from "./assets/htmx.ts";
 import { maskableMarkSource } from "./assets/mark-maskable.ts";
-import { markSource } from "./assets/mark.ts";
+import { faviconSource, markSource } from "./assets/mark.ts";
 import { clientScript } from "./shell/client-script.ts";
 import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/icons/sprite.ts";
 
@@ -12,12 +12,11 @@ import { contentHash, iconSprite, iconSpriteHash, iconSpriteHref } from "./ui/ic
  */
 const htmxHash = contentHash(htmxSource);
 
-/**
- * The StoryShelf brand mark. Serves as the enforced favicon and as the default
- * sidebar logo when `ui.logo` is not set.
- */
+/** The StoryShelf mark on its tile: the default sidebar logo when `ui.logo` is not set. */
 const markHash = contentHash(markSource);
 
+/** The bare mark that follows the browser's colour scheme: the enforced favicon. */
+const faviconHash = contentHash(faviconSource);
 /** The same mark with a full-bleed background and safe-zone padding: the maskable app icon. */
 const maskableHash = contentHash(maskableMarkSource);
 
@@ -26,6 +25,7 @@ const clientSource = clientScript();
 const clientHash = contentHash(clientSource);
 
 export const assetManifest = {
+  favicon: { source: faviconSource, hash: faviconHash, href: `/assets/favicon-${faviconHash}.svg` },
   client: { source: clientSource, hash: clientHash, href: `/assets/client-${clientHash}.js` },
   htmx: { source: htmxSource, hash: htmxHash, href: `/assets/htmx-${htmxHash}.js` },
   icons: { source: iconSprite, hash: iconSpriteHash, href: iconSpriteHref },

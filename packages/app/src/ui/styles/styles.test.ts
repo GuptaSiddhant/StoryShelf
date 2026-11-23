@@ -3,6 +3,13 @@ import { baseStyle } from "../styles.ts";
 import { DARK_THEME, LIGHT_THEME } from "../theme.ts";
 
 describe("baseStyle", () => {
+  it("declares color-scheme per theme so native controls follow the app theme", () => {
+    const css = baseStyle(LIGHT_THEME, DARK_THEME);
+    expect(css).toMatch(/:root \{\s*color-scheme: light;/u);
+    expect(css).toMatch(/\[data-theme="dark"\] \{\s*color-scheme: dark;/u);
+    expect(css).toMatch(/\[data-theme="system"\] \{\s*color-scheme: dark;/u);
+  });
+
   it("contains tokens, components, shell, and review sections", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     for (const token of [
@@ -20,8 +27,12 @@ describe("baseStyle", () => {
     const css = baseStyle(LIGHT_THEME, DARK_THEME);
     // An `auto` track is as wide as its widest child (a nowrap table header), so it must be minmax(0, 1fr).
     expect(css).toContain(".grid { display: grid; grid-template-columns: minmax(0, 1fr);");
+    // Two columns stack at 880px; three stay a row on a tablet and stack on a phone (#1133, P7).
     expect(css).toContain(
-      "@media (max-width: 880px) { .grid--2, .grid--3 { grid-template-columns: minmax(0, 1fr); } }",
+      "@media (max-width: 880px) { .grid--2 { grid-template-columns: minmax(0, 1fr); } }",
+    );
+    expect(css).toContain(
+      "@media (max-width: 480px) { .grid--3 { grid-template-columns: minmax(0, 1fr); } }",
     );
   });
 
@@ -149,6 +160,12 @@ describe("baseStyle", () => {
         expect(contrast(theme.accent, surface)).toBeGreaterThanOrEqual(4.5);
         expect(contrast(theme.ring ?? "", surface)).toBeGreaterThanOrEqual(3);
       }
+    }
+  });
+
+  it("keeps text on the filled accent marker and avatar readable (WCAG AA), one character included", () => {
+    for (const theme of [LIGHT_THEME, DARK_THEME]) {
+      expect(contrast(theme.accentContrast ?? "", theme.accent)).toBeGreaterThanOrEqual(4.5);
     }
   });
 

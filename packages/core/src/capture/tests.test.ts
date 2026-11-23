@@ -3,17 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureRunner, TestOutcome } from "../adapters/capture-runner.ts";
+import type { StoryEntry } from "../adapters/story-source.ts";
 import { BuildModel } from "../models/build.ts";
 import { ProjectModel } from "../models/project.ts";
+import { parseTestResults, summarizeTests } from "../models/test-results.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
-import type { StoryEntry } from "./adapter.ts";
-import {
-  parseTestResults,
-  runProjectTests,
-  summarizeTests,
-  type RunTestsInput,
-  type TestResult,
-} from "./tests.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
+import { runProjectTests, type RunTestsInput } from "./tests.ts";
 
 let dir: string;
 
@@ -78,6 +74,7 @@ async function setup(
   const recordLog = vi.fn(async () => {});
   const runner = {
     metadata: { name: "fake", version: "0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     render: vi.fn(),
     cancel: vi.fn(),
     ...(runTests ? { runTests } : {}),
@@ -229,22 +226,5 @@ describe("runProjectTests", () => {
     );
     const call = (runTests.mock.calls[0] as unknown as [{ storybookUrl?: string }])[0];
     expect(call.storybookUrl).toBe("https://shelf.example.com/_s/t/");
-  });
-});
-
-describe("test result helpers", () => {
-  it("parses what a build holds and ignores anything else", () => {
-    const good: TestResult = {
-      id: "a:b",
-      title: "T",
-      name: "b",
-      parentId: "a",
-      status: "passed",
-      durationMs: 1,
-    };
-    expect(parseTestResults(JSON.stringify([good, { nope: 1 }, "x"]))).toEqual([good]);
-    expect(parseTestResults(null)).toEqual([]);
-    expect(parseTestResults("not json")).toEqual([]);
-    expect(parseTestResults('{"a":1}')).toEqual([]);
   });
 });

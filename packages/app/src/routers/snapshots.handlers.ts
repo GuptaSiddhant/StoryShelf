@@ -9,6 +9,7 @@ import { findDriftedSnapshots, isBaselineChanged, isOpenSnapshot } from "./basel
 import {
   APPROVER_ROLES,
   approveSnapshot,
+  assertNotSkipped,
   buildForProject,
   refreshBuild,
   snapshotForBuild,
@@ -43,7 +44,9 @@ async function authorizeApprover(
   { slug, buildId }: BuildParams,
 ): Promise<{ project: Project; build: Build }> {
   const project = await resolveAuthorizedProject(c, slug, ...APPROVER_ROLES);
-  return { project, build: await buildForProject(project.id, buildId) };
+  const build = await buildForProject(project.id, buildId);
+  assertNotSkipped(build, "reviewed");
+  return { project, build };
 }
 
 /**
@@ -173,8 +176,12 @@ export async function rediffOne(
 ): Promise<Awaited<ReturnType<typeof rediffBuild>>> {
   const { project, build } = await authorizeApprover(c, p);
   assertRediffable(build);
-  const { db, storage, logger } = getStore();
-  const result = await rediffBuild({ db, storage, logger }, project, build);
+  const { db, storage, logger, runner } = getStore();
+  if (!runner) {
+    // Re-diff is a `testing` route, so `requireTesting` answers 404 before this without a runner.
+    throw new HTTPException(404, { message: "Not found" });
+  }
+  const result = await rediffBuild({ db, storage, images: runner.images, logger }, project, build);
   await refreshBuild(build.id);
   hxRefresh(c);
   flashHx(c, "Re-diffed against current baselines");

@@ -1,0 +1,146 @@
+/** Option, job and runtime types of the database capture queue. */
+import type {
+  CaptureJob,
+  LeaseRenewal,
+  PollableCaptureQueue,
+  PollableJob,
+} from "../../adapters/capture-queue.ts";
+import type { AdapterLifecycle } from "../../adapters/metadata.ts";
+import type { Logger } from "../../logger.ts";
+import type { BuildModel } from "../../models/build.ts";
+import type { CaptureJobModel } from "../../models/capture-job.ts";
+import type { CaptureJobKind } from "../../schema/capture-job.ts";
+import type { QueueTimers } from "./timers.ts";
+import type { WakeSignal } from "./wake.ts";
+
+/** Options of {@link createDatabaseCaptureQueue}. */
+export interface DatabaseCaptureQueueOptions {
+  /** Job kinds this instance polls (default `["capture"]`); enqueue accepts every kind. */
+  kinds?: readonly CaptureJobKind[];
+  /** Lease granted per attempt, renewed by a heartbeat and by progress (default {@link DEFAULT_LEASE_MS}, 5 min; `testing.leaseSeconds`). */
+  leaseMs?: number;
+  /** Retries after the first attempt (`testing.retries`, default 2: three attempts in total). */
+  retries?: number;
+  /** Identity written on the attempt rows this instance holds (default host, pid and a random tag). */
+  owner?: string;
+  /** Clock in epoch ms (default `Date.now`); tests inject one to drive leases and visibility. */
+  now?: () => number;
+  /** Timers of the local wake wait (default the global timers); tests inject a manual clock. */
+  timers?: QueueTimers;
+  /** Explicit logger override; the host normally binds one through `setLogger`. */
+  logger?: Logger;
+  /**
+   * Called after a job's last attempt lost its lease: nothing was running to record the failure, so
+   * the host writes it (a build left `capturing`). The job is `exhausting` meanwhile; a throw leaves
+   * it so, and once the hook's lease ends any instance runs it again, up to five runs in total
+   * (`MAX_HOOK_RUNS`). It may therefore run on several instances and must be idempotent.
+   */
+  onExhausted?: (job: DatabaseJob, error: string) => Promise<void>;
+  /**
+   * Called once the hook has failed `MAX_HOOK_RUNS` times: the job fails regardless, so this
+   * is the host's chance to tell an operator the work behind it may be stuck. Best effort.
+   */
+  onAbandoned?: (job: DatabaseJob, error: string) => Promise<void>;
+  /**
+   * Called after a job reached `done` or `failed` (its row is written, its key freed): the host
+   * can act on the end itself, as opposed to the work's outcome, which its handler already saw.
+   * Best effort: a throw is logged and never blocks the queue. A cancelled job does not call it.
+   */
+  onEnded?: (job: DatabaseJob) => Promise<void>;
+}
+
+/** Default lease per attempt: long enough for a slow stage, short enough to recover a crash. */
+export const DEFAULT_LEASE_MS = 5 * 60_000;
+
+/** Default `testing.retries` (ADR 0006, decision 11). */
+export const DEFAULT_RETRIES = 2;
+
+/** A job of any kind, as `enqueueJob` takes it. */
+export interface QueueJobInput {
+  /** The job id, when the caller needs it before the row exists (a capture job is stamped first). */
+  id?: string;
+  kind: CaptureJobKind;
+  /** Build the job works on; notify jobs may have none. */
+  buildId?: string | null;
+  /** `capture_shards` row, for a shard capture job. */
+  shard?: string;
+  reqId?: string;
+  traceparent?: string;
+  /** Kind-specific fields (channel id, zip key, …), stored as JSON. */
+  data?: Record<string, unknown>;
+  /** Attempts allowed in total for this job; defaults to the queue's (`retries` + 1). */
+  maxAttempts?: number;
+  /**
+   * Single-flight key (ADR 0040): at most one non-terminal job holds it. A request while a queued
+   * job holds it is coalesced into that job; while a running one holds it, that job is marked and
+   * one more pass runs after it ends. The id returned is the job that covers the request.
+   */
+  activeKey?: string;
+  /**
+   * Version of `data` (ADR 0053, decision 5); default `PAYLOAD_VERSION`. A job whose `data`
+   * an older release cannot read is written at a higher one, which that release hands back unrun.
+   */
+  payloadVersion?: number;
+}
+
+/** A job claimed from the database queue. */
+export interface DatabaseJob extends PollableJob {
+  /** Id of the job row (`receipt` is the attempt row, `<jobId>:<attempt>`). */
+  jobId: string;
+  kind: CaptureJobKind;
+  /** Attempt number, from 1 (`attempts` is the number made before this one). */
+  attempt: number;
+  maxAttempts: number;
+  /** Kind-specific fields given at enqueue. */
+  data: Record<string, unknown>;
+  /** Version of the payload (`data`); 1 for a row written before payloads were versioned. */
+  payloadVersion: number;
+}
+
+/** The database queue: a {@link PollableCaptureQueue} plus multi-kind enqueue and a local wake. */
+export interface DatabaseCaptureQueue extends PollableCaptureQueue {
+  readonly lifecycle: AdapterLifecycle;
+  poll(options?: { waitMs?: number }): Promise<DatabaseJob | null>;
+  extend(job: PollableJob): Promise<LeaseRenewal>;
+  /** Put a job of any kind on the queue; resolves to its job id. */
+  enqueueJob(job: QueueJobInput): Promise<string>;
+  /** Cancel a job by job id, or every unfinished job of a build (every kind) by build id. */
+  cancel(id: string): Promise<boolean>;
+  /** Read the job's state without renewing its lease (the 5 s cancel check). */
+  inspect(job: PollableJob): Promise<LeaseRenewal>;
+  /**
+   * Resolve true when this instance enqueues a job (including one enqueued since the last `poll`
+   * began, so no wake-up is lost), false after `ms`.
+   */
+  waitForWork(ms: number): Promise<boolean>;
+  /**
+   * Claim only these kinds from now on (those of `kinds` that are listed). The consumer calls it
+   * with the kinds it has handlers for, so a poll never claims a job it cannot run (ADR 0053).
+   */
+  claimOnly(kinds: readonly CaptureJobKind[]): void;
+}
+
+/** State shared by the queue's modules. */
+export interface QueueRuntime {
+  model: CaptureJobModel;
+  /** Stamps the build a capture job was queued for ({@link BuildModel.stampCaptureJob}). */
+  builds: BuildModel;
+  kinds: readonly CaptureJobKind[];
+  /** Kinds a poll claims: `kinds`, narrowed to the ones the consumer has a handler for. */
+  claimKinds?: readonly CaptureJobKind[];
+  leaseMs: number;
+  maxAttempts: number;
+  owner: string;
+  now: () => number;
+  timers?: QueueTimers;
+  wake: WakeSignal;
+  /** Wake version read when the latest poll began. */
+  pollVersion: number;
+  logger?: Logger;
+  onExhausted?: DatabaseCaptureQueueOptions["onExhausted"];
+  onAbandoned?: DatabaseCaptureQueueOptions["onAbandoned"];
+  onEnded?: DatabaseCaptureQueueOptions["onEnded"];
+}
+
+/** The capture-shaped job `enqueue` takes, re-exported for the modules. */
+export type { CaptureJob };

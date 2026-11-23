@@ -62,6 +62,45 @@ describe("probeCredentials", () => {
   });
 });
 
+async function seedConnection() {
+  const { db } = makeDatabase();
+  const now = "2026-01-01T00:00:00.000Z";
+  await db.insert(db.tables.gitConnections, {
+    id: "conn1",
+    provider: "github-app",
+    name: "Acme",
+    apiBase: null,
+    config: "{}",
+    secretEncrypted: encrypt(OLD, "private-key"),
+    createdBy: null,
+    state: "active",
+    createdAt: now,
+    updatedAt: now,
+  } as never);
+  return db;
+}
+
+describe("git connection secrets", () => {
+  it("is probed and re-encrypted with the other credentials", async () => {
+    const db = await seedConnection();
+    expect(await probeCredentials(db, KEYS)).toMatchObject({ total: 1, previous: 1 });
+
+    expect(await reencryptCredentials(db, KEYS)).toEqual({
+      reencrypted: 1,
+      failed: 0,
+      unreadable: [],
+    });
+
+    expect(await probeCredentials(db, KEYS)).toMatchObject({ total: 1, current: 1, previous: 0 });
+  });
+
+  it("reports a connection no key can read under its own source name", async () => {
+    const db = await seedConnection();
+    const probe = await probeCredentials(db, { current: "x", previous: "y" });
+    expect(probe.unreadable).toEqual([{ source: "git connections", id: "conn1" }]);
+  });
+});
+
 describe("reencryptCredentials", () => {
   it("moves every table to the current key so the new secret alone works", async () => {
     const { db, webhook, status, channel } = await seedUnderOld();

@@ -1,5 +1,5 @@
 /** The catalog's tabs of the component page: its stories with a click-to-load preview, and its builds. */
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import { createUrlBuilder, hasDotSegment } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { CatalogHistoryRow } from "../routers/component-catalog.handlers.ts";

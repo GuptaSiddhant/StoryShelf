@@ -11,10 +11,11 @@ import { CaptureAttemptModel } from "../../models/capture-attempt.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { ProjectModel } from "../../models/project.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
+import { parseTestResults } from "../../models/test-results.ts";
 import { makeDatabase, makeStorage } from "../../test-helpers/fake-adapters.ts";
+import { pngImageEngine } from "../../test-helpers/png-image-engine.ts";
 import { storybookDir, storybookZipPath } from "../../utils/paths.ts";
 import { executeCaptureJob, type CaptureJobOptions, type ShardJob } from "../orchestrator.ts";
-import { parseTestResults } from "../tests.ts";
 import { executeCaptureShard, type ShardOutcome } from "./execute.ts";
 import type { ShardDelivery } from "./repeated-work.ts";
 
@@ -89,6 +90,7 @@ interface Behaviour {
 function fakeRunner(behaviour: Behaviour): CaptureRunner {
   return {
     metadata: { name: "Fake", version: "0.0.0", kind: "fake", category: "capture-runner" },
+    images: pngImageEngine(),
     cancel: async () => {},
     render: async (input) => {
       await Promise.resolve();
@@ -184,7 +186,10 @@ async function world(options: {
 }) {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  const project = await new ProjectModel(db, tables(db)).create({ name: "Sharded" });
+  const project = await new ProjectModel(db, tables(db)).create({
+    name: "Sharded",
+    requireVerifiedDefault: false,
+  });
   const build = await new BuildModel(db, tables(db)).create(project.id, {
     gitSha: "sha-1",
     gitBranch: "main",
@@ -974,10 +979,11 @@ describe("sharded capture", () => {
       w.jobOptions,
     );
 
-    // Two stage marks (running, extracted), then one per screenshot taken and one per snapshot.
+    // Two stage marks (running, extracted), one as the render pass starts (its cancel check), then
+    // one per screenshot taken and one per snapshot.
     const captured = (await w.snapshots()).length;
     expect(captured).toBeGreaterThan(0);
-    expect(ticks).toBe(2 + captured * 2);
+    expect(ticks).toBe(3 + captured * 2);
   });
 
   it("cancels only its own render when a shard's render budget runs out", async () => {

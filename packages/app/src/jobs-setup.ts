@@ -1,21 +1,17 @@
+import { NOTIFY_MAX_ATTEMPTS, type BuildStatePublisher } from "@storyshelf/core/build-state";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
 /**
  * Background jobs of the app (ADR 0006): the one database queue, the handlers of its job kinds
  * (`capture` with `testing`, `publish` on a long-running host, `notify` and `review-request` on a queue of its own) and the one consumer that runs
  * them.
  */
-import {
-  DEFAULT_RETRIES,
-  NOTIFY_MAX_ATTEMPTS,
-  type BuildStatePublisher,
-  type CaptureConsumer,
-  type KindHandler,
-} from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
-import { DEFAULT_SCRATCH_DIR } from "@storyshelf/core/config";
+import { DEFAULT_RETRIES, type CaptureConsumer, type KindHandler } from "@storyshelf/core/jobs";
 import type { Build, CaptureJobKind, Project } from "@storyshelf/core/schema";
 import { setupBuildState, type BuildStateWiring } from "./build-state-setup.ts";
 import { setupCapture, type CaptureWiring } from "./capture-setup.ts";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import { createJobCanceller, type JobCanceller } from "./job-canceller.ts";
 import { createJobQueue, type JobQueue } from "./job-queue.ts";
 import { notifyAssignedWith, notifyDepsFor, type NotifyDeps } from "./notify.ts";
@@ -48,7 +44,7 @@ export interface JobsWiring {
 
 /** Wire the queue, the handlers and the consumer for `options`. */
 export function setupJobs(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   env: NodeJS.ProcessEnv = process.env,
 ): JobsWiring {
@@ -60,6 +56,7 @@ export function setupJobs(
     runtime.config,
     {
       notifiers: runtime.notifiers,
+      gitConnections: gitConnectionsOf(options, runtime.config),
       buildState: buildState.publisher,
       publicOrigin: async () => await runtime.publicOrigin.url(),
     },
@@ -95,7 +92,7 @@ export function setupJobs(
  * capture that holds every slot for minutes.
  */
 function queuesFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   serverless: boolean,
 ): { jobs: JobQueue; notifyJobs: JobQueue | null } {
   const testing = options.testing;
@@ -114,7 +111,7 @@ function queuesFor(
 
 /** Every consumer this instance runs; none on a host that polls nothing. */
 function consumersOf(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue,
   wiring: {
@@ -143,7 +140,7 @@ function consumersOf(
 
 /** The consumer of the database queue: capture and publish jobs. */
 function databaseConsumer(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue,
   wiring: {
@@ -189,7 +186,7 @@ const NOTIFY_CONCURRENCY = 4;
 
 /** The consumer of `notify` and `review-request` jobs, on its own queue so no capture or publish job can starve it. */
 function notifyConsumer(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   queue: JobQueue,
   handlers: { notify: KindHandler; "review-request"?: KindHandler },
@@ -232,7 +229,7 @@ async function assignedOrNone(
 
 /** Tells the project's reviewers a published build waits for a verdict (webhook and notifications). */
 function reviewRequestedFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   reviewRequests: NotifyDeps["reviewRequests"],
 ): (project: Project, build: Build) => Promise<void> {
@@ -260,7 +257,7 @@ function reviewRequestedFor(
 }
 
 /** The consumer's wall-clock bound for one job, when `testing.maxJobSeconds` states it. */
-function maxJobConfig(options: ShelfOptions): { maxJobSeconds?: number } {
+function maxJobConfig(options: ResolvedShelfOptions): { maxJobSeconds?: number } {
   const seconds = options.testing?.maxJobSeconds;
   return seconds === undefined ? {} : { maxJobSeconds: seconds };
 }

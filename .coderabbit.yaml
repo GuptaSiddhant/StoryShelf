@@ -137,7 +137,7 @@ reviews:
     - path: "packages/core/src/schema/**"
       instructions: |
         Schema changes are cross-database changes. Verify:
-        - Every table/column/index change is mirrored in `packages/db-sqlite`, `packages/db-postgres` and `packages/db-mysql` Drizzle schemas, DDL and migration paths, including driver presets.
+        - Every table/column/index change is mirrored in `packages/db/src/sqlite`, `packages/db/src/postgres` and `packages/db/src/mysql` Drizzle schemas, DDL and migration paths, including driver presets.
         - Migrations are upgrade-safe from the previous released schema, idempotent where the adapter promises it, and have a rollback or backfill story for destructive changes.
         - Indexes cover the predicates and ordering of real queries; flag missing indexes on foreign keys and high-cardinality filters, and redundant indexes.
         - Nullability, defaults, FK actions, unique constraints, timestamp precision/timezone and JSON encoding are consistent across dialects.
@@ -163,7 +163,7 @@ reviews:
         - No full-image copy per pixel; flag quadratic scans over large images.
         Require fixture coverage for identical, differing, size-changed and malformed images.
 
-    - path: "packages/image/**"
+    - path: "packages/core/src/diff/**"
       instructions: |
         Image processing runs on a worker pool. Verify:
         - Worker tasks always settle (resolve or reject) and the pool is drained/terminated on teardown.
@@ -181,7 +181,7 @@ reviews:
         - Contract tests use a fake transport, not a fake adapter, and exercise the published suite (`storageContractSuite`, `databaseContractSuite`, queue suite).
         - A new optional capability is reflected in `metadata` rather than probed ad hoc at call sites.
 
-    - path: "packages/db-sqlite/**"
+    - path: "packages/db/src/sqlite/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only, no string interpolation of values or identifiers. Check:
         - Schema/DDL/migration parity with Postgres and MySQL; presets (`turso`, `better-sqlite3`, `bun-sqlite`, `d1`) keep the same behavior or explicitly document a capability gap in `metadata`.
@@ -190,7 +190,7 @@ reviews:
         - Indexes support the actual query predicates; flag N+1 loops and unbounded `SELECT`s.
         Require upgrade tests against a populated pre-change database.
 
-    - path: "packages/db-postgres/**"
+    - path: "packages/db/src/postgres/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only, no string interpolation. Check:
         - Schema/DDL/migration parity with SQLite and MySQL, including enum/JSON/timestamp/boolean differences and preset drivers (`pg`, `neon`, `neon-http`, `vercel`, `pglite`).
@@ -199,7 +199,7 @@ reviews:
         - Indexes match query predicates and ordering; flag unindexed scans, N+1 queries and unbounded results.
         Do not accept driver-specific types in core contracts.
 
-    - path: "packages/db-mysql/**"
+    - path: "packages/db/src/mysql/**"
       instructions: |
         Database adapter review. Verify parameterized SQL only. Check:
         - MySQL/MariaDB-specific semantics are handled deliberately: identifier quoting, case sensitivity, `utf8mb4`, timestamp precision, JSON columns, `ON DUPLICATE KEY`, transaction isolation.
@@ -207,7 +207,7 @@ reviews:
         - Constraint errors map to typed errors; migrations are upgrade-safe and idempotent; teardown twice is safe.
         - Indexes match real predicates/order; flag unindexed scans, N+1 queries and unbounded results.
 
-    - path: "packages/storage-*/**"
+    - path: "packages/storage/**"
       instructions: |
         Storage adapters handle untrusted keys and large streams. Verify:
         - Path traversal (`../`), absolute paths, NUL bytes and empty segments are rejected before any filesystem/object call.
@@ -217,7 +217,7 @@ reviews:
         - Missing objects map to typed errors; list limits are clamped; credentials and signed URLs never enter logs.
         Require path-traversal, missing-object, partial-write and contract-suite tests.
 
-    - path: "packages/runner-playwright/**"
+    - path: "packages/runner/**"
       instructions: |
         Browser runner review. Verify:
         - Every page/context/browser is closed in `finally`, including on navigation or render failure, timeout and cancellation.
@@ -225,16 +225,6 @@ reviews:
         - Launch failures become `TargetLaunchError` (not a story crash); story errors are isolated to the snapshot.
         - Screenshot bytes are validated (PNG magic, size cap) before storage; remote endpoints, headers, query values and tokens are scrubbed from errors/logs.
         - Remote targets go through `retryConnect` and the process-wide session gate; target availability is reported through metadata, not guessed.
-        - The Playwright and Puppeteer implementations stay behaviorally identical for shared logic (`play`, `settle`, `a11y`).
-
-    - path: "packages/runner-puppeteer/**"
-      instructions: |
-        Browser runner review. Verify:
-        - Browser/page lifecycle is closed in `finally` on success, timeout, navigation failure and cancellation.
-        - `executablePath` is required and validated; launch failures are `TargetLaunchError`, not story failures.
-        - Rendering waits on the Storybook settle signal, never a fixed sleep; fallback delay is bounded.
-        - Screenshot bytes meet the PNG magic/size contract; remote endpoints, headers and tokens are scrubbed from errors.
-        - Shared `play`, `settle` and a11y logic stays identical to Playwright; flag drift.
 
     - path: "packages/app/src/routes/**"
       instructions: |
@@ -296,7 +286,7 @@ reviews:
         - Retries come from `testing.retries`; lease renewal is active for the handler lifetime; an exhausted job fails its build.
         - Cancellation cancels every job kind for the build; no in-memory queue, boot sweep or stall handler is reintroduced.
 
-    - path: "packages/core/src/capture/db-queue/**"
+    - path: "packages/core/src/jobs/db-queue/**"
       instructions: |
         Verify queue correctness under concurrency:
         - Claiming is atomic and conditional; two consumers cannot claim one job.
@@ -315,7 +305,7 @@ reviews:
         - Passkey/SSO challenges are single-use, expire, and bind to the session/user; replay and cross-user use are rejected.
         Require tests for anonymous/member/admin, expired/revoked sessions, wrong-user tokens and replay.
 
-    - path: "packages/notify-*/**"
+    - path: "packages/core/src/integrations/{git,chat,email}/**"
       instructions: |
         Notifications are durable side effects. Verify:
         - Nothing is sent without a confirmed public origin; no relative-link fallback and no channel marked errored because the origin is unknown.
@@ -359,7 +349,7 @@ reviews:
         - Changed files map to owning packages deterministically; a test-only change does not select unrelated packages.
         Require tests for cycles, empty graphs, scoped packages, renamed files and Windows/POSIX separators.
 
-    - path: "packages/design-figma/**"
+    - path: "packages/core/src/integrations/design/**"
       instructions: |
         External design-provider integration. Verify:
         - Credentials and tokens never enter logs, errors, URLs or rendered HTML; link validation does not leak private file access.

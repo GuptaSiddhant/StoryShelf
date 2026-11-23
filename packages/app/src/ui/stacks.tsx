@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
-const hGaps = { sm: "0.5rem", md: "0.75rem", lg: "1rem" } as const;
+const hGaps = { sm: "var(--space-2)", md: "var(--space-3)", lg: "var(--space-4)" } as const;
 const hAligns = {
   center: "center",
   start: "flex-start",

@@ -1,6 +1,11 @@
 /** The `Auth` singleton over the Better Auth instance: user mirror, session resolve and revoke, disable. */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
-import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
+import {
+  normalizeAccountEmail,
+  readOnlyAccountMatcher,
+  type Auth,
+  type EngineLoginMethod,
+} from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { SESSION_COOKIE, type AuthUser } from "@storyshelf/core/types";
 import { hasPasswordCredential, listUserPasskeys } from "../passkeys.ts";
@@ -12,14 +17,18 @@ import {
 } from "../sessions.ts";
 import { describeLoginMethods } from "./login-methods.ts";
 import { buildInviteMethods } from "./mail.ts";
+import { providerChecksOf } from "./provider-checks.ts";
+import { assertAuthSecret } from "./secret.ts";
 import { ENGINE_PROVIDER_ID, type ShelfAuthInstance, type ShelfAuthOptions } from "./types.ts";
 
 function toAuthUser(
   sessionUser: { id: string; email: string; name: string; image?: string | null },
   role: AuthUser["role"],
   displayName: string | null,
+  readOnly: boolean,
 ): AuthUser {
   return {
+    ...(readOnly ? { readOnly: true } : {}),
     id: sessionUser.id,
     email: sessionUser.email,
     // Empty overrides fall back (writes normalize "" to null, but legacy
@@ -65,6 +74,7 @@ async function resolveAuthUser(
   shelf: ShelfAuthInstance,
   db: DatabaseAdapter,
   request: Request,
+  isReadOnly: (email: string) => boolean,
 ): Promise<AuthUser | null> {
   const result = await shelf.api.getSession({ headers: request.headers });
   if (!result?.user) {
@@ -101,6 +111,7 @@ async function resolveAuthUser(
     },
     stored?.role ?? "member",
     stored?.displayNameOverride ?? null,
+    isReadOnly(result.user.email),
   );
 }
 
@@ -137,17 +148,17 @@ export function buildAdapter(
   db: DatabaseAdapter,
   options: ShelfAuthOptions,
 ): Auth {
+  const isReadOnly = readOnlyAccountMatcher(options.readOnlyAccounts);
   return {
     hostSessionCookie: options.hostSessionCookie === true,
     handler: async (request: Request): Promise<Response> => await shelf.handler(request),
     loginMethods: (): EngineLoginMethod[] => describeLoginMethods(options),
+    providerChecks: () => providerChecksOf(options),
     // eslint-disable-next-line require-await -- Auth.setup is async; validation is sync
     setup: async () => {
       // Better Auth merely warns on short secrets; the shelf fails fast
-      // (32 chars ≈ 128+ bits for generated values; forgeable cookies else).
-      if (options.secret.length < 32) {
-        throw new Error("Shelf auth requires a secret of at least 32 characters");
-      }
+      // (forgeable cookies else). createShelfAuth checks too; this covers other callers.
+      assertAuthSecret(options.secret);
     },
     ...buildInviteMethods(db, options),
     passkeysEnabled: () => options.passkeys !== undefined,
@@ -158,7 +169,12 @@ export function buildAdapter(
       await setUserDisabled(db, userId, disabled);
     },
     check: async (request: Request): Promise<AuthUser | null> =>
-      await resolveAuthUser(shelf, db, request),
+      await resolveAuthUser(shelf, db, request, isReadOnly),
+    isReadOnlyAccount: (email: string): boolean => isReadOnly(email),
+    readOnlyAccounts: (): string[] =>
+      (options.readOnlyAccounts ?? [])
+        .map((email) => normalizeAccountEmail(email))
+        .filter((email) => email !== ""),
     // eslint-disable-next-line require-await -- interface is async; minting forbidden by design
     createSession: async (): Promise<string> => {
       throw new Error(

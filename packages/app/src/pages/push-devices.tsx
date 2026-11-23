@@ -7,7 +7,7 @@ import {
   EmptyState,
   Field,
   HStack,
-  PageHeader,
+  SectionTitle,
   RelativeTime,
   Table,
   VStack,
@@ -29,7 +29,7 @@ export type PushClientState = "unsupported" | "idle" | "enabled" | "denied";
 const note = css`
   /* push-note */
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   margin: 0;
 `;
 
@@ -92,11 +92,11 @@ export const PushDevicesCard: FC<{
   return (
     <Card>
       <div data-push data-push-state={state}>
-        <PageHeader
-          level={2}
-          title="Push notifications"
-          description="Choose which devices get push. Per-project delivery follows your notification subscriptions."
-        />
+        <SectionTitle>Push notifications</SectionTitle>
+        <p class={note}>
+          Choose which devices get push. Per-project delivery follows your notification
+          subscriptions.
+        </p>
         <VStack>
           <div data-push-when="unsupported" hidden={state !== "unsupported"}>
             <Alert tone="warning" title="Push is not available in this browser" role="status">

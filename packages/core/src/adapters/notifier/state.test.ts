@@ -34,7 +34,13 @@ const states: BuildStateSet = {
       url: "https://shelf/sb/1",
     },
   ],
-  comment: { url: "https://shelf/b/1", markdown: "body", state: "pending" },
+  comment: {
+    url: "https://shelf/b/1",
+    projectSlug: "web",
+    buildId: "01B",
+    markdown: "body",
+    state: "pending",
+  },
 };
 
 describe("channelPrefix", () => {
@@ -81,7 +87,7 @@ describe("writeBuildState", () => {
         context: "storyshelf/storybook",
         description: "Storybook published",
       },
-      { kind: "comment", sha: "abc", markdown: "body" },
+      { kind: "comment", sha: "abc", project: "web", buildId: "01B", markdown: "body" },
     ]);
     expect(fake.calls.map((call) => call.url)).toEqual([
       "https://shelf/b/1",

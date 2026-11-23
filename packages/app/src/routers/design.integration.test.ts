@@ -1,7 +1,7 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { DesignCredentialModel, DesignModel, MemberModel } from "@storyshelf/core/models";
 import type { DesignNode } from "@storyshelf/core/schema";
 import { createLatch, makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -101,7 +101,7 @@ describe("design settings", () => {
     const { app, design, credentials } = await seed();
     const page = await (await app.request("/projects/app/settings/capture")).text();
     expect(page).toContain("Design files");
-    expect(page).toContain("No design files linked.");
+    expect(page).toContain("No design files linked");
     expect(page).toContain("Component mapping");
 
     const file = await app.request(
@@ -579,15 +579,17 @@ async function bare() {
     storage,
     logger: pino({ level: "silent" }),
     config: { secret: SECRET },
+    design: false,
   });
   return { app, design: new DesignModel(db, []) };
 }
 
 describe("without a design provider", () => {
-  it("shows an empty Design tab and no design actions anywhere", async () => {
+  it("shows a site admin one line in place of the Design section, and no design actions anywhere", async () => {
     const { app } = await bare();
     const settings = await (await app.request("/projects/app/settings/capture")).text();
-    expect(settings).toContain("No design provider configured");
+    expect(settings).toContain("Design tools are not offered to projects on this server");
+    expect(settings).toContain("Figma (Turned off by the operator)");
     expect(settings).not.toContain("Component mapping");
     const library = await (await app.request("/projects/app/library")).text();
     expect(library).not.toContain(">Figma<");

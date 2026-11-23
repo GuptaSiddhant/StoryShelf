@@ -139,6 +139,33 @@ describe("capture settings tab", () => {
   });
 });
 
+describe("browser extras fragment", () => {
+  it("leaves the primary out and keeps the ticks already made", async () => {
+    const { app } = await setup();
+    const res = await app.request(
+      "/projects/capture-project/settings/capture/extras?browser=firefox&extra_webkit=webkit",
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain('name="extra_firefox"');
+    expect(html).toMatch(/name="extra_webkit"[^>]*checked|checked[^>]*name="extra_webkit"/u);
+    expect(html).toContain('name="extra_chromium"');
+  });
+
+  it("refuses an unknown browser", async () => {
+    const { app } = await setup();
+    const res = await app.request("/projects/capture-project/settings/capture/extras?browser=nope");
+    expect(res.status).toBe(400);
+  });
+
+  it("wires the primary select to the fragment", async () => {
+    const { app } = await setup();
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain('hx-get="/projects/capture-project/settings/capture/extras"');
+    expect(html).toContain('id="browser-extras"');
+  });
+});
+
 describe("diff thresholds", () => {
   it("shows the thresholds on the capture tab and saves them", async () => {
     const { app, saveThresholds, project } = await setup();
@@ -167,5 +194,44 @@ describe("diff thresholds", () => {
     expect(refused.status).toBe(400);
     expect(await refused.text()).toContain("from 0 to 1");
     expect(await project()).toEqual(before);
+  });
+});
+
+async function post(app: App, fields: Record<string, string>) {
+  return await app.request("/projects/capture-project/settings/capture/superseded", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "x-csrf-token": getCsrfToken(),
+    },
+    body: new URLSearchParams(fields).toString(),
+  });
+}
+const flag = async (app: App) =>
+  (
+    (await (await app.request("/api/v1/projects/capture-project")).json()) as {
+      cancelSuperseded?: boolean;
+    }
+  ).cancelSuperseded;
+
+type App = Awaited<ReturnType<typeof setup>>["app"];
+
+describe("cancel-superseded setting (ADR 0045)", () => {
+  it("renders the toggle ticked by default", async () => {
+    const { app } = await setup();
+    const html = await (await app.request("/projects/capture-project/settings/capture")).text();
+    expect(html).toContain("Cancel superseded builds");
+    expect(html).toMatch(
+      /name="cancelSuperseded"[^>]*checked|checked[^>]*name="cancelSuperseded"/u,
+    );
+    expect(html).toContain("Save superseded-build setting");
+  });
+
+  it("turns it off with an unticked box and on again", async () => {
+    const { app } = await setup();
+    expect((await post(app, {})).status).toBeLessThan(400);
+    expect(await flag(app)).toBe(false);
+    await post(app, { cancelSuperseded: "true" });
+    expect(await flag(app)).toBe(true);
   });
 });

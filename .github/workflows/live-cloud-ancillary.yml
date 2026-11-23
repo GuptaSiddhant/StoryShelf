@@ -2,7 +2,7 @@
 name: Live Cloud Ancillary
 
 # Phase 4 live tests: Turso + Postgres + MySQL + OAuth + GitHub + GitLab
-# against strictly real endpoints (no fakes, no stubs). No terraform scaffold
+# against strictly real endpoints (no fakes, no stubs). No Terraform module
 # covers these — resources are long-lived and shared, isolation is per-run
 # (unique row ids/slugs, unique status contexts).
 #
@@ -90,7 +90,7 @@ jobs:
       - name: Run db suites (hermetic + live)
         if: matrix.suite == 'db'
         # --force: live results must never come from the turbo cache.
-        run: nubx turbo test --filter='@storyshelf/db-sqlite' --filter='@storyshelf/db-postgres' --filter='@storyshelf/db-mysql' --force
+        run: nubx turbo test --filter='@storyshelf/db' --force
 
       - name: Run auth suite (hermetic + live)
         if: matrix.suite == 'auth'
@@ -98,4 +98,7 @@ jobs:
 
       - name: Run git suites (hermetic + live)
         if: matrix.suite == 'git'
-        run: nubx turbo test --filter='@storyshelf/notify-git' --force
+        # The git integrations live in core (ADR 0049).
+        # Runs the git folder directly (no turbo, so never a cached result).
+        working-directory: packages/core
+        run: nubx vitest run src/integrations/git/

@@ -1,5 +1,5 @@
 import type { Auth } from "@storyshelf/core/auth";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
+import type { ShelfConfig, ResolvedShelfOptions } from "@storyshelf/core/config";
 import { createShelfLogger, type Logger } from "@storyshelf/core/logger";
 import { Retention } from "@storyshelf/core/retention";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
@@ -8,6 +8,7 @@ import type { ShelfRouter } from "./app-types.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { startBranchGcTimer } from "./retention-timer.ts";
 import type { ServerRuntime } from "./runtime.ts";
+import { stubRunner } from "./test-runner.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -86,8 +87,8 @@ describe("background retention", () => {
       const options = {
         database: db,
         storage,
-        ...(testing ? { testing: {} } : {}),
-      } as ShelfOptions;
+        ...(testing ? { testing: { runner: stubRunner() } } : {}),
+      } as ResolvedShelfOptions;
       const runtime = {
         config: { branchGcIntervalMs: 120_000 },
         logger: createShelfLogger({ level: "silent" }),

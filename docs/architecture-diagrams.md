@@ -25,7 +25,7 @@ flowchart TB
     GH["Git Provider\nGitHub / GitLab\n(status checks, MR comments)"]
     Store["Storage\nLocal FS / S3 / R2 / MinIO"]
     DB["Database\nSQLite (node:sqlite) / Turso"]
-    Browser["Playwright Chromium\n@storyshelf/runner-playwright"]
+    Browser["Playwright Chromium\n@storyshelf/runner"]
 
     SB["Storybook Static Build\n(storybook-static/)"]
 
@@ -58,7 +58,7 @@ How the monorepo maps to runtime containers. `nub` workspaces are `apps/*` + `pa
 ```mermaid
 flowchart TB
     subgraph CLI_pkg["CLI — packages/cli"]
-        cli["storyshelf\ncommander\nupload / init / create / retry / purge / server init"]
+        cli["storyshelf\ncommander\nupload / init / create / retry / purge"]
     end
 
     subgraph Router["HTTP — packages/app"]
@@ -74,18 +74,18 @@ flowchart TB
         models["Models\ncore/models/*\n(constructor-injected)"]
         schema["Schema\ncore/schema/* + ddl.ts"]
         capture["Capture\ncore/capture/*\norchestrator / pipeline / queue\nstorybook discovery"]
-        diff["Diff\ncore/diff\npixelmatch + pngjs"]
+        diff["Image engine contract\ncore/adapter/capture-runner\n(runner/images: pixelmatch + pngjs)"]
         retention["Retention\ncore/retention/purge.ts"]
         utils["Utils\ncore/utils + paths + urls\nlogger (pino) + config"]
     end
 
     subgraph DBadapters["Database Adapters"]
-        dbsqlite["@storyshelf/db-sqlite\nnode:sqlite + Drizzle\n(presets: turso / better-sqlite3 / bun-sqlite / d1)"]
+        dbsqlite["@storyshelf/db/sqlite\nnode:sqlite + Drizzle\n(presets: turso / better-sqlite3 / bun-sqlite / d1)"]
     end
 
     subgraph StoreAdapters["Storage Adapters"]
-        slocal["@storyshelf/storage-local\nfilesystem"]
-        ss3["@storyshelf/storage-s3\nAWS S3 / R2 / MinIO"]
+        slocal["@storyshelf/core/storage/local\nfilesystem"]
+        ss3["@storyshelf/storage/s3\nAWS S3 / R2 / MinIO"]
     end
 
     subgraph AuthAdapters["Auth Singleton"]
@@ -93,12 +93,12 @@ flowchart TB
     end
 
     subgraph CaptureAdapters["Capture Adapters"]
-        runner["@storyshelf/runner-playwright\npure CaptureRunner"]
+        runner["@storyshelf/runner\npure CaptureRunner"]
         qmem["Database queue (capture_jobs)\ncore/capture (default)"]
     end
 
     subgraph GitAdapters["Git Notifiers"]
-        ghub["@storyshelf/notify-git\nGitHub / GitLab / git-log (state delivery)"]
+        ghub["core/integrations/git\nGitHub / GitLab / git-log (state delivery)"]
     end
 
     subgraph Apps["Apps (deployables)"]
@@ -250,8 +250,8 @@ sequenceDiagram
     participant Q as CaptureQueue<br/>core/capture (database queue)
     participant Orc as Orchestrator<br/>core/capture/orchestrator.ts:32
     participant FS as StorageAdapter<br/>local / S3
-    participant Runner as CaptureRunner<br/>runner-playwright
-    participant Diff as Diff Engine<br/>core/diff (pixelmatch)
+    participant Runner as CaptureRunner<br/>runner
+    participant Diff as Image Engine<br/>runner.images (pixelmatch)
     participant Git as Git notifier (state delivery)
 
     CI->>CLI: storyshelf upload --token=xxx
@@ -291,7 +291,7 @@ sequenceDiagram
     Orc->>Orc: partition failures → blockingFailed vs flakyFailed (isFlakyStory)
     Orc->>Diff: persistCapture({ db, storage, project, build, viewports, captures })
     Diff->>FS: storage.read(baseline) — per-branch fallback
-    Diff->>Diff: diffImages(baseline, current, { pixelThreshold, maxDiffRatio })
+    Diff->>Diff: compare(baseline, current, { pixelThreshold, maxDiffRatio })
     Diff->>FS: storage.write(screenshots/{story}/{viewport}.png)
     Diff->>FS: storage.write(diffs/{story}/{viewport}.png) if changed
     Diff->>DB: snapshots upsert (status: new/unchanged/changed)
@@ -312,7 +312,7 @@ sequenceDiagram
     Orc->>Orc: scratchDir cleanup
 ```
 
-**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `STORYSHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
+**Performance note:** a build renders only the stories its diff affects and inherits the rest from their baselines where one exists (a story or viewport with no baseline renders; `affectedOnly`, default true, `splitStory` in `core/src/capture/affected.ts`; any uncertainty or `--full` renders everything, see [affected capture](./archive/architecture-deferred-v2.md#deliberately-deferred-v2)); pages per build are bounded by the runner (`concurrency`, sized from detected CPU/memory, `SHELF_CAPTURE_CONCURRENCY`) and persist is capped at 4; queue concurrency defaults from detected resources, 1 or 2 (`testing.concurrency`, `ShelfTestingOptions` in `core/src/config.ts`).
 
 ---
 
@@ -507,7 +507,7 @@ erDiagram
         text id PK
         text project_id FK
         text url
-        text secret_encrypted "AES-256-GCM with SECRET"
+        text secret_encrypted "AES-256-GCM with SHELF_SECRET"
         text events "JSON array or null=all"
         text created_at
         text updated_at
@@ -587,7 +587,7 @@ flowchart TB
     class Purge,Publish purge;
 ```
 
-Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). Publishing is independent of capture: a zip up to `maxInlineUnzipSize` (default 50 MB) is extracted inline at upload, a larger one by a `publish` job on the database queue, and extraction is capped by `maxZipEntries` and `maxUnzippedBytes` (`packages/core/src/capture/publish/`).
+Upload path: CLI uploads `storybook.zip` → storage; orchestrator extracts to `scratchDir` (temp), then `persistStorybookStatics` copies to `storage/{projectId}/builds/{buildId}/storybook/` for serving (`packages/core/src/capture/orchestrator.ts:57`). Publishing is independent of capture: a zip up to `maxInlineUnzipSize` (default 50 MB) is extracted inline at upload, a larger one by a `publish` job on the database queue, and extraction is capped by `maxZipEntries` and `maxUnzippedBytes` (`packages/core/src/publish/`).
 
 ---
 
@@ -762,12 +762,12 @@ flowchart TB
     subgraph Docker["Single Container — mcr.microsoft.com/playwright:v1.63.0-noble"]
         Node["Node 24+ — Hono server<br/>node src/index.ts"]
         PW["Chromium (Playwright) — in-process capture"]
-        SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db-sqlite"]
-        FS["Filesystem — @storyshelf/storage-local<br/>VOLUME /app/data"]
+        SQLite["SQLite — node:sqlite (WAL)<br/>@storyshelf/db/sqlite"]
+        FS["Filesystem — @storyshelf/core/storage/local<br/>VOLUME /app/data"]
         Queue2["Database queue<br/>concurrency 2"]
     end
 
-    Compose["docker-compose.yml<br/>ports 3000:3000<br/>env: SECRET, CAPTURE_CONCURRENCY,<br/>PURGE_TTL_DAYS, OIDC_*/AUTH_PASSWORD"]
+    Compose["docker-compose.yml<br/>ports 3000:3000<br/>env: SHELF_SECRET, SHELF_CAPTURE_CONCURRENCY,<br/>SHELF_PURGE_TTL_DAYS, SHELF_OIDC_*/SHELF_ADMIN_PASSWORD"]
     CI2["CI — storyshelf upload"]
 
     CI2 --> Node
@@ -789,8 +789,8 @@ No Docker socket mount, no repo cloning; capture runs via the image's own browse
 flowchart TB
     subgraph Cloud["Cloud Deployment"]
         Edge["Edge — Vercel / Cloudflare Workers<br/>Hono FetchHandler (Web Request/Response)"]
-        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db-sqlite/turso"]
-        S3["S3 / R2 — @storyshelf/storage-s3"]
+        Turso["Turso — @libsql/client + Drizzle<br/>@storyshelf/db/sqlite/turso"]
+        S3["S3 / R2 — @storyshelf/storage/s3"]
     end
 
     Edge --> Turso
@@ -901,7 +901,7 @@ Uses same libs Playwright does internally ([Pixel Diff Engine](./architecture/di
 | 2   | Package Map         | flowchart    | `package.json` workspaces, `repo-structure.md`                                                                                                                    |
 | 3   | Adapter Composition | flowchart    | `packages/app/src/index.tsx:44`, `core/config.ts:146`                                                                                                             |
 | 4   | Middleware Chain    | sequence     | `packages/app/src/index.tsx:74`, `app/middleware/*`                                                                                                               |
-| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner-playwright`                                                                                                            |
+| 5   | Capture Pipeline    | sequence     | `core/capture/orchestrator.ts:32`, `runner`                                                                                                                       |
 | 6   | Baseline Resolution | flowchart    | [Baseline Resolution & Review Workflow](./architecture/review.md#baseline-resolution--review-workflow), ADR 0009                                                  |
 | 7   | State Machine       | stateDiagram | [Entity Model](./architecture/data-model.md#entity-model)                                                                                                         |
 | 8   | ER Model            | erDiagram    | [Entity Model](./architecture/data-model.md#entity-model), `core/schema/*`                                                                                        |

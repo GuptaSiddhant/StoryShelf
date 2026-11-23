@@ -1,3 +1,7 @@
+import type { ShardRepeatedEvent } from "../../jobs/consumer/metrics.ts";
+import { isFinalAttempt } from "../../jobs/consumer/retry.ts";
+import type { ConsumerJob, JobRunContext, KindHandler } from "../../jobs/consumer/types.ts";
+import { DEFAULT_LEASE_MS } from "../../jobs/db-queue/types.ts";
 /**
  * The parent side of forked capture (ADR 0006, decision 5). The app's consumer polls the queue and
  * holds the slots; its `capture` handler is this one, which pushes each leased job to a child over
@@ -11,10 +15,6 @@
  * to the in-process handler.
  */
 import type { Logger } from "../../logger.ts";
-import type { ShardRepeatedEvent } from "../consumer/metrics.ts";
-import { isFinalAttempt } from "../consumer/retry.ts";
-import type { ConsumerJob, JobRunContext, KindHandler } from "../consumer/types.ts";
-import { DEFAULT_LEASE_MS } from "../db-queue/types.ts";
 import type { ChildProcessHandle } from "./channel.ts";
 import { CrashTracker } from "./crash-tracker.ts";
 import { describeExit, type ChildExit } from "./exit.ts";
@@ -62,6 +62,10 @@ export function createForkedCaptureHandler(options: ForkedCaptureOptions): Forke
   return {
     get tripped() {
       return forked.tripped;
+    },
+    // The parent checks the image engine before it polls, as it did with the in-process handler.
+    prepare: async (logger) => {
+      await options.fallback.prepare?.(logger);
     },
     accepts: (job) => forked.accepts(job),
     // The deadline is the parent's: it records it with the in-process handler.

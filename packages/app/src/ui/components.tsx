@@ -10,18 +10,30 @@
  * an organizational detail.
  */
 export { Button, Tabs } from "./buttons.tsx";
-export { Alert, Badge, EmptyState, Meta, Stat, statusLabel, statusTone } from "./feedback.tsx";
+export {
+  Alert,
+  Badge,
+  EmptyState,
+  Meta,
+  Stat,
+  StatGroup,
+  statusLabel,
+  statusTone,
+} from "./feedback.tsx";
 export { CheckField, Field, FormActions, SelectField, TextareaField } from "./forms.tsx";
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";
 export { Avatar, AvatarGroup } from "./avatar.tsx";
 export { DefinitionList, Disclosure } from "./disclosure.tsx";
+export { Dialog, DialogLink } from "./dialog.tsx";
 export { Dropdown, DropdownDivider, DropdownItem } from "./dropdown.tsx";
 export { Icon } from "./icons/icon.tsx";
 export type { IconName } from "./icons/paths.ts";
 export { Kbd } from "./kbd.tsx";
+export { OptionFields, parseOptionFields, type OptionFieldsItem } from "./option-fields.tsx";
 export { Option, OptionList } from "./option-list.tsx";
 export { Segmented, type SegmentedItem } from "./segmented.tsx";
+export { SummaryList, type SummaryItem } from "./summary-list.tsx";
 export { Table } from "./table.tsx";
 export { Thumbnail } from "./thumbnail.tsx";
 export {
@@ -36,5 +48,5 @@ export { PreviewEmbed, PREVIEW_SANDBOX } from "./preview-embed.tsx";
 export { DesignPreview, DesignReference } from "./design-reference.tsx";
 export { CodeBlock } from "./code-block.tsx";
 export { FilterInput } from "./filter-input.tsx";
-export { RelativeTime, formatRelative } from "./time.tsx";
+export { RelativeTime, Time, formatAbsolute, formatRelative } from "./time.tsx";
 export { SubNavLayout, type SubNavItem } from "./subnav.tsx";

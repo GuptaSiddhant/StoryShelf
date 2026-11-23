@@ -9,7 +9,10 @@ import type { NotifierProvider } from "./adapters/notifier/provider.ts";
 import type { StorageAdapter } from "./adapters/storage.ts";
 import type { Ai } from "./ai.ts";
 import type { Auth } from "./auth.ts";
+import type { IntegrationStatus } from "./integrations/availability.ts";
+import type { ShelfGitOptions } from "./integrations/git/connections/types.ts";
 import type { VapidConfig } from "./integrations/push/types.ts";
+import type { IntegrationOption } from "./integrations/resolve.ts";
 import {
   storybookHostingSchema,
   validateStorybookHosting,
@@ -52,6 +55,14 @@ export interface BrandTheme {
   shadow?: string;
 }
 
+/** A secondary link on the sign-in page to something anyone may open without an account. */
+export interface AuthPublicLink {
+  /** An `https:` URL or a same-origin path (`/_/<slug>/`); nothing else is accepted. */
+  href: string;
+  /** Link text, e.g. "Browse the demo's Storybook without an account". */
+  label: string;
+}
+
 /** Text overrides for the auth (login) UI. */
 export interface AuthUiConfig {
   /** Page title, default "Sign in". */
@@ -71,6 +82,11 @@ export interface AuthUiConfig {
   ssoLabelTemplate?: string;
   /** Help text shown under the form. */
   helpText?: string;
+  /**
+   * A link under the form to public content (a public build's Storybook). It opens hosting only,
+   * never review (ADR 0011). Nothing renders when unset.
+   */
+  publicLink?: AuthPublicLink;
   /** Footer text shown at the bottom of the card. */
   footerText?: string;
 }
@@ -182,7 +198,7 @@ export interface ShelfConfig {
    */
   migrateCredentialsOnBoot?: boolean;
   /**
-   * Bootstrap site-admin bearer token (`STORYSHELF_ADMIN_TOKEN`/`ADMIN_TOKEN`).
+   * Bootstrap site-admin bearer token (`SHELF_ADMIN_TOKEN`).
    * Grants site-admin API access when no admin user exists yet; never
    * mint sessions from it. Distinct from `secret` (session signing).
    */
@@ -207,7 +223,7 @@ export interface ShelfConfig {
   /**
    * Proxies allowed to report the client's IP, which keys rate limits (see {@link TrustProxy}).
    * Unset keeps the socket peer, so behind a load balancer every client shares the proxy's
-   * buckets. Hosts map it from `TRUST_PROXY` with {@link parseTrustProxy}.
+   * buckets. Hosts map it from `SHELF_TRUST_PROXY` with {@link parseTrustProxy}.
    */
   trustProxy?: TrustProxy;
   /**
@@ -240,6 +256,13 @@ export interface ShelfConfig {
   serverTiming?: boolean;
   /** Persist gzip and brotli copies of published Storybook files, made when publishing ends (default off). */
   publishedCompression?: boolean;
+  /**
+   * Act on `supersedes` when a build is created (ADR 0045, decision 3): cancel the older in-flight
+   * builds the CLI names, for projects with `cancelSuperseded` on. Default off, so a rolling upgrade
+   * never has a copy cancel builds that a previous copy cannot read as superseded (ADR 0053,
+   * decision 5: readers first); turn it on one minor release after the readers shipped.
+   */
+  supersedeOnCreate?: boolean;
   /** Signed Storybook asset serving for remote capture browsers; see {@link CaptureAssetsConfig}. */
   captureAssets?: CaptureAssetsConfig;
   /** Offline Storybooks on installed devices (ADR 0048); see {@link OfflineConfig}. */
@@ -309,6 +332,14 @@ const adapterSnapshotSchema: z.ZodType<AdapterSnapshot> = z.object({
   ]),
 });
 
+/** An `https:` URL or a path on this server (one leading `/`, never `//`). */
+const PUBLIC_LINK_HREF = /^(?:https:\/\/[^\s]+|\/(?!\/)[^\s]*)$/u;
+
+const authPublicLinkSchema: z.ZodType<AuthPublicLink> = z.object({
+  href: z.string().regex(PUBLIC_LINK_HREF, "must be an https URL or a path starting with /"),
+  label: z.string().min(1),
+});
+
 const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   title: z.string().min(1).optional(),
   subtitle: z.string().optional(),
@@ -317,6 +348,7 @@ const authUiConfigSchema: z.ZodType<AuthUiConfig> = z.object({
   submitLabel: z.string().min(1).optional(),
   ssoLabelTemplate: z.string().min(1).optional(),
   helpText: z.string().optional(),
+  publicLink: authPublicLinkSchema.optional(),
   footerText: z.string().optional(),
 });
 
@@ -336,7 +368,7 @@ const MAX_TRUSTED_HOPS = 10;
 const TRUSTED_PROXY_PATTERN = /^[\da-f:.]+(?:\/\d{1,3})?$/iu;
 
 /**
- * Map a `TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
+ * Map a `SHELF_TRUST_PROXY` environment value to {@link ShelfConfig.trustProxy}: unset, empty, `false`
  * or `0` is off; `fly` is Fly.io; digits are a hop count; anything else is a comma-separated list
  * of IPs or CIDRs (checked by {@link validateConfig}).
  */
@@ -400,6 +432,7 @@ export const shelfConfigSchema: z.ZodType<ShelfConfig> = z
     maxUploadBytes: z.number().int().positive().optional(),
     serverTiming: z.boolean().optional(),
     publishedCompression: z.boolean().optional(),
+    supersedeOnCreate: z.boolean().optional(),
     captureAssets: z
       .object({
         cacheMaxAgeSeconds: z.number().int().min(0).max(MAX_CAPTURE_ASSET_CACHE_SECONDS).optional(),
@@ -575,8 +608,17 @@ export interface ShelfTestingOptions {
 
 /** Notification options: who can deliver, over which transport, with what branding. */
 export interface ShelfNotificationsOptions {
-  /** Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these. */
-  notifiers?: NotifierProvider[];
+  /**
+   * Provider adapters (Slack, Teams, email, ...); a channel's `provider` must name one of these.
+   * An array lists exactly these; a function `(builtIn) => list` adds, replaces or filters the
+   * built-in notifiers; `false` wires none (ADR 0049).
+   */
+  notifiers?: IntegrationOption<NotifierProvider>;
+  /**
+   * Email transports, chosen like `notifiers`: an array, a function of the built-ins, or `false`
+   * (ADR 0049). Resolved and checked at startup; the app does not use the list yet.
+   */
+  email?: IntegrationOption<EmailSender>;
   /**
    * VAPID identity for web push (ADR 0048; `vapidConfigFromEnv` reads `SHELF_VAPID_*`). Set ⇒ push
    * on, after the key pair checks out at boot; absent ⇒ off (the push routes answer 404).
@@ -592,7 +634,7 @@ export interface ShelfNotificationsOptions {
 export interface ShelfCompareOptions {
   /**
    * Worker threads for pixel diffs: default CPU count minus one (min 1), `0` diffs on the main
-   * thread. Takes precedence over `STORYSHELF_DIFF_WORKERS`.
+   * thread. Takes precedence over `SHELF_DIFF_WORKERS`.
    */
   threads?: number;
 }
@@ -602,7 +644,7 @@ export interface ShelfImagesOptions {
   /**
    * Image library for diffs, diff overlays and AI thumbnails: `"pngjs"` (default, pure JavaScript,
    * runs anywhere) or `"sharp"` (native, several times faster on large PNGs; needs the optional
-   * `sharp` package installed). Falls back to `STORYSHELF_IMAGE_ENGINE`. The pixel comparison is
+   * `sharp` package installed). Falls back to `SHELF_IMAGE_ENGINE`. The pixel comparison is
    * pixelmatch either way, so verdicts match.
    */
   engine?: "pngjs" | "sharp";
@@ -618,6 +660,14 @@ export interface ShelfOptions {
    */
   testing?: ShelfTestingOptions;
   /**
+   * Accept skipped builds (ADR 0044): `GET …/builds/skip-source` and `POST …/builds/skipped`. Off by
+   * default, and then both answer 404 as if they did not exist, so a release can ship the readers of
+   * the `skipped` status before any server writes it (ADR 0053, decision 5). The release after the
+   * readers turns the default on and removes the option. Needs `testing`; without it the routes
+   * answer 404 either way.
+   */
+  skippedBuilds?: boolean;
+  /**
    * Requests per minute one client IP may make to the signed Storybook URL route, `/_s/<token>/*`,
    * and to the read-grant route, `/_r/<token>/*`, which share one bucket (ADR 0007, decision 5;
    * ADR 0051, decision 10). Default 6000, enough for a render fetching thousands of assets from one
@@ -629,10 +679,19 @@ export interface ShelfOptions {
   auth?: Auth;
   /** AI insights surface (ADR 0016). Set ⇒ AI on site-wide; absent ⇒ off. */
   ai?: Ai;
-  /** Design-tool providers (Figma, …) that resolve links, metadata and previews. */
-  design?: DesignProvider[];
+  /**
+   * Design-tool providers (Figma, …) that resolve links, metadata and previews: an array (exactly
+   * these), a function `(builtIn) => list`, or `false` for none (ADR 0049).
+   */
+  design?: IntegrationOption<DesignProvider>;
   /** Notification subsystem: providers, the email transport, and shared brand/sender settings. */
   notifications?: ShelfNotificationsOptions;
+  /**
+   * Server-wide git connections and approved repository links managed by configuration (ADR 0054,
+   * decision 9): `githubApp(...)`, `gitlabGroup(...)` or `gitFromEnv(env)` from
+   * `@storyshelf/core/integrations`. A configured connection wins over a stored one with its id.
+   */
+  git?: ShelfGitOptions;
   logger?: Logger;
   ui?: UIConfig;
   config?: ShelfConfig;
@@ -642,6 +701,32 @@ export interface ShelfOptions {
    * observability package. Flushed on `app.lifecycle.teardown()`.
    */
   observability?: ObservabilityHandle;
+}
+
+/** Notification options after {@link resolveShelfOptions}: every integration group is a list. */
+export interface ResolvedNotificationsOptions extends Omit<
+  ShelfNotificationsOptions,
+  "notifiers" | "email"
+> {
+  notifiers?: NotifierProvider[];
+  email?: EmailSender[];
+}
+
+/**
+ * `ShelfOptions` after {@link resolveShelfOptions}: the integration groups are resolved, once, into
+ * the lists the app registers. `resolveShelfOptions` always sets them; they stay optional so a
+ * hand-built options object (tests, embedders) reads as "none".
+ */
+export interface ResolvedShelfOptions extends Omit<ShelfOptions, "design" | "notifications"> {
+  /** Design providers offered to projects: registered and available (issue #1126). */
+  design?: DesignProvider[];
+  /** `notifiers` holds only available providers (issue #1126). */
+  notifications?: ResolvedNotificationsOptions;
+  /**
+   * Every integration kind with its standing (available, unavailable with a reason, or turned off),
+   * for the System page and deep health. Absent on a hand-built options object.
+   */
+  integrations?: readonly IntegrationStatus[];
 }
 
 /**
@@ -658,3 +743,19 @@ export {
   sequentialTransactionsWarning,
 } from "./options.ts";
 export { ALLOW_SERVERLESS_ENV, assertServerless, isServerlessHost } from "./serverless.ts";
+export {
+  ALLOW_OLD_NAMES_ENV,
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  readS3Bucket,
+  readSetting,
+  refuseRenamedSettings,
+  renamedSettingsIn,
+  RENAMED_SETTINGS,
+  RenamedSettingError,
+  UNPREFIXED_ALLOWED,
+  type RenamedSetting,
+  type SettingName,
+  type SettingRename,
+  type SettingsEnv,
+} from "./env-settings/index.ts";

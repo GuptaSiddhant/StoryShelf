@@ -1,11 +1,17 @@
 import { getTableColumns, type Table } from "@storyshelf/core/orm";
-import { DDL, tableColumns } from "@storyshelf/db-sqlite/ddl";
 import { describe, expect, it } from "vitest";
 import { baseAuthTables } from "./auth-tables.ts";
 
+/** `@storyshelf/db` does not publish its `ddl` module, so load it by file: a static import would pull another package's source into this package's type-check and declaration build. */
+const ddlModule = new URL("../../db/src/sqlite/ddl.ts", import.meta.url).href;
+const { DDL, tableColumns } = (await import(ddlModule)) as {
+  DDL: string;
+  tableColumns: (ddl: string) => Map<string, string[]>;
+};
+
 /**
  * Pin the auth drizzle definitions to the driver DDL: every table and
- * column in `auth-tables.ts` must exist in db-sqlite's hand-written DDL
+ * column in `auth-tables.ts` must exist in @storyshelf/db/sqlite's hand-written DDL
  * (which Turso shares). Drivers stay auth-agnostic; this test is the seam.
  */
 describe("auth DDL parity", () => {

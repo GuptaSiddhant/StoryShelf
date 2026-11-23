@@ -6,7 +6,7 @@ description: What StoryShelf stores, where your data goes, how credentials are p
 StoryShelf is self-hosted, so your data stays where you put it. This page is the short version of what a security review usually asks: what is stored, who can see it, how secrets are protected, what the server connects to, and what you should set before sharing an instance. It links to the pages that go into detail.
 
 :::caution
-**Authentication is off by default.** A server scaffolded with no auth leaves the web UI open and project roles unenforced. That is fine on your laptop or a private network; before you share an instance, turn on [authentication](/guides/auth/) and set a strong `SECRET` (see [Hardening checklist](#hardening-checklist)).
+**Authentication is off by default.** A server scaffolded with no auth leaves the web UI open and project roles unenforced. That is fine on your laptop or a private network; before you share an instance, turn on [authentication](/guides/auth/) and set a strong `SHELF_SECRET` (see [Hardening checklist](#hardening-checklist)).
 :::
 
 ## What is stored
@@ -28,7 +28,7 @@ A published Storybook is whatever you uploaded: its HTML, scripts and assets, as
 
 ## How credentials are protected
 
-- **`SECRET`.** The server secret signs login sessions and CSRF tokens, and is the key for AES-256-GCM encryption of the credentials StoryShelf must read back: webhook signing secrets, notification-channel secrets (chat webhook URLs, git tokens, GitHub App private keys), and design-provider credentials. Set it to at least 32 random characters. Rotate it on purpose with the old value kept as a decrypt-only fallback: see [Rotating the server secret](/guides/deployment/secret-rotation/).
+- **`SHELF_SECRET`.** The server secret signs login sessions and CSRF tokens, and is the key for AES-256-GCM encryption of the credentials StoryShelf must read back: webhook signing secrets, notification-channel secrets (chat webhook URLs, git tokens, GitHub App private keys), and design-provider credentials. Set it to at least 32 random characters. Rotate it on purpose with the old value kept as a decrypt-only fallback: see [Rotating the server secret](/guides/deployment/secret-rotation/).
 - **Never echoed back.** Stored secrets are not returned by the API or shown again in the UI, and are removed from log lines and error text.
 - **Accounts.** Local accounts are invite-only. Invite links are single-use, expire after seven days and are stored hashed; passwords are at least 12 characters; there are no temporary passwords; login failures are generic so they do not reveal which emails exist. Single sign-on (OIDC and SAML), social login and passkeys are available through [Better Auth](https://www.better-auth.com/docs). See [Local accounts](/guides/auth/local/).
 - **Webhooks you send** are signed with HMAC so receivers can verify them. See [Webhooks](/guides/webhooks/).
@@ -41,6 +41,26 @@ An uploaded Storybook is code from your repository, and StoryShelf runs it in a 
 - **In the review UI**, a story preview loads only when someone clicks it, in a sandboxed frame with scripts allowed but without access to the app's cookies or storage.
 - **Uploads are bounded.** Zips are limited by size, entry count and uncompressed size, and entries with absolute paths or `..` are refused. See [Published Storybook](/concepts/publishing/#limits).
 - **Capture runs on your server**, in a browser the server launches. Treat the host as you would any machine that executes your own front-end code; give it only the access it needs.
+
+## Hosting uploaded Storybooks
+
+The server hosts every uploaded Storybook itself. Where it serves the files from is the **hosting mode** (`storybookHosting.mode`, [ADR 0051](https://github.com/GuptaSiddhant/StoryShelf/blob/main/docs/adr/0051-storybook-hosting-modes.md)).
+
+**The default is `trusted`.** With nothing set, Storybooks are served from the app's own origin, at paths like `/projects/<slug>/storybook/build/<id>/`. Script in an uploaded Storybook then runs with the same origin as the app, so it can read the session of whoever opens it and act as them. That makes `trusted` safe only when everyone who can upload is someone you would also trust with every viewer's session: a team that uploads its own builds from its own CI. It is not safe for uploads from forks, contractors or the public. The product image does not change this default.
+
+**`sandboxed`** serves the same paths but answers every uploaded file with `Content-Security-Policy: sandbox allow-scripts allow-popups allow-forms`, never `allow-same-origin`. The Storybook still runs, but in an opaque origin with no access to the app's cookies, storage or API. Private builds are not served directly: the server checks access, then redirects to a short-lived, read-only link (`/_r/<token>/`, at most an hour, one build). Public builds keep their paths.
+
+To choose it, set `SHELF_STORYBOOK_HOSTING=sandboxed` on the image, or `config.storybookHosting: { mode: "sandboxed" }` in code. With sign-in on it also needs `SHELF_SECRET`, which signs the read links. An unknown value stops boot; it never falls back to `trusted`.
+
+| Compared                                     | `trusted`   | `sandboxed`                                                     |
+| -------------------------------------------- | ----------- | --------------------------------------------------------------- |
+| Uploaded script can use the viewer's session | Yes         | No                                                              |
+| Storybook addon badges                       | Yes         | No: the addon stays inert                                       |
+| [Offline Storybooks](/guides/deployment/)    | Yes         | No                                                              |
+| Opening a Storybook outside the app          | Normal page | Normal page, opaque origin: storage-dependent features may fail |
+| Screenshot capture and review pages          | Unchanged   | Unchanged                                                       |
+
+Hosting isolation does not replace the protections around capture: the capture worker still runs uploaded code in a browser on your server, in every mode. A `subdomain` mode (one origin per build) exists in the library but needs wildcard DNS and TLS you provision yourself; the image does not offer it yet.
 
 ## What the server connects to
 
@@ -56,19 +76,19 @@ StoryShelf makes outbound connections only for the integrations you configure:
 
 ### URLs that projects set
 
-Project admins set some of those URLs: webhooks, Slack and Teams channels and GitLab hosts. The server refuses any of them that is not `https`, or that resolves to a loopback, private (RFC 1918), link-local (such as a cloud metadata service), unique-local, CGNAT, multicast or unspecified address, IPv4 or IPv6. A webhook is checked when it is saved and the check runs again on every send, because DNS can change. The request connects to the address that was checked, and a redirect is checked as a new destination (at most three hops). A refusal logs only the URL's origin and a reason code, never the resolved address.
+Project admins set some of those URLs: webhooks, Slack and Teams channels, GitLab hosts and the GitHub Enterprise Server API base. The server refuses any of them that is not `https`, or that resolves to a loopback, private (RFC 1918), link-local (such as a cloud metadata service), unique-local, CGNAT, multicast or unspecified address, IPv4 or IPv6. A webhook is checked when it is saved and the check runs again on every send, because DNS can change. The request connects to the address that was checked, and a redirect is checked as a new destination (at most three hops). A refusal logs only the URL's origin and a reason code, never the resolved address.
 
-URLs the operator configures (AI providers, remote browsers, storage endpoints, SMTP) are not affected. To let projects reach a self-hosted GitLab or Mattermost on a private network, list its exact host in `config.outbound.allowHosts`. See [Configuration](/guides/config/#outbound-urls-set-by-projects).
+URLs the operator configures (AI providers, remote browsers, storage endpoints, SMTP) are not affected. To let projects reach a self-hosted GitLab, GitHub Enterprise Server or Mattermost on a private network, list its exact host in `config.outbound.allowHosts`. See [Configuration](/guides/config/#outbound-urls-set-by-projects).
 
 There is no analytics, telemetry or update check in the server. The web UI ships its own scripts, styles and fonts and loads nothing from a CDN; the only content it can show from elsewhere is a profile picture, when your sign-in provider supplies one.
 
 ## Hardening checklist
 
 1. **Turn on authentication** for any instance more than one person reaches, and choose [how people sign in](/guides/auth/).
-2. **Set `SECRET`** to 32 or more random characters (`openssl rand -hex 32`) and keep it in your secret store. Plan how you would [rotate it](/guides/deployment/secret-rotation/).
-3. **Set `PUBLIC_BASE_URL`** (or confirm the address on **System**), so links and notifications point at the right host. See [Public origin](/guides/config/#public-origin).
-4. **Serve it over HTTPS**, in front of the server (a load balancer or reverse proxy); the reference stacks include DNS and certificates.
-5. **Keep tokens narrow.** A token has the role of the user who created it, so create the CI token from an account that is only a `developer` on that project, not a project or site admin. Keep `STORYSHELF_ADMIN_TOKEN` out of routine uploads.
+2. **Set `SHELF_SECRET`** to 32 or more random characters (`openssl rand -hex 32`) and keep it in your secret store. Plan how you would [rotate it](/guides/deployment/secret-rotation/).
+3. **Set `SHELF_PUBLIC_BASE_URL`** (or confirm the address on **System**), so links and notifications point at the right host. See [Public origin](/guides/config/#public-origin).
+4. **Serve it over HTTPS**, in front of the server (a load balancer or reverse proxy); the [cloud modules](/guides/deployment/cloud/) serve HTTPS (the AWS module with your `domain_name`, GCP and Azure on the platform's own domain).
+5. **Keep tokens narrow.** A token has the role of the user who created it, so create the CI token from an account that is only a `developer` on that project, not a project or site admin. Keep `SHELF_ADMIN_TOKEN` out of routine uploads.
 6. **Limit who is a project `admin` or `approver`**, and who can reach the storage bucket and the database directly.
 7. **Pick what is public on purpose.** Leave `public_branch_regex` empty unless you want a branch's Storybook open to everyone.
 8. **Back up** the database and the storage together, or use [baseline export](/guides/portability/) for the baselines.

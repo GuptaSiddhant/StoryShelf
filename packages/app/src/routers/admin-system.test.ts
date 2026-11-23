@@ -1,7 +1,7 @@
 import { createShelfAuth } from "@storyshelf/auth";
 import { UserModel } from "@storyshelf/core/models";
-import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { makeDatabase, makeStorage, fakeImageEngine } from "@storyshelf/core/test-helpers";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
@@ -34,6 +34,7 @@ function brokenLifecycle(message: string): {
 function inProcessRunner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    images: fakeImageEngine(),
     render: async () => ({ captures: [], failures: [] }),
     cancel: async () => {},
   } as never;
@@ -214,5 +215,32 @@ describe("admin system page", () => {
     expect(page.status).toBe(200);
     // Password method label renders as a badge; no secret material leaks.
     expect(await page.text()).toContain(">Email<");
+  });
+});
+
+describe("admin system page: default-branch verification (#910)", () => {
+  it("lists the projects that turned verification off", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const app = createShelfApp({
+      database: db,
+      storage,
+      logger: silentLogger,
+      testing: { runner: inProcessRunner() },
+    });
+    await app.lifecycle.setup();
+    const create = async (body: Record<string, unknown>) =>
+      await app.request("/api/v1/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    await create({ name: "Verified" });
+    expect(await (await app.request("/admin")).text()).not.toContain("counted unverified");
+    await create({ name: "Trusting", requireVerifiedDefault: false });
+    const html = await (await app.request("/admin")).text();
+    expect(html).toContain("Default-branch builds counted unverified");
+    expect(html).toContain('href="/projects/trusting/settings/tests"');
+    expect(html).not.toContain('href="/projects/verified/settings/tests"');
   });
 });

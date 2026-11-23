@@ -53,7 +53,7 @@ function logProbe(probe: CredentialProbe, config: ShelfConfig, logger: Logger): 
   if (probe.unreadable.length > 0) {
     logger.error(
       { count: probe.unreadable.length, rows: probe.unreadable.slice(0, 20) },
-      "stored credentials cannot be decrypted; check SECRET and SECRET_PREVIOUS",
+      "stored credentials cannot be decrypted; check SHELF_SECRET and SHELF_SECRET_PREVIOUS",
     );
   }
   if (probe.previous > 0 && !config.migrateCredentialsOnBoot) {

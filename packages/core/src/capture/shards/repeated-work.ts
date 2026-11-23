@@ -1,8 +1,8 @@
+import type { ShardRepeatedEvent } from "../../jobs/consumer/metrics.ts";
 import { emitAttemptLog, type AttemptLogRecorder } from "../../models/capture-attempt.ts";
 /** What a shard that runs again reports about the work it did twice (visibility only, never a resume). */
 import { CaptureLogModel } from "../../models/capture-log.ts";
 import { CaptureShardModel } from "../../models/capture-shard.ts";
-import type { ShardRepeatedEvent } from "../consumer/metrics.ts";
 import type { ShardTarget } from "./context.ts";
 
 /** Where a shard run stands in its job's deliveries; either is absent when the queue did not say. */

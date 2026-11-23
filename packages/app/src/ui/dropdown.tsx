@@ -21,15 +21,15 @@ const dropdownTrigger = css`
   list-style: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 36px;
-  padding: 0.25rem 0.6rem;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-card);
   color: var(--text-primary);
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   cursor: pointer;
   &::-webkit-details-marker {
     display: none;
@@ -42,7 +42,7 @@ const dropdownTrigger = css`
 const dropdownTriggerGhost = css`
   /* dropdown-trigger-ghost */
   ${dropdownTrigger}
-  min-height: 34px;
+  min-height: var(--control-sm);
   width: 100%;
   justify-content: space-between;
   border-color: transparent;
@@ -60,7 +60,7 @@ const dropdownMenu = css`
   top: calc(100% + 4px);
   left: 0;
   min-width: 12rem;
-  padding: 0.25rem;
+  padding: var(--space-1);
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -98,9 +98,9 @@ const dropdownItem = css`
   appearance: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   width: 100%;
-  padding: 0.45rem 0.6rem;
+  padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -123,7 +123,7 @@ const dropdownItem = css`
 const dropdownDivider = css`
   /* dropdown-divider */
   height: 1px;
-  margin: 0.25rem 0;
+  margin: var(--space-1) 0;
   background: var(--border-subtle);
 `;
 
@@ -154,7 +154,9 @@ export const Dropdown: FC<{
       <summary class={block ? dropdownTriggerGhost : dropdownTrigger} aria-label={ariaLabel}>
         {label}
         {iconOnly ? null : (
-          <Icon name={placement === "above" ? "chevron-up" : "chevron-down"} size="sm" />
+          <span data-dropdown-chevron>
+            <Icon name={placement === "above" ? "chevron-up" : "chevron-down"} size="sm" />
+          </span>
         )}
       </summary>
       <div class={menuClasses[placement][align]} role="menu">
