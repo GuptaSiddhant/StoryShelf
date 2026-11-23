@@ -18,6 +18,7 @@ The current-state spec for StoryShelf: entities, interfaces and workflows, one f
 | AI                  | [`ai-insights.md`](./ai-insights.md)                                   | AI insights                                                                                                    |
 | Retention           | [`retention.md`](./retention.md)                                       | What is purged and what never is                                                                               |
 | Published Storybook | [`published-storybook.md`](./published-storybook.md)                   | Hosting a build's Storybook, URLs, subdomains                                                                  |
+| Installable app     | [`installable-app.md`](./installable-app.md)                           | Manifest, the one service worker, offline Storybooks, web push                                                 |
 | UI                  | [`ui.md`](./ui.md)                                                     | Component, library and build pages; the server-rendered UI                                                     |
 | Design and labels   | [`design-and-labels.md`](./design-and-labels.md)                       | Design sources and build labels                                                                                |
 | API                 | [`api.md`](./api.md)                                                   | The `/api/v1` surface and the UI routes                                                                        |

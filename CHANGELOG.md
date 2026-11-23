@@ -31,11 +31,63 @@ release is prepared (`scripts/version-packages.mjs`, ADR 0043); do not edit this
   - The old `ImageEngine` string type is now `ImageEngineName` in `@storyshelf/runner/images`; `configureDiffPool` is removed (use `configureImages`).
   - A hosting-only server shows the image engine as `off` on the System page.
 
+### Added
+
+- StoryShelf can be installed as an app (ADR 0048).
+
+  The app serves `GET /manifest.webmanifest` (class `hosting`, no session) with standalone display, theme colours from the theme tokens and 192 px, 512 px and maskable icons from the brand mark. The document head links it and sets light and dark `theme-color`. Schema: none.
+
+- An offline home page and per-device offline settings (ADR 0048)
+
+  The offline home page is styled and shows an empty and an expired state. A new "This device" page under the profile (`/profile/offline`) keeps default-branch Storybooks per project or for all projects, shows storage use against the cap, changes the cap and syncs on demand. Outside `trusted` hosting mode it says offline Storybooks are unavailable and offers nothing to keep. The Library gains a "Keep offline" button next to "View Storybook".
+
+  Schema: none.
+
+- Keep a project's default-branch Storybook available offline (ADR 0048)
+
+  The service worker now keeps opted-in projects on the device. It syncs from `GET /api/v1/offline` on app start and by periodic background sync, downloads only the content hashes the device lacks into Cache Storage, and deletes projects the answer leaves out and hashes nothing refers to. A 500 MB cap per device refuses a project that would pass it and never evicts silently. Kept Storybooks are served only from the cache at `/offline/<slug>/` and stop being served `maxOfflineDays` after the last successful sync; `/offline` lists them. The page controls it by message (keep, unkeep, sync, usage, set-cap). `GET /api/v1/offline` answers an empty list with `reason: "hosting-mode"` outside `trusted` hosting mode, so a device in another mode keeps nothing and drops what it had.
+
+- An offline sync endpoint for default-branch Storybooks (ADR 0048).
+
+  `GET /api/v1/offline?projects=<slug,…>` (class `hosting`) lists, for each requested project the caller may read, the latest published default-branch build with its file manifest (path, content hash, size) and `maxOfflineDays`. A project that is unknown, hidden or has no such build is left out. The new `offline.maxOfflineDays` config (default 30) sets how long a device may keep serving a copy after its last sync.
+
+  Schema: none
+
+- Manage push notifications per device (ADR 0048).
+
+  The "This device" page gains a push card: "Enable push on this device" (the browser asks for permission only on the click), the signed-in person's devices with label and last delivery, and "Remove". It is hidden when the server has no VAPID keys. A short note says push on iPhone and iPad needs the app installed to the home screen.
+
+  Schema: none.
+
+- Web push notifications for review requests, mentions and failures (ADR 0048).
+
+  Three routes, all class `hosting` and `404` without VAPID keys: `GET /api/v1/push/public-key`, `POST /api/v1/me/push-subscriptions` (register this browser; signed-in users only) and `DELETE /api/v1/me/push-subscriptions/:id`. `push` is now a `via` kind of a personal notification subscription: it stays off until the person registers a device and lists `push`, and then follows their event preferences. Review requests queue one `review-request` job per device on the `notify` queue (a device the push service reports gone is deleted, any other failure is retried); mentions and failures deliver inline like email. Nothing is sent without a confirmed public origin, and a push carries a title, a one-line body and a path, never an absolute URL. The service worker shows each push, opens only same-origin pages on click, and unsubscribes the device (and forgets its row) on sign-out.
+
+  Review follow-ups to the core notifier: the VAPID key pair is checked once at boot (a garbage or mismatched pair leaves push off with one error line instead of failing 403 at every push service), the private key is held only as a `KeyObject`, and VAPID tokens are cached per origin for three hours. `SHELF_VAPID_SUBJECT` is now required with the keys. Registrations are validated: an `https:` endpoint of at most 512 characters, a 65-byte `p256dh` starting `0x04` and a 16-byte `auth`. `ShelfOptions.notifications.vapid` enables push; the server image and dev server read it from `SHELF_VAPID_*`. `FormattedNotification` gains optional `summary` and `url`.
+
+  Schema: none.
+
+- A web push notifier (ADR 0048)
+
+  Core gains `@storyshelf/core/integrations/push`: a `push` message notifier addressed to a person, with VAPID signing (RFC 8292) and `aes128gcm` payload encryption (RFC 8291) on node's own crypto and no new dependency. A 404 or 410 from the push service throws `PushGoneError` so the caller can delete the device's row; other failures throw an error with no key, endpoint or response body. Configuration is `SHELF_VAPID_PUBLIC_KEY`, `SHELF_VAPID_PRIVATE_KEY` and `SHELF_VAPID_SUBJECT`; without both keys push is off. `httpStatus` and `httpText` accept a raw `body`.
+
 ### Fixed
 
 - A third project with the same name no longer reuses the slug `name-2`
 
   `ProjectModel.create` looked only for the bare slug, so once `test` existed every later project named "Test" was given `test-2` and the insert failed on the unique slug index. It now reads the numbered slugs too and takes the first free suffix.
+
+### Internal
+
+- Push_subscriptions table (ADR 0048).
+
+  Schema: expand-only (ADR 0053). Adds the table `push_subscriptions` (`id`, `user_id`, unique `endpoint`, `p256dh`, `auth`, `label`, `created_at`, `last_success_at`, `failure_count`) in SQLite, Postgres and MySQL, deleted with its user; nothing is dropped or altered, and the previous release ignores it.
+
+  Core gains the `PushSubscriptionRow` type and `PushSubscriptionModel` (add or replace by endpoint, list by user, delete, record success or failure). Nothing reads the table yet; the endpoint and keys must never be logged.
+
+- Register the app's service worker (ADR 0048)
+
+  `GET /sw.js` serves a worker that passes every request to the network and shows an offline placeholder for a failed navigation. It caches nothing. Signing out sends `Clear-Site-Data: "cache", "storage"`.
 
 ## 0.15.1 (2026-11-23)
 

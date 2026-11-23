@@ -102,6 +102,7 @@ const DDL_TABLES = [
   "webhooks",
   "notification_channels",
   "notification_subscriptions",
+  "push_subscriptions",
   "insights",
   "ai_usage",
   "ai_budget_alerts",

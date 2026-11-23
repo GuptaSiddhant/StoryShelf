@@ -9,7 +9,7 @@ import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import { createCatalogLoader, type CatalogLoader } from "@storyshelf/core/catalog";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
 import type { IntegrationStatus } from "@storyshelf/core/integrations";
-import type { GitLinkConfig } from "@storyshelf/core/integrations";
+import type { GitLinkConfig, Vapid } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
 import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -54,6 +54,8 @@ export interface Store {
   design: DesignProvider[];
   /** Notifiers offered to projects: registered and available (issue #1126). */
   notifiers: NotifierProvider[];
+  /** The web push identity (ADR 0048); absent ⇒ push is off. */
+  push?: Vapid | undefined;
   /**
    * Every integration kind with its standing (issue #1126); absent in hand-built stores, which
    * read as "everything wired is available".

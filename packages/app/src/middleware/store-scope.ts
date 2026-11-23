@@ -7,7 +7,7 @@ import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
 import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
-import type { GitLinkConfig, IntegrationStatus } from "@storyshelf/core/integrations";
+import type { GitLinkConfig, IntegrationStatus, Vapid } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
 import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
@@ -39,6 +39,7 @@ export interface StoreScopeDeps {
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
+  push?: Vapid | undefined;
   integrations?: readonly IntegrationStatus[];
   gitConfiguredLinks?: readonly GitLinkConfig[] | undefined;
   notificationsConfig?: NotificationsConfig;
@@ -76,6 +77,7 @@ export function storeScope(deps: StoreScopeDeps) {
         publicOrigin: deps.publicOrigin,
         design: deps.design,
         notifiers: deps.notifiers,
+        push: deps.push,
         integrations: deps.integrations,
         gitConfiguredLinks: deps.gitConfiguredLinks,
         notificationsConfig: deps.notificationsConfig,
