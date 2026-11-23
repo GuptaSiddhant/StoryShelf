@@ -93,6 +93,7 @@ export {
   projectLinks,
   projectMembers,
   projects,
+  pushSubscriptions,
   schemaMeta,
   siteSettings,
   snapshots,

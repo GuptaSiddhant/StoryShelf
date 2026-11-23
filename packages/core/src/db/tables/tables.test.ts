@@ -21,6 +21,7 @@ import type { BuildLabel, LabelType } from "../../schema/label.ts";
 import type { ProjectMember } from "../../schema/member.ts";
 import type { ProjectGroupMapping } from "../../schema/project-group-mapping.ts";
 import type { Project } from "../../schema/project.ts";
+import type { PushSubscriptionRow } from "../../schema/push.ts";
 import type { SchemaMeta } from "../../schema/schema-meta.ts";
 import type { SiteSetting } from "../../schema/site-setting.ts";
 import type { Snapshot } from "../../schema/snapshot.ts";
@@ -56,6 +57,7 @@ import {
   projectLinks,
   projectMembers,
   projects,
+  pushSubscriptions,
   schemaMeta,
   siteSettings,
   snapshots,
@@ -125,6 +127,10 @@ describe("spike tables", () => {
     expectTypeOf<InferRow<typeof gitRepositoryLinks>>().toEqualTypeOf<GitRepositoryLinkRow>();
   });
 
+  it("match the core push subscription row exactly", () => {
+    expectTypeOf<InferRow<typeof pushSubscriptions>>().toEqualTypeOf<PushSubscriptionRow>();
+  });
+
   it("match the core insight and AI usage rows apart from kind and status", () => {
     // `InsightRow` narrows `kind` and `status`, and `AiUsageRow` narrows `status`; the Drizzle
     // schemas read them as `string`.
@@ -176,6 +182,7 @@ describe("spike tables", () => {
     expect(names.indexOf("user")).toBeLessThan(names.indexOf("ssoProvider"));
     expect(names.indexOf("capture_attempts")).toBeLessThan(names.indexOf("capture_logs"));
     expect(names.indexOf("snapshots")).toBeLessThan(names.indexOf("comments"));
-    expect(new Set(names).size).toBe(45);
+    expect(names.indexOf("users")).toBeLessThan(names.indexOf("push_subscriptions"));
+    expect(new Set(names).size).toBe(46);
   });
 });

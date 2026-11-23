@@ -30,6 +30,7 @@ import {
 import { buildLabels, labelTypes } from "./label.ts";
 import { notificationChannels, notificationSubscriptions, webhooks } from "./notification.ts";
 import { projectGroupMappings, projectLinks, projectMembers, projects } from "./project.ts";
+import { pushSubscriptions } from "./push.ts";
 import { schemaMeta, siteSettings } from "./settings.ts";
 import { baselines, comments, snapshots } from "./snapshot.ts";
 import { users } from "./user.ts";
@@ -72,6 +73,7 @@ export {
   projectLinks,
   projectMembers,
   projects,
+  pushSubscriptions,
   schemaMeta,
   siteSettings,
   snapshots,
@@ -123,6 +125,7 @@ export const NEUTRAL_TABLES = [
   aiBudgetAlerts,
   gitConnections,
   gitRepositoryLinks,
+  pushSubscriptions,
   authUser,
   authSession,
   authAccount,
