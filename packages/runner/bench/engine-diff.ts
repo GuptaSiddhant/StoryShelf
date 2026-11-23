@@ -16,6 +16,11 @@ const dirs = readdirSync(out)
   .toSorted();
 const stock = dirs.filter((d) => d.startsWith("stock-"));
 const fw = dirs.filter((d) => d.startsWith("fw-"));
+if (stock.length === 0 || fw.length === 0) {
+  throw new Error(
+    `need stock-N/ and fw-N/ capture sets under ${out} (found ${stock.length} stock, ${fw.length} fw)`,
+  );
+}
 const options = { threshold: 0, maxDiffRatio: 0, failOnSizeChange: true } as Parameters<
   typeof diffImages
 >[2];
@@ -26,7 +31,8 @@ async function maxDiff(pairs: [string, string][], id: string): Promise<number> {
   let worst = 0;
   for (const [a, b] of pairs) {
     const result = await diffImages(read(a, id), read(b, id), options);
-    worst = Math.max(worst, result.sizeChanged ? -1 : result.diffPixels);
+    if (result.sizeChanged) return -1;
+    worst = Math.max(worst, result.diffPixels);
   }
   return worst;
 }

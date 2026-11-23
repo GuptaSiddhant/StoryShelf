@@ -10,7 +10,7 @@ import type { StoryEntry } from "@storyshelf/core/adapter/capture-runner";
  * `playwright-core` import resolves to that module (Flashwright); without it, stock playwright-core.
  */
 /* oxlint-disable eslint/no-await-in-loop, eslint/no-console, eslint/id-length, eslint/sort-vars, eslint/prefer-named-capture-group -- a sequential benchmark CLI: timings must not overlap, and printing is its output */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import { createCaptureRunner } from "../src/capture-runner.ts";
@@ -37,6 +37,7 @@ const viewports = [{ name: "desktop", width: 1280, height: 720 }];
 const passes: unknown[] = [];
 for (let pass = 1; pass <= Number(passArg); pass += 1) {
   const dir = path.join(outDir, `pass-${pass}`);
+  rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const runner = createCaptureRunner({ concurrency: Number(concArg) });
   const started = performance.now();
