@@ -8,9 +8,9 @@
  */
 import { httpInstrumentationMiddleware } from "@hono/otel";
 import { context, trace, type Span } from "@opentelemetry/api";
-import { redactSecrets } from "@storyshelf/core/utils";
+import { redactSecrets } from "@storyshelf/common/redact";
+import type { HttpMiddlewareOptions } from "@storyshelf/common/tracing";
 import type { Context, MiddlewareHandler } from "hono";
-import type { HttpMiddlewareOptions } from "./types.ts";
 
 /** Copy request/user ids from the Hono context onto the active server span. */
 function enrichSpan(c: Context): void {

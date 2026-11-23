@@ -1,117 +1,82 @@
 ---
-title: Chromatic vs StoryShelf
-description: Honest feature, pricing, and architecture comparison for teams evaluating visual testing tools.
+title: StoryShelf vs Chromatic
+description: A factual feature and hosting comparison of StoryShelf and Chromatic for teams evaluating visual testing tools for Storybook.
 ---
 
-This page compares Chromatic (SaaS) and StoryShelf (self-hosted) factually. No recommendations — choose based on your constraints.
+This page compares Chromatic, a hosted service, with StoryShelf, which you host yourself. It describes both and makes no recommendation. Statements about Chromatic come from its public pages, linked under [Sources](#sources) and checked on 14 November 2026; Chromatic can change its plans and features, so check them before you decide. Where a Chromatic detail is not stated publicly, this page leaves it out.
 
-## Quick comparison
+## At a glance
 
-| Aspect                    | Chromatic                                      | StoryShelf                                                                                   |
-| ------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Pricing model**         | Per-snapshot billing                           | Free (self-hosted, unlimited)                                                                |
-| **Hosting**               | SaaS only (Chromatic cloud)                    | Self-hosted (your infrastructure)                                                            |
-| **Browsers**              | Chrome, Firefox, Safari, Edge (branded, cloud) | Chromium (default), Firefox, WebKit via Playwright (per-project `browser`)                   |
-| **TurboSnap**             | Yes (dependency graph)                         | Yes — affected capture (dependency graph, on by default)                                     |
-| **Modes / Globals**       | Yes                                            | Yes — `parameters.chromatic.modes` / `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
-| **Accessibility testing** | Yes (aXe)                                      | axe-core checks (on by default), shown in review and non-blocking                               |
-| **Ignore regions**        | `.chromatic-ignore`, `data-chromatic="ignore"`, `ignoreSelectors` | Yes — same markers, `data-storyshelf-ignore` and `ignoreSelectors` ([Ignore regions](/guides/chromatic-migration/#ignore-regions)) |
-| **Interaction tests**     | Yes (`play` functions)                         | Yes (`play` functions)                                                                       |
-| **SSO / Enterprise**      | Enterprise plan                                | Better Auth engine (OIDC/SAML via any IdP)                                                   |
-| **Vendor lock-in**        | Yes (proprietary)                              | No (MIT, open source)                                                                        |
-| **Data residency**        | US / EU regions                                | Your choice (your infra)                                                                     |
-| **Parallelization**       | Automatic cloud                                | Manual (concurrency config)                                                                  |
-| **Flake handling**        | Built-in                                       | `flakyTest` param + tags                                                                     |
-| **Setup**                 | `npx chromatic`                                | `storyshelf server init` + CI config                                                         |
+| Aspect                | Chromatic                                                            | StoryShelf                                                                               |
+| --------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Hosting**           | Hosted by Chromatic                                                  | Self-hosted on your infrastructure                                                       |
+| **Pricing model**     | Plans with a monthly allowance of billed snapshots                   | MIT licence, no snapshot billing; you pay for your own infrastructure                    |
+| **Browsers**          | Chrome by default; Firefox, Safari and Edge on paid plans            | Chromium (default), Firefox and WebKit through Playwright                                |
+| **Affected capture**  | TurboSnap, from Git history and the Webpack or Vite dependency graph | Affected capture from `preview-stats.json` (Vite, with tolerant Webpack shapes)          |
+| **Modes and globals** | Modes                                                                | `parameters.chromatic.modes` and `parameters.storyshelf.modes` ([Modes](/guides/modes/)) |
+| **Accessibility**     | Accessibility testing                                                | axe-core checks, on by default, shown in review and never blocking                       |
+| **Interaction tests** | `play` functions                                                     | `play` functions                                                                         |
+| **Single sign-on**    | Enterprise plan                                                      | Any OIDC provider, through Better Auth                                                   |
+| **Source licence**    | Proprietary service                                                  | MIT, open source                                                                         |
+| **Data location**     | Chromatic's infrastructure                                           | Your database and storage, wherever you run them                                         |
 
-## Pricing detail
+## Pricing
 
-**Chromatic (2024 pricing):**
+Chromatic's pricing page lists these plans:
 
-- Free: 5,000 billed snapshots/month
-- Pro: $179/month for 35,000 billed snapshots
-- Enterprise: Custom pricing
+| Plan       | Price      | Billed snapshots per month | Notable inclusions               |
+| ---------- | ---------- | -------------------------- | -------------------------------- |
+| Free       | $0/month   | 5,000                      | Chrome testing                   |
+| Starter    | $179/month | 35,000                     | Safari, Firefox and Edge testing |
+| Pro        | $399/month | 85,000                     | Custom domain                    |
+| Enterprise | Custom     | Customizable               | SSO, priority support, SLA       |
 
-Billed snapshots = visual snapshots + accessibility snapshots. TurboSnap copies count as 0.2 billed snapshots each.
+Chromatic says TurboSnap-reused snapshots "count less toward your usage". StoryShelf does not bill per snapshot, so skipping unaffected stories saves server time, not money.
 
-**StoryShelf:**
+StoryShelf costs what your servers, database and object storage cost. Capture time grows with the number of stories, browsers and viewports you render, so see [Sizing](/guides/sizing/) before you plan capacity.
 
-- $0 license (MIT)
-- Infrastructure cost only (your servers, databases, object storage)
-- Unlimited snapshots, projects, users
+## How they differ in design
 
-## Architecture differences
+| Aspect        | Chromatic            | StoryShelf                                                                                          |
+| ------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| **Capture**   | Run by Chromatic     | Run by your server: Playwright (Chromium, Firefox, WebKit)                                          |
+| **Baselines** | Managed by Chromatic | Per branch, with fallback to the default branch; looked up by key, with no walk through Git history |
+| **Storage**   | Managed by Chromatic | Local disk, S3-compatible storage, Azure Blob Storage or Google Cloud Storage                       |
+| **Database**  | Managed by Chromatic | SQLite, Postgres or MySQL                                                                           |
+| **Job queue** | Managed by Chromatic | A table in your database, with no extra service                                                     |
+| **Sign-in**   | Chromatic accounts   | Local accounts, social sign-in, OIDC single sign-on, passkeys, or none                              |
 
-| Aspect              | Chromatic                                                                  | StoryShelf                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Capture**         | Cloud browsers                                                             | Self-hosted on your infra: Playwright (Chromium/Firefox/WebKit) or lightweight Puppeteer (Chromium-only, chrome-headless-shell) |
-| **Baselines**       | Global + branch                                                            | Per-branch with default-branch fallback                                                                                         |
-| **Baseline lookup** | Traverses git ancestry to find ancestor builds; rebase/squash can break it | Key lookup on project/story/viewport/branch — no history walk, rebase- and squash-proof                                         |
-| **Storage**         | Chromatic cloud                                                            | Your S3-compatible or local filesystem                                                                                          |
-| **Database**        | Chromatic managed                                                          | Your SQLite/Turso/Postgres                                                                                                      |
-| **Queue**           | Chromatic managed                                                          | Your database (`capture_jobs`), no extra service                                                                                |
-| **Auth**            | Chromatic accounts / SAML                                                  | Local / social / SSO / passkeys / none                                                                                          |
+## Where StoryShelf does less
 
-## Feature parity
+- **Browsers.** Chromium, Firefox and WebKit are selectable per project, with up to three per project and per-engine baselines. StoryShelf does not drive branded Safari or Edge.
+- **Affected capture.** It reads `preview-stats.json`, so it works best on Vite Storybooks. Builders without stats fall back to rendering every story.
+- **Accessibility.** Results are annotations. They never fail a build, and there is no accessibility baseline.
+- **Parallelism.** Concurrency is limited by your own server (`testing.concurrency`).
+- **Flaky stories.** There is no automatic flake detection; mark a story with `flakyTest` or a tag.
+- **Operations.** You run, back up and upgrade it.
 
-### Parity
+## Where StoryShelf does more
 
-- Visual regression testing via pixel diff (pixelmatch)
-- Storybook `play` function execution
-- Per-story controls: `disableSnapshot`, `flakyTest`, `delay`, `diffThreshold`, `pauseAnimationAtEnd`
-- Git provider status checks (GitHub, GitLab)
-- PR/MR comments with diff links
-- Branch-aware baselines
-- CI integration (GitHub Actions, GitLab CI, etc.)
+- No per-snapshot billing, and no limit on projects or users beyond your own resources.
+- Your data stays in your own database and storage, and the source is MIT licensed.
+- It runs wherever you can run a Node.js service, such as Docker, Fly.io or your own servers.
+- Any OIDC provider works for sign-in, with no plan requirement.
 
-### StoryShelf gaps (vs Chromatic)
+## Moving from Chromatic
 
-- **Cross-browser gaps** — Chromium (default), Firefox, and WebKit are selectable per project; list up to three with `PATCH /api/v1/projects/:slug` (`browsers`) to capture each build on every engine, with per-engine baselines. No branded Safari/Edge binaries.
-- **Vite-only tracing** — affected capture reads `preview-stats.json` (plus tolerant Webpack shapes). TurboSnap-equivalent skip rates on Vite Storybooks; custom builders without stats fall back to full renders.
-- **Modes differ slightly** — Mode values may only use characters Storybook's `globals` URL arg accepts; baselines are keyed by mode name as in Chromatic.
-- **Accessibility results are annotations only** — On by default per project (`runA11y`, which a project admin can turn off in Settings > Tests); the runners inject axe-core into the story page and scan the story root with the WCAG A/AA and best-practice rules (honouring `parameters.a11y`). Violations are listed per story in the attempt log and shown on the snapshot in the build review and on the component page, but never fail or gate a build; there is no accessibility baseline, review workflow or accessibility snapshot billing.
-- **No cloud parallelization** — Concurrency limited by your server resources (`testing.concurrency` option).
-- **No built-in flake detection** — Relies on explicit `flakyTest` parameter/tags.
+| Item           | Notes                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| **Baselines**  | Chromatic offers no baseline export, so the first StoryShelf build needs re-acceptance.        |
+| **Parameters** | `chromatic:` and `storyshelf:` keys both work; `storyshelf:` wins on conflict.                 |
+| **Modes**      | Existing `parameters.chromatic.modes` work unchanged ([Modes](/guides/modes/)).                |
+| **Affected**   | Stories are skipped only on Vite Storybooks; expect more snapshots on other builders at first. |
 
-### StoryShelf advantages (vs Chromatic)
+Step by step: [Migrating from Chromatic](/guides/chromatic-migration/). Coming from Lost Pixel instead? See the [Lost Pixel migration guide](/guides/lost-pixel-migration/).
 
-- **Unlimited snapshots** — No per-snapshot billing ever (so skipping saves server CPU, not money — there is no 0.2× copy charge because there is nothing to bill).
-- **Full data control** — Your database, your storage, your network.
-- **No vendor lock-in** — MIT licensed, open source, standard APIs.
-- **Flexible SSO** — Any OIDC provider (Keycloak, Okta, Entra ID, Auth0, Cognito).
-- **Self-hosted on any platform** — Node, Bun, Fly.io, Railway, Render, Vercel, Cloudflare Workers, AWS Lambda, etc.
-- **Per-branch baselines with fallback** — Cleaner model for long-lived feature branches.
+## Sources
 
-## Migration considerations
+- [Chromatic pricing](https://www.chromatic.com/pricing): plans, prices, allowances, SSO.
+- [Chromatic browser support](https://www.chromatic.com/docs/browsers/): Chrome, Firefox, Safari and Edge.
+- [Chromatic TurboSnap](https://www.chromatic.com/docs/turbosnap/): Git history and the Webpack or Vite dependency graph.
 
-Coming from Lost Pixel instead? See the [Lost Pixel migration guide](/guides/lost-pixel-migration/).
-
-If migrating from Chromatic:
-
-| Item              | Notes                                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Baselines**     | No export API in Chromatic. Requires re-acceptance on first StoryShelf run.                                                 |
-| **Parameters**    | Dual-key support: `chromatic:` and `storyshelf:` keys both work; `storyshelf:` wins on conflict.                            |
-| **TurboSnap**     | Not replicated. Expect 5-10× more snapshots initially.                                                                      |
-| **Modes/Globals** | Supported — existing `parameters.chromatic.modes` work unchanged ([Modes](/guides/modes/)).                                 |
-| **Cross-browser** | Chromium / Firefox / WebKit, up to 3 per project via `browsers` (per-engine baselines, sequential); no branded Safari/Edge. |
-| **Team workflow** | Similar — PR status checks, review UI, approve/reject.                                                                      |
-
-## When to choose each
-
-**Choose Chromatic if:**
-
-- You want zero infrastructure maintenance
-- You need branded Safari/Edge binaries or multi-browser matrices in a single build
-- You rely on TurboSnap's Webpack tracing for a non-Vite builder
-- You need accessibility results as a reviewed, baselined gate rather than non-blocking annotations
-- Your team prefers SaaS over self-hosting
-
-**Choose StoryShelf if:**
-
-- Snapshot costs are a concern (large Storybooks, frequent commits)
-- Data residency / compliance requires self-hosting
-- You want to avoid vendor lock-in
-- You already run infrastructure (Kubernetes, VMs, serverless)
-- You need flexible SSO with existing OIDC provider
-- You're comfortable operating a Node.js service
+Chromatic is a trademark of its owner. StoryShelf is not affiliated with or endorsed by Chromatic.

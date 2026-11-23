@@ -1,17 +1,24 @@
-import { serve } from "@hono/node-server";
 import { createAuthSystemHook, createShelfApp } from "@storyshelf/app";
+import { startServer } from "@storyshelf/app/node";
 import { createShelfAuth, ensurePasswordAdmin } from "@storyshelf/auth";
-import { parseTrustProxy } from "@storyshelf/core/config";
-import { vapidConfigFromEnv } from "@storyshelf/core/integrations/push";
+import {
+  OLD_NAMES_ALLOWED_MESSAGE,
+  oldNamesAllowedFields,
+  parseTrustProxy,
+  readSetting,
+  refuseRenamedSettings,
+} from "@storyshelf/core/config";
+import {
+  createEmailNotifier,
+  smtpPresetFromEnv,
+  vapidConfigFromEnv,
+} from "@storyshelf/core/integrations";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
-import { createFigmaDesign, figmaOAuthFromEnv } from "@storyshelf/design-figma";
-import { chatNotifiers } from "@storyshelf/notify-chat";
-import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/notify-email";
+import { createLocalStorage } from "@storyshelf/core/storage/local";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { otelLogMixin } from "@storyshelf/observability";
 import { initObservabilityFromEnv } from "@storyshelf/observability/node";
-import { createPlaywrightCaptureRunner } from "@storyshelf/runner-playwright";
-import { createLocalStorage } from "@storyshelf/storage-local";
+import { createCaptureRunner } from "@storyshelf/runner";
 /**
  * Local StoryShelf dev server.
  *
@@ -37,27 +44,46 @@ if (legacy.length > 0) {
       .join("\n")}`,
   );
 }
-const dataDir = env["DATA_DIR"] ?? ".dev-data";
+// The variables were renamed with no aliases (#1308, owner policy #1309): boot refuses while an
+// old name is set, listing each with its new name and never a value, so no setting is silently dropped.
+// With SHELF_ALLOW_OLD_NAMES=1 the old names found come back, to be logged once below.
+const ignoredOldNames = refuseRenamedSettings(env);
+const smtpFrom = readSetting(env, "SHELF_SMTP_FROM");
+const previousSecret = readSetting(env, "SHELF_SECRET_PREVIOUS");
+const dataDir = readSetting(env, "SHELF_DATA_DIR") ?? ".dev-data";
 const port = Number(env["PORT"] ?? 3000);
-const secret = env["SECRET"];
-const authPassword = env["AUTH_PASSWORD"];
-const authEmail = env["AUTH_EMAIL"] ?? "admin@example.com";
-const adminToken = env["STORYSHELF_ADMIN_TOKEN"] ?? env["ADMIN_TOKEN"];
-const publicBaseUrl = env["PUBLIC_BASE_URL"];
+const secret = readSetting(env, "SHELF_SECRET");
+const authPassword = readSetting(env, "SHELF_ADMIN_PASSWORD");
+const authEmail = readSetting(env, "SHELF_ADMIN_EMAIL") ?? "admin@example.com";
+const adminToken = readSetting(env, "SHELF_ADMIN_TOKEN");
+const publicBaseUrl = readSetting(env, "SHELF_PUBLIC_BASE_URL");
 // Proxies allowed to name the client for rate limits (#911); unset trusts none.
-const trustProxy = parseTrustProxy(env["TRUST_PROXY"]);
+const trustProxy = parseTrustProxy(readSetting(env, "SHELF_TRUST_PROXY"));
 
-// Scheduled build purge is opt-in (ADR 0039): `PURGE_TTL_DAYS` turns it on; unset leaves it off, so
+// Scheduled build purge is opt-in (ADR 0039): `SHELF_PURGE_TTL_DAYS` turns it on; unset leaves it off, so
 // an upgrade never starts deleting builds. A value that is not a positive whole number stops the boot.
 function purgeTtlDaysFromEnv(): number | undefined {
-  const raw = env["PURGE_TTL_DAYS"];
+  const raw = readSetting(env, "SHELF_PURGE_TTL_DAYS");
   if (raw === undefined || raw === "") return undefined;
   if (!/^[1-9]\d*$/u.test(raw)) {
-    throw new Error("PURGE_TTL_DAYS must be a positive whole number of days");
+    throw new Error("SHELF_PURGE_TTL_DAYS must be a positive whole number of days");
   }
   return Number(raw);
 }
 const purgeTtlDays = purgeTtlDaysFromEnv();
+
+// Bound of the SIGTERM shutdown (#912): `SHELF_SHUTDOWN_GRACE_SECONDS` hands the jobs still running near
+// its end back to the queue, without spending an attempt. Unset leaves startServer's default (30 s).
+// Mirrors apps/fly-app/shutdown.ts (without its Fly default).
+function shutdownGraceMsFromEnv(): number | undefined {
+  const raw = readSetting(env, "SHELF_SHUTDOWN_GRACE_SECONDS");
+  if (raw === undefined || raw === "") return undefined;
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error("SHELF_SHUTDOWN_GRACE_SECONDS must be a whole number of seconds");
+  }
+  return Number(raw) * 1000;
+}
+const graceMs = shutdownGraceMsFromEnv();
 
 function buildAuthUi(): Record<string, string> | undefined {
   const pairs: Array<[string, string | undefined]> = [
@@ -100,7 +126,7 @@ mkdirSync(dataDir, { recursive: true });
 // Adapters — swap these to try other combinations.
 const database = createSqliteDatabase(`${dataDir}/shelf.db`);
 const storage = createLocalStorage(dataDir);
-const captureRunner = createPlaywrightCaptureRunner();
+const captureRunner = createCaptureRunner();
 
 const ui = buildUi();
 
@@ -109,12 +135,10 @@ const ui = buildUi();
 const observability = await initObservabilityFromEnv();
 const shelfLogger = createShelfLogger({ mixin: otelLogMixin });
 
-// Notifications: SMTP sender from SMTP_* env (undefined keeps invites
-// out-of-band); chat + email providers serve stored channels.
-const emailSender = smtpPresetFromEnv(env, shelfLogger);
-const emailNotifiers = emailSender
-  ? [createEmailNotifier(emailSender, { from: env["SMTP_FROM"] })]
-  : [];
+// Every built-in integration is registered (ADR 0049) and idle until a project configures it. With
+// SHELF_SMTP_* set, the built-in `email` notifier is swapped for one that sends through that transport
+// (undefined keeps invites out-of-band).
+const emailSender = await smtpPresetFromEnv(env, shelfLogger);
 
 // Web push (ADR 0048): off without SHELF_VAPID_PUBLIC_KEY and SHELF_VAPID_PRIVATE_KEY; the subject
 // (SHELF_VAPID_SUBJECT) is then required.
@@ -124,25 +148,32 @@ const app = createShelfApp({
   database,
   storage,
   testing: { runner: captureRunner },
-  design: [createFigmaDesign({ oauth: figmaOAuthFromEnv() })],
   notifications: {
     ...(vapid ? { vapid } : {}),
-    notifiers: [...chatNotifiers, ...emailNotifiers],
-    ...(env["SMTP_FROM"] ? { config: { fromEmail: env["SMTP_FROM"] } } : {}),
+    notifiers: (builtIn) =>
+      emailSender
+        ? builtIn.map((provider) =>
+            provider.metadata.kind === "email"
+              ? createEmailNotifier(emailSender, { from: smtpFrom })
+              : provider,
+          )
+        : builtIn,
+    ...(smtpFrom ? { config: { fromEmail: smtpFrom } } : {}),
   },
-  // Enable local-account login by setting AUTH_PASSWORD (and SECRET): the
+  // Enable local-account login by setting SHELF_ADMIN_PASSWORD (and SHELF_SECRET): the
   // engine provisions an admin identity from the env on every boot.
-  // AUTH_PASSWORD must be at least 12 characters; AUTH_EMAIL overrides the
+  // SHELF_ADMIN_PASSWORD must be at least 12 characters; SHELF_ADMIN_EMAIL overrides the
   // admin address (defaults to admin@example.com). No viewer tier exists anymore.
   auth:
-    authPassword && secret
+    // SHELF_ADMIN_PASSWORD without a valid SHELF_SECRET refuses to start (createShelfAuth throws); never auth off.
+    authPassword
       ? createShelfAuth({
           db: database,
-          secret,
+          secret: secret ?? "",
           baseURL: publicBaseUrl ?? `http://localhost:${port}`,
           passkeys: {},
           emailSender,
-          fromEmail: env["SMTP_FROM"],
+          fromEmail: smtpFrom,
           onAuthSystemEvent: createAuthSystemHook(),
           logger: shelfLogger,
         }).adapter
@@ -151,14 +182,14 @@ const app = createShelfApp({
   logger: shelfLogger,
   observability,
   config: {
-    // `SECRET` signs auth sessions; `scratchDir` is where an uploaded
+    // `SHELF_SECRET` signs auth sessions; `scratchDir` is where an uploaded
     // Storybook archive is extracted before Playwright renders it.
-    // `STORYSHELF_ADMIN_TOKEN` bootstraps site-admin API access.
+    // `SHELF_ADMIN_TOKEN` bootstraps site-admin API access.
     // `serverTiming` emits Server-Timing response headers (total + db/storage).
     secret,
-    // Rotation: keep the old SECRET here until stored credentials are re-encrypted.
-    previousSecret: env["SECRET_PREVIOUS"] === "" ? undefined : env["SECRET_PREVIOUS"],
-    migrateCredentialsOnBoot: env["SECRET_MIGRATE"] === "true",
+    // Rotation: keep the old SHELF_SECRET here until stored credentials are re-encrypted.
+    previousSecret: previousSecret === "" ? undefined : previousSecret,
+    migrateCredentialsOnBoot: readSetting(env, "SHELF_SECRET_MIGRATE") === "true",
     adminToken,
     publicBaseUrl,
     ...(trustProxy === undefined ? {} : { trustProxy }),
@@ -168,25 +199,28 @@ const app = createShelfApp({
   },
 });
 
-await app.lifecycle.setup();
 const logger = app.lifecycle.logger;
 
-if (authPassword && secret) {
-  await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
-  logger.info({ email: authEmail }, "Local admin login enabled from AUTH_PASSWORD");
-}
+// Ready (a failed boot check stops the server before it listens), the admin, then the port. The
+// host owns SIGINT/SIGTERM, so `nub watch`'s restart (SIGTERM) drains and frees the port.
+const server = await startServer({
+  app,
+  port,
+  handleSignals: true,
+  ...(graceMs === undefined ? {} : { shutdownTimeoutMs: graceMs }),
+  beforeListen: async () => {
+    if (ignoredOldNames.length > 0) {
+      logger.warn(oldNamesAllowedFields(ignoredOldNames), OLD_NAMES_ALLOWED_MESSAGE);
+    }
+    if (authPassword) {
+      await ensurePasswordAdmin(database, { email: authEmail, password: authPassword });
+      logger.info({ email: authEmail }, "Local admin login enabled from SHELF_ADMIN_PASSWORD");
+    }
+  },
+});
+logger.info({ port: server.port, dataDir }, "StoryShelf dev server listening");
 
-const server = serve({ fetch: app.fetch, port }, () => {
-  logger.info({ port, dataDir }, "StoryShelf dev server listening");
-});
-
-const shutdown = async (): Promise<void> => {
-  await app.lifecycle.teardown();
-  server.close();
-};
-process.on("SIGTERM", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
-process.on("SIGINT", () => {
-  shutdown().catch(() => {}); // Intentionally empty — shutdown errors are already logged
-});
+// The process ends with the shutdown (bounded), so the watcher's restart never waits on a stuck job.
+await server.closed;
+// oxlint-disable-next-line unicorn/no-process-exit -- the executable owns the final exit
+process.exit(0);

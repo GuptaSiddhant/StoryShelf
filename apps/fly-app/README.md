@@ -1,15 +1,15 @@
 # StoryShelf Fly App (apps/fly-app)
 
-Production demo: SQLite on the volume (`db-sqlite`), objects on **Tigris** through `storage-s3` (or on the volume with `storage-local` when no bucket is configured), `runner-playwright` for capture, and **workspace packages** (no publish).
+Production demo: SQLite on the volume (`@storyshelf/db/sqlite`), objects on **Tigris** through `@storyshelf/storage/s3` (or on the volume with core's local storage when no bucket is configured), `runner` for capture, and **workspace packages** (no publish).
 
-- `server.ts` mirrors `apps/dev-server/src/server.ts:1` but with `DATA_DIR=/data`, `PORT=3000`, `SECRET`/`AUTH_PASSWORD` via Fly secrets.
+- `instance.ts` (a `defineShelfInstance` module that `storyshelf-server serve` loads) mirrors `apps/dev-server/src/server.ts:1` but with `SHELF_DATA_DIR=/data`, `PORT=3000`, `SHELF_SECRET`/`SHELF_ADMIN_PASSWORD` via Fly secrets.
 - `Dockerfile` is multi-stage, cache-efficient, and uses `ghcr.io/nubjs/nub:0.8.1` for `nub install --frozen-lockfile` with BuildKit cache mount, then `mcr.microsoft.com/playwright:v1.62.1-noble` for runtime. Build context must be **repo root**.
 
 ## Local run
 
 ```sh
 nub install
-DATA_DIR=.dev-data node --conditions=source --experimental-transform-types apps/fly-app/server.ts
+SHELF_DATA_DIR=.dev-data node --conditions=source --experimental-transform-types packages/app/src/server-bin/bin.ts serve --entry apps/fly-app/instance.ts
 ```
 
 ## Fly deploy (manual)
@@ -17,30 +17,32 @@ DATA_DIR=.dev-data node --conditions=source --experimental-transform-types apps/
 ```sh
 fly apps create storyshelf
 fly volumes create storyshelf_data --region iad --size 1
-fly secrets set SECRET=$(openssl rand -hex 32) --app storyshelf
-# optional: fly secrets set AUTH_PASSWORD=... --app storyshelf
+fly secrets set SHELF_SECRET=$(openssl rand -hex 32) --app storyshelf
+fly secrets set SHELF_ADMIN_PASSWORD=... --app storyshelf   # required on Fly (see below)
 fly deploy . --config apps/fly-app/fly.toml --dockerfile apps/fly-app/Dockerfile --remote-only
 fly status -a storyshelf
 ```
 
-`.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. Demo data is seeded by the `seed` job after each deploy (`seed.sh`: builds the fixture, uploads it through the API, and re-seeds only when the fixture changed). It needs the `STORYSHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
+**Sign-in is required on Fly (#1360).** With `FLY_APP_NAME` set (Fly does), `instance.ts` throws at boot, naming the missing setting, unless both `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` are set, so the health check fails and Fly keeps the previous machine instead of serving an open app. `SHELF_ALLOW_NO_AUTH=1` opts out for a deliberately open demo. Without `FLY_APP_NAME` (local runs) no password still means auth off. `fly-dry-run.yml` boots the image with sign-in on and asserts `auth: true` from `/api/v1/health`.
+
+`.github/workflows/fly.yml` deploys a stable release, never a push to `main`: `release.yml` calls it after the tag and the image exist, and `workflow_dispatch` takes a `version`. It runs `ghcr.io/guptasiddhant/storyshelf:<version>` when that image exists (from v0.12.0) and otherwise builds from the release tag. The demo shows one project, `storyshelf-ui` (the app's own Storybook, uploaded by `app-storybook.yml`). The `seed` job runs `seed.sh` after each deploy: it deletes the old seeded `demo-design-system` project through the admin API (a no-op once it is gone) and creates `storyshelf-ui` when missing. The one published read-only account `demo@storyshelf.js.org` (`SHELF_READ_ONLY_ACCOUNTS`, #1274) is created by the server at boot from the `SHELF_DEMO_VIEWER_PASSWORD` Fly secret (`demo-viewer.ts`) and made a viewer of `storyshelf-ui` only; set the secret with `fly secrets set SHELF_DEMO_VIEWER_PASSWORD=...` (never in `fly.toml`). It needs the `SHELF_ADMIN_TOKEN` repo secret to match the Fly secret.
 
 ## Notes
 
-- Capture concurrency is sized automatically from the VM's CPU and memory (1 build, 1 page at a time on the 1 GB shared-CPU VM). Set `CAPTURE_CONCURRENCY` in `fly.toml` to override the page count; raise it only after scaling `[[vm]]` CPUs and memory.
+- Capture concurrency is sized automatically from the VM's CPU and memory (1 build, 1 page at a time on the 1 GB shared-CPU VM). Set `SHELF_CAPTURE_CONCURRENCY` in `fly.toml` to override the page count; raise it only after scaling `[[vm]]` CPUs and memory.
 - `NODE_OPTIONS=--max-old-space-size=384` in `fly.toml` caps the Node heap so Chromium keeps the rest of the 1 GB. Raise it together with `[[vm]] memory`.
-- `PURGE_TTL_DAYS = '14'` in `fly.toml` turns on the daily build purge: builds older than 14 days are removed (a build a baseline still needs is kept, and so is each branch's newest), so the volume and bucket stop growing. It is opt-in per deployment; unset it (or change the number) in `fly.toml` and redeploy. It needs retention to be active on the SQLite database: if the System page says "Retention is paused", fix the baseline it names and restart. The same variable works in `apps/dev-server`.
+- `SHELF_PURGE_TTL_DAYS = '14'` in `fly.toml` turns on the daily build purge: builds older than 14 days are removed (a build a baseline still needs is kept, and so is each branch's newest), so the volume and bucket stop growing. It is opt-in per deployment; unset it (or change the number) in `fly.toml` and redeploy. It needs retention to be active on the SQLite database: if the System page says "Retention is paused", fix the baseline it names and restart. The same variable works in `apps/dev-server`.
 - Persistent volume `/data` holds `shelf.db`, and, without a bucket, every stored object too (survives redeploys). With the bucket configured it holds only `shelf.db*` and scratch space.
 - `NODE_OPTIONS=--conditions=source` resolves `@storyshelf/*` to `src/` via `exports.source` in `packages/*/package.json:83`.
 - `*.fly.dev` wildcard works for `PUBLISHED_BASE_DOMAIN=storyshelf.fly.dev` if set.
 
 ## Object storage on Tigris
 
-The 1 GB volume used to hold SQLite **and** every published Storybook, screenshot, baseline and diff. Objects now go to a Tigris bucket (S3-compatible, `@storyshelf/storage-s3`); SQLite stays on the volume.
+The 1 GB volume used to hold SQLite **and** every published Storybook, screenshot, baseline and diff. Objects now go to a Tigris bucket (S3-compatible, `@storyshelf/storage/s3`); SQLite stays on the volume.
 
-**Configuration** is Fly secrets only (`fly storage create` sets most of them). `server.ts` reads the bucket from `AWS_BUCKET` (or `BUCKET_NAME`), the endpoint from `AWS_ENDPOINT_URL_S3` (`https://t3.storage.dev`) and the region from `AWS_REGION` (`auto` when unset); the SDK takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment by itself. With no bucket set the app uses the volume as before, so removing the secret (`fly secrets unset AWS_BUCKET -a storyshelf`) is the rollback. At boot the server logs one `object storage` line with the storage kind and the endpoint origin, never the bucket, a key or a credential.
+**Configuration** is Fly secrets only (`fly storage create` sets most of them). `instance.ts` reads the bucket from `SHELF_S3_BUCKET`, else the `BUCKET_NAME` that `fly storage create` injects, the endpoint from `AWS_ENDPOINT_URL_S3` (`https://t3.storage.dev`) and the region from `AWS_REGION` (`auto` when unset); the SDK takes `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` from the environment by itself. With no bucket set the app uses the volume as before, so removing the secret (`fly secrets unset SHELF_S3_BUCKET -a storyshelf`) is the rollback. At boot the server logs one `object storage` line with the storage kind and the endpoint origin, never the bucket, a key or a credential.
 
-**Existing data.** `storage-local` and `storage-s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
+**Existing data.** Core's local storage and `@storyshelf/storage/s3` both use the storage path (`<projectId>/builds/…`, `<projectId>/content/…`, …) as the key, so the volume's tree copies over unchanged. The deploy that adds the bucket switches the app over at once, and until the copy finishes the old objects are missing from the bucket, so run the copy straight after the deploy:
 
 ```sh
 fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh --dry-run"   # counts only, writes nothing
@@ -54,9 +56,9 @@ fly ssh console -a storyshelf -C "/app/migrate-to-s3.sh"
 The adapter's own contract can be checked against a scratch Tigris bucket (never the demo's) with credentials you provide for that run:
 
 ```sh
-cd packages/storage-s3
-LIVE_CLOUD=1 S3_BUCKET=<scratch-bucket> AWS_ENDPOINT_URL_S3=https://t3.storage.dev AWS_REGION=auto \
-  AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… nubx vitest run src/s3.live.test.ts
+cd packages/storage
+LIVE_CLOUD=1 SHELF_S3_BUCKET=<scratch-bucket> AWS_ENDPOINT_URL_S3=https://t3.storage.dev AWS_REGION=auto \
+  AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=… nubx vitest run src/s3/s3.live.test.ts
 ```
 
 ## Browser on a Fly Sprite (scale to zero)
@@ -73,4 +75,4 @@ The demo can run AI insights (build triage and project health, ADR 0016) on Anth
 
 **Configuration** is Fly secrets only: `fly secrets set ANTHROPIC_API_KEY=… -a storyshelf`. It must be a Console API key (`sk-ant-api…`); a Claude subscription or a Claude Code OAuth token is not supported (see `apps/website/src/content/docs/ai/setup.mdx`, "Consumer plans are not supported"). The model and budget are fixed in `ai.ts`, not set by environment variables (#992): `claude-haiku-5-5`, 100,000 tokens a day. There is one profile, `default`: no screenshot is ever sent (vision is off), output is capped at 1000 tokens for triage and 2000 for project health, and a project may make 5 AI calls an hour. With the key unset there is no AI at all (`501 ai-disabled`, no AI pages), so the demo boots as before and removing the secret (`fly secrets unset ANTHROPIC_API_KEY -a storyshelf`) is the rollback. The server logs one `ai insights` line with the model in use (`null` when off), never the key: the provider reads the key from the environment itself when it makes a call, so it is not in any config the app holds, and the boot check (`ai.setup()`) makes no billed call.
 
-**Set the key only with `AUTH_PASSWORD` (and `SECRET`) also set.** Without login nobody is a site admin, so any visitor could pick the profile for a project and spend the budget; the daily token and per-project call limits cap that, they do not replace identity. **Using it.** Nothing is enabled for a project by itself. `seed.sh` sets the demo project's AI profile to `default` through the API (only when it is not already set), so the demo shows the AI panels with no manual step. With no key on the server the profile does not exist, so `seed.sh` warns and seeds without AI insights (the CI dry run takes this path). Any other project still needs a site admin to pick the profile under Project settings → AI, and the AI usage page (`/admin/ai`) shows the spend. To spend more, change the budget in `ai.ts` and deploy.
+**Set the key only with `SHELF_ADMIN_PASSWORD` (and `SHELF_SECRET`) also set.** Without login nobody is a site admin, so any visitor could pick the profile for a project and spend the budget; the daily token and per-project call limits cap that, they do not replace identity. **Using it.** Nothing is enabled for a project by itself. `seed.sh` sets the demo project's AI profile to `default` through the API (only when it is not already set), so the demo shows the AI panels with no manual step. With no key on the server the profile does not exist, so `seed.sh` warns and seeds without AI insights (the CI dry run takes this path). Any other project still needs a site admin to pick the profile under Project settings → AI, and the AI usage page (`/admin/ai`) shows the spend. To spend more, change the budget in `ai.ts` and deploy.

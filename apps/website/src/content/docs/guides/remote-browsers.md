@@ -5,7 +5,7 @@ description: Render captures in browsers on other machines, a self-hosted Playwr
 
 A server that launches every browser itself pays for every browser, and can only render the engines it can install. A **remote target** moves the browser elsewhere: the runner connects to a browser over a WebSocket instead of launching one, and everything else (the capture pipeline, diffs, baselines, review) is unchanged. The decisions are in ADR 0007.
 
-With only remote targets in `browsers`, the host needs no installed browsers at all (`playwright-core` or `puppeteer-core` only). It is not idle: diffing, parameter extraction, unzipping and, for some targets, serving the Storybook over the connection still run on it, and every screenshot comes back over the WebSocket.
+With only remote targets in `browsers`, the host needs no installed browsers at all (`playwright-core` only). It is not idle: diffing, parameter extraction, unzipping and, for some targets, serving the Storybook over the connection still run on it, and every screenshot comes back over the WebSocket.
 
 ## Targets and baselines
 
@@ -20,10 +20,10 @@ A remote target is named `<engine>@<name>`, for example `chromium@grid`. The nam
 Remote services are entries of the runner's `browsers` list, imported from the `/remote` subpath of the runner package. Each is plain configuration; no vendor SDK is needed.
 
 ```ts
-import { createPlaywrightCaptureRunner, local } from "@storyshelf/runner-playwright";
-import { azurePlaywright, playwrightServer } from "@storyshelf/runner-playwright/remote";
+import { createCaptureRunner, local } from "@storyshelf/runner";
+import { azurePlaywright, playwrightServer } from "@storyshelf/runner/remote";
 
-const runner = createPlaywrightCaptureRunner({
+const runner = createCaptureRunner({
   browsers: [
     "chromium", // local; the first target is the default for new projects
     playwrightServer({
@@ -45,13 +45,12 @@ createShelfApp({ database, storage, testing: { runner } });
 
 Credentials are operator-level: they are passed in the server's code, from the environment or a secret manager. They are never stored per project, and never logged: the endpoint (it can carry a key) and every header value are removed from the messages the runner surfaces.
 
-| Preset                                      | Package                                | Protocol                       | Reaches the Storybook through                       |
-| ------------------------------------------- | -------------------------------------- | ------------------------------ | --------------------------------------------------- |
-| `playwrightServer(...)`                     | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork` (default)                           |
-| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner-playwright/remote` | Playwright                     | `exposeNetwork`                                     |
-| `browserstack(...)` (experimental)          | `@storyshelf/runner-playwright/remote` | Playwright                     | a Storybook URL                                     |
-| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner-playwright/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
-| `cdp(...)`                                  | `@storyshelf/runner-puppeteer/remote`  | CDP                            | a Storybook URL                                     |
+| Preset                                      | Package                     | Protocol                       | Reaches the Storybook through                       |
+| ------------------------------------------- | --------------------------- | ------------------------------ | --------------------------------------------------- |
+| `playwrightServer(...)`                     | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork` (default)                           |
+| `azurePlaywright(...)` (experimental)       | `@storyshelf/runner/remote` | Playwright                     | `exposeNetwork`                                     |
+| `browserstack(...)` (experimental)          | `@storyshelf/runner/remote` | Playwright                     | a Storybook URL                                     |
+| `remote({ protocol, reach, connect, ... })` | `@storyshelf/runner/remote` | `protocol` (Playwright or CDP) | as `reach` declares (`loopback` or a Storybook URL) |
 
 `remote()` is the generic constructor every preset is sugar over, so a provider without a preset needs no new release. A fixed service declares how it is reached and where:
 
@@ -78,7 +77,7 @@ The presets other than `playwrightServer` follow each vendor's published connect
 The Storybook is extracted on the host and served on `127.0.0.1`, which a remote browser cannot open on its own. There are two ways in (ADR 0007, decision 5):
 
 - **`exposeNetwork`** (Playwright's own protocol, on a self-hosted Playwright server and Azure Playwright Workspaces): the runner connects with `exposeNetwork: "<loopback>"`, and the remote browser's requests for `127.0.0.1` are routed back through the connection to the host, so the static server works unchanged and nothing new is exposed. Every asset crosses the WebSocket, so a remote render is slower per page than a local one.
-- **A Storybook URL** (CDP-only services, every Puppeteer remote target, and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a confirmed [public origin](/guides/config/#public-origin) (a detected, unconfirmed address does not count). Until both exist such a target is `unavailable` on **System → Capture browsers** with the reason ("no secret: set the server secret, it signs the Storybook URL the remote browser opens" or "no public origin: set PUBLIC_BASE_URL, or confirm the detected origin on the System page"), settings saves naming it are refused, and a build that still reaches one (a project saved before the origin went away) fails at once with that reason before anything renders: no story runs on the other targets first, and no partial result is stored. Fix the reason and retry the build.
+- **A Storybook URL** (CDP-only services and providers that cannot route back such as BrowserStack): the runner is given an absolute, signed URL to the build's published Storybook and navigates there. This needs a `secret` and a confirmed [public origin](/guides/config/#public-origin) (a detected, unconfirmed address does not count). Until both exist such a target is `unavailable` on **System → Capture browsers** with the reason ("no secret: set the server secret, it signs the Storybook URL the remote browser opens" or "no public origin: set SHELF_PUBLIC_BASE_URL, or confirm the detected origin on the System page"), settings saves naming it are refused, and a build that still reaches one (a project saved before the origin went away) fails at once with that reason before anything renders: no story runs on the other targets first, and no partial result is stored. Fix the reason and retry the build.
 
 ### Signed Storybook URLs
 
@@ -130,7 +129,7 @@ The capture fingerprint (see [Capture](/concepts/capture/)) of a local render co
 - `deviceScaleFactor`: `window.devicePixelRatio` of the page.
 - `fontsHash`: a digest over a fixed list of 44 common font families, each tested in a blank page by measuring text against the generic family it would fall back to. `fc-list` is not used. Changing that list would re-baseline every remote target, so it is part of the fingerprint's contract.
 
-A field the runner cannot determine (a page that would not open) is omitted, and an unknown fingerprint component is not read as a change. The measurement is bounded: `timeouts: { probeMs }` on `remote()` and on the leased form of `cdp()` (default 15 000 ms; the other presets use the default) caps how long a render waits for it. If it overruns or fails, the render goes on with those fields unknown and a warning in the log, and the page it used is closed. If the build is cancelled while it runs, the render stops at once and its lease is released as `cancelled`; a cancel is never recorded as an unknown environment. Provider browser builds move: pin the browser version in the preset where it has one (`browserVersion` on BrowserStack), because every move is a baseline migration on the default branch.
+A field the runner cannot determine (a page that would not open) is omitted, and an unknown fingerprint component is not read as a change. The measurement is bounded: `timeouts: { probeMs }` on `remote()` (default 15 000 ms; the other presets use the default) caps how long a render waits for it. If it overruns or fails, the render goes on with those fields unknown and a warning in the log, and the page it used is closed. If the build is cancelled while it runs, the render stops at once and its lease is released as `cancelled`; a cancel is never recorded as an unknown environment. Provider browser builds move: pin the browser version in the preset where it has one (`browserVersion` on BrowserStack), because every move is a baseline migration on the default branch.
 
 ## Sessions and failures
 
@@ -138,12 +137,13 @@ A field the runner cannot determine (a page that would not open) is omitted, and
 - `sessions` is per app instance. When several instances share one provider plan, divide the limit among them. For a self-hosted farm put the cap on the farm (below). A shared limit across instances is not built.
 - Connection-level failures (a refused or dropped connection, a timeout, "no capacity", 429 and 5xx answers) are retried with exponential backoff (500 ms, doubling, three retries by default; `retry: { attempts, backoffMs }` and `timeouts: { connectMs }` on `remote()`) **before** the render sees them, so a provider outage is not treated as a story crash. When the retries are spent the job fails at once with the reason (a `TargetLaunchError`), not through crash isolation. The reason is one bounded line made from the error's message and its causes with the connection's secrets removed; a driver that throws an event object (a WebSocket error) instead of an `Error` is read by what the event says, and such an outage is retried like any other connection failure.
 - A failure that no retry fixes (refused credentials, a missing endpoint, mismatched versions) also marks the target `unavailable` with the reason on **System → Capture browsers**, until the server restarts. A service that is merely down does not: it stays offered, and the next build tries again. A project that already has an unavailable remote target keeps it and sees the reason; its builds fail at once with that reason, before anything renders. Restore the target by fixing the reason (and restarting the server when the target was marked by a failed launch), or remove it in **Settings → Capture** by saving the targets you want; see [project settings](/guides/project-settings/).
+- **Reachability.** A launch or connect failure (a `TargetLaunchError`) marks the target **unreachable** with the time and a fixed reason class (`connection`, `not-installed` or `launch`), never the endpoint, a header or a lease; the next build that renders on the target clears it. It is kept in memory per process, so a restart starts clear. A site admin reads it as `targets: { "<target>": "ok" | "unreachable" }` in the `POST /api/v1/health` answer (the open `GET` answer is unchanged, and the status stays `ok`: the server is up), and as an **unreachable** badge with the time and a link to this guide on **System → Capture browsers**. Admin channels get one `sys:target-unreachable` notification when a target becomes unreachable and one `sys:target-recovered` when it renders again, never one per failed build.
 - A page that crashes while rendering is a crash like a local one and goes through crash isolation as usual. A **lost connection** is different: when the remote browser disconnects in the middle of a pass, the runner stops scheduling stories on it, lets the pages already running settle, and ends the pass with one error (`The remote browser disconnected during the capture pass`) instead of recording a failure for every story that was left. The lease is released as `failed`, and the job is retried through the queue's usual redelivery: a retry connects to a new browser and renders from the start (for a sharded build, the shard's rows from the lost attempt are replaced). Stories captured before the drop are not marked failed. If every attempt is lost, the build fails with that error. A cancelled build stays cancelled, and an error that names the endpoint or credentials is never logged.
 - Browser recycling (`recycleBrowserEvery`) releases the old connection and opens a new remote session instead of relaunching; it never sends `Browser.close`.
 
 ### What each run logs
 
-At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lowest of the applicable limits: `pages`, `pagesPerConnection` where the runner enforces it, and the run's `concurrency`; the Puppeteer runner does not enforce `pagesPerConnection`), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
+At the start of a remote run the runner logs one `remote sizing` line per target with the limits as configured and as they apply: `pages` (the target's page limit, per target and per process), `pagesPerConnection`, `effectivePagesPerConnection` (the lowest of the applicable limits: `pages`, `pagesPerConnection` where the runner enforces it, and the run's `concurrency`), and `maxConnections` (per process; `null` means no cap), plus `scope`, `experimental` and, for an experimental preset, `verification`. A `sessions` function is read at that moment. The line carries no endpoint, header, credential or lease, and nothing is measured on the app host: the browser's environment is still measured in the browser.
 
 ## Self-hosted farm
 
@@ -216,8 +216,8 @@ remote<{ id: string }>({
 - The connection `connect` returns must be `endpoint`, `headers` and `lease` only: `protocol` and `reach` are declared on `remote()`, and a wrong scheme or an extra field fails the job.
 - `sessions` can be a function, read each time a render pass starts and a page waits for a slot, for a provider whose cap follows the servers it has woken. A value that is not a finite number keeps the last good one (and logs once); below 1 counts as 1.
 - Playwright's `remote()` and `playwrightServer()` accept `maxPagesPerConnection`, a positive integer that limits the pages on each connection independently of the target-wide `sessions` budget. Two pages per connection worked as a starting point on one 2 GB browser host; measure and tune it for your workload. The local loopback Storybook server allows successful files to be cached for one hour within a capture run. Signed Storybook URLs retain their own cache and access policies.
-- `maxConnections` (on `remote()`, `playwrightServer()`, `cdp()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Each lease counts separately, including every lease of one `refCounted` pool, because each is a real connection to the provider: size `maxConnections` against the connections a scale-to-zero pool will open, not against its one shared resource. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
-- `createPlaywrightCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
+- `maxConnections` (on `remote()`, `playwrightServer()` and `defineRemote`) caps how many connections this process holds to the service at once. It is separate from `sessions` (pages) and `maxPagesPerConnection`: a connection counts from the moment it is requested until its render has ended, and one connection shared by several pages counts once. Each lease counts separately, including every lease of one `refCounted` pool, because each is a real connection to the provider: size `maxConnections` against the connections a scale-to-zero pool will open, not against its one shared resource. Renders over the cap wait; a cancelled build ends its wait without taking a slot. A wait longer than `timeouts.acquireMs` is logged once with the target and the limit. Unset means no cap, as before. The cap is per process: it does not coordinate several StoryShelf instances.
+- `createCaptureRunner({ staticCompression: true })` enables gzip for compressible loopback assets when accepted by the browser. It defaults off, limits eligible files to 512 KiB and reserves at most 4 MiB per server for compressed assets, and costs CPU and memory on cold starts. Larger assets and requests that do not accept gzip use uncompressed responses; signed URLs are unaffected.
 - Playwright remote captures retry one navigation timeout, screenshot timeout or observed page crash on a fresh page and context, within the same page limits. A disconnected browser is reported as a failure instead of being replaced while sibling captures may be active. Play/assertion failures, cancellation and capture-delivery failures are not retried; retry attempts and outcomes are logged.
 
 **Errors**
@@ -228,7 +228,7 @@ remote<{ id: string }>({
 
 **Sharing one server: `refCounted`**
 
-When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner-playwright/remote` counts the connections for you:
+When all shards of a build use one resource (a computer woken once, suspended after), `refCounted` from `@storyshelf/runner/remote` counts the connections for you:
 
 ```ts
 const computer = refCounted({
@@ -249,26 +249,12 @@ remote({
 - A `close` that throws or exceeds `closeTimeoutMs` (default 30 s) leaves the resource `unknown`: the next connection calls `open` again and the idle timer retries the close. The error's class is logged, never its message.
 - **Shutdown.** `lifecycle.teardown()` (what the app runs on SIGTERM) aborts pending `connect` signals, releases every held lease as `cancelled`, then closes every pool at once, ignoring `idleMs`. There is no `close()` on the runner. Pools register themselves in a process-wide registry, so two apps in one process would close each other's pools, and tests must call `pool.dispose()`.
 
-**On the Puppeteer runner.** `cdp()` takes the same lifecycle: pass `connect` as a function (with `release`, `retry`, `timeouts`) instead of `endpoint`, and import `RemoteConnectError` and `refCounted` from `@storyshelf/runner-puppeteer/remote`. The context, release outcomes, error handling and shutdown behave as above (`purpose` is `render` or `tests`; Puppeteer has no parameter pre-pass). What differs is the protocol: CDP drives Chromium only, so `reach` is always `url` and every render needs a signed Storybook URL (a confirmed public origin and a server secret). The server must speak CDP (Chrome or Chromium with remote debugging), not Playwright's `run-server`. Puppeteer's `connect` cannot be aborted mid-handshake, so `signal` only stops a `connect` that is still pending; an open handshake runs to `timeouts.connectMs`.
-
-```ts
-import { cdp, refCounted } from "@storyshelf/runner-puppeteer/remote";
-
-const chrome = refCounted({ open: wakeChrome, close: suspendChrome, idleMs: 120_000 });
-cdp({
-  name: "pool",
-  sessions: 4,
-  connect: chrome.connect((resource) => ({ endpoint: `wss://${resource.host}/devtools/browser` })),
-  release: chrome.release,
-});
-```
-
 ### Example: a hibernating Fly Sprite
 
 The demo app (`apps/fly-app`) renders on a [Fly Sprite](https://sprites.dev) that wakes for a build and sleeps afterwards. The Sprite runs `playwright run-server` behind a small proxy that refuses requests without a shared secret. The target is plain configuration: `refCounted` wakes the Sprite by polling its `/healthz`, and the Sprite pauses by itself once the connections close, so `close` has nothing to do.
 
 ```ts
-import { refCounted, remote } from "@storyshelf/runner-playwright/remote";
+import { refCounted, remote } from "@storyshelf/runner/remote";
 
 const secret = process.env.SPRITE_BROWSER_SECRET ?? "";
 const pool = refCounted<string>({ idleMs: 60_000, open: wakeSprite, close: () => {} });
@@ -304,7 +290,7 @@ Keep the proxy's secret and the platform token in the host's secrets. Only the c
 
 **Experimental presets.** `azurePlaywright` and `browserstack` are marked experimental: they were written against the providers' documentation and are **not verified against live infrastructure**, because no provider credentials were available to check them. Treat a first run as a trial, pin versions, and report what you find. The mark is `experimental: true` on the returned service and shows in the run's sizing log (`verification: "not verified against live infrastructure"`). It changes no behavior; it is removed once someone verifies the preset.
 
-- **Browserless** and other CDP services: `cdp({ name, endpoint, headers, sessions })` on the Puppeteer runner, or `remote({ protocol: "cdp", reach: "url", connect: { endpoint } })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
+- **Browserless** and other CDP services: `remote({ protocol: "cdp", reach: "url", connect: { endpoint, headers } })` on the Playwright runner (Chromium only, and noticeably lower fidelity than Playwright's own protocol, which is acceptable because the target is its own engine with its own baselines). Both need a Storybook URL.
 - **Azure Playwright Workspaces** (experimental): `azurePlaywright({ endpoint, token, os, sessions })`, with the workspace's browser endpoint (`PLAYWRIGHT_SERVICE_URL`) and access token; it passes `os` and the API version as query parameters.
 - **BrowserStack** (experimental): `browserstack({ username, accessKey, os, browserVersion, engines, sessions })`; the credentials travel in the connection's capabilities and are scrubbed from messages. Needs a Storybook URL.
 - Real devices and real Safari go through WebDriver and Appium, not a connect endpoint, and are not covered.

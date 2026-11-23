@@ -11,14 +11,14 @@ In **Settings → Webhooks** or via API:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/webhooks \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "url": "https://hooks.example.com/shelf", "events": ["build.approved", "build.failed"], "secret": "whsec_..." }'
 ```
 
 - `url` — HTTPS endpoint (must be reachable from the server).
 - `events` — JSON array filter or `null` for all events. Build events are `build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending, for example when a rejecting reviewer rewrites to an approval and too few approvals remain) and `build:cancelled` (a user cancelled the build, see [Builds](/concepts/builds/); the payload is `{ buildId, status: "cancelled" }`). Review adds `review:requested` and `review:verdict` (see [Review](/guides/review/#events)). Every comment, whatever it is anchored to, raises one `comment:created` whose `data.scope` is `build`, `story` or `snapshot`. `design:changed` reports a linked design that changed after its baseline was approved (see [`design:changed`](#design-changes)).
-- `secret` — HMAC secret; stored AES-256-GCM encrypted with server `SECRET`.
+- `secret` — HMAC secret; stored AES-256-GCM encrypted with server `SHELF_SECRET`.
 
 Manage via `GET /api/v1/projects/:slug/webhooks` and `DELETE`. See `POST /api/v1/projects/:slug/webhooks` in the OpenAPI.
 

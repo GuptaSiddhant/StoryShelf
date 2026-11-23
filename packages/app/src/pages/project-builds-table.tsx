@@ -15,10 +15,11 @@ import {
   statusTone,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
+import { type SkipSource, noStoryChangedText, skipSourceSha } from "./skipped-source.ts";
 const buildCell = css`
   /* build-cell */
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
   max-width: 38ch;
   & strong a {
@@ -36,6 +37,26 @@ const messageLine = css`
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+/** At 880px and below the Author and Created columns fold into the Build cell's second line. */
+const hideNarrow = css`
+  /* build-hide-narrow */
+  @media (max-width: 880px) {
+    & {
+      display: none;
+    }
+  }
+`;
+
+const foldedMeta = css`
+  /* build-folded-meta */
+  display: none;
+  @media (max-width: 880px) {
+    & {
+      display: block;
+    }
+  }
 `;
 
 const authorCell = css`
@@ -59,6 +80,28 @@ function changeSummary(build: Build): string {
   return parts.join(" · ");
 }
 
+/** "No story changed since a1b2c3d", the sha linking to the build this one repeats. */
+function SkippedSummary({
+  project,
+  build,
+  source,
+}: {
+  project: Project;
+  build: Build;
+  source: SkipSource | undefined;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
+  const sha = skipSourceSha(build, source);
+  if (!source?.build || !sha) {
+    return <>{noStoryChangedText(sha)}</>;
+  }
+  return (
+    <>
+      No story changed since <a href={urls.build(project.slug, source.build.id)}>{sha}</a>
+    </>
+  );
+}
+
 function BuildSummaryCell({
   project,
   build,
@@ -76,6 +119,12 @@ function BuildSummaryCell({
         </Meta>
       </strong>
       <span class={messageLine}>{build.message ?? "No message"}</span>
+      <span class={foldedMeta}>
+        <Meta as="span">
+          {build.authorName ? `${build.authorName} · ` : ""}
+          <RelativeTime value={build.createdAt} />
+        </Meta>
+      </span>
     </div>
   );
 }
@@ -83,13 +132,20 @@ function BuildSummaryCell({
 function BuildActions({
   project,
   build,
+  source,
 }: {
   project: Project;
   build: Build;
+  source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const urls = createUrlBuilder("/", contentHostSuffix(getStore().config));
   // The diff page is a testing route; hosting-only instances link to the build page.
   const needsReview = build.status === "reviewing" && testingEnabled();
+  // A skipped build has no Storybook of its own: link the source's, while it is available.
+  const skipped = build.status === "skipped";
+  const storybookId = skipped ? source?.build?.id : build.id;
+  const showStorybook = skipped ? source?.storybook === true && Boolean(storybookId) : true;
+  const storybookLabel = skipped ? "View source Storybook" : "View Storybook";
   return (
     <HStack wrap={false} justify="end">
       <Button
@@ -99,6 +155,16 @@ function BuildActions({
       >
         {needsReview ? "Review" : "View"}
       </Button>
+      {showStorybook ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="external-link"
+          href={urls.short(storybookId ?? build.id)}
+          aria-label={storybookLabel}
+          title={storybookLabel}
+        />
+      ) : null}
     </HStack>
   );
 }
@@ -106,13 +172,15 @@ function BuildActions({
 function BuildRow({
   project,
   build,
+  source,
 }: {
   project: Project;
   build: Build;
+  source: SkipSource | undefined;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <tr>
-      <td>
+      <td class="nowrap">
         <BuildSummaryCell project={project} build={build} />
       </td>
       <td>
@@ -120,22 +188,28 @@ function BuildRow({
           {statusLabel(build.status)}
         </Badge>
       </td>
-      <td>
-        <Meta as="span">{changeSummary(build)}</Meta>
+      <td class="nowrap">
+        <Meta as="span">
+          {build.status === "skipped" ? (
+            <SkippedSummary project={project} build={build} source={source} />
+          ) : (
+            changeSummary(build)
+          )}
+        </Meta>
       </td>
-      <td>
+      <td class={hideNarrow}>
         <div class={authorCell}>
           {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
           <span>{build.authorName ?? "—"}</span>
         </div>
       </td>
-      <td class="nowrap">
+      <td class={hideNarrow}>
         <Meta as="span">
           <RelativeTime value={build.createdAt} />
         </Meta>
       </td>
       <td class="nowrap">
-        <BuildActions project={project} build={build} />
+        <BuildActions project={project} build={build} source={source} />
       </td>
     </tr>
   );
@@ -145,9 +219,12 @@ function BuildRow({
 export function BuildsTable({
   project,
   builds,
+  sources = new Map(),
 }: {
   project: Project;
   builds: Build[];
+  /** What each skipped build repeats, keyed by the skipped build's id. */
+  sources?: Map<string, SkipSource>;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <Table label="Builds">
@@ -157,8 +234,8 @@ export function BuildsTable({
             <th>Build</th>
             <th>Status</th>
             <th>Changes</th>
-            <th>Author</th>
-            <th>Created</th>
+            <th class={hideNarrow}>Author</th>
+            <th class={hideNarrow}>Created</th>
             <th>
               <span class="visually-hidden">Actions</span>
             </th>
@@ -166,7 +243,12 @@ export function BuildsTable({
         </thead>
         <tbody>
           {builds.map((build) => (
-            <BuildRow key={build.id} project={project} build={build} />
+            <BuildRow
+              key={build.id}
+              project={project}
+              build={build}
+              source={sources.get(build.id)}
+            />
           ))}
         </tbody>
       </table>

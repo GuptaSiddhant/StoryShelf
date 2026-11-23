@@ -11,7 +11,7 @@ StoryShelf sends formatted notifications for build review events and site-wide a
 - **Delivery kinds**: a provider either sends a **message** once (Slack, Teams, email) or makes a git host show a **state** (GitHub, GitLab commit status and pull-request comment). Git channels follow the build, not a topic list, so they have no event filter and never receive chat messages. See [Git channels](#git-channels-commit-statuses-and-check-runs).
 - **Subscriptions** (you): per-project opt-in. No row means silence, with one exception: `review:requested` (a published build waits for a verdict) is on by default for the project's approvers and admins, who receive it by email until they opt out: with **Send me review requests** unticked (it changes nothing else), with **Email me** unticked (a switched-off subscription stays recorded, so it does not fall back to the default), or with a topic list that leaves the topic out. Email goes to `users.email`; [web push](/guides/web-push/) goes to the devices you registered, when the server has VAPID keys; Slack DMs are deferred. A subscription is personal: its `via` may only name kinds that address one person (a provider declares `audience: "person"`; email and push). Saving one with a room kind such as `slack-webhook` answers 422 ("Slack posts to a room; add it as a project channel instead"), since a room belongs to a project channel. An older row that already lists a room kind keeps delivering over its personal kinds; the room kind is skipped and logged once per subscription and kind.
 - <a id="mentions"></a>**Mentions**: a comment that `@`-mentions a project member (see [Review](/guides/review/#mentions)) sends that member one `comment:mentioned` notification, and nobody else. With no subscription it is an email (when an email provider is wired); with an enabled subscription it follows that subscription's channels (**Email me**, chat); a disabled subscription opts out. It never reaches a stored project channel, and it is not a webhook event, so `comment:mentioned` is not a topic to list. A member who is subscribed to `comment:created` and mentioned gets the mention instead of the comment. The author of a comment is not notified of their own mention.
-- **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending), `build:cancelled` (a user cancelled the build; never on by default, and a cancel raises no `build:failed`), `baseline:created`, `baseline:updated`, `comment:created` (every comment, with `scope` `build`, `story` or `snapshot`), the review topics `review:requested` and `review:verdict`, `design:changed` when a linked design is modified after its baseline was approved or deleted (opt-in, never on by default; see [Webhooks](/guides/webhooks/#design-changes)), plus `insight:ready` when an AI triage or health digest finishes). `review:comment` is a filter alias, never sent: a channel or subscription that lists it receives a `comment:created` for build and story comments (not snapshot comments), and one that lists both names receives it once; admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`, `sys:notify-failed`, `sys:ai-budget`.
+- **Topics**: project events reuse webhook names (`build:created`, `build:reviewing`, `build:approved`, `build:rejected`, `build:pending` (a verdict sent a build back to pending), `build:cancelled` (a user cancelled the build; never on by default, and a cancel raises no `build:failed`), `baseline:created`, `baseline:updated`, `comment:created` (every comment, with `scope` `build`, `story` or `snapshot`), the review topics `review:requested` and `review:verdict`, `design:changed` when a linked design is modified after its baseline was approved or deleted (opt-in, never on by default; see [Webhooks](/guides/webhooks/#design-changes)), plus `insight:ready` when an AI triage or health digest finishes). `review:comment` is a filter alias, never sent: a channel or subscription that lists it receives a `comment:created` for build and story comments (not snapshot comments), and one that lists both names receives it once; admin events are `sys:user-created`, `sys:invite-issued`, `sys:auth-failed`, `sys:capture-failed`, `sys:purge-completed`, `sys:notify-failed`, `sys:ai-budget`, `sys:target-unreachable` and `sys:target-recovered` (a capture target stopped or resumed answering; once per change, see [remote browsers](/guides/remote-browsers/)).
 
 ## Configure channels (project admin)
 
@@ -19,31 +19,35 @@ In **Settings → Notifications** or via API:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "provider": "slack-webhook", "events": ["build:reviewing"], "config": { "style": "compact" }, "secret": "https://hooks.slack.com/..." }'
 ```
 
-- `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be wired in `ShelfOptions.notifications.notifiers`, and unknown kinds are a 400.
+- `provider` — `slack-webhook` | `teams-workflow` | `email`, or a git provider (see below); it must be registered (every built-in is, unless `ShelfOptions.notifications.notifiers` says otherwise), and unknown kinds are a 400.
 - `events` — allowlist or empty for all; `enabled` toggles delivery without deleting.
-- Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SECRET` and decrypted only in memory at send time.
-- **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected. Events that happen while notifications are paused are not delivered later: chat, email and system messages for them are lost, and only the current state of open builds is sent again to git channels once a public URL resolves.
+- Secrets (webhook URLs, SMTP passwords) are stored AES-256-GCM encrypted with server `SHELF_SECRET` and decrypted only in memory at send time.
+- **A public URL is required.** Every message links to the build or review page, so while the server resolves no [public origin](/guides/config/#public-origin) (`SHELF_PUBLIC_BASE_URL`, the platform's address, or the origin an admin confirmed on **System**; a detected origin counts only once confirmed) no notification is sent at all, git statuses included. Channels are not marked as failing; **System**, the project's notification settings and your profile show "Notifications are paused until a public URL is set", and the server logs it at start-up. Webhooks carry ids and no links, so they are unaffected. Events that happen while notifications are paused are not delivered later: chat, email and system messages for them are lost, and only the current state of open builds is sent again to git channels once a public URL resolves.
 - Display toggles: `style` (`compact`|`verbose`), `subjectPrefix`, `includeAuthor`, `includeMessage`, `includeCounts`. Brand (name, logo, links) comes from server `UIConfig` + `publicBaseUrl`.
 
 ## Git channels (commit statuses and check runs)
 
-A git channel (`github`, `gitlab` from [`@storyshelf/notify-git`](/packages/notify-git/)) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
+A git channel (the built-in `github` and `gitlab` providers) belongs to a project and shows the build's state on your repository: commit statuses named `<prefix>/testing` (or `<prefix>/review` without `testing`) and `<prefix>/storybook`, and one pull-request comment per build. It takes the repository as config and the token as its secret:
 
 ```sh
 curl -X POST $SHELF/api/v1/projects/my-app/notification-channels \
-  -H "Authorization: Bearer $STORYSHELF_TOKEN" \
+  -H "Authorization: Bearer $SHELF_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{ "provider": "github", "config": { "owner": "acme", "repo": "widgets", "prefix": "storyshelf-web" }, "secret": "ghp_..." }'
 ```
 
-A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/packages/notify-git/#github-check-runs). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
+A GitHub channel can post **check runs** as a GitHub App instead of commit statuses (`"mode": "checks"`, `appId`, `installationId` in `config`, the App's private key as `secret`); see [GitHub check runs](/guides/merge-gate/#github-app-checks). GitLab always uses statuses. A site-wide git channel, or one without a token (or key), is a 400. On the settings page, use **Add a git channel**. To block merges until review is approved, see [Merge gate setup](/guides/merge-gate/).
 
-Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no job queue. See [Delivery](/packages/notify-git/#delivery).
+A server can also hold a **git connection** declared by its configuration or environment (`SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`, ...), so no project pastes a key; see [Server-wide connection from configuration](/guides/merge-gate/#server-wide-connection-from-configuration).
+
+**Self-hosted git hosts.** For GitHub Enterprise Server, set `apiUrl` in `config` to its REST API base, for example `"apiUrl": "https://ghes.example.com/api/v3"` (leave it out for github.com); statuses, check runs, the App token exchange and pull-request comments all use it. For self-managed GitLab, set `host`. Both URLs go through the same outbound guard as webhooks: `https` only, and a host that resolves to a private address is refused. The settings page then says why (not https, or a private address) and that the operator must add the exact hostname to `config.outbound.allowHosts`; it never shows the address the host resolved to. See [Outbound URLs set by projects](/guides/config/#outbound-urls-set-by-projects).
+
+Git delivery is **durable**, unlike messages: each state change is a `notify` job on the database queue that reads the build when it runs and is retried with backoff (five attempts), or delivered inline without durability on a host with no job queue. See [Delivery](/guides/notifications/#git-channels-commit-statuses-and-check-runs).
 
 **How soon a git status appears.** When the server itself changes a build's state, it queues the job and wakes its notification consumer at once. If a job for the same build and channel is already waiting, the new request is covered by it and wakes nothing, so that delivery waits for the next poll. When a forked capture worker (`testing.workerEntry`) changes the state, the worker queues the job but sends no wake-up, so the server's consumer finds it at its next poll: about 2 seconds later if that consumer handled a notification in the last minute, otherwise about 15 seconds later (each wait can be up to 20 % longer). The consumer polls only while one of its four delivery slots is free, so a job also waits while all four are busy delivering. How busy the server is with captures does not change any of this. If queueing the job fails, the state is delivered inline in the worker instead, without durability. If no consumer is running, the job is kept, not dropped and not delivered by the worker: the status appears once a consumer starts.
 
@@ -64,15 +68,25 @@ Site admins manage project-less channels (`POST /api/v1/admin/notification-chann
 
 ## Email transport
 
-One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and `notifications.notifiers`. Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
+One SMTP configuration serves notification channels and (optionally) auth mail: wire the same sender into `createShelfAuth({ emailSender })` and swap it into the built-in `email` notifier (see [Choosing the providers](#choosing-the-providers)). Without it, invites stay out-of-band links (fictional addresses keep working; sends are best-effort and the token is still returned). Presets: `smtp` (default), `ses` (Amazon SES over SMTP), `mailpit` (local dev), `log` (tests/unconfigured), HTTP APIs (`resend`-style via shared `httpJson`).
 
-| Env                       | Purpose                             | Default  |
-| ------------------------- | ----------------------------------- | -------- |
-| `SMTP_HOST`               | SMTP relay host (unset = no sender) | —        |
-| `SMTP_PORT`               | Relay port                          | `587`    |
-| `SMTP_SECURE`             | `1`/`true` for implicit TLS (465)   | STARTTLS |
-| `SMTP_USER` / `SMTP_PASS` | Relay credentials                   | —        |
-| `SMTP_FROM`               | Sender address (`fromEmail`)        | —        |
+| Env                                   | Purpose                             | Default  |
+| ------------------------------------- | ----------------------------------- | -------- |
+| `SHELF_SMTP_HOST`                     | SMTP relay host (unset = no sender) | —        |
+| `SHELF_SMTP_PORT`                     | Relay port                          | `587`    |
+| `SHELF_SMTP_SECURE`                   | `1`/`true` for implicit TLS (465)   | STARTTLS |
+| `SHELF_SMTP_USER` / `SHELF_SMTP_PASS` | Relay credentials                   | —        |
+| `SHELF_SMTP_FROM`                     | Sender address (`fromEmail`)        | —        |
+
+**Amazon SES.** `sesPresetFromEnv` (or `sesPreset({ region, user, pass, from })`) points the same SMTP transport at `email-smtp.<region>.amazonaws.com:587` with STARTTLS; there is no AWS SDK.
+
+| Env                                           | Purpose                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SHELF_SES_REGION` (or `AWS_REGION`)          | SES region, such as `eu-west-1`                                                      |
+| `SHELF_SES_SMTP_USER` / `SHELF_SES_SMTP_PASS` | SES SMTP credentials (not an IAM access key)                                         |
+| `SHELF_SES_FROM`                              | Sender address; its address or domain must be a verified SES identity in that region |
+
+Verify the sending identity in the SES console first; a new account is in the SES sandbox and can only send to verified recipients until you request production access.
 
 Password recovery is both: users can request a reset email when a sender is configured; admins can always re-invite (which also resets access). Failed local logins emit `sys:auth-failed` to admin channels (SSO failures excluded in v1).
 
@@ -81,3 +95,46 @@ Password recovery is both: users can request a reset email when a sender is conf
 - [Webhooks](/guides/webhooks/) — signed machine events for custom receivers
 - [Project settings](/guides/project-settings/) — where channels are managed
 - [REST API](/guides/api/) — endpoint walkthrough
+
+## Choosing the providers
+
+Git, chat (Slack, Teams) and email providers are built in and registered by default. Registering sends nothing: a provider acts only once a project adds a channel. Email also needs a transport (`SHELF_SMTP_HOST` and `SHELF_SMTP_FROM`, or a sender you pass); `nodemailer` is needed only for SMTP: `npm install nodemailer`.
+
+A project is offered only the integrations the server can deliver. Without an email transport, email is unavailable: projects see no email option and no **My notifications** card, and creating an email channel through the API answers 400 with the reason. The same holds for a provider the operator turned off. A channel that already exists for such a provider is kept but hidden from its project and not delivered to; **System → Integrations** lists every integration as available, unavailable (with the reason) or turned off, and the channels held back. Site admins also see one line in a project's settings naming what is missing. Turn the integration back on and its channels return. The site-admin `POST /api/v1/health` lists the same under `integrations`.
+
+### Turning integrations off without code
+
+The server image and the Fly demo read `SHELF_INTEGRATIONS_DISABLED`: a comma-separated list of provider kinds to turn off, for example `slack,teams,figma`. The kinds are `github`, `gitlab`, `git-log`, `email`, `slack-webhook` (or `slack`), `teams-workflow` (or `teams`), `log` and `figma`. An unknown kind stops startup and names it. In your own server, `integrationsFromEnv(process.env)` from `@storyshelf/core/integrations` returns the function forms to pass as `notifications.notifiers` and `design`.
+
+`notifications.notifiers`, `notifications.email` and `design` each take:
+
+- **nothing:** every built-in;
+- **an array:** exactly these, with no built-ins;
+- **a function `(builtIn) => list`:** add a provider, replace a built-in of the same `kind`, or filter some out. It runs once, at startup;
+- **`false`:** none of that group.
+
+Add a custom notifier next to the built-ins, and swap the built-in email notifier for your own transport:
+
+```ts
+import { createEmailNotifier, smtpPresetFromEnv } from "@storyshelf/core/integrations";
+
+const emailSender = await smtpPresetFromEnv(process.env);
+
+createShelfApp({
+  // ...
+  notifications: {
+    notifiers: (builtIn) => [
+      ...builtIn.map((provider) =>
+        provider.metadata.kind === "email" && emailSender
+          ? createEmailNotifier(emailSender, { from: process.env.SHELF_SMTP_FROM })
+          : provider,
+      ),
+      myPagerNotifier, // a NotifierProvider of your own, with a unique `kind`
+    ],
+  },
+});
+```
+
+A provider kind must be unique within its group; a repeated kind stops startup and names the kind.
+
+Those packages were retired in 0.14.0 and are no longer published. Migrating from `@storyshelf/notify-git`, `@storyshelf/notify-chat`, `@storyshelf/notify-email` or `@storyshelf/design-figma`: remove the dependency and its import, and delete `notifiers: [...chatNotifiers, ...gitNotifiers]` and `design: [createFigmaDesign()]`. Those lists replaced the built-ins; leaving them in keeps working but pins the old behaviour.

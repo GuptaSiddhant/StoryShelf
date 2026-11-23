@@ -46,7 +46,7 @@ async function seedApp(options: {
     storage,
     logger: silent,
     config: { secret: "origin-test-secret", ...options.config },
-    ...(options.notifiers ? { notifications: { notifiers: options.notifiers } } : {}),
+    ...(options.notifiers === undefined ? {} : { notifications: { notifiers: options.notifiers } }),
     ...(role ? { auth: stubAuth({ id: "u1", email: "a@b.c", name: "A", role }) } : {}),
   });
   await app.lifecycle.setup();
@@ -163,11 +163,34 @@ describe("public origin on the System page", () => {
     );
   });
 
+  it("opens the origin form from the page as a dialog fragment, or as a page of its own", async () => {
+    const app = await seedApp({});
+    const token = await csrfFrom(app);
+    await report(app, token, { origin: ORIGIN });
+    const page = await (await app.request("/admin")).text();
+    expect(page).toContain('href="/admin/public-origin/edit"');
+    expect(page).not.toContain('action="/admin/public-origin"');
+    const fragment = await (
+      await app.request("/admin/public-origin/edit", { headers: { "HX-Request": "true" } })
+    ).text();
+    expect(fragment).toContain('id="edit-origin-form"');
+    expect(fragment).toContain(`value="${ORIGIN}"`);
+    expect(fragment).not.toContain("<html");
+    expect(await (await app.request("/admin/public-origin/edit")).text()).toContain("<html");
+  });
+
+  it("serves no origin form to a member, and none while the configuration answers", async () => {
+    const member = await seedApp({ role: "member" });
+    expect((await member.request("/admin/public-origin/edit")).status).toBe(403);
+    const fixed = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
+    expect((await fixed.request("/admin/public-origin/edit")).status).toBe(404);
+  });
+
   it("stops asking once the configuration or the platform answers", async () => {
     const app = await seedApp({ config: { publicBaseUrl: "https://configured.example.com" } });
     const html = await (await app.request("/admin")).text();
     expect(html).toContain("configured.example.com");
-    expect(html).toContain("configured (PUBLIC_BASE_URL)");
+    expect(html).toContain("configured (SHELF_PUBLIC_BASE_URL)");
     expect(html).not.toContain("data-report-origin");
     // Nothing to confirm: no stored-origin form and no entry form either (#315).
     expect(html).not.toContain('action="/admin/public-origin"');
@@ -195,7 +218,7 @@ describe("public origin on the System page", () => {
         const response = await form(app, "/admin/public-origin", token, "https://shelf.acme.io");
         expect(response.status).toBeLessThan(400);
         expect(flashOf(response)).toEqual({
-          message: expect.stringContaining("PUBLIC_BASE_URL") as string,
+          message: expect.stringContaining("SHELF_PUBLIC_BASE_URL") as string,
           tone: "warning",
         });
         expect(await new SiteSettingsModel(db).get(PUBLIC_ORIGIN_KEY)).toBeNull();
@@ -282,13 +305,44 @@ async function openBuildApp(logger: typeof silent = silent) {
   return { app, git, token, urlOf };
 }
 
+/** A project channel, enabled or not: the banner is about enabled channels only (#1018). */
+async function addChannel(
+  db: ReturnType<typeof makeDatabase>["db"],
+  enabled: boolean,
+): Promise<void> {
+  const project = await createTestProject(db, db.tables);
+  await new NotificationChannelModel(db, undefined, "origin-test-secret").create({
+    projectId: project.id,
+    provider: "fake-git",
+    config: {},
+    secret: "token",
+    enabled,
+  });
+}
+
 describe("notifications without a public origin", () => {
   const paused = "Notifications are paused until a public URL is set";
 
-  it("warns on the System page while notifiers are wired and no origin resolves", async () => {
+  it("warns on the System page while a channel is enabled and no origin resolves", async () => {
+    const git = makeFakeStateNotifier();
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, true);
+    expect(await (await app.request("/admin")).text()).toContain(paused);
+  });
+
+  it("stays quiet with notifiers wired but no channel configured (#1018)", async () => {
     const git = makeFakeStateNotifier();
     const app = await seedApp({ notifiers: [git.provider] });
-    expect(await (await app.request("/admin")).text()).toContain(paused);
+    expect(await (await app.request("/admin")).text()).not.toContain(paused);
+  });
+
+  it("stays quiet when every channel is disabled (#1018)", async () => {
+    const git = makeFakeStateNotifier();
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, false);
+    expect(await (await app.request("/admin")).text()).not.toContain(paused);
   });
 
   it("stays quiet with an origin, or with no notifier wired", async () => {
@@ -298,8 +352,9 @@ describe("notifications without a public origin", () => {
       config: { publicBaseUrl: ORIGIN },
     });
     expect(await (await withOrigin.request("/admin")).text()).not.toContain(paused);
-    const noNotifiers = await seedApp({});
-    expect(await (await noNotifiers.request("/admin")).text()).not.toContain(paused);
+    // No channel configured: quiet even with the built-in notifiers wired (#1018).
+    const noChannel = await seedApp({});
+    expect(await (await noChannel.request("/admin")).text()).not.toContain(paused);
   });
 
   it("asks again for the state of open builds once an admin confirms an origin", async () => {
@@ -369,7 +424,9 @@ describe("notifications without a public origin", () => {
 
   it("stays paused after a report: a detected origin counts only once confirmed", async () => {
     const git = makeFakeStateNotifier();
-    const app = await seedApp({ notifiers: [git.provider] });
+    const { db } = makeDatabase();
+    const app = await seedApp({ db, notifiers: [git.provider] });
+    await addChannel(db, true);
     const token = await csrfFrom(app);
     expect((await report(app, token, { origin: ORIGIN })).status).toBe(201);
     expect(await (await app.request("/admin")).text()).toContain(paused);

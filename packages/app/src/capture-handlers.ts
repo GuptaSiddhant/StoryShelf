@@ -6,13 +6,11 @@
 import {
   createCaptureHandler,
   failCrashedCapture,
-  isFinalAttempt,
   type captureDispatchDeps,
   type CaptureHandlerOptions,
-  type ConsumerJob,
-  type KindHandler,
 } from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import { isFinalAttempt, type ConsumerJob, type KindHandler } from "@storyshelf/core/jobs";
 import type { Logger } from "@storyshelf/core/logger";
 import { createForkedHandler, shouldForkCapture } from "./capture-process.ts";
 import type { JobQueue } from "./job-queue.ts";
@@ -50,7 +48,7 @@ export function registerCrashHooks(
 
 /** The capture handler: in this process, or forked into a worker (which falls back to this process). */
 export function handlerFor(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   handlerOptions: CaptureHandlerOptions,
   parts: {
     retries: number;
@@ -65,7 +63,7 @@ export function handlerFor(
 }
 
 function forkedHandler(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   parts: {
     fallback: KindHandler;
     retries: number;
@@ -94,6 +92,9 @@ export function alerting(
   alert: (buildId: string) => Promise<void>,
 ): CaptureHandler {
   return {
+    prepare: async (logger) => {
+      await inner.prepare?.(logger);
+    },
     accepts: (job) => inner.accepts?.(job) !== false,
     deadlineExceeded: async (job, seconds) => {
       await inner.deadlineExceeded?.(job, seconds);

@@ -64,12 +64,14 @@ export {
   type BuildCreateInput,
   type BuildListFilter,
   type BuildSummary,
+  type SkippedBuildInput,
 } from "./build.ts";
 export {
   RECENT_BUILDS_FOR_INHERITED_RATIO,
   averageInheritedRatio,
   type InheritedRatio,
 } from "./inherited-ratio.ts";
+export type { SupersedeOptions, SupersedingBuild } from "./build-supersede.ts";
 export { BuildReviewModel, type BuildReviewTables } from "./build-review.ts";
 export {
   deriveReviewStatus,
@@ -170,7 +172,39 @@ export {
   type ReencryptResult,
   type UnreadableCredential,
 } from "./credentials.ts";
+export {
+  anyRepositoryLinkAllowed,
+  GIT_LINK_ANY_REPOSITORY_KEY,
+  GitRepositoryLinkModel,
+  linkOutputsOf,
+  type GitLinkChange,
+  type GitLinkPins,
+  type GitRepositoryLinkInput,
+  type GitRepositoryLinkTables,
+} from "./git-repository-link.ts";
+export { connectionHost, linkKeyOf, type LinkKey } from "./git-link-key.ts";
+export { GitLinkStateError } from "./git-link-state-error.ts";
+export {
+  CONNECTION_REMOVED_REASON,
+  syncConfiguredLinks,
+  type GitLinkSyncDeps,
+  type GitLinkSyncResult,
+} from "./git-link-sync.ts";
+export { GitRepositoryTakenError } from "./git-repository-taken-error.ts";
+export {
+  GitConnectionModel,
+  type GitConnection,
+  type GitConnectionInput,
+  type GitConnectionTables,
+} from "./git-connection.ts";
+export { ManagedGitConnectionError } from "./managed-git-connection-error.ts";
 export { SiteSettingsModel, type SiteSettingsTables } from "./site-settings.ts";
+export {
+  GIT_SETUP_STATE_TTL_MS,
+  GitSetupStateModel,
+  type GitSetupPayload,
+  type GitSetupStateTables,
+} from "./git-setup-state.ts";
 export {
   PUBLIC_ORIGIN_KEY,
   createPublicOriginResolver,
@@ -180,3 +214,21 @@ export {
   type ResolvedPublicOrigin,
   type StoredPublicOrigin,
 } from "./public-origin.ts";
+export { SkipSourceRefused } from "./skip-source-refused.ts";
+export {
+  axeUnavailableNote,
+  axeUnavailableReason,
+  baselineNote,
+  baselineSha,
+  BASELINE_SHA_LENGTH,
+  isA11yNote,
+  parametersNote,
+  parametersReason,
+  parseList,
+} from "./a11y-notes.ts";
+export {
+  parseTestResults,
+  summarizeTests,
+  type TestResult,
+  type TestSummary,
+} from "./test-results.ts";

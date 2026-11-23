@@ -5,11 +5,11 @@ import type { DesignProvider } from "@storyshelf/core/adapter/design";
 import type { NotifierProvider } from "@storyshelf/core/adapter/notifier";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import type { Ai } from "@storyshelf/core/ai";
-import type { BuildStatePublisher } from "@storyshelf/core/capture";
+import type { BuildStatePublisher } from "@storyshelf/core/build-state";
 import type { NotificationsConfig, ShelfConfig, UIConfig } from "@storyshelf/core/config";
-import type { Vapid } from "@storyshelf/core/integrations/push";
+import type { GitLinkConfig, IntegrationStatus, Vapid } from "@storyshelf/core/integrations";
 import type { Logger } from "@storyshelf/core/logger";
-import type { PublicOriginResolver } from "@storyshelf/core/models";
+import type { GitConnectionModel, PublicOriginResolver } from "@storyshelf/core/models";
 import type { AuthUser } from "@storyshelf/core/types";
 import type { Context, Next } from "hono";
 import type { PublishService } from "../publish-setup.ts";
@@ -25,6 +25,8 @@ export interface StoreScopeDeps {
   logger: Logger;
   authEnabled: boolean;
   testing: boolean;
+  /** `options.skippedBuilds` is on (ADR 0044). */
+  skippedBuilds?: boolean;
   enqueueCapture?: (buildId: string, reqId?: string) => Promise<void>;
   captureQueue: CaptureQueue | null;
   /** This instance runs the capture jobs itself (the retry and compute-jobs UI applies). */
@@ -33,13 +35,16 @@ export interface StoreScopeDeps {
   cancelBuildJobs?: (buildId: string) => Promise<boolean>;
   buildState?: BuildStatePublisher;
   captureConcurrency?: number;
-  runner?: Pick<CaptureRunner, "metadata"> | undefined;
+  runner?: Pick<CaptureRunner, "metadata" | "images"> | undefined;
   publicOrigin?: PublicOriginResolver | undefined;
   design: DesignProvider[];
   notifiers: NotifierProvider[];
   push?: Vapid | undefined;
+  integrations?: readonly IntegrationStatus[];
+  gitConfiguredLinks?: readonly GitLinkConfig[] | undefined;
   notificationsConfig?: NotificationsConfig;
   ai?: Ai;
+  gitConnections?: GitConnectionModel;
   resolveUser: (c: Context) => Promise<AuthUser | null>;
 }
 
@@ -59,6 +64,7 @@ export function storeScope(deps: StoreScopeDeps) {
         user,
         authEnabled: deps.authEnabled,
         testing: deps.testing,
+        skippedBuilds: deps.skippedBuilds === true,
         sessionId: sessionIdFrom(c),
         enqueueCapture: deps.enqueueCapture,
         captureQueue: deps.captureQueue,
@@ -72,8 +78,11 @@ export function storeScope(deps: StoreScopeDeps) {
         design: deps.design,
         notifiers: deps.notifiers,
         push: deps.push,
+        integrations: deps.integrations,
+        gitConfiguredLinks: deps.gitConfiguredLinks,
         notificationsConfig: deps.notificationsConfig,
         ai: deps.ai,
+        gitConnections: deps.gitConnections,
       },
       async () => {
         await next();

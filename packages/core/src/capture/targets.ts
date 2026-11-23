@@ -7,7 +7,7 @@ export const NO_SECRET_REASON =
 
 /** Why it is unavailable without a confirmed public origin. */
 export const NO_ORIGIN_REASON =
-  "no public origin: set PUBLIC_BASE_URL, or confirm the detected origin on the System page";
+  "no public origin: set SHELF_PUBLIC_BASE_URL, or confirm the detected origin on the System page";
 
 /** What a target that needs a URL depends on. */
 export interface TargetPrerequisites {

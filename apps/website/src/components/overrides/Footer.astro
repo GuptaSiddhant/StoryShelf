@@ -1,0 +1,22 @@
+---
+/** Footer: Starlight's page footer, then where to ask for help. */
+import Default from "@astrojs/starlight/components/Footer.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/u, "");
+---
+
+<Default {...Astro.props}><slot /></Default>
+
+<p class="support-links">
+  Questions and ideas:
+  <a href="https://github.com/GuptaSiddhant/StoryShelf/discussions">GitHub Discussions</a>
+  · <a href={`${base}/guides/support/`}>Upgrading and support</a>
+</p>
+
+<style is:global>
+  .support-links {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+    margin-block-start: 1rem;
+  }
+</style>

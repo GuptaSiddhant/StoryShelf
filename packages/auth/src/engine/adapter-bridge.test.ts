@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { UserModel } from "@storyshelf/core/models";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import { describe, expect, it, vi } from "vitest";
 import { baseAuthTables } from "../auth-tables.ts";
 import { buildAdapter, mirrorUser } from "./adapter-bridge.ts";
@@ -133,6 +133,12 @@ describe("buildAdapter", () => {
   it("refuses a secret shorter than 32 characters at setup", async () => {
     const adapter = buildAdapter(instance(), await testDb(), options({ secret: "short" }));
     await expect(adapter.setup()).rejects.toThrow("at least 32 characters");
+    const unset = buildAdapter(
+      instance(),
+      await testDb(),
+      options({ secret: undefined as unknown as string }),
+    );
+    await expect(unset.setup()).rejects.toThrow(/SECRET .*unset/u);
     await expect(
       buildAdapter(instance(), await testDb(), options()).setup(),
     ).resolves.toBeUndefined();

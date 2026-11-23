@@ -1,6 +1,6 @@
 /** Sorting a render's failures into the three kinds that decide a build's status. */
 import type { RenderFailure } from "../adapters/capture-runner.ts";
-import { isFlakyStory, type StoryEntry } from "./adapter.ts";
+import { isFlakyStory, type StoryEntry } from "../adapters/story-source.ts";
 
 /** Story ids by how their failure counts. */
 export interface FailureSets {

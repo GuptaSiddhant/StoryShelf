@@ -1,0 +1,19 @@
+---
+title: "@storyshelf/common"
+description: The small shared layer every StoryShelf package builds on — settings, outbound HTTP, redaction, tracing, errors, ids and logging.
+---
+
+import { PackageManagers } from "starlight-package-managers";
+
+`@storyshelf/common` is the lightweight code the other packages share: reading `SHELF_*` settings, outbound HTTP, secret redaction, tracing helpers, errors, ids and the logger. Its only runtime dependency is `@opentelemetry/api`, and it never imports another `@storyshelf/*` package. `@storyshelf/core` re-exports it from its existing subpaths, so most apps never install it directly. [`@storyshelf/mcp`](/packages/mcp/) and [`@storyshelf/observability`](/packages/observability/) depend on it instead of core.
+
+- [npm package](https://www.npmjs.com/package/@storyshelf/common): install tarballs and version history.
+- [Source on GitHub](https://github.com/GuptaSiddhant/storyshelf/tree/main/packages/common): package directory on `main`.
+
+## Install
+
+<PackageManagers pkg="@storyshelf/common" />
+
+## Subpaths
+
+<Readme heading="Subpaths" />

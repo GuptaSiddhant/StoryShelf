@@ -1,0 +1,116 @@
+import { createLatch, deferred } from "@storyshelf/core/test-helpers";
+import { describe, expect, it, vi } from "vitest";
+import { createSessionGate, sessionGateFor } from "./session-gate.ts";
+
+async function peakOf(
+  gate: { run<T>(fn: () => Promise<T>): Promise<T>; size?: number },
+  runs: number,
+) {
+  let active = 0;
+  let peak = 0;
+  const latch = createLatch();
+  const full = deferred();
+  const limit = gate.size ?? runs;
+  const work = Promise.all(
+    Array.from({ length: runs }, async () => {
+      await gate.run(async () => {
+        active += 1;
+        peak = Math.max(peak, active);
+        if (active === limit) full.resolve();
+        await latch.wait();
+        active -= 1;
+      });
+    }),
+  );
+  await full.promise;
+  latch.open();
+  await work;
+  return peak;
+}
+
+describe("session gates", () => {
+  it("never runs more than its size at once, and hands slots on in order", async () => {
+    expect(await peakOf(createSessionGate(3), 20)).toBe(3);
+    const order: number[] = [];
+    const gate = createSessionGate(1);
+    await Promise.all(
+      [1, 2, 3].map((n) =>
+        gate.run(async () => {
+          order.push(n);
+          await Promise.resolve();
+        }),
+      ),
+    );
+    expect(order).toEqual([1, 2, 3]);
+  });
+
+  it("releases the slot when the work throws", async () => {
+    const gate = createSessionGate(1);
+    await expect(gate.run(() => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
+    await expect(gate.run(() => Promise.resolve("ok"))).resolves.toBe("ok");
+  });
+
+  it("counts a size below one as one", () => {
+    expect(createSessionGate(0).size).toBe(1);
+  });
+
+  it("shares one gate per target across the process, keeping its first size", async () => {
+    const first = sessionGateFor("chromium@gate-test", 2);
+    expect(sessionGateFor("chromium@gate-test", 9)).toBe(first);
+    expect(first.size).toBe(2);
+    expect(sessionGateFor("firefox@gate-test", 4)).not.toBe(first);
+    expect(await peakOf(sessionGateFor("chromium@gate-test", 2), 10)).toBe(2);
+  });
+
+  it("reads a function size on every use, so a scaling provider can raise or lower the cap", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    expect(gate.size).toBe(1);
+    cap = 3;
+    expect(gate.size).toBe(3);
+    expect(await peakOf(gate, 10)).toBe(3);
+    cap = 1;
+    expect(await peakOf(gate, 6)).toBe(1);
+  });
+
+  it("keeps the last good cap when a function returns garbage, telling the caller once", async () => {
+    let value: unknown = 2;
+    const invalid = vi.fn();
+    const gate = createSessionGate(() => value as number, invalid);
+    expect(gate.size).toBe(2);
+    value = Number.NaN;
+    expect(gate.size).toBe(2);
+    value = "many";
+    expect(gate.size).toBe(2);
+    expect(invalid).toHaveBeenCalledTimes(1);
+    expect(await peakOf(gate, 8)).toBe(2);
+  });
+
+  it("counts a function returning below one as one", () => {
+    expect(createSessionGate(() => 0).size).toBe(1);
+  });
+
+  it("lets in every waiter a grown cap has room for on the next release, not one", async () => {
+    let cap = 1;
+    const gate = createSessionGate(() => cap);
+    const first = deferred();
+    const running = [gate.run(async () => await first.promise)];
+    const counter = { started: 0 };
+    const barrier = deferred();
+    for (let index = 0; index < 4; index += 1) {
+      running.push(
+        gate.run(async () => {
+          counter.started += 1;
+          await barrier.promise;
+        }),
+      );
+    }
+    cap = 4;
+    first.resolve();
+    await running[0];
+    await Promise.resolve();
+    expect(counter.started).toBe(4);
+    barrier.resolve();
+    await Promise.all(running);
+  });
+});

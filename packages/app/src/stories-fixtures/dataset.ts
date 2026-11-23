@@ -1,7 +1,9 @@
-import type { CatalogEntry } from "@storyshelf/core/capture";
+import type { CatalogEntry } from "@storyshelf/core/catalog";
 import type {
   Baseline,
   Build,
+  BuildLabel,
+  LabelType,
   BuildComponent,
   CaptureAttempt,
   CaptureLog,
@@ -26,7 +28,17 @@ export const BUILD_REVIEW = id("BLD002");
 export const BUILD_FAILED = id("BLD003");
 export const BUILD_CAPTURING = id("BLD004");
 export const BUILD_REJECTED = id("BLD005");
+/** An older build of the capturing build's branch, cancelled when that newer commit arrived (ADR 0045). */
+export const BUILD_SUPERSEDED = id("BLD013");
 export const BUILD_CANCELLED = id("BLD006");
+/** An approved build whose Storybook retention already removed. */
+export const BUILD_PURGED = id("BLD012");
+/** Skipped builds (ADR 0044), one per state of the source they repeat. */
+export const BUILD_SKIPPED = id("BLD007");
+export const BUILD_SKIPPED_REJECTED_SOURCE = id("BLD008");
+export const BUILD_SKIPPED_PURGED_STORYBOOK = id("BLD009");
+export const BUILD_SKIPPED_SOURCE_GONE = id("BLD010");
+export const BUILD_SKIPPED_MANY_FILES = id("BLD011");
 
 export const project: Project = {
   id: PROJECT_ID,
@@ -78,6 +90,100 @@ const build = (overrides: Partial<Build> & Pick<Build, "id" | "gitSha" | "gitBra
   updatedAt: hoursAgo(48),
   ...overrides,
 });
+
+/** A skipped build: no snapshots, no upload; it names the build it repeats and what was compared. */
+const skipped = (
+  overrides: Partial<Build> & Pick<Build, "id" | "gitSha" | "gitBranch" | "skippedFromBuildId">,
+  changedFiles: string[],
+): Build =>
+  build({
+    status: "skipped",
+    message: "docs: fix a typo",
+    changedFiles: JSON.stringify(changedFiles),
+    ...overrides,
+  });
+
+/** A backlog: six builds queued on `main` and a seventh on a feature branch, none started yet. */
+export const backlogBuilds = (): Build[] =>
+  Array.from({ length: 7 }, (_, index) =>
+    build({
+      id: id(`BKL${String(index + 1).padStart(3, "0")}`),
+      gitSha: `b${index}c4d5e6`,
+      gitBranch: index === 6 ? "feature/dark-tabs" : "main",
+      status: "pending",
+      message: `chore: queued commit ${index + 1}`,
+      createdAt: hoursAgo(7 - index),
+      updatedAt: hoursAgo(7 - index),
+    }),
+  );
+
+export const skippedBuilds = (): Build[] => [...recentSkipped(), ...olderSkipped()];
+
+const recentSkipped = (): Build[] => [
+  skipped(
+    {
+      id: BUILD_SKIPPED,
+      gitSha: "e4f5a6b",
+      gitBranch: "main",
+      skippedFromBuildId: BUILD_MAIN,
+      baselineSha: "a1b2c3d",
+      createdAt: hoursAgo(2),
+      updatedAt: hoursAgo(2),
+    },
+    ["README.md", "docs/guide.md"],
+  ),
+];
+
+const olderSkipped = (): Build[] => [
+  skipped(
+    {
+      id: BUILD_SKIPPED_REJECTED_SOURCE,
+      gitSha: "4c3b2a1",
+      gitBranch: "feature/card-shadow",
+      skippedFromBuildId: BUILD_REJECTED,
+      baselineSha: "3b2a1c0",
+      createdAt: hoursAgo(30),
+      updatedAt: hoursAgo(30),
+    },
+    ["CHANGELOG.md"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_PURGED_STORYBOOK,
+      gitSha: "7e8f9a0",
+      gitBranch: "release/1.x",
+      skippedFromBuildId: BUILD_PURGED,
+      baselineSha: "0d1e2f3",
+      createdAt: hoursAgo(24 * 20),
+      updatedAt: hoursAgo(24 * 20),
+    },
+    ["package.json"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_SOURCE_GONE,
+      gitSha: "b1c2d3e",
+      gitBranch: "chore/ci",
+      skippedFromBuildId: id("BLDGONE"),
+      baselineSha: "f0e1d2c",
+      createdAt: hoursAgo(72),
+      updatedAt: hoursAgo(72),
+    },
+    [".github/workflows/ci.yml"],
+  ),
+  skipped(
+    {
+      id: BUILD_SKIPPED_MANY_FILES,
+      gitSha: "9a8b7c6",
+      gitBranch: "main",
+      skippedFromBuildId: BUILD_MAIN,
+      baselineSha: "a1b2c3d",
+      createdAt: hoursAgo(6),
+      updatedAt: hoursAgo(6),
+    },
+    Array.from({ length: 24 }, (_, index) => `docs/reference/page-${index + 1}.md`),
+  ),
+];
 
 export const builds: Build[] = [
   build({
@@ -153,6 +259,30 @@ export const builds: Build[] = [
     createdAt: hoursAgo(96),
     updatedAt: hoursAgo(94),
   }),
+  build({
+    id: BUILD_SUPERSEDED,
+    gitSha: "e4f5a6b",
+    gitBranch: "feature/dark-tabs",
+    status: "cancelled",
+    supersededByBuildId: BUILD_CAPTURING,
+    authorName: "Grace Hopper",
+    authorEmail: "grace@example.com",
+    message: "wip(tabs): dark mode tab bar",
+    createdAt: hoursAgo(0.5),
+    updatedAt: hoursAgo(0.1),
+  }),
+  build({
+    id: BUILD_PURGED,
+    gitSha: "0d1e2f3",
+    gitBranch: "release/1.x",
+    status: "approved",
+    message: "chore: cut 1.x",
+    snapshotCount: 11,
+    approvedCount: 11,
+    createdAt: hoursAgo(24 * 30),
+    updatedAt: hoursAgo(24 * 30),
+  }),
+  ...skippedBuilds(),
 ];
 
 const entry = (component: string, name: string, tags: string[] = ["autodocs"]): CatalogEntry => ({
@@ -340,4 +470,42 @@ export const captureLogs: CaptureLog[] = [
     fields: null,
     createdAt: hoursAgo(19.8),
   },
+];
+
+/** The project's label types: one with a link template, one without (the label pages' table and links). */
+export const labelTypes: LabelType[] = [
+  {
+    id: id("LBT001"),
+    projectId: PROJECT_ID,
+    key: "pr",
+    name: "Pull request",
+    linkTemplate: "https://github.com/{repo}/pull/{value}",
+    color: null,
+    createdAt: hoursAgo(24 * 60),
+  },
+  {
+    id: id("LBT002"),
+    projectId: PROJECT_ID,
+    key: "release",
+    name: "Release",
+    linkTemplate: null,
+    color: null,
+    createdAt: hoursAgo(24 * 60),
+  },
+];
+
+const buildLabel = (n: number, buildId: string, typeKey: string, value: string): BuildLabel => ({
+  id: id(`LBL00${n}`),
+  projectId: PROJECT_ID,
+  buildId,
+  typeKey,
+  value,
+  createdAt: hoursAgo(24),
+});
+
+/** `pr=482` on two builds of the feature branches, `release=1.4` on the default-branch build. */
+export const buildLabels: BuildLabel[] = [
+  buildLabel(1, BUILD_REVIEW, "pr", "482"),
+  buildLabel(2, BUILD_CAPTURING, "pr", "482"),
+  buildLabel(3, BUILD_MAIN, "release", "1.4"),
 ];

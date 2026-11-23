@@ -1,5 +1,3 @@
-/** The browser loop: one partition + render pass per engine, sequentially. */
-import { currentImageEngine } from "@storyshelf/image";
 import type { Logger } from "pino";
 import type {
   CaptureRunner,
@@ -10,12 +8,14 @@ import type {
 import { TargetLaunchError } from "../adapters/capture-target.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
+import { isFlakyStory, type StoryEntry, type Viewport } from "../adapters/story-source.ts";
+/** The browser loop: one partition + render pass per engine, sequentially. */
 import type { AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { Build } from "../schema/build.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
+import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storeScreenshot } from "../utils/screenshot-store.ts";
-import { isFlakyStory, type StoryEntry, type Viewport } from "./adapter.ts";
 import { partitionAffectedStories, type InheritedStory } from "./affected.ts";
 import { mirrorAttemptLog, type AttemptMirror } from "./attempt-logger.ts";
 import { primaryTargetOf, resolveBrowsers } from "./browsers.ts";
@@ -188,11 +188,17 @@ async function attemptPass(
     const pass = await renderPass(input, browser, mirror, stories, [], spooled);
     return { captures: pass.captures, failures: pass.failures };
   } catch (error) {
-    // The browser never started, or the signed URL lifetime cannot fit the pass: no story is at
-    // fault, so it is not isolated or retried.
-    if (error instanceof TargetLaunchError || error instanceof SignedUrlLifetimeError) {
+    // The browser never started, the signed URL lifetime cannot fit the pass, or the job was
+    // cancelled (or lost its lease): no story is at fault, so it is not isolated or retried.
+    if (
+      error instanceof TargetLaunchError ||
+      error instanceof SignedUrlLifetimeError ||
+      error instanceof JobAbortedError
+    ) {
       throw error;
     }
+    // A pass the job's cancel (or lost lease) ended crashed because of it: stop, never isolate.
+    input.progress?.();
     mirror.log("warn", "render pass crashed, isolating the story at fault", {
       browser,
       stories: stories.length,
@@ -309,13 +315,14 @@ async function renderPass(
     storybookUrl: input.storybookUrl,
     captureCount: (story) => resolveStoryViewports(story, input.viewports).length,
     renderTimeoutMs: input.renderTimeoutMs,
+    checkpoint: input.progress,
   });
   mirror.log("info", "render pass finished", {
     browser,
     captured: spooled.length + rendered.captures.length,
     failed: rendered.failures.length,
     expected,
-    imageEngine: currentImageEngine(),
+    imageEngine: input.runner.images.state().engine,
   });
   const { environment } = rendered;
   return {

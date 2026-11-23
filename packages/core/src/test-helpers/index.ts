@@ -17,6 +17,7 @@ export { createTestBuild, createTestProject } from "./create-project.ts";
 export { databaseContractSuite, REQUIRED_TABLES } from "./database-contract.ts";
 export { FAKE_PNG, fakeUrl, makeFakeDesign, type FakeDesign } from "./fake-design.ts";
 export { makeDatabase, makeStorage, stubTables, type FakeStorage } from "./fake-adapters.ts";
+export { compareBytes, fakeImageEngine } from "./fake-image-engine.ts";
 export { pushSubscriptionContractSuite } from "./push-subscription-contract.ts";
 export { notifierContractSuite, stateNotifierContractSuite } from "./notifier-contract.ts";
 export {
@@ -47,6 +48,10 @@ export {
   type BuildReferenceContractFixtureRunner,
 } from "./build-reference-contract.ts";
 export {
+  retentionSkippedContractSuite,
+  type RetentionSkippedRunner,
+} from "./retention-skipped-contract.ts";
+export {
   retentionActivationContractSuite,
   type RetentionActivationHarness,
   type RetentionActivationHarnessRunner,
@@ -69,3 +74,8 @@ export {
 
 export { publicNetworkForTests } from "./public-network.ts";
 export { describeSchemaLevelContract, type SchemaLevelHarness } from "./schema-level-contract.ts";
+
+/** Spike #800 (ADR 0041): the neutral schema layer, for the adapters' table factories. */
+export * as neutralSchema from "../db/index.ts";
+export { compareDdlShapes } from "./ddl-diff.ts";
+export { ddlShape, type DdlShape, type ShapeDialect } from "./ddl-shape.ts";

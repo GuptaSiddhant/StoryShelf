@@ -1,0 +1,260 @@
+/** The `capture` kind's handler: builds the existing core dispatch from the host's adapters. */
+import type { CaptureRunner } from "../adapters/capture-runner.ts";
+import type { DatabaseAdapter } from "../adapters/database.ts";
+import type { DesignProvider } from "../adapters/design.ts";
+import type { NotifierProvider } from "../adapters/notifier/provider.ts";
+import type { StorageAdapter } from "../adapters/storage.ts";
+import { createBuildStatePublisher } from "../build-state/publisher.ts";
+import type { BuildStatePublisher } from "../build-state/types.ts";
+import type { ShelfConfig } from "../config.ts";
+import type { ConsumerMetrics } from "../jobs/consumer/metrics.ts";
+import { DEFAULT_MAX_RETRIES, retriesOf } from "../jobs/consumer/retry.ts";
+import type { ConsumerJob, KindHandler } from "../jobs/consumer/types.ts";
+import { GENERATION_KEY } from "../jobs/db-queue/codec.ts";
+import { abortableLease } from "../jobs/job-lease.ts";
+import type { Logger } from "../logger.ts";
+import { BuildModel } from "../models/build.ts";
+import { CaptureAttemptModel } from "../models/capture-attempt.ts";
+import { CaptureLogModel } from "../models/capture-log.ts";
+import type { GitConnectionModel } from "../models/git-connection.ts";
+import { createPublicOriginResolver } from "../models/public-origin.ts";
+import { extractionLimitsOf, resolvePublishLimits } from "../publish/limits.ts";
+import type { SecretInput } from "../utils/encrypt.ts";
+import { createDispatchJob, type CaptureDispatchJob, type DispatchDeps } from "./dispatch.ts";
+import { ensureImageEngine } from "./image-engine.ts";
+import type { CaptureJobOptions, ShardJob } from "./orchestrator.ts";
+
+/** What the capture handler needs: the same adapters the server's own capture setup uses. */
+export interface CaptureHandlerOptions {
+  /** Database adapter; its own `tables` are used (never a dialect's defaults). */
+  db: DatabaseAdapter;
+  storage: StorageAdapter;
+  /** Pure renderer; `cancel` is called when a job's lease is lost or the job is cancelled. */
+  runner: CaptureRunner;
+  /** Scratch directory for Storybook extraction. */
+  scratchDir: string;
+  logger: Logger;
+  /** Puts a shard job on the queue; sharding needs it. Defaults to the consumed queue's `enqueue`. */
+  enqueue: (job: ShardJob) => Promise<void>;
+  /** Notifier providers; `state` channels (git hosts) get the build statuses. */
+  notifiers?: NotifierProvider[];
+  /** The server's git connections: approved repository links take part like git channels (ADR 0054). */
+  gitConnections?: GitConnectionModel | undefined;
+  /**
+   * Shows a build's state on its git channels at every transition. Default: deliver inline through
+   * `notifiers` (a capture always has `testing` on); the app passes its queue-backed publisher.
+   */
+  buildState?: BuildStatePublisher;
+  /** Links in statuses are absolute from `publicBaseUrl`; published Storybooks use `publishedBaseDomain`. */
+  config?: Pick<
+    ShelfConfig,
+    | "publicBaseUrl"
+    | "publishedBaseDomain"
+    | "storybookHosting"
+    | "maxZipEntries"
+    | "maxUnzippedBytes"
+  >;
+  /**
+   * The resolved public origin (ADR 0007, decision 6): status links and URL-reaching targets use it.
+   * Default: `config.publicBaseUrl`, then the platform's address, then the origin an admin stored.
+   */
+  publicOrigin?: () => Promise<string | undefined>;
+  /** Design providers validating declared design links during capture. */
+  design?: DesignProvider[];
+  /** Server secret for webhook decryption. */
+  secret?: SecretInput;
+  viewports?: CaptureJobOptions["viewports"];
+  /** Captures per shard; unset keeps every build in one job. */
+  shardSize?: number;
+  /** Retries assumed for jobs that do not state `maxAttempts` (default 2). */
+  maxRetries?: number;
+  /** Told when a shard re-captures work an earlier attempt had stored (the consumer's `metrics`). */
+  onShardRepeated?: ConsumerMetrics["shardRepeated"];
+}
+
+/** Whether a polled capture job carries the minimum shape to execute. */
+function isValidCaptureJob(job: ConsumerJob): boolean {
+  return typeof job.buildId === "string" && job.buildId.length > 0;
+}
+
+/**
+ * Whether a build's capture job was queued for a run the build has left: its payload's generation
+ * is not the build's (a retry started a newer run), or the build is gone. A shard job and a job
+ * queued without a generation are never superseded here.
+ */
+async function isSuperseded(options: CaptureHandlerOptions, job: ConsumerJob): Promise<boolean> {
+  const queuedFor = job.data?.[GENERATION_KEY];
+  if (job.shard !== undefined || typeof queuedFor !== "number") {
+    return false;
+  }
+  const build = await new BuildModel(options.db, options.db.tables, options.logger).get(
+    job.buildId,
+  );
+  return build === null || (build.captureGeneration ?? 0) !== queuedFor;
+}
+
+/** The `capture` handler: runs `createDispatchJob`'s runner, cancels through `runner.cancel`. */
+export function createCaptureHandler(options: CaptureHandlerOptions): KindHandler {
+  const fallbackRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+  // The shard rule ("a shard's last try is its final word") depends on the queue's retry limit,
+  // which a database job states itself, so one dispatch exists per distinct limit.
+  const dispatches = new Map<number, ReturnType<typeof createDispatchJob>>();
+  const dispatchFor = (retries: number): ReturnType<typeof createDispatchJob> => {
+    const existing = dispatches.get(retries);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const created = createDispatchJob(captureDispatchDeps(options, retries));
+    dispatches.set(retries, created);
+    return created;
+  };
+  dispatchFor(fallbackRetries);
+  return {
+    // A consumer that cannot diff must not claim capture jobs.
+    prepare: async (logger) => {
+      await ensureImageEngine(options.runner.images, logger);
+    },
+    accepts: isValidCaptureJob,
+    superseded: async (job) => await isSuperseded(options, job),
+    run: async (job, context) => {
+      // The consumer checked before it claimed a slot; a job that waited for a forked child's slot,
+      // or was pushed to it again after a crash, is checked again right before it writes.
+      if (await isSuperseded(options, job)) {
+        options.logger.info(
+          { buildId: job.buildId, jobId: job.jobId },
+          "superseded capture skipped",
+        );
+        return;
+      }
+      await dispatchFor(retriesOf(job, fallbackRetries))(
+        toDispatchJob(job),
+        abortableLease(
+          {
+            touch: () => {
+              context.touch();
+            },
+          },
+          context.signal,
+        ),
+      );
+    },
+    deadlineExceeded: async (job, seconds) => {
+      await recordDeadline(options, job, seconds);
+    },
+    cancel: async (job) => {
+      await options.runner.cancel(job.buildId, job.shard);
+    },
+  };
+}
+
+/** Put `job deadline exceeded (<n>s)` on the log of the build's open attempt, if it has one. */
+async function recordDeadline(
+  options: CaptureHandlerOptions,
+  job: ConsumerJob,
+  seconds: number,
+): Promise<void> {
+  const tables = options.db.tables;
+  const attempts = await new CaptureAttemptModel(options.db, tables).listByBuild(job.buildId);
+  const open = attempts.findLast((a) => a.status === "queued" || a.status === "running");
+  if (open === undefined) {
+    return;
+  }
+  await new CaptureLogModel(options.db, tables).append(
+    open.projectId,
+    job.buildId,
+    open.id,
+    "error",
+    `job deadline exceeded (${String(seconds)}s)`,
+  );
+}
+
+function toDispatchJob(job: ConsumerJob): CaptureDispatchJob {
+  return {
+    buildId: job.buildId,
+    shard: job.shard,
+    attempts: job.attempts,
+    ...(job.reqId === undefined ? {} : { reqId: job.reqId }),
+    ...(job.traceparent === undefined ? {} : { traceparent: job.traceparent }),
+  };
+}
+
+/** The dispatch dependencies the handler runs captures with; the host reuses them to write failures the pipeline never got to. */
+export function captureDispatchDeps(
+  options: CaptureHandlerOptions,
+  maxRetries: number,
+): DispatchDeps {
+  const t = options.db.tables;
+  const publicOrigin = originOf(options);
+  const jobOptions: CaptureJobOptions = {
+    db: options.db,
+    tables: {
+      projects: t.projects,
+      builds: t.builds,
+      buildLabels: t.buildLabels,
+      snapshots: t.snapshots,
+      baselines: t.baselines,
+      captureAttempts: t.captureAttempts,
+      captureLogs: t.captureLogs,
+    },
+    storage: options.storage,
+    runner: options.runner,
+    scratchDir: options.scratchDir,
+    limits: extractionLimitsOf(resolvePublishLimits(options.config)),
+    viewports: options.viewports,
+    logger: options.logger,
+    secret: options.secret,
+    design: options.design,
+    notifiers: options.notifiers,
+    gitConnections: options.gitConnections,
+    publicOrigin,
+    shardSize: options.shardSize,
+    enqueue: options.enqueue,
+  };
+  return {
+    db: options.db,
+    tables: {
+      projects: t.projects,
+      builds: t.builds,
+      buildLabels: t.buildLabels,
+      snapshots: t.snapshots,
+      captureAttempts: t.captureAttempts,
+      captureLogs: t.captureLogs,
+    },
+    jobOptions,
+    buildState: options.buildState ?? inlineBuildState(options, publicOrigin),
+    logger: options.logger,
+    maxRetries,
+    ...(options.onShardRepeated === undefined ? {} : { onShardRepeated: options.onShardRepeated }),
+  };
+}
+
+/** Inline delivery of captured builds' states through the handler's own adapters. */
+function inlineBuildState(
+  options: CaptureHandlerOptions,
+  publicOrigin: () => Promise<string | undefined>,
+): BuildStatePublisher {
+  return createBuildStatePublisher({
+    deps: {
+      db: options.db,
+      storage: options.storage,
+      notifiers: options.notifiers ?? [],
+      gitConnections: options.gitConnections,
+      secret: options.secret,
+      config: options.config ?? {},
+      publicOrigin,
+      flags: () => ({ testing: true, review: false }),
+      logger: options.logger,
+    },
+  });
+}
+
+/** The host's origin resolver, else one built from the database and `config.publicBaseUrl`. */
+export function originOf(
+  options: Pick<CaptureHandlerOptions, "db" | "config" | "publicOrigin">,
+): () => Promise<string | undefined> {
+  if (options.publicOrigin !== undefined) {
+    return options.publicOrigin;
+  }
+  const resolver = createPublicOriginResolver({ db: options.db, config: options.config });
+  return async () => await resolver.url();
+}

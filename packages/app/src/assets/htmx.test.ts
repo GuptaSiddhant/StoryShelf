@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { assetManifest } from "../asset-manifest.ts";
 import { htmxSource, htmxVersion } from "./htmx.ts";
-import { markSource } from "./mark.ts";
+import { faviconSource, markSource } from "./mark.ts";
 
 describe("embedded assets", () => {
   it("embeds the htmx build whose version the module declares", () => {
@@ -11,9 +11,20 @@ describe("embedded assets", () => {
     expect(htmxSource).toContain("htmx");
   });
 
-  it("embeds the brand mark as a complete SVG", () => {
-    expect(markSource.startsWith("<svg ")).toBe(true);
-    expect(markSource.endsWith("</svg>")).toBe(true);
+  it("embeds the brand mark and the favicon as complete SVGs", () => {
+    for (const source of [markSource, faviconSource]) {
+      expect(source.startsWith("<svg ")).toBe(true);
+      expect(source.endsWith("</svg>")).toBe(true);
+      expect(source).toContain("aria-label='StoryShelf'");
+    }
+  });
+
+  it("draws the mark and the favicon in the base and foreground colours only", () => {
+    for (const source of [markSource, faviconSource]) {
+      const colours = new Set(source.match(/#[0-9a-f]{6}/giu));
+      expect([...colours].toSorted()).toEqual(["#5b3fd6", "#ffffff"]);
+    }
+    expect(markSource).toContain("rx='14'");
   });
 
   it("serves exactly the embedded sources, each under its own content hash", () => {
@@ -21,6 +32,8 @@ describe("embedded assets", () => {
     expect(assetManifest.mark.source).toBe(markSource);
     expect(assetManifest.htmx.href).toBe(`/assets/htmx-${assetManifest.htmx.hash}.js`);
     expect(assetManifest.mark.href).toBe(`/assets/mark-${assetManifest.mark.hash}.svg`);
+    expect(assetManifest.favicon.source).toBe(faviconSource);
+    expect(assetManifest.favicon.href).toBe(`/assets/favicon-${assetManifest.favicon.hash}.svg`);
   });
 
   it("embeds exactly the htmx source whose checksum is recorded", async () => {

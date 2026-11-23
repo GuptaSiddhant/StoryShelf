@@ -4,7 +4,7 @@ import { BaselineModel, MemberModel, TokenModel } from "@storyshelf/core/models"
 import type { Baseline } from "@storyshelf/core/schema";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { sha256 } from "@storyshelf/core/utils";
-import { createSqliteDatabase } from "@storyshelf/db-sqlite";
+import { createSqliteDatabase } from "@storyshelf/db/sqlite";
 import AdmZip from "adm-zip";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";

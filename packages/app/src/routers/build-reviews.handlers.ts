@@ -3,20 +3,20 @@
  * routes are classed `review`, so `requireReview` answers 404 for a project with review off.
  */
 import { STORYBOOK_UNAVAILABLE } from "@storyshelf/core/adapter/notifier";
-import { publishingOfBuild } from "@storyshelf/core/capture";
 import {
   BuildModel,
   BuildReviewModel,
   deriveReviewStatus,
   latestVerdicts,
 } from "@storyshelf/core/models";
+import { publishingOfBuild } from "@storyshelf/core/publish";
 import type { Build, BuildReview, Project } from "@storyshelf/core/schema";
 import type { BuildStatus, ReviewVerdict } from "@storyshelf/core/types";
 import { HTTPException } from "hono/http-exception";
 import { requestBuildState } from "../git-status.ts";
 import { REVIEW_EVENTS, announceReview } from "../review-events.ts";
 import { getStore } from "../store.ts";
-import { announceBuildStatus } from "./builds.handlers.ts";
+import { announceBuildStatus, assertNotSkipped } from "./builds.handlers.ts";
 
 /** Statuses the verdicts may move a build between; a failed, cancelled or capturing build is not theirs to decide. */
 const VERDICT_STATUSES: ReadonlySet<BuildStatus> = new Set(["pending", "approved", "rejected"]);
@@ -97,6 +97,7 @@ async function assertReviewable(
   build: Build,
   userId: string | null,
 ): Promise<void> {
+  assertNotSkipped(build, "reviewed");
   if (build.status === "failed" || build.status === "cancelled") {
     throw new HTTPException(409, {
       message: `The build ${build.status === "failed" ? "failed" : "was cancelled"}; there is nothing to review`,

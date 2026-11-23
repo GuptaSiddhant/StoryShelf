@@ -1,4 +1,4 @@
-import type { ShelfOptions } from "@storyshelf/core/config";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import { BuildComponentModel } from "@storyshelf/core/models";
 import {
   createTestBuild,
@@ -16,16 +16,16 @@ import { settlePrecompression } from "./routers/published-precompress.ts";
 
 const logger = pino({ level: "silent" });
 
-function options(): ShelfOptions {
+function options(): ResolvedShelfOptions {
   const { db } = makeDatabase();
   const { storage } = makeStorage();
-  return { database: db, storage } as unknown as ShelfOptions;
+  return { database: db, storage } as unknown as ResolvedShelfOptions;
 }
 
 const buildState = { request: vi.fn(async () => {}) };
 const reviewRequested = vi.fn(async () => {});
 
-function jobsFor(opts: ShelfOptions, serverless: boolean) {
+function jobsFor(opts: ResolvedShelfOptions, serverless: boolean) {
   return createJobQueue(opts, serverless ? [] : ["publish"], 2);
 }
 
@@ -205,7 +205,7 @@ describe("setupPublishing: compressed copies", () => {
   async function publishWith(config: { publishedCompression?: boolean }, outcome: { ok: boolean }) {
     const { db } = makeDatabase();
     const { storage, objects } = makeStorage();
-    const opts = { database: db, storage } as unknown as ShelfOptions;
+    const opts = { database: db, storage } as unknown as ResolvedShelfOptions;
     const project = await createTestProject(db, db.tables);
     const build = await createTestBuild(db, db.tables, project.id);
     objects.set(

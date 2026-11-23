@@ -34,6 +34,7 @@ import {
   renderEntries,
   unknownReleases,
 } from "./changeset-lib.mjs";
+import { writeVersionManifest } from "./version-manifest.mjs";
 
 const root = join(import.meta.dirname, "..");
 const changesetDir = join(root, ".changeset");
@@ -103,6 +104,8 @@ function writeVersion(version) {
     }
     writeFileAtomic(file, text.replace(VERSION_LINE, `$<head>${version}$<tail>`));
   }
+  // The version and peer manifest (#1332) carries every version: regenerate it with the bump.
+  writeVersionManifest();
 }
 
 /** Delete every changeset file (empty ones too): all of them are consumed by a version run. */

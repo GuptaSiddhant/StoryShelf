@@ -9,7 +9,7 @@ import {
   locatePublishedFile,
   openPublishedFile,
   type OpenedPublishedFile,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/catalog";
 import { isSafeSegment, mimeFor, type StorybookTokenClaims } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { createHash } from "node:crypto";

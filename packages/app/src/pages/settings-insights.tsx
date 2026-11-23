@@ -128,6 +128,7 @@ function CaptureNumbers(props: { data: SettingsInsightsData }): Rendered {
 export function renderSettingsInsights(project: Project, data: SettingsInsightsData): unknown {
   return (
     <VStack>
+      <h2 class="visually-hidden">Insights</h2>
       <HealthSlot project={project} data={data.health} />
       {data.storage ? <StorageCard storage={data.storage} /> : null}
       {data.testing ? (

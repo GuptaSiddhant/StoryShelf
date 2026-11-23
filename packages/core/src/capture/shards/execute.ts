@@ -1,5 +1,6 @@
 import { CaptureShardModel } from "../../models/capture-shard.ts";
 import { SnapshotModel } from "../../models/snapshot.ts";
+import { removeShardScratch } from "../../publish/scratch.ts";
 import type { CaptureShard } from "../../schema/capture-shard.ts";
 /** The render stage: one shard of a sharded capture, run by whichever worker picked up its job. */
 import { JobAbortedError } from "../../utils/job-aborted.ts";
@@ -9,7 +10,6 @@ import { renderWork } from "../matrix.ts";
 import type { CaptureJobOptions } from "../orchestrator.ts";
 import { persistRendered } from "../pipeline.ts";
 import type { CaptureProgress } from "../progress.ts";
-import { removeShardScratch } from "../scratch.ts";
 import type { ShardPayload, ShardResult } from "../shard-plan.ts";
 import { detectUnstableRenders, stabilityKey } from "../stability.ts";
 import { loadTarget } from "../target.ts";

@@ -10,32 +10,36 @@ import {
   resolveShelfOptions,
   sequentialTransactionsWarning,
 } from "@storyshelf/core/config";
-import type { ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
-import { configureImages } from "@storyshelf/core/diff";
+import type { ResolvedShelfOptions, ShelfConfig, ShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+/**
+ * StoryShelf app: compose database, storage, capture, auth, and notifier
+ * adapters into a complete self-hosted visual-testing Hono app.
+ */
+import { createInstrumentedDatabase, createInstrumentedStorage } from "@storyshelf/core/telemetry";
 import {
   configureOutbound,
   STORYBOOK_EXCHANGE_PREFIX,
   STORYBOOK_READ_PREFIX,
   STORYBOOK_TOKEN_PREFIX,
 } from "@storyshelf/core/utils";
-/**
- * StoryShelf app: compose database, storage, capture, auth, and notifier
- * adapters into a complete self-hosted visual-testing Hono app.
- */
-import {
-  createHttpMiddleware,
-  createInstrumentedDatabase,
-  createInstrumentedStorage,
-} from "@storyshelf/observability";
 import { requestId } from "hono/request-id";
-import type { ShelfApp, ShelfContext, ShelfRouter } from "./app-types.ts";
+import { noteAppConstructed } from "./app-count.ts";
+import type {
+  ShelfApp,
+  ShelfAppMode,
+  ShelfAppOptions,
+  ShelfContext,
+  ShelfRouter,
+} from "./app-types.ts";
 import { runBootTasks } from "./boot-tasks.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import { setupJobs, type JobsWiring } from "./jobs-setup.ts";
 import { attachLifecycle, type LifecycleCell } from "./lifecycle.ts";
 import { mountErrorHandlers, rejectInvalidRequest } from "./middleware/api-errors.ts";
 import { createClientIpResolver } from "./middleware/client-ip.ts";
 import { compression } from "./middleware/compression.ts";
+import { createHttpMiddleware } from "./middleware/http-telemetry.ts";
 import {
   authGate,
   notFoundPage,
@@ -45,6 +49,7 @@ import {
   requireReview,
   requireTesting,
   rateLimitKey,
+  readOnlyWrites,
   requestLogging,
   resolveRequestUser,
   sameSiteWrites,
@@ -53,8 +58,9 @@ import {
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
+import { registerAdminGit } from "./routers/admin-git.ts";
 import { registerAdminPages } from "./routers/admin-pages.ts";
-import { registerPublicOriginRoutes } from "./routers/admin-public-origin.ts";
+import { registerPublicOriginRoutes } from "./routers/admin-public-origin.tsx";
 import { registerAdmin } from "./routers/admin.ts";
 import { registerAssets } from "./routers/assets.ts";
 import { registerEngineAuth } from "./routers/auth.ts";
@@ -94,7 +100,7 @@ import { resolveRuntime, type ServerRuntime } from "./runtime.ts";
  * Fail fast on third-party adapters that cannot satisfy their slot.
  * Throws before any route or lifecycle hook runs.
  */
-function throwOnInvalidAdapters(options: ShelfOptions): void {
+function throwOnInvalidAdapters(options: ResolvedShelfOptions): void {
   const invalid = validateBootAssembly(adapterSourcesOf(options));
   if (invalid.length > 0) {
     throw new AdapterLifecycleError("setup", invalid, true);
@@ -102,7 +108,7 @@ function throwOnInvalidAdapters(options: ShelfOptions): void {
 }
 
 /** Request/capture-path adapters with OTEL wrappers (lifecycle keeps raw ones). */
-function instrumentedOptions(options: ShelfOptions): ShelfOptions {
+function instrumentedOptions(options: ResolvedShelfOptions): ResolvedShelfOptions {
   return {
     ...options,
     database: createInstrumentedDatabase(options.database),
@@ -111,10 +117,17 @@ function instrumentedOptions(options: ShelfOptions): ShelfOptions {
 }
 
 /** Wire the job queue, its handlers and its consumer, and run the boot tasks that need them. */
-function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: LifecycleCell): JobsWiring {
+function wireQueues(
+  scoped: ResolvedShelfOptions,
+  runtime: ServerRuntime,
+  cell: LifecycleCell,
+): JobsWiring {
   const jobs = setupJobs(scoped, runtime);
-  cell.consumer = jobs.consumer;
-  runBootTasks(cell, scoped, runtime, jobs.buildState);
+  if (cell.mode === "serve") {
+    // Only a serving app polls the queue and runs boot tasks (git-link sync, replay, backfills).
+    cell.consumer = jobs.consumer;
+    runBootTasks(cell, scoped, runtime, jobs.buildState);
+  }
   return jobs;
 }
 
@@ -122,7 +135,7 @@ function wireQueues(scoped: ShelfOptions, runtime: ServerRuntime, cell: Lifecycl
  * Serverless check (ADR 0006, decision 3): throws on AWS Lambda, warns on Vercel and Netlify. Only
  * an instance with `testing` needs a process that outlives the request.
  */
-function warnOnServerless(options: ShelfOptions, logger: Logger): void {
+function warnOnServerless(options: ResolvedShelfOptions, logger: Logger): void {
   const warning = assertServerless(options.testing?.runner !== undefined);
   if (warning) {
     logger.warn(warning);
@@ -139,10 +152,19 @@ function warnOnServerless(options: ShelfOptions, logger: Logger): void {
 }
 
 /** Attach lifecycle, queue, middleware, routes, and docs to the app. */
-function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions): void {
+function assembleApp(
+  app: ShelfApp,
+  options: ResolvedShelfOptions,
+  scoped: ResolvedShelfOptions,
+  mode: ShelfAppMode,
+): void {
   const runtime = resolveRuntime(options);
   warnOnServerless(options, runtime.logger);
-  const cell: LifecycleCell = { ready: Promise.resolve({ ok: true, failures: [] }), settled: null };
+  const cell: LifecycleCell = {
+    mode,
+    ready: Promise.resolve({ ok: true, failures: [] }),
+    settled: null,
+  };
   attachLifecycle(app, options, runtime, cell);
   const queues = wireQueues(scoped, runtime, cell);
   wireMiddleware(app, {
@@ -170,20 +192,26 @@ function assembleApp(app: ShelfApp, options: ShelfOptions, scoped: ShelfOptions)
  *
  * Adapter `init` hooks kick off eagerly in the background (the constructor
  * stays synchronous). Await `app.lifecycle.setup()` before serving for
- * fail-fast startup, or let the first request gate on settlement.
+ * fail-fast startup, or let the first request gate on settlement. `mode` (default `serve`) is what
+ * `storyshelf-server` passes: `migrate` sets only the database up, `tool` runs nothing by itself.
  */
-export function createShelfApp(rawOptions: ShelfOptions): ShelfApp {
+export function createShelfApp(
+  rawOptions: ShelfOptions,
+  appOptions: ShelfAppOptions = {},
+): ShelfApp {
+  noteAppConstructed();
   const options = resolveShelfOptions(rawOptions);
-  configureImages({
-    engine: options.testing?.images?.engine,
-    threads: options.testing?.compare?.threads,
+  // The runner's image engine; with no `testing` nothing image-related loads (#1365).
+  options.testing?.runner.images.configure({
+    engine: options.testing.images?.engine,
+    threads: options.testing.compare?.threads,
   });
   configureOutbound(options.config?.outbound);
   throwOnInvalidAdapters(options);
   const app = new OpenAPIHono<{ Variables: ShelfContext }>({
     defaultHook: rejectInvalidRequest,
   }) as ShelfApp;
-  assembleApp(app, options, instrumentedOptions(options));
+  assembleApp(app, options, instrumentedOptions(options), appOptions.mode ?? "serve");
 
   return app;
 }
@@ -208,7 +236,7 @@ function wireMiddleware(app: ShelfRouter, wiring: MiddlewareWiring): void {
   mountGuards(app, config, wiring.options);
   mountStoreScope(app, wiring);
   mountPortalBoundary(app, config);
-  mountAccessGates(app);
+  mountAccessGates(app, wiring.options);
 }
 
 /**
@@ -238,10 +266,12 @@ function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
 }
 
 /**
- * What the request is allowed to see, inside the request store: the not-found page (it needs to
- * know who is asking) wraps the sign-in gate and the project gates, whose 404s it dresses.
+ * What the request is allowed to see, inside the request store: a read-only shared account's writes
+ * are refused first (#1274); the not-found page (it needs to know who is asking) wraps the sign-in
+ * gate and the project gates, whose 404s it dresses.
  */
-function mountAccessGates(app: ShelfRouter): void {
+function mountAccessGates(app: ShelfRouter, options: Pick<ResolvedShelfOptions, "auth">): void {
+  app.use("*", readOnlyWrites(options.auth));
   app.use("*", notFoundPage());
   app.use("*", authGate());
   mountProjectGates(app);
@@ -295,7 +325,7 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
-function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ShelfOptions): void {
+function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ResolvedShelfOptions): void {
   // One resolver for every bucket: a forwarded header counts only from a trusted proxy (#911).
   const clientIp = createClientIpResolver(config.trustProxy);
   const rateLimit = createRateLimiter(clientIp);
@@ -352,6 +382,7 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       logger,
       authEnabled,
       testing: options.testing !== undefined,
+      skippedBuilds: options.skippedBuilds === true,
       enqueueCapture,
       captureQueue,
       capturesHere,
@@ -364,8 +395,11 @@ function mountStoreScope(app: ShelfRouter, wiring: MiddlewareWiring): void {
       design,
       notifiers,
       push,
+      integrations: options.integrations,
+      gitConfiguredLinks: options.git?.links,
       notificationsConfig: options.notifications?.config,
       ai: options.ai,
+      gitConnections: gitConnectionsOf(options, config),
       resolveUser: async (c) => await resolveRequestUser(c, options.auth),
     }),
   );
@@ -402,7 +436,7 @@ function registerNotificationRoutes(app: ShelfRouter): void {
 }
 
 /** Register the auth flow: engine mount, relying-party documents, profile. */
-function registerAuthFlow(app: ShelfRouter, options: ShelfOptions): void {
+function registerAuthFlow(app: ShelfRouter, options: ResolvedShelfOptions): void {
   // Auth-gated pages mount only with auth: authEnabled=false mounts zero
   // auth routes. Static imports stay — true lazy loading would need an async
   // createShelfApp, which the sync Hono assembly cannot do.
@@ -422,23 +456,37 @@ function registerTokenStorybook(app: ShelfRouter): void {
 }
 
 /** Register HTML pages, assets, and the optional auth flow. */
-function registerPageRoutes(app: ShelfRouter, options: ShelfOptions, health: HealthDeps): void {
+function registerPageRoutes(
+  app: ShelfRouter,
+  options: ResolvedShelfOptions,
+  health: HealthDeps,
+): void {
   registerAuthFlow(app, options);
   registerAssets(app);
   registerStorybook(app);
   registerTokenStorybook(app);
   registerPreviewToken(app);
-  registerAdminPages(app, health, options.auth);
-  registerPublicOriginRoutes(app);
+  registerSystemPages(app, options, health);
   registerUiPages(app);
   registerReviewForms(app);
   registerInsightFragments(app);
 }
 
+/** The site-admin System page, its public-origin routes and System → Git. */
+function registerSystemPages(
+  app: ShelfRouter,
+  options: ResolvedShelfOptions,
+  health: HealthDeps,
+): void {
+  registerAdminPages(app, health, options.auth);
+  registerPublicOriginRoutes(app);
+  registerAdminGit(app);
+}
+
 /** Register every API router and page set, then the error answers that cover them. */
 function registerAllRoutes(
   app: ShelfRouter,
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   health: HealthDeps,
   logger: Logger,
 ): void {
@@ -514,13 +562,14 @@ function registerDocs(app: ShelfRouter): void {
  *
  * `createShelfApp` plus the option/config types needed to call it. Adapter
  * interfaces live under `core/adapter/*`; runtime helpers under `core/logger`,
- * `core/capture`, `core/paths`, `core/urls`, `core/diff`; tables and row types
+ * `core/capture`, `core/paths`, `core/urls`; tables and row types
  * under `core/schema`. Importing the barrel must never pull Node-only modules
  * into edge bundles beyond what Hono itself needs.
  */
 export { createAuthSystemHook } from "./notify.ts";
 export type {
   ShelfOptions,
+  ResolvedShelfOptions,
   ShelfTestingOptions,
   ShelfCompareOptions,
   ShelfNotificationsOptions,
@@ -535,4 +584,21 @@ export {
   type LoggerOptions,
   type PinoTransport,
 } from "@storyshelf/core/logger";
-export type { ShelfApp, ShelfContext, ShelfLifecycle, ShelfRouter } from "./app-types.ts";
+export type {
+  ShelfApp,
+  ShelfAppMode,
+  ShelfAppOptions,
+  ShelfContext,
+  ShelfLifecycle,
+  ShelfRouter,
+} from "./app-types.ts";
+export { appsConstructed } from "./app-count.ts";
+export {
+  defineShelfInstance,
+  isShelfInstance,
+  type InstanceEnv,
+  type ShelfInstance,
+  type ShelfInstanceContext,
+  type ShelfInstanceFactory,
+  type ShelfInstanceHooks,
+} from "./instance-definition.ts";

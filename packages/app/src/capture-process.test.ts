@@ -1,4 +1,5 @@
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { fakeImageEngine } from "@storyshelf/core/test-helpers";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { childEnvOf, createForkedHandler, shouldForkCapture } from "./capture-process.ts";
@@ -8,6 +9,7 @@ const logger = createShelfLogger({ level: "silent" });
 function runner() {
   return {
     metadata: { name: "mock", version: "0.0.0", kind: "mock", category: "capture-runner" as const },
+    images: fakeImageEngine(),
     render: vi.fn(async () => ({ captures: [], failures: [] })),
     cancel: vi.fn(async () => {}),
   } as unknown as import("@storyshelf/core/adapter/capture-runner").CaptureRunner;
@@ -17,22 +19,22 @@ describe("childEnvOf", () => {
   it("hands the image engine, diff threads and retries to the child, with the shard size", () => {
     expect(childEnvOf({ retries: 3, shardSize: 40, imageEngine: "sharp", diffThreads: 2 })).toEqual(
       {
-        STORYSHELF_CAPTURE_RETRIES: "3",
-        STORYSHELF_CAPTURE_SHARD_SIZE: "40",
-        STORYSHELF_IMAGE_ENGINE: "sharp",
-        STORYSHELF_DIFF_WORKERS: "2",
+        SHELF_CAPTURE_RETRIES: "3",
+        SHELF_CAPTURE_SHARD_SIZE: "40",
+        SHELF_IMAGE_ENGINE: "sharp",
+        SHELF_DIFF_WORKERS: "2",
       },
     );
   });
 
   it("always hands down the retries, and nothing for options that were not given", () => {
-    expect(childEnvOf({ retries: 0 })).toEqual({ STORYSHELF_CAPTURE_RETRIES: "0" });
+    expect(childEnvOf({ retries: 0 })).toEqual({ SHELF_CAPTURE_RETRIES: "0" });
   });
 
   it("keeps a diff thread count of 0 (main-thread diffs)", () => {
     expect(childEnvOf({ retries: 2, diffThreads: 0 })).toEqual({
-      STORYSHELF_CAPTURE_RETRIES: "2",
-      STORYSHELF_DIFF_WORKERS: "0",
+      SHELF_CAPTURE_RETRIES: "2",
+      SHELF_DIFF_WORKERS: "0",
     });
   });
 });

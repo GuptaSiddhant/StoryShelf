@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Viewport } from "./adapter.ts";
+import type { Viewport } from "../adapters/story-source.ts";
 import {
   applyModes,
   buildGlobalsParam,

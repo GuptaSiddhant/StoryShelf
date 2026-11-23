@@ -20,6 +20,8 @@ export interface PageStoryOptions {
   dataset?: StoryDataset;
   /** Show the review comparison stage in this mode, zoom or flip side (default: split, fit). */
   stage?: StageState;
+  /** Show these CSS-only toggles (checkbox ids, such as the phone snapshot list) as checked. */
+  checked?: string[];
   /**
    * Run the shell's own client script inside the page frame for this story only, so the comparison
    * controls work. Every other page story stays a fixed state.
@@ -61,6 +63,15 @@ function withClientScript(html: string): string {
   return html.replace("</body>", () => `<script>${clientScript()}</script></body>`);
 }
 
+/** Mark the checkbox with each id as checked: a story-only fixed state for a CSS-only toggle. */
+function checkToggles(html: string, ids: string[] = []): string {
+  let next = html;
+  for (const id of ids) {
+    next = next.replace(new RegExp(`(<input\\b[^>]*\\sid="${id}")`, "u"), "$1 checked");
+  }
+  return next;
+}
+
 /** The same story in the preview's 375px phone viewport (`viewport.options.phone` in `preview.ts`). */
 export function onAPhone(story: StoryObj): StoryObj {
   return { ...story, globals: { viewport: { value: "phone", isRotated: false } } };
@@ -79,7 +90,10 @@ export function pageStory(render: () => PageHtml, options: PageStoryOptions = {}
         html: await withFrozenClock(async () => {
           setStoryStore(options.store);
           await useStoryDataset(options.dataset ?? "populated");
-          return stageState(await resolveHtml(await render()), options.stage);
+          return checkToggles(
+            stageState(await resolveHtml(await render()), options.stage),
+            options.checked,
+          );
         }),
       }),
     ],

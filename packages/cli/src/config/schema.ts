@@ -16,6 +16,8 @@ export interface StorybookConfig {
   affectedOnly?: boolean;
   /** Append `--stats-json` to the build script when affected capture is on (default true). */
   buildStats?: boolean;
+  /** Record a commit that changed no story as a skipped build instead of uploading (default false). */
+  skipUnchanged?: boolean;
   /** Glob patterns excluded from affected tracing (union with `--untraced`). */
   untraced?: string[];
 }
@@ -85,7 +87,7 @@ const OPTIONAL_CONFIG_KEYS = [
 ] as const;
 
 /** Optional config keys with boolean values. */
-const BOOLEAN_CONFIG_KEYS = ["affectedOnly", "buildStats"] as const;
+const BOOLEAN_CONFIG_KEYS = ["affectedOnly", "buildStats", "skipUnchanged"] as const;
 
 /** Optional config keys with string-array values. */
 const STRING_ARRAY_CONFIG_KEYS = ["untraced"] as const;
@@ -185,8 +187,7 @@ function checkCrossFieldRules(
     return { ok: false, error: "buildCommand and buildScriptName are mutually exclusive" };
   }
   const { buildDir, buildCommand, buildScriptName, skip } = parts.values;
-  const affectedOnly = parts.flags["affectedOnly"];
-  const buildStats = parts.flags["buildStats"];
+  const { affectedOnly, buildStats, skipUnchanged } = parts.flags;
   const untraced = parts.lists["untraced"];
   return {
     ok: true,
@@ -199,6 +200,7 @@ function checkCrossFieldRules(
       ...(skip === undefined ? {} : { skip }),
       ...(affectedOnly === undefined ? {} : { affectedOnly }),
       ...(buildStats === undefined ? {} : { buildStats }),
+      ...(skipUnchanged === undefined ? {} : { skipUnchanged }),
       ...(untraced === undefined ? {} : { untraced }),
     },
   };
@@ -237,8 +239,10 @@ export interface SchemaReferenceOptions {
 
 /**
  * Resolve the `$schema` value for a config file: a path relative to the
- * config directory when the schema ships alongside this CLI on disk, else a
- * versioned unpkg URL. Never throws — falls back to the unversioned URL.
+ * config directory only when this CLI is installed in a `node_modules` folder
+ * of the project (an ancestor of the config directory), else a versioned unpkg
+ * URL. A global install or the `npx` cache is machine-specific, so it never
+ * yields a path. Never throws — falls back to the unversioned URL.
  *
  * @param configDir - Directory that will contain the config file.
  * @param options - Module URL and version overrides (test seams).
@@ -259,7 +263,7 @@ export function schemaReference(configDir: string, options: SchemaReferenceOptio
     : `${SCHEMA_BASE_URL}@${version}/${SCHEMA_PACKAGE_PATH}`;
 }
 
-/** Repo-relative path to the bundled schema, or null when not on disk. */
+/** Project-relative path to the bundled schema, or null when it is not in the project's `node_modules`. */
 function resolveLocalSchema(configDir: string, moduleUrl: string): string | null {
   let schemaPath: string;
   try {
@@ -271,5 +275,9 @@ function resolveLocalSchema(configDir: string, moduleUrl: string): string | null
     return null;
   }
   const rel = relative(configDir, schemaPath).split(sep).join("/");
+  // Keep it only when it sits in a `node_modules` of the project or one of its parents.
+  if (!rel.replace(/^(?:\.\.\/)+/u, "").startsWith("node_modules/")) {
+    return null;
+  }
   return rel.startsWith(".") ? rel : `./${rel}`;
 }

@@ -8,9 +8,9 @@ export function NotificationsPausedNotice(props: {
   return props.paused ? (
     <div id="notifications-paused">
       <Alert tone="warning" title="Notifications are paused">
-        Notifications are paused until a public URL is set; set <code>PUBLIC_BASE_URL</code> or
-        confirm the detected origin on the System page. Nothing is sent meanwhile, and no channel is
-        marked as failing.
+        Notifications are paused until a public URL is set; set <code>SHELF_PUBLIC_BASE_URL</code>{" "}
+        or confirm the detected origin on the System page. Nothing is sent meanwhile, and no channel
+        is marked as failing.
       </Alert>
     </div>
   ) : null;

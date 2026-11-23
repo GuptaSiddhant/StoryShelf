@@ -4,7 +4,8 @@ import {
   requestOpenBuildStates,
   tryRequestOpenBuildStates,
   type OpenBuildRequest,
-} from "@storyshelf/core/capture";
+} from "@storyshelf/core/build-state";
+import { BuildModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
 import { notificationOrigin } from "./notifications-pause.ts";
@@ -18,10 +19,39 @@ import { getStore, type Store } from "./store.ts";
  */
 export async function requestBuildState(
   buildId: string,
-  only?: { channelId?: string },
+  only?: { channelId?: string; linkId?: string },
 ): Promise<void> {
   const store = getStore();
-  await (store.buildState ?? inlinePublisher(store)).request(buildId, only);
+  const publisher = store.buildState ?? inlinePublisher(store);
+  await publisher.request(buildId, only);
+  await requestSkippedFollowers(store, publisher, buildId, only);
+}
+
+/**
+ * A skipped build follows its source (ADR 0044, decision 6): whenever the source's state is asked
+ * for (a verdict moved it, a retry reset it), the builds skipped from it are asked for too, so a
+ * rejected source never leaves a green check on a newer commit. This is the one place that does it:
+ * every call site of {@link requestBuildState} gets it. A lookup that fails is logged, not thrown.
+ */
+async function requestSkippedFollowers(
+  store: Store,
+  publisher: ReturnType<typeof createBuildStatePublisher>,
+  buildId: string,
+  only?: { channelId?: string; linkId?: string },
+): Promise<void> {
+  try {
+    const followers = await new BuildModel(store.db).skippedFrom(buildId);
+    await Promise.all(
+      followers.map(async (build) => {
+        await publisher.request(build.id, only);
+      }),
+    );
+  } catch (err) {
+    store.logger.warn(
+      { err, buildId },
+      "could not request the state of the builds skipped from it",
+    );
+  }
 }
 
 /**

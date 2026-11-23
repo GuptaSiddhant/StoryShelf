@@ -35,7 +35,7 @@ Site `admin` bypasses all project checks. `GET /api/v1/projects/:slug/members` l
 
 ### Projects you cannot see
 
-With sign-in on, a project you have no role on does not exist as far as you can tell: its API routes and pages answer `404 Project not found`, byte for byte the answer for a slug that was never created, so nobody can probe which projects exist. `403` is only for a project you can see when your role is too low for the action (a viewer trying to approve, for example). The published Storybook of a build that is public stays readable, as before. A visitor who is not signed in gets the same `404` for a private project's Storybook, so a shared private link opens a not-found page; every not-found page for a visitor who is not signed in has a **Sign in** link that returns to the page you were opening, and it is the same page for a project that does not exist, so it tells no one which one they hit.
+With sign-in on, a project you have no role on does not exist as far as you can tell: its API routes and pages answer `404 Project not found`, byte for byte the answer for a slug that was never created, so nobody can probe which projects exist. Lists show only the projects you have a role on (a site viewer's or admin's role covers every project): the **Projects** page, the project switcher, `GET /api/v1/projects` and the upstream picker in a project's settings. `403` is only for a project you can see when your role is too low for the action (a viewer trying to approve, for example). The published Storybook of a build that is public stays readable, as before. A visitor who is not signed in gets the same `404` for a private project's Storybook, so a shared private link opens a not-found page; every not-found page for a visitor who is not signed in has a **Sign in** link that returns to the page you were opening, and it is the same page for a project that does not exist, so it tells no one which one they hit.
 
 ### IdP group mappings
 
@@ -44,13 +44,13 @@ Each project's **Members** tab can map an IdP group name to a project role. Mapp
 ## API tokens vs user auth
 
 - **Web UI** — session cookie via the auth engine / none.
-- **CLI/CI** — per-project **API tokens** (`Authorization: Bearer <token>`, `STORYSHELF_TOKEN`) and site-admin tokens (`STORYSHELF_ADMIN_TOKEN` / `ADMIN_TOKEN` for `storyshelf create` / `purge`). Tokens are per-project, hashed at rest, shown once at creation in Settings → Tokens.
+- **CLI/CI** — per-project **API tokens** (`Authorization: Bearer <token>`, `SHELF_TOKEN`) and site-admin tokens (`SHELF_ADMIN_TOKEN` for `storyshelf create` / `purge`). Tokens are per-project, hashed at rest, shown once at creation in Settings → Tokens.
 
 Tokens are **bound to the minting user** and resolve to that user’s live project role — demoting a user instantly downgrades their tokens. Legacy pre-binding tokens resolve as `viewer`; tokens whose owner was deleted are denied (re-issue).
 
 ## First admin bootstrap
 
-With auth enabled and an empty DB, no one can be `admin` yet. Set `STORYSHELF_ADMIN_TOKEN` on the server — its bearer grants site-admin API access without a session (distinct from `SECRET` which signs sessions). Creating a project as the first logged-in user also records them as that project’s `admin`.
+With auth enabled and an empty DB, no one can be `admin` yet. Set `SHELF_ADMIN_TOKEN` on the server — its bearer grants site-admin API access without a session (distinct from `SHELF_SECRET` which signs sessions). Creating a project as the first logged-in user also records them as that project’s `admin`.
 
 ## Related
 

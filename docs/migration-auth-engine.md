@@ -22,7 +22,7 @@ keeps users, memberships, invites, and UI. See ADR 0011.
   to `member` otherwise), project memberships from the Members-tab group
   mappings (highest rank wins, recorded as `sso:<group>`; manual grants
   survive). No `viewerGroups` equivalent — site roles are `admin`/`member`.
-- **`storyshelf server init` output changed** — `password` scaffolds email/pass
+- **`create-storyshelf` output changed** — `password` scaffolds email/pass
   - `ensurePasswordAdmin` bootstrap; `oauth` on AWS scaffolds the `cognitoPreset`
     social (new `COGNITO_DOMAIN` env); otherwise the `keycloakPreset` recipe.
 
@@ -41,7 +41,7 @@ keeps users, memberships, invites, and UI. See ADR 0011.
 New engine tables auto-migrate on boot (`IF NOT EXISTS`, no action needed):
 
 - sqlite / Turso: `user`, `session`, `account`, `verification`, `passkey`, `ssoProvider`
-- Postgres: same six tables in `db-postgres` DDL (fresh installs migrate; existing
+- Postgres: same six tables in `@storyshelf/db/postgres` DDL (fresh installs migrate; existing
   installs pick them up on next boot)
 
 Dual-driver verification checklist (run before promoting the deploy):

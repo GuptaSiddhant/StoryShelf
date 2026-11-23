@@ -1,26 +1,26 @@
-import {
-  requestOpenBuildStates,
-  sweepOrphanedScratch,
-  type BuildStatePublisher,
-} from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+import { requestOpenBuildStates, type BuildStatePublisher } from "@storyshelf/core/build-state";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
+import { sweepOrphanedScratch } from "@storyshelf/core/publish";
 import { backfillContentUses } from "@storyshelf/core/retention";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
+import { syncGitLinks } from "./git-connections.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
 import { startConsumer, trackBackground, type LifecycleCell } from "./lifecycle.ts";
 import { NOTIFICATIONS_PAUSED_TEXT } from "./notifications-pause.ts";
+import { warnMissingReadOnlyAccountsAfterSetup } from "./read-only-accounts.ts";
 import type { ServerRuntime } from "./runtime.ts";
 
 /**
  * Boot-time work that runs once adapters are ready: the job consumer starts (there is no boot sweep
  * of builds left `capturing`: leases expire and jobs are redelivered, so a second instance can
- * start without touching a first one's builds), the credential state is checked, and the git state
- * of open builds is asked for again (see {@link replayGitStateAfterSetup}).
+ * start without touching a first one's builds), the credential state is checked, the configured git
+ * links are applied (ADR 0054), and then the git state of open builds is asked for again (see
+ * {@link replayGitStateAfterSetup}).
  */
 export function runBootTasks(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   runtime: ServerRuntime,
   buildState?: BuildStatePublisher,
 ): void {
@@ -30,9 +30,34 @@ export function runBootTasks(
   logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
   logPausedAfterSetup(cell, runtime);
   backfillContentUsesAfterSetup(cell, scoped, runtime.logger);
+  warnMissingReadOnlyAccountsAfterSetup(cell, scoped.auth, scoped.database, runtime.logger);
+  const linksSynced = syncGitLinksAfterSetup(cell, scoped, runtime);
   if (buildState) {
-    replayGitStateAfterSetup(cell, scoped, runtime, buildState);
+    replayGitStateAfterSetup(cell, scoped, runtime, { buildState, after: linksSynced });
   }
+}
+
+/**
+ * Once adapters are ready, apply the repository links configuration declares and mark links whose
+ * connection is gone `broken` (restoring them once it is back). Never rejects: a failure is logged
+ * and the next start tries again. The replay waits for it, so a configured link is asked too.
+ */
+async function syncGitLinksAfterSetup(
+  cell: LifecycleCell,
+  scoped: ResolvedShelfOptions,
+  runtime: ServerRuntime,
+): Promise<void> {
+  const synced = cell.ready
+    .then(async (setup) => {
+      if (setup.ok) {
+        await syncGitLinks(scoped, runtime.config, runtime.logger);
+      }
+    })
+    .catch((error: unknown) => {
+      runtime.logger.warn({ err: error }, "could not apply the configured git links");
+    });
+  trackBackground(cell, synced);
+  await synced;
 }
 
 /**
@@ -43,17 +68,18 @@ export function runBootTasks(
  */
 function replayGitStateAfterSetup(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   runtime: ServerRuntime,
-  buildState: BuildStatePublisher,
+  replay: { buildState: BuildStatePublisher; after: Promise<void> },
 ): void {
   if (runtime.notifiers.length === 0) {
     return;
   }
+  const { buildState } = replay;
   trackBackground(
     cell,
-    cell.ready
-      .then(async (setup) => {
+    Promise.all([cell.ready, replay.after])
+      .then(async ([setup]) => {
         if (setup.ok && (await runtime.publicOrigin.url()) !== undefined) {
           const asked = await requestOpenBuildStates(
             { db: scoped.database, logger: runtime.logger },
@@ -76,7 +102,7 @@ function replayGitStateAfterSetup(
  */
 function backfillContentUsesAfterSetup(
   cell: LifecycleCell,
-  scoped: ShelfOptions,
+  scoped: ResolvedShelfOptions,
   logger: Logger,
 ): void {
   trackBackground(
@@ -118,7 +144,11 @@ function logPausedAfterSetup(cell: LifecycleCell, runtime: ServerRuntime): void 
 }
 
 /** Without `testing`, once adapters are ready, log the mode and any snapshots it hides. */
-function logHostingOnlyAfterSetup(cell: LifecycleCell, scoped: ShelfOptions, logger: Logger): void {
+function logHostingOnlyAfterSetup(
+  cell: LifecycleCell,
+  scoped: ResolvedShelfOptions,
+  logger: Logger,
+): void {
   if (scoped.testing !== undefined) {
     return;
   }

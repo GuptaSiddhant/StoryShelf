@@ -2,14 +2,15 @@
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import type { Project } from "@storyshelf/core/schema";
 import type { Context } from "hono";
+import { unofferedKindMessage } from "../integrations.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 const CONFIG_FIELDS = ["owner", "repo", "host", "prefix"] as const;
-/** Only the GitHub provider reads these: how it shows a build and the App that posts check runs. */
-const GITHUB_FIELDS = ["mode", "appId", "installationId"] as const;
+/** Only the GitHub provider reads these: how it shows a build, the App that posts check runs and the GHES API base. */
+const GITHUB_FIELDS = ["mode", "appId", "installationId", "apiUrl"] as const;
 
 /** The provider config from the form; blank optional fields are left out. */
 function gitConfig(provider: string, form: FormData): Record<string, string> {
@@ -85,6 +86,10 @@ async function gitChannelProblem(
   config: Record<string, string>,
   secret: { token: string | undefined; secretField: "token" | "privateKey" },
 ): Promise<Record<string, string> | null> {
+  const unoffered = unofferedKindMessage(provider);
+  if (unoffered !== undefined) {
+    return { gitProvider: unoffered };
+  }
   const { notifiers } = getStore();
   if (!NotificationChannelModel.isStateKind(notifiers, provider)) {
     return { gitProvider: `Unknown git provider: ${provider}` };

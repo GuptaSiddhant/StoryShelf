@@ -1,7 +1,17 @@
-import type { CaptureConsumer } from "@storyshelf/core/capture";
-import { captureMetrics } from "@storyshelf/observability";
+import type { CaptureConsumer } from "@storyshelf/core/jobs";
+import { captureMetrics } from "@storyshelf/core/telemetry";
 import { describe, expect, it, vi } from "vitest";
 import { combineConsumers, jobMetrics, lazyConsumer } from "./consumer-setup.ts";
+
+const built = vi.hoisted(() => ({ stop: vi.fn(async () => {}) }));
+vi.mock(import("@storyshelf/core/jobs"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  createCaptureConsumer: () => ({
+    start: async () => {},
+    stop: built.stop,
+    isRunning: () => false,
+  }),
+}));
 
 function fake(): CaptureConsumer & {
   start: ReturnType<typeof vi.fn>;
@@ -42,6 +52,16 @@ describe("combineConsumers", () => {
     expect(second.stop).toHaveBeenCalledOnce();
     expect(both.isRunning()).toBe(false);
   });
+
+  it("passes the stop's grace to every consumer (#912)", async () => {
+    const [first, second] = [fake(), fake()];
+    const both = combineConsumers([first, second]) as CaptureConsumer;
+    const running = both.start();
+    await both.stop({ graceMs: 7000 });
+    await running;
+    expect(first.stop).toHaveBeenCalledWith({ graceMs: 7000 });
+    expect(second.stop).toHaveBeenCalledWith({ graceMs: 7000 });
+  });
 });
 
 describe("lazyConsumer", () => {
@@ -52,6 +72,15 @@ describe("lazyConsumer", () => {
     expect(consumer.isRunning()).toBe(false);
     await consumer.stop();
     expect(options).not.toHaveBeenCalled();
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it("passes the stop's grace to the consumer it built, then runs the closers (#912)", async () => {
+    const closed = vi.fn(async () => {});
+    const consumer = lazyConsumer((() => ({})) as never, [closed]);
+    await consumer.start();
+    await consumer.stop({ graceMs: 7000 });
+    expect(built.stop).toHaveBeenCalledWith({ graceMs: 7000 });
     expect(closed).toHaveBeenCalledOnce();
   });
 });

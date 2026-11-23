@@ -19,6 +19,7 @@ GET    /api/v1/projects/:slug/builds
 POST   /api/v1/projects/:slug/builds          # multipart: storybook zip + sha/branch/message/author -> 202
 GET    /api/v1/projects/:slug/builds/:buildId
 POST   /api/v1/projects/:slug/builds/:buildId/retry   # re-run capture (flaky tests)
+POST   /api/v1/projects/:slug/builds/cancel            # cancel older unfinished builds, keeping the newest of each branch (class testing)
 POST   /api/v1/projects/:slug/builds/:buildId/cancel  # cancel the build's jobs of every kind; the build ends cancelled (class testing)
 DELETE /api/v1/projects/:slug/builds/:buildId
 

@@ -1,4 +1,4 @@
-import { createDatabaseCaptureQueue } from "@storyshelf/core/capture";
+import { createDatabaseCaptureQueue } from "@storyshelf/core/jobs";
 import {
   BuildModel,
   CaptureJobModel,

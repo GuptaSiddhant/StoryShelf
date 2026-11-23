@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunnerTarget } from "../adapters/capture-runner.ts";
+import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { NO_ORIGIN_REASON, NO_SECRET_REASON, offeredTargets } from "./targets.ts";
 
 const runner = (targets?: RunnerTarget[]) => ({
@@ -10,6 +11,7 @@ const runner = (targets?: RunnerTarget[]) => ({
     category: "capture-runner" as const,
     ...(targets ? { targets } : {}),
   },
+  images: pngImageEngine(),
 });
 
 const local: RunnerTarget = { target: "chromium", reach: "loopback", status: "ready" };

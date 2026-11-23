@@ -1,0 +1,183 @@
+name: Release dry run
+
+# Each stable release so far found its blockers only after the release pull request merged, while
+# publishing (#1097): an arm64 image that had never been built (#1072), a package published for the
+# first time with no trusted publisher (ENEEDAUTH), and an image running as uid 1000 on a Fly volume
+# the old root image wrote (#1073, #1088). This runs the risky parts of `release.yml` and `fly.yml`
+# when the release pull request opens, without publishing or deploying anything.
+#
+# It runs only on `release/v*` pull requests, and by hand (`workflow_dispatch`, to test it on any
+# branch). On any other pull request every job is skipped, which a required check counts as passing,
+# so the job can be required in branch protection. `changeset` and `docs:check` already run in CI.
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read # the previous release's image, for the demo volume
+
+concurrency:
+  group: release-dry-run-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/guptasiddhant/storyshelf
+
+jobs:
+  # `release.yml`'s `publish-image` builds both variants for both platforms. Nothing is pushed.
+  images:
+    name: release images build
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [full, hosting]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build without pushing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server-image/Dockerfile
+          target: ${{ matrix.variant }}
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha,scope=image-${{ matrix.variant }}
+
+  # `publish-npm` needs every package on npm, with a trusted publisher.
+  npm:
+    name: npm packages exist
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # The trust config is readable only with an npm token; without `NPM_TOKEN` the existence
+      # check still runs. The token is passed through npm's own auth variable and never printed.
+      - name: Check every public package
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+            echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > "$RUNNER_TEMP/npmrc"
+            export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc"
+            node scripts/check-npm-packages.mjs --trust
+          else
+            echo "::notice::NPM_TOKEN is not set; checking existence only, not the trusted publishers."
+            node scripts/check-npm-packages.mjs
+          fi
+
+  # `fly.yml` runs the official image of the release when `FLY_OFFICIAL_IMAGE` is `true`, else a
+  # build of `apps/fly-app/Dockerfile`. The demo's volume was written by the previous release's
+  # demo image, so: fill a volume with that image, then boot this release's demo image on it.
+  demo:
+    name: demo image boots on the previous volume
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Resolve the previous release and the demo image
+        id: plan
+        env:
+          OFFICIAL: ${{ vars.FLY_OFFICIAL_IMAGE }}
+        run: |
+          set -e
+          prev=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n 1)
+          echo "prev=${prev}" >> "$GITHUB_OUTPUT"
+          echo "official=$([ "$OFFICIAL" = true ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Previous release: ${prev:-none}; official image: ${OFFICIAL:-unset}" >> "$GITHUB_STEP_SUMMARY"
+
+      # The image the demo runs next: the official one (target `full`) or the Fly image.
+      - name: Build the next demo image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ steps.plan.outputs.official == 'true' && 'apps/server-image/Dockerfile' || 'apps/fly-app/Dockerfile' }}
+          target: ${{ steps.plan.outputs.official == 'true' && 'full' || '' }}
+          platforms: linux/amd64
+          load: true
+          tags: demo-next
+          cache-from: type=gha,scope=image-full
+
+      # The image that wrote the volume: the previous release's official image when the demo ran
+      # it, else the Fly image built from the previous tag. No previous release: nothing to fill.
+      - name: Get the previous demo image
+        id: prev
+        if: steps.plan.outputs.prev != ''
+        env:
+          PREV: ${{ steps.plan.outputs.prev }}
+          OFFICIAL: ${{ steps.plan.outputs.official }}
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          if [ "$OFFICIAL" = true ] && docker pull "${IMAGE}:${PREV#v}"; then
+            docker tag "${IMAGE}:${PREV#v}" demo-prev
+          else
+            git worktree add --detach "$RUNNER_TEMP/prev" "refs/tags/${PREV}"
+            docker build -f "$RUNNER_TEMP/prev/apps/fly-app/Dockerfile" -t demo-prev "$RUNNER_TEMP/prev"
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Boot both images on one /data volume
+        env:
+          DRY_RUN_SECRET: dry-run-secret-of-at-least-32-characters
+          FILLED: ${{ steps.prev.outputs.ready }}
+        run: |
+          set -e
+          wait_healthy() {
+            for i in $(seq 1 40); do
+              if curl -fsS "http://127.0.0.1:3000/api/v1/health"; then echo; return 0; fi
+              sleep 3
+            done
+            echo "::error::$1 did not answer /api/v1/health"; docker logs "$1" || true; return 1
+          }
+          docker volume create demo-data
+          if [ "$FILLED" = true ]; then
+            # The previous release still reads the names from before #1308.
+            docker run -d --name prev -p 3000:3000 -v demo-data:/data -e SECRET="$DRY_RUN_SECRET" \
+              -e PORT=3000 -e DATA_DIR=/data demo-prev
+            wait_healthy prev
+            docker stop prev && docker rm prev
+          fi
+          # SHELF_AUTH=none: the official image refuses to start without SHELF_ADMIN_PASSWORD unless told.
+          # The new names (#1308): the next image has no aliases and refuses to boot on the old ones,
+          # so an operator renames the variables before upgrading (the upgrading guide's table).
+          docker run -d --name next -p 3000:3000 -v demo-data:/data -e SHELF_SECRET="$DRY_RUN_SECRET" \
+            -e PORT=3000 -e SHELF_DATA_DIR=/data -e SHELF_AUTH=none demo-next
+          wait_healthy next
+          docker stop next

@@ -1,13 +1,14 @@
 name: Fly dry run
 
 # Reusable: proves a merge would still deploy to Fly. Builds the Fly image from the same
-# Dockerfile and context as fly.yml (no push), boots it, seeds the demo into it and checks
-# the demo captures. Called by ci.yml and nightly.yml.
+# Dockerfile and context as fly.yml (no push), boots it and runs the demo seed against it (#1275: it
+# prepares the `storyshelf-ui` project and removes the old one), always with sign-in on (#1360). Called by ci.yml and nightly.yml.
 #
-# `e2e: true` adds the browser golden path (#941) on the same container: password sign-in and a
-# confirmed PUBLIC_BASE_URL are switched on at boot, and after the seed `apps/fly-app/e2e` uploads
-# one changed build, signs in, approves it with the keyboard, checks the git status recorded by the
-# `git-log` provider and the private Storybook, and runs axe on the pages it visits. Off by default;
+# `e2e: true` adds the browser golden path (#941) on the same container: a
+# confirmed SHELF_PUBLIC_BASE_URL and the read-only demo account are switched on at boot, and after the seed `apps/fly-app/e2e` creates
+# a project of its own with one changed build, signs in, approves it with the keyboard, checks the git
+# status recorded by the `git-log` provider and that a private build stays private, signs in as the
+# read-only demo account, and runs axe on the pages it visits. Off by default;
 # ci.yml turns it on for `release/v*` PRs and manual runs, nightly.yml always.
 on:
   workflow_call:
@@ -26,12 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      STORYSHELF_URL: http://127.0.0.1:3000
-      STORYSHELF_ADMIN_TOKEN: ci-admin-token
+      SHELF_URL: http://127.0.0.1:3000
+      SHELF_ADMIN_TOKEN: ci-admin-token
       # Throwaway values for the e2e container only (the password is 12+ characters).
       E2E_EMAIL: reviewer@example.com
       E2E_PASSWORD: e2e-password-123
       E2E_SECRET: e2e-secret-that-is-long-enough-1234567890
+      # The demo's read-only account, with a throwaway password (the real one is a Fly secret).
+      E2E_DEMO_PASSWORD: e2e-demo-password-123
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -39,8 +42,10 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Build the workspace CLI
-        run: nubx turbo build --filter=storyshelf
+      # The CLI seeds the demo; the e2e imports `@storyshelf/runner/a11y`, whose `default` export is
+      # its `dist` (Vitest does not use the `source` condition), so build both.
+      - name: Build the workspace CLI and runner
+        run: nubx turbo build --filter=storyshelf --filter=@storyshelf/runner
 
       - name: Build fixture Storybook
         uses: ./.github/actions/build-fixture
@@ -53,38 +58,35 @@ jobs:
 
       - name: Boot the image
         run: |
-          # With e2e: password sign-in and a confirmed public origin, as a deployment would have.
-          extra=()
+          # Sign-in is always on, as on Fly: FLY_APP_NAME makes the demo refuse to boot without
+          # SHELF_ADMIN_PASSWORD and SHELF_SECRET (#1360). SHELF_TRUST_PROXY=false keeps rate limits
+          # keyed on the socket peer, since no Fly proxy sits in front of this container.
+          extra=(-e FLY_APP_NAME=storyshelf-dry-run -e SHELF_TRUST_PROXY=false \
+            -e SHELF_SECRET="$E2E_SECRET" -e SHELF_ADMIN_EMAIL="$E2E_EMAIL" -e SHELF_ADMIN_PASSWORD="$E2E_PASSWORD")
+          # With e2e: also a confirmed public origin and the read-only demo account, as a deployment would have.
           if [ "${{ inputs.e2e }}" = "true" ]; then
-            extra=(-e SECRET="$E2E_SECRET" -e AUTH_EMAIL="$E2E_EMAIL" -e AUTH_PASSWORD="$E2E_PASSWORD" \
-              -e PUBLIC_BASE_URL="$STORYSHELF_URL")
+            extra+=(-e SHELF_PUBLIC_BASE_URL="$SHELF_URL" \
+              -e SHELF_READ_ONLY_ACCOUNTS=demo@storyshelf.js.org \
+              -e SHELF_DEMO_VIEWER_PASSWORD="$E2E_DEMO_PASSWORD")
           fi
           docker run -d --name storyshelf -p 3000:3000 \
-            -e STORYSHELF_ADMIN_TOKEN="$STORYSHELF_ADMIN_TOKEN" "${extra[@]}" storyshelf-fly
+            -e SHELF_ADMIN_TOKEN="$SHELF_ADMIN_TOKEN" "${extra[@]}" storyshelf-fly
           for i in $(seq 1 30); do
-            curl -fsS "$STORYSHELF_URL/api/v1/health" && exit 0
+            curl -fsS "$SHELF_URL/api/v1/health" -o health.json && exit 0
             sleep 2
           done
           echo "::error::the Fly image did not become healthy"
           exit 1
 
-      - name: Seed the demo
-        run: apps/fly-app/seed.sh
-
-      - name: Demo captures through the pipeline
+      # A release that would come up open (as v0.15.0 did) fails here, before it ships.
+      - name: Assert sign-in is on
         run: |
-          for i in $(seq 1 90); do
-            status="$(curl -fsS -H "Authorization: Bearer $STORYSHELF_ADMIN_TOKEN" \
-              "$STORYSHELF_URL/api/v1/projects/demo-design-system/builds" | jq -r '[.[].status] | join(" ")')"
-            echo "build statuses: $status"
-            case "$status" in
-              *failed*) echo "::error::a demo build failed"; exit 1 ;;
-              *pending*|*capturing*|*comparing*|"") sleep 5 ;;
-              *) exit 0 ;;
-            esac
-          done
-          echo "::error::demo builds did not settle in time"
-          exit 1
+          cat health.json
+          jq -e '.auth == true' health.json >/dev/null \
+            || { echo "::error::/api/v1/health does not report auth: true"; exit 1; }
+
+      - name: Seed the demo (removes the old project, prepares storyshelf-ui)
+        run: apps/fly-app/seed.sh
 
       - name: Re-seed is a no-op
         run: apps/fly-app/seed.sh | tee reseed.log && grep -q "up to date" reseed.log

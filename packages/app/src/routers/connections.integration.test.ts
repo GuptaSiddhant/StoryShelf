@@ -1,6 +1,6 @@
+import { createFigmaDesign } from "@storyshelf/core/integrations";
 import { ConnectionModel, DesignCredentialModel } from "@storyshelf/core/models";
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
-import { createFigmaDesign } from "@storyshelf/design-figma";
 import { pino } from "pino";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";

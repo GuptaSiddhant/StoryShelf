@@ -15,6 +15,7 @@ import {
   RelativeTime,
   SectionTitle,
   VStack,
+  Time,
 } from "../ui/components.tsx";
 import { Style } from "../ui/css.ts";
 import {
@@ -97,7 +98,9 @@ export function CommentCard(
     <div key={comment.id} id={`comment-${comment.id}`} tabIndex={-1} class={reviewComment}>
       <div class={reviewCommentHead}>
         <strong>{who}</strong>
-        <span>· {new Date(comment.createdAt).toLocaleString()}</span>
+        <span>
+          · <Time value={comment.createdAt} />
+        </span>
         {anchor ?? null}
         <KindBadge comment={comment} />
       </div>
@@ -134,7 +137,7 @@ function KindBadge(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   const { comment } = props;
   if (comment.kind !== "change_request") {
-    return comment.resolved ? <Badge tone="success">resolved</Badge> : null;
+    return comment.resolved ? <Badge tone="success">Resolved</Badge> : null;
   }
   return comment.resolved ? (
     <Badge tone="success" icon>

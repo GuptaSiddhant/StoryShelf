@@ -11,13 +11,14 @@ import {
   notifyExhausted,
   type BuildStateDeps,
   type BuildStatePublisher,
-  type KindHandler,
   type NotifyFailure,
-} from "@storyshelf/core/capture";
-import type { ShelfOptions } from "@storyshelf/core/config";
+} from "@storyshelf/core/build-state";
+import type { ResolvedShelfOptions } from "@storyshelf/core/config";
+import type { KindHandler } from "@storyshelf/core/jobs";
 import { ProjectModel } from "@storyshelf/core/models";
 import { buildStateFlags } from "./build-state-flags.ts";
 import { credentialKeys } from "./credential-keys.ts";
+import { gitConnectionsOf } from "./git-connections.ts";
 import type { JobQueue } from "./job-queue.ts";
 import { notifySystemWith } from "./notify.ts";
 import type { ServerRuntime } from "./runtime.ts";
@@ -32,7 +33,7 @@ export interface BuildStateWiring {
 
 /** Wire build-state delivery for `options`; `jobs` is the `notify` queue, null on a host with no consumer. */
 export function setupBuildState(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   jobs: JobQueue | null,
 ): BuildStateWiring {
@@ -45,6 +46,7 @@ export function setupBuildState(
     publicOrigin: async () => await runtime.publicOrigin.url(),
     flags: (project) => buildStateFlags(options.testing !== undefined, project),
     logger: runtime.logger.child({ component: "build-state" }),
+    gitConnections: gitConnectionsOf(options, runtime.config),
   };
   if (jobs === null) {
     return { publisher: createBuildStatePublisher({ deps }), handler: null };
@@ -73,7 +75,7 @@ export function setupBuildState(
  * alert can never raise another one.
  */
 async function alertAdmins(
-  options: ShelfOptions,
+  options: ResolvedShelfOptions,
   runtime: ServerRuntime,
   failure: NotifyFailure,
 ): Promise<void> {
@@ -100,7 +102,7 @@ async function alertAdmins(
       buildId: failure.buildId,
       error: failure.error,
       // The formatter prints `message` in an admin alert.
-      message: `${failure.provider} channel of ${project?.slug ?? "a project"} could not show build ${failure.buildId}: ${failure.error}`,
+      message: `${failure.provider} ${failure.linkId === undefined ? "channel" : "repository link"} of ${project?.slug ?? "a project"} could not show build ${failure.buildId}: ${failure.error}`,
     },
   );
 }

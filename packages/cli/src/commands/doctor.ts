@@ -1,9 +1,9 @@
 import { gitRepoRoot, gitRepoStatus, pathBase } from "@storyshelf/affected";
 import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createClient } from "../client.ts";
+import { createClient, RequestError } from "../client.ts";
 import { findStorybookMain, loadStorybookConfig, type StorybookConfig } from "../config.ts";
-import { printLine } from "../output.ts";
+import { createReporter, printLine, type Reporter } from "../output.ts";
 import {
   resolveConnection,
   type ConnectionOptions,
@@ -65,10 +65,10 @@ function serverErrorMessage(error: unknown): string {
   }
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("(401)")) {
-    return "authentication failed (401) — check STORYSHELF_TOKEN";
+    return "authentication failed (401) — check SHELF_TOKEN";
   }
   if (message.includes("(403)")) {
-    return "forbidden (403) — token lacks access to this project";
+    return `forbidden (403) — ${message.replace(/^Request failed \(403\): /u, "")}`;
   }
   if (message.includes("(404)")) {
     return "project not found (404) — check --slug";
@@ -87,6 +87,33 @@ async function checkServer(connection: ResolvedConnection): Promise<Check> {
   } catch (error) {
     return { status: "fail", message: `Server check failed: ${serverErrorMessage(error)}` };
   }
+}
+
+/**
+ * Whether the token may upload, without uploading: record usage for a build that does not exist.
+ * The server checks the role before it looks the build up, so 404 means permitted and 401/403
+ * means refused (the answer says why). A server with sign-in off permits every token.
+ */
+async function checkUpload(connection: ResolvedConnection): Promise<Check> {
+  const client = createClient(connection.url, connection.token);
+  try {
+    if ((await client.health()).auth === false) {
+      return { status: "pass", message: "Upload permitted (server has sign-in off)" };
+    }
+    await client.projects.builds.postUsage(connection.slug, "doctor-probe", []);
+  } catch (error) {
+    if (error instanceof RequestError && error.status === 404) {
+      return { status: "pass", message: "Token may upload builds" };
+    }
+    return { status: "fail", message: `Token may not upload: ${serverErrorMessage(error)}` };
+  }
+  return { status: "pass", message: "Token may upload builds" };
+}
+
+/** The server check, then the upload check when the server answered. */
+async function checkConnection(connection: ResolvedConnection): Promise<Check[]> {
+  const server = await checkServer(connection);
+  return server.status === "pass" ? [server, await checkUpload(connection)] : [server];
 }
 
 async function checkBuildOutput(cwd: string, inputs: BuildInputs): Promise<Check> {
@@ -129,18 +156,27 @@ function resolveBuildInputs(options: DoctorOptions, cfg: StorybookConfig | null)
  *
  * @param options - Connection and build options (flags, config, or env).
  */
-export async function runDoctor(options: DoctorOptions): Promise<void> {
+export async function runDoctor(
+  options: DoctorOptions,
+  reporter: Reporter = createReporter(),
+): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
-  const cfg = await loadStorybookConfig(cwd, options.config);
-  const checks: Check[] = [await checkSetup(cwd), checkConfigFile(cfg)];
-  const connection = await tryResolveConnection(options, checks);
-  if (connection) {
-    checks.push(await checkServer(connection));
+  const checks: Check[] = [];
+  const connection = await reporter.phase("Checking config", "Checked config", async () => {
+    const cfg = await loadStorybookConfig(cwd, options.config);
+    checks.push(await checkSetup(cwd), checkConfigFile(cfg));
+    return { cfg, connection: await tryResolveConnection(options, checks) };
+  });
+  if (connection.connection) {
+    const resolved = connection.connection;
+    await reporter.phase("Checking server", "Checked server", async () => {
+      checks.push(...(await checkConnection(resolved)));
+    });
   }
-  checks.push(
-    await checkBuildOutput(cwd, resolveBuildInputs(options, cfg)),
-    await checkAffected(cwd, resolveBuildInputs(options, cfg).buildDir),
-  );
+  await reporter.phase("Checking Storybook build", "Checked Storybook build", async () => {
+    const inputs = resolveBuildInputs(options, connection.cfg);
+    checks.push(await checkBuildOutput(cwd, inputs), await checkAffected(cwd, inputs.buildDir));
+  });
   reportChecks(checks);
 }
 

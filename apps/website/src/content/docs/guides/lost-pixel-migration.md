@@ -16,14 +16,14 @@ description: Move Lost Pixel Storybook shots to StoryShelf — config mapping, b
 | `breakpoints`                                                          | Server `ShelfConfig.viewports`                                          |
 | `waitBeforeScreenshot`                                                 | Story `parameters.storyshelf.delay`                                     |
 | `lostpixel update` (accept)                                            | Approve in the review UI                                                |
-| `lostPixelProjectId` / `apiKey`                                        | `STORYSHELF_SLUG` / `STORYSHELF_TOKEN`                                  |
+| `lostPixelProjectId` / `apiKey`                                        | `SHELF_SLUG` / `SHELF_TOKEN`                                            |
 
 ## 1. Deploy a server and create the project
 
 Follow [Getting started](/guides/getting-started/), then create the project:
 
 ```bash
-storyshelf create --url https://shelf.example.com --name "My Design System" --token $ADMIN_TOKEN
+storyshelf create --url https://shelf.example.com --name "My Design System" --token $SHELF_ADMIN_TOKEN
 ```
 
 ## 2. Replace the CI step
@@ -44,10 +44,10 @@ After (StoryShelf):
   with:
     fetch-depth: 0 # affected capture diffs against history
 - run: npx build-storybook -o storybook-static
-- run: npx storyshelf upload --token ${{ secrets.STORYSHELF_TOKEN }} --sha ${{ github.sha }} --branch ${{ github.ref_name }}
+- run: npx storyshelf upload --token ${{ secrets.SHELF_TOKEN }} --sha ${{ github.sha }} --branch ${{ github.ref_name }}
   env:
-    STORYSHELF_URL: https://shelf.example.com
-    STORYSHELF_SLUG: my-design-system
+    SHELF_URL: https://shelf.example.com
+    SHELF_SLUG: my-design-system
 ```
 
 Then delete `lostpixel.config.ts` and the Lost Pixel workflow. The [CLI guide](/guides/cli/) and [CI guide](/guides/ci/) cover the full option set and the `.storybook/storyshelf.json` shortcut.
@@ -99,7 +99,7 @@ If you need page-level shots, keep a small Playwright test for those pages outsi
 ## Checklist
 
 - ☐ StoryShelf server deployed, project created
-- ☐ `STORYSHELF_TOKEN` added to CI secrets; Lost Pixel secrets removed
+- ☐ `SHELF_TOKEN` added to CI secrets; Lost Pixel secrets removed
 - ☐ CI step replaced; `lostpixel.config.ts` and `.lostpixel/baseline/` deleted
 - ☐ First default-branch build uploaded and baselines established
 - ☐ Thresholds, viewports and per-story delays carried over
