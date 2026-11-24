@@ -28,6 +28,20 @@
       "package": "@vitest/mocker",
       "reviewBy": "2027-02-18",
       "issue": 335
+    },
+    {
+      "advisory": "GHSA-3g3m-2fjr-6pw4",
+      "target": "storybook-10",
+      "package": "glob",
+      "reviewBy": "2027-02-18",
+      "issue": 335
+    },
+    {
+      "advisory": "GHSA-g3hv-75wg-m249",
+      "target": "storybook-10",
+      "package": "minimatch",
+      "reviewBy": "2027-02-18",
+      "issue": 335
     }
   ]
 }
