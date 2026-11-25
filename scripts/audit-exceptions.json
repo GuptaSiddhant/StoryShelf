@@ -56,6 +56,13 @@
       "package": "minimatch",
       "reviewBy": "2027-02-18",
       "issue": 335
+    },
+    {
+      "advisory": "GHSA-g3hv-75wg-m249",
+      "target": "workspace",
+      "package": "minimatch",
+      "reviewBy": "2027-02-18",
+      "issue": 335
     }
   ]
 }
