@@ -32,7 +32,7 @@
       "adm-zip": "0.6.1",
       "drizzle-kit": "1.0.0-rc.6",
       "drizzle-orm": "1.0.0-rc.6",
-      "hono": "^4.11.0",
+      "hono": "^4.13.16",
       "oxfmt": "^0.65.0",
       "oxlint": "^1.80.0",
       "oxlint-tsgolint": "^7.0.2001",
@@ -96,6 +96,7 @@
   },
   "overrides": {
     "form-data@^4.0.0": "4.0.6",
+    "readdir-glob@^3.0.0": "4.0.0",
     "source-map-js": "1.2.2",
     "tinypool": "2.2.0",
     "undici@^7.0.0": "7.30.1",
