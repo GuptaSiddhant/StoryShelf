@@ -137,6 +137,10 @@ All providers speak the standard Postgres wire protocol. Pick the connection str
 | Neon                          | `postgres://user:pass@<neon-host>/db?sslmode=require`                                                               | `ssl: true`                                                                          | Serverless pooler — keep `max` low (e.g. `max: 5`); pooled endpoints via PgBouncer need `prepare: false`                        |
 | Azure Database for PostgreSQL | `postgres://user:pass@<server>.postgres.database.azure.com:5432/db?sslmode=require`                                 | `ssl: true`                                                                          | Microsoft Entra ID (IAM) via injected `client` with an access token; otherwise password auth works with default pooling         |
 
+### PGlite on Node 24
+
+`@storyshelf/db/postgres/pglite` runs Postgres as WebAssembly inside the Node process. Node 24's V8 can abort the process (`Check failed: jit_page_->allocations_.erase(addr) == 1` or `jit_page.has_value()`, exit code 133) when it frees the wasm code of a PGlite instance that was closed ([nodejs/node#66366](https://github.com/nodejs/node/issues/66366); the fix is in V8 and Node 22 and 26, but not yet in a 24.x release). A server that opens one PGlite for its whole life does not free that code, so it does not hit the bug. If one process opens and closes many PGlite instances (as test suites do), start Node with `--no-wasm-code-gc`, for example `node --no-wasm-code-gc node_modules/@storyshelf/app/dist/bin.mjs serve` or a Vitest `execArgv`. Node refuses this flag in `NODE_OPTIONS`.
+
 ### RDS and Aurora with IAM authentication
 
 `@storyshelf/db/postgres/rds-iam` connects to RDS or Aurora Postgres with a short-lived IAM token instead of a password, so there is nothing to rotate. Install the optional peers (`pg` and `@aws-sdk/rds-signer`); the standard AWS credential chain applies (ECS task role, instance role, web identity).
