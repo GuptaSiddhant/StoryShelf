@@ -3,7 +3,7 @@
 import { RenderRuns } from "@storyshelf/core/adapter/capture-runner";
 import { errorText } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
-import type { RemoteLeaseOutcome } from "./remote/remote-browser.ts";
+import { scrubConnection, type RemoteLeaseOutcome } from "./remote/remote-browser.ts";
 import type { HeldConnection } from "./remote/remote-lease.ts";
 import type { ActiveRun } from "./types.ts";
 
@@ -16,6 +16,16 @@ const leases = new WeakMap<Browser, HeldConnection>();
 /** Tie a lease to the browser opened over it: closing the browser through this module releases it. */
 export function holdLease(browser: Browser, lease: HeldConnection): void {
   leases.set(browser, lease);
+}
+
+/**
+ * `text` with the connection of `browser` removed from it (endpoint, headers, lease), so a failure
+ * seen through a remote browser can be stored; a local browser holds none and the text is returned
+ * as it is.
+ */
+export function scrubFor(browser: Browser, text: string): string {
+  const held = leases.get(browser);
+  return held === undefined ? text : scrubConnection(text, held.connection);
 }
 
 /** Close a browser if present, for a cancel (its lease is released as such); never throws. */
