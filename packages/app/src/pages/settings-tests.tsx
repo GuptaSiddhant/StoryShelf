@@ -24,8 +24,8 @@ export function renderSettingsTests(
         <SectionTitle>Interaction and accessibility tests</SectionTitle>
         <Meta>
           When enabled, Storybook <code>play</code> functions run before each screenshot. Failures
-          block the build unless the story is marked
-          <code>flaky-test</code> via <code>tags: ['flaky-test']</code> or
+          block the build unless the story is marked <code>flaky-test</code> via{" "}
+          <code>tags: ['flaky-test']</code> or{" "}
           <code>parameters: &#123; flakyTest: true &#125;</code> (supports both{" "}
           <code>chromatic</code> and <code>storyshelf</code> keys, story-level, case-insensitive).
           Use <code>disableSnapshot</code> to skip a story entirely.
@@ -130,8 +130,7 @@ export const Flaky2: Story = {
         </Meta>
         <Meta>
           Tags are story-level and case-insensitive (<code>flaky-test</code>). Whole story is
-          non-blocking when flaky. GitHub status stays
-          <code>success</code> with a warning comment.
+          non-blocking when flaky. GitHub status stays <code>success</code> with a warning comment.
         </Meta>
       </Card>
     </div>

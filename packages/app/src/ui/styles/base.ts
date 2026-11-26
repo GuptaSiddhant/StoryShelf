@@ -11,6 +11,8 @@ function resetCss(): string {
     html:has([data-action-bar]) { scroll-padding-bottom: 7rem; }
     main:has([data-action-bar]) { padding-bottom: calc(var(--space-8) * 3.5); }
     body { margin: 0; font-size: var(--text-base); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--surface-base); color: var(--text-primary); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    /* Form controls do not inherit the page font by default; Chromium draws them in Arial. */
+    button, input, select, textarea { font-family: inherit; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     /* A link inside running text is underlined, not told apart by colour alone (WCAG 1.4.1). */

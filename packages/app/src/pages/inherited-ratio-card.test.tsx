@@ -34,6 +34,13 @@ describe("InheritedRatioCard", () => {
     expect(html).toContain("Over the most recent build with snapshots,");
   });
 
+  it("renders nothing when the stored counts give no finite ratio", async () => {
+    const broken = { snapshotCount: 3, createdAt: "2026-01-01T00:00:00.000Z" } as Build;
+    const html = await render([broken]);
+    expect(html).toBe("");
+    expect(html).not.toContain("NaN");
+  });
+
   it("renders nothing until a build holds snapshots", async () => {
     expect(await render([])).toBe("");
     expect(await render([build(0, 0, "2026-01-01T00:00:00.000Z")])).toBe("");

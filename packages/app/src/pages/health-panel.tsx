@@ -12,6 +12,7 @@ import {
   SectionTitle,
   VStack,
   statusLabel,
+  RelativeTime,
 } from "../ui/components.tsx";
 /** Badge tone for a health verdict. */
 export function healthTone(verdict: string | null): "success" | "warning" | "danger" | "neutral" {
@@ -63,12 +64,12 @@ function HealthBody(props: {
       <ul>
         {trendsOf(latest.output).map((trend) => (
           <li>
-            <strong>{trend.label}</strong> ({trend.direction}): {trend.note}
+            <strong>{trend.label}</strong> ({statusLabel(trend.direction)}): {trend.note}
           </li>
         ))}
       </ul>
       <Meta>
-        {latest.profile} · {latest.model} · {latest.createdAt.slice(0, 16).replace("T", " ")}
+        {latest.profile} · {latest.model} · <RelativeTime value={latest.createdAt} />
         {scoreText(latest.output)}
       </Meta>
     </>
