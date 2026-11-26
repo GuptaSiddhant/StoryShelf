@@ -54,26 +54,24 @@ Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`.
 Build (optionally), zip, and upload a Storybook build for capture.
 
 ```bash
-# explicit flags
-storyshelf upload \
-  --url http://localhost:3000 \
-  --slug my-design-system \
-  --token shelf_xxx \
-  --sha "$GITHUB_SHA" \
-  --branch "$GITHUB_REF_NAME"
+# in CI, with .storybook/storyshelf.json committed: only the token, from the environment
+SHELF_TOKEN=shelf_xxx storyshelf upload
 
-# with .storybook/storyshelf.json present (no args defaults to upload)
-storyshelf
-storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
+# no config file: url and slug as flags or SHELF_URL / SHELF_SLUG
+SHELF_TOKEN=shelf_xxx storyshelf upload --url http://localhost:3000 --slug my-design-system
+
+# a system the CLI does not know: name the commit and branch yourself
+SHELF_TOKEN=shelf_xxx storyshelf upload --sha "$BUILD_COMMIT" --branch main
 ```
 
 | Flag                              | Description                                                                                                                                                                           |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--url`                           | Server URL (or file / `SHELF_URL`)                                                                                                                                               |
 | `--slug`                          | Project slug (or file / `SHELF_SLUG`)                                                                                                                                            |
-| `--token`                         | Project API token (`Authorization: Bearer`, or `SHELF_TOKEN`)                                                                                                                    |
-| `--sha`                           | Revision SHA (flag, CI env, local git HEAD, or synthesized `local-*`)                                                                                                                 |
-| `--branch`                        | Baseline namespace (flag, CI env, local git branch, or `local`)                                                                                                                       |
+| `--token`                         | Project API token. Prefer `SHELF_TOKEN`: a flag shows in the process list, and the CLI warns when you use it                                                                     |
+| `--sha`                           | Revision SHA (flag, CI provider, local git HEAD, or synthesized `local-*`)                                                                                                            |
+| `--branch`                        | Baseline namespace (flag, CI provider, local git branch, or `local`)                                                                                                                  |
+| `--verbose`                       | List each resolved commit, branch, message and author with where it came from (never the token)                                                                                       |
 | `--build-dir` / `-d`              | Built Storybook directory (default `storybook-static`)                                                                                                                                |
 | `--config` / `-c`                 | Config file path (default `.storybook/storyshelf.json`)                                                                                                                               |
 | `--build-command`                 | Custom build command (mutually exclusive with `--build-script-name`)                                                                                                                  |
@@ -92,6 +90,32 @@ storyshelf upload --token shelf_xxx --sha $GITHUB_SHA --branch main
 | `--wait`                          | After the upload, follow the build until it stops needing the server, and exit by how it ended (see [Gating CI with `--wait`](#gating-ci-with---wait))                                |
 | `--timeout <duration>`            | With `--wait`, stop waiting after this long: `90`, `90s`, `30m`, `2h` (default `30m`). Never cancels the build                                                                        |
 | `--dry-run`                       | Validate/build but send no requests                                                                                                                                                   |
+
+### Where the commit and branch come from
+
+Each of `--sha`, `--branch`, `--message`, `--author-name` and `--author-email` resolves on its own, in this order: the **flag**, then the **CI provider**, then **local git**, then (commit and branch only) a **synthesized** local identity, so a checkout without git still uploads. The message and author prefer `git log -1` on the resolved commit when the checkout has it, then the provider's own variables. `storyshelf doctor` and `upload --verbose` print every value with its source, for example `branch: feature/x (GitHub pull_request: GITHUB_HEAD_REF)`.
+
+| Provider                     | Detected by                  | Commit                                                     | Branch                                                              | Also read                                                    |
+| ---------------------------- | ---------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| GitHub Actions, pull request | `GITHUB_ACTIONS`             | `pull_request.head.sha` in the `GITHUB_EVENT_PATH` file    | `GITHUB_HEAD_REF`                                                   | PR number (event file), `GITHUB_BASE_REF`                    |
+| GitHub Actions, merge queue  | `GITHUB_ACTIONS`             | `merge_group.head_sha` (else `GITHUB_SHA`)                 | `merge_group.base_ref`                                              |                                                              |
+| GitHub Actions, other events | `GITHUB_ACTIONS`             | `GITHUB_SHA`                                               | `GITHUB_REF_NAME` (the tag name for a tag)                          |                                                              |
+| GitLab CI, merge request     | `GITLAB_CI`                  | `CI_MERGE_REQUEST_SOURCE_BRANCH_SHA`, else `CI_COMMIT_SHA` | `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`                               | `CI_MERGE_REQUEST_IID`, `CI_COMMIT_MESSAGE`, `CI_COMMIT_AUTHOR` |
+| GitLab CI, branch or tag     | `GITLAB_CI`                  | `CI_COMMIT_SHA`                                            | `CI_COMMIT_REF_NAME`                                                | `CI_COMMIT_MESSAGE`, `CI_COMMIT_AUTHOR`                      |
+| Vercel                       | `VERCEL`                     | `VERCEL_GIT_COMMIT_SHA`                                    | `VERCEL_GIT_COMMIT_REF`                                             | message, author name, `VERCEL_GIT_PULL_REQUEST_ID`           |
+| Netlify                      | `NETLIFY`                    | `COMMIT_REF`                                               | `HEAD`                                                              | `REVIEW_ID` on a pull request                                |
+| CircleCI                     | `CIRCLECI`                   | `CIRCLE_SHA1`                                              | `CIRCLE_BRANCH`, else `CIRCLE_TAG`                                  | `CIRCLE_PR_NUMBER` (forked pull requests only)               |
+| Buildkite                    | `BUILDKITE`                  | `BUILDKITE_COMMIT` (not the symbolic `HEAD`)               | `BUILDKITE_BRANCH`, else `BUILDKITE_TAG`                            | message, author, `BUILDKITE_PULL_REQUEST` and base branch    |
+| Bitbucket Pipelines          | `BITBUCKET_BUILD_NUMBER`     | `BITBUCKET_COMMIT`                                         | `BITBUCKET_BRANCH`, else `BITBUCKET_TAG`                            | `BITBUCKET_PR_ID`, `BITBUCKET_PR_DESTINATION_BRANCH`         |
+| Azure Pipelines, pull request | `TF_BUILD`                  | `SYSTEM_PULLREQUEST_SOURCECOMMITID`                        | `SYSTEM_PULLREQUEST_SOURCEBRANCH`                                   | PR number, target branch                                     |
+| Azure Pipelines, other       | `TF_BUILD`                   | `BUILD_SOURCEVERSION`                                      | `BUILD_SOURCEBRANCH` without `refs/heads/` or `refs/tags/`          |                                                              |
+| Jenkins                      | `JENKINS_URL`                | `GIT_COMMIT`                                               | `GIT_LOCAL_BRANCH`, else `BRANCH_NAME` (none on a change request)   | `CHANGE_ID`                                                  |
+
+Only variables in the provider's own documentation are read. The first detected provider wins, and a field it does not supply falls to local git. A pull request or merge request number and its target branch are shown by `doctor` and `--verbose` but not sent: the build API has no field for them. On a Jenkins change request the branch comes from local git, because `CHANGE_BRANCH` is not documented where the CLI could cite it.
+
+`url` and `slug` resolve as flag, then `SHELF_URL` / `SHELF_SLUG`, then `.storybook/storyshelf.json` (an empty variable counts as unset, so a CI secret that does not exist does not hide the file). The token comes from `--token` or `SHELF_TOKEN` only; a `token` key in `.storybook/storyshelf.json` is refused with an error that names the key and `SHELF_TOKEN`.
+
+A shallow clone makes affected capture and `--skip-unchanged` fall back to rendering every story. `upload` warns about it, naming `fetch-depth: 0` (GitHub Actions) and `GIT_DEPTH: 0` (GitLab CI), and never fails or deepens the clone itself.
 
 Affected capture is on by default: the CLI traces `git diff baseline..HEAD` through the build's dependency graph, posts the affected set, and prints a summary (`Affected capture: rendering 3 stories (baseline abc1234)`). Anything it cannot prove unchanged renders anyway — see [Affected capture](/concepts/affected-capture/). `SHELF_FULL=1` and `"affectedOnly": false` opt out the same way as `--full`.
 

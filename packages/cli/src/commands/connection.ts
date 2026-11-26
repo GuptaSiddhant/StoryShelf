@@ -1,6 +1,7 @@
 import { normalizeBaseUrl } from "../client.ts";
 import { loadStorybookConfig } from "../config.ts";
 import { readSetting } from "../settings.ts";
+import { warnTokenFlag } from "./token-flag.ts";
 
 /** Server connection options shared by read-only commands. */
 export interface ConnectionOptions {
@@ -24,15 +25,16 @@ export interface ResolvedConnection {
 }
 
 /**
- * Resolve url/slug/token as flags > config file > env, throwing on the first
+ * Resolve url/slug/token as flags > env > config file (the token never comes from the file), throwing on the first
  * missing value (same messages as `upload`).
  */
 export async function resolveConnection(options: ConnectionOptions): Promise<ResolvedConnection> {
   const cwd = options.cwd ?? process.cwd();
   const cfg = await loadStorybookConfig(cwd, options.config);
+  warnTokenFlag(options.token);
   const fields = {
-    url: options.url ?? cfg?.url ?? readSetting(process.env, "SHELF_URL"),
-    slug: options.slug ?? cfg?.slug ?? readSetting(process.env, "SHELF_SLUG"),
+    url: options.url ?? readSetting(process.env, "SHELF_URL") ?? cfg?.url,
+    slug: options.slug ?? readSetting(process.env, "SHELF_SLUG") ?? cfg?.slug,
     token: options.token ?? readSetting(process.env, "SHELF_TOKEN"),
   };
   assertConnectionFields(fields);

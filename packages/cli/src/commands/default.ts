@@ -14,35 +14,27 @@ interface DefaultUploadOptions {
   url: string;
   slug: string;
   token: string;
-  sha: string;
-  branch: string;
   buildDir: string;
   buildCommand?: string;
   buildScriptName?: string;
   skip?: string;
 }
 
+/**
+ * The connection and build settings of a bare `storyshelf`. The commit and branch are not read
+ * here: `runUpload` resolves them (flags, CI provider, local git, then a synthesized identity).
+ */
 function defaultUploadOptions(cfg: StorybookConfig | null): DefaultUploadOptions | null {
-  const url = cfg?.url ?? readSetting(process.env, "SHELF_URL");
-  const slug = cfg?.slug;
+  const url = readSetting(process.env, "SHELF_URL") ?? cfg?.url;
+  const slug = readSetting(process.env, "SHELF_SLUG") ?? cfg?.slug;
   const token = readSetting(process.env, "SHELF_TOKEN");
-  const sha =
-    process.env["GITHUB_SHA"] ??
-    process.env["VERCEL_GIT_COMMIT_SHA"] ??
-    process.env["CI_COMMIT_SHA"];
-  const branch =
-    process.env["GITHUB_REF_NAME"] ??
-    process.env["VERCEL_GIT_COMMIT_REF"] ??
-    process.env["CI_COMMIT_REF_NAME"];
-  if (!url || !slug || !token || !sha || !branch) {
+  if (!url || !slug || !token) {
     return null;
   }
   return {
     url,
     slug,
     token,
-    sha,
-    branch,
     buildDir: cfg?.buildDir ?? "storybook-static",
     buildCommand: cfg?.buildCommand,
     buildScriptName: cfg?.buildScriptName,
@@ -61,7 +53,7 @@ export async function runDefaultCommand(program: Command): Promise<void> {
     program.outputHelp();
     if (cfg) {
       printError(
-        "Missing required upload options — ensure SHELF_URL/SLUG/TOKEN and GITHUB_SHA/BRANCH are set or run `storyshelf upload --help`",
+        "Missing required upload options — ensure SHELF_TOKEN is set, and the url and slug come from .storybook/storyshelf.json or SHELF_URL/SHELF_SLUG, or run `storyshelf upload --help`",
       );
     } else {
       printError(

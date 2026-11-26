@@ -23,9 +23,13 @@ export type CliSetting = keyof typeof CLI_RENAMED_SETTINGS;
 
 type Env = Readonly<Record<string, string | undefined>>;
 
-/** The value of `name`. Only the `SHELF_*` name is read; an old name never is. */
+/**
+ * The value of `name`. Only the `SHELF_*` name is read; an old name never is. An empty value is
+ * unset: a CI secret that does not exist expands to an empty variable, and must not hide the config file.
+ */
 export function readSetting(env: Env, name: CliSetting): string | undefined {
-  return env[name];
+  const value = env[name];
+  return value === "" ? undefined : value;
 }
 
 /** `OLD -> NEW` for every old name of the CLI's settings set to a non-empty value. */
