@@ -70,20 +70,27 @@ jobs:
             fi
           done
 
-      # One step for both paths: with AWS_ROLE_ARN it assumes the role by OIDC and gets no keys;
-      # without it, it exports the static keys.
-      - name: Configure AWS credentials
+      # OIDC only. The action writes nothing to the job's environment (output-env-credentials:
+      # false); the role's credentials are step outputs, passed to the one step that needs them.
+      # Without AWS_ROLE_ARN this step is skipped and that step takes the static keys itself.
+      - name: Assume the AWS role (OIDC)
+        id: aws
+        if: ${{ vars.AWS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
         with:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           role-session-name: storyshelf-live-s3-${{ github.run_id }}
-          aws-access-key-id: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID || '' }}
-          aws-secret-access-key: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
+          output-credentials: true
+          output-env-credentials: false
 
       - name: Run S3 suites (hermetic + live)
         env:
           S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-access-key-id || secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-secret-access-key || secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/storage' --force -- src/s3
 
@@ -128,21 +135,29 @@ jobs:
           echo "TF_VAR_image_version=${tag#v}" >> "$GITHUB_ENV"
           echo "applying the module with image ${tag#v}"
 
-      # Two hours, so the credentials outlive the job's 60-minute timeout and the destroy after it.
-      # With OIDC the role's maximum session duration must allow it (docs/testing.md).
-      - name: Configure AWS credentials
+      # OIDC only, as in live-s3: nothing goes into the job's environment, so the smoke test never
+      # holds a credential; Apply and Destroy get them in their own env. Two hours, so the
+      # credentials outlive the job's 60-minute timeout and the destroy after it; the role's
+      # maximum session duration must allow it (docs/testing.md).
+      - name: Assume the AWS role (OIDC)
+        id: aws
+        if: ${{ vars.AWS_ROLE_ARN != '' }}
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
         with:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           role-session-name: storyshelf-module-apply-${{ github.run_id }}
           role-duration-seconds: 7200
-          aws-access-key-id: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID || '' }}
-          aws-secret-access-key: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
+          output-credentials: true
+          output-env-credentials: false
 
       - name: Apply
         env:
           TF_VAR_region: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-access-key-id || secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-secret-access-key || secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
         run: |
           set -e
           terraform init -input=false
@@ -162,4 +177,8 @@ jobs:
         if: ${{ always() }}
         env:
           TF_VAR_region: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-access-key-id || secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_ROLE_ARN != '' && steps.aws.outputs.aws-secret-access-key || secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
         run: terraform destroy -input=false -auto-approve

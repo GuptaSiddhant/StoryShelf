@@ -263,9 +263,13 @@ scoped to one subject, case included:
 **Environment** (once, Settings → Environments → `live-cloud`):
 
 - [ ] Required reviewers: the owner. Leave "Prevent self-review" off if the owner dispatches alone.
-- [ ] Deployment branches and tags: `main` only, so a workflow edited on a branch cannot reach the
-      credentials.
-- [ ] Optional: move the live secrets from repository to environment secrets.
+- [ ] Deployment branches and tags: `main` only, so a job on any other branch cannot enter the
+      environment. That alone guards only what the environment holds: the OIDC trusts below
+      (their subject names the environment) and environment secrets. A repository secret stays
+      readable by any workflow pushed to a branch, which can simply leave `environment:` out.
+- [ ] Move every live secret (all the names in the four workflow headers) to the environment's
+      secrets, then delete the repository copies. Do this before relying on the branch rule; the
+      workflows read `secrets.*` the same way from either place.
 
 **AWS** (`live-cloud-aws.yml`, variable `AWS_ROLE_ARN`):
 
