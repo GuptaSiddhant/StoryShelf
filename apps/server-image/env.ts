@@ -1,4 +1,8 @@
-import type { BrowserName } from "@storyshelf/core/adapter/capture-runner";
+import {
+  TARGET_NAME_PATTERN,
+  isBrowserName,
+  type BrowserName,
+} from "@storyshelf/core/adapter/capture-runner";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { StorageAdapter } from "@storyshelf/core/adapter/storage";
 import { readS3Bucket, readSetting, type SettingName } from "@storyshelf/core/config";
@@ -8,8 +12,13 @@ import { createMysqlDatabase } from "@storyshelf/db/mysql";
 import { createPostgresDatabase } from "@storyshelf/db/postgres";
 import { createRdsIamDatabase, type RdsIamDatabaseOptions } from "@storyshelf/db/postgres/rds-iam";
 import { createSqliteDatabase } from "@storyshelf/db/sqlite";
-import type { RemoteBrowser } from "@storyshelf/runner/remote";
-import { azurePlaywright } from "@storyshelf/runner/remote";
+import {
+  azurePlaywright,
+  hasSchemeFor,
+  remote,
+  type RemoteBrowser,
+  type RemoteProtocol,
+} from "@storyshelf/runner/remote";
 import { createAzureStorage, type AzureStorageOptions } from "@storyshelf/storage/azure";
 import { createGcsStorage, type GcsStorageOptions } from "@storyshelf/storage/gcs";
 import { createS3Storage, type S3StorageOptions } from "@storyshelf/storage/s3";
@@ -343,14 +352,214 @@ export function storybookHostingFromEnv(env: Env): { mode: "trusted" | "sandboxe
   return { mode };
 }
 
-/** The runner's `browsers`: the bundled Chromium, plus `chromium@azure` when a workspace is configured. */
+/** The variables that describe the one generic remote browser; any one of them set turns it on. */
+const REMOTE_VARIABLES = [
+  "SHELF_REMOTE_BROWSER_ENDPOINT",
+  "SHELF_REMOTE_BROWSER_TOKEN",
+  "SHELF_REMOTE_BROWSER_PROTOCOL",
+  "SHELF_REMOTE_BROWSER_REACH",
+  "SHELF_REMOTE_BROWSER_NAME",
+  "SHELF_REMOTE_BROWSER_ENGINES",
+  "SHELF_REMOTE_BROWSER_SESSIONS",
+  "SHELF_REMOTE_BROWSER_MAX_CONNECTIONS",
+] as const;
+
+/** The target name half of the generic remote browser when `SHELF_REMOTE_BROWSER_NAME` is unset. */
+const DEFAULT_REMOTE_NAME = "remote";
+
+/** The name half `azurePlaywright` takes; a generic remote browser never shares it. */
+const AZURE_NAME = "azure";
+
+/** A choice declared in the environment (never inferred): one of `allowed`, else a refusal naming the variable. */
+function declaredChoice<T extends string>(
+  env: Env,
+  name: (typeof REMOTE_VARIABLES)[number],
+  allowed: readonly T[],
+): T {
+  const value = nonEmpty(readSetting(env, name));
+  if (value === undefined) {
+    throw new BootRefusal(`${name} is unset: declare it as ${allowed.join(" or ")}`);
+  }
+  const chosen = allowed.find((option) => option === value);
+  if (chosen === undefined) {
+    throw new BootRefusal(`${name} must be ${allowed.join(" or ")}`);
+  }
+  return chosen;
+}
+
+/** An optional positive whole number; any other value refuses, naming the variable and not the value. */
+function remoteCount(env: Env, name: (typeof REMOTE_VARIABLES)[number]): number | undefined {
+  const raw = nonEmpty(readSetting(env, name));
+  if (raw === undefined) {
+    return undefined;
+  }
+  const value = Number(raw);
+  if (!/^\d+$/u.test(raw) || !Number.isSafeInteger(value) || value < 1) {
+    throw new BootRefusal(`${name} must be a positive whole number`);
+  }
+  return value;
+}
+
+/** `SHELF_REMOTE_BROWSER_ENGINES`: a comma-separated list of engines, default `chromium`. */
+function remoteEngines(env: Env, protocol: RemoteProtocol): BrowserName[] {
+  const raw = nonEmpty(readSetting(env, "SHELF_REMOTE_BROWSER_ENGINES")) ?? "chromium";
+  const engines: BrowserName[] = [];
+  for (const part of raw.split(",").map((engine) => engine.trim())) {
+    if (!isBrowserName(part) || engines.includes(part)) {
+      throw new BootRefusal(
+        "SHELF_REMOTE_BROWSER_ENGINES must list each of chromium, firefox, webkit or chrome at most once, separated by commas",
+      );
+    }
+    engines.push(part);
+  }
+  if (
+    protocol === "cdp" &&
+    engines.some((engine) => engine !== "chromium" && engine !== "chrome")
+  ) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_ENGINES: the cdp protocol drives chromium or chrome only",
+    );
+  }
+  return engines;
+}
+
+/** The target name half: `SHELF_REMOTE_BROWSER_NAME`, default `remote`; never `azure`, which `azurePlaywright` owns. */
+function remoteName(env: Env): string {
+  const name = nonEmpty(readSetting(env, "SHELF_REMOTE_BROWSER_NAME")) ?? DEFAULT_REMOTE_NAME;
+  if (!TARGET_NAME_PATTERN.test(name)) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_NAME must be lowercase letters, digits and hyphens, start with a letter or digit and be at most 32 characters",
+    );
+  }
+  if (name === AZURE_NAME && azureConfigured(env)) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_NAME must not be azure while PLAYWRIGHT_SERVICE_URL and PLAYWRIGHT_SERVICE_ACCESS_TOKEN are set",
+    );
+  }
+  return name;
+}
+
+/** A `reach: "url"` target is opened through a signed Storybook URL: it needs a secret to sign it and an origin to put in it. */
+function assertUrlReach(env: Env): void {
+  if (nonEmpty(readSetting(env, "SHELF_SECRET")) === undefined) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_REACH=url needs SHELF_SECRET: it signs the Storybook URL the remote browser opens",
+    );
+  }
+  if (nonEmpty(readSetting(env, "SHELF_PUBLIC_BASE_URL")) === undefined) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_REACH=url needs SHELF_PUBLIC_BASE_URL: the remote browser opens a URL on the confirmed origin",
+    );
+  }
+}
+
+/** The endpoint, which can carry a key: only its scheme is checked, and only the variable is named. */
+function remoteEndpoint(env: Env, protocol: RemoteProtocol): string {
+  const endpoint = nonEmpty(readSetting(env, "SHELF_REMOTE_BROWSER_ENDPOINT"));
+  if (endpoint === undefined) {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_ENDPOINT is unset: it is required with the other SHELF_REMOTE_BROWSER_* variables",
+    );
+  }
+  if (!hasSchemeFor(protocol, endpoint)) {
+    throw new BootRefusal(
+      `SHELF_REMOTE_BROWSER_ENDPOINT must be a ${protocol === "cdp" ? "ws(s):// or http(s)://" : "ws(s)://"} URL`,
+    );
+  }
+  return endpoint;
+}
+
+/**
+ * The one generic remote browser the `SHELF_REMOTE_BROWSER_*` variables describe, or undefined when
+ * none is set (ADR 0050). `protocol` and `reach` are declared, never inferred. The endpoint and
+ * token are secrets (the runner scrubs them from what it surfaces) and a refusal names the
+ * variable, never its value: a half-set, unknown or malformed configuration stops boot.
+ */
+export function remoteBrowserFromEnv(env: Env): RemoteBrowser | undefined {
+  if (REMOTE_VARIABLES.every((name) => nonEmpty(readSetting(env, name)) === undefined)) {
+    return undefined;
+  }
+  const protocol = declaredChoice(env, "SHELF_REMOTE_BROWSER_PROTOCOL", ["playwright", "cdp"]);
+  const reach = declaredChoice(env, "SHELF_REMOTE_BROWSER_REACH", ["loopback", "url"]);
+  assertReach(env, protocol, reach);
+  const endpoint = remoteEndpoint(env, protocol);
+  const token = nonEmpty(readSetting(env, "SHELF_REMOTE_BROWSER_TOKEN"));
+  return buildRemote(env, { protocol, reach, endpoint, token });
+}
+
+/** What the declared reach needs: CDP cannot loop back, and a URL needs a secret and an origin. */
+function assertReach(env: Env, protocol: RemoteProtocol, reach: "loopback" | "url"): void {
+  if (protocol === "cdp" && reach === "loopback") {
+    throw new BootRefusal(
+      "SHELF_REMOTE_BROWSER_REACH=loopback needs SHELF_REMOTE_BROWSER_PROTOCOL=playwright",
+    );
+  }
+  if (reach === "url") {
+    assertUrlReach(env);
+  }
+}
+
+/** `remote()` over the checked values; its own messages are never forwarded, as one could quote the endpoint. */
+function buildRemote(
+  env: Env,
+  {
+    protocol,
+    reach,
+    endpoint,
+    token,
+  }: {
+    protocol: RemoteProtocol;
+    reach: "loopback" | "url";
+    endpoint: string;
+    token: string | undefined;
+  },
+): RemoteBrowser {
+  const options = {
+    name: remoteName(env),
+    engines: remoteEngines(env, protocol),
+    protocol,
+    reach,
+    sessions: remoteCount(env, "SHELF_REMOTE_BROWSER_SESSIONS") ?? 1,
+    maxConnections: remoteCount(env, "SHELF_REMOTE_BROWSER_MAX_CONNECTIONS"),
+    connect: {
+      endpoint,
+      ...(token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } }),
+    },
+  };
+  try {
+    return remote(options);
+  } catch {
+    throw new BootRefusal(
+      "The SHELF_REMOTE_BROWSER_* variables do not describe a valid remote browser",
+    );
+  }
+}
+
+/** Both Azure Playwright Workspace variables are set. */
+function azureConfigured(env: Env): boolean {
+  return (
+    nonEmpty(env["PLAYWRIGHT_SERVICE_URL"]) !== undefined &&
+    nonEmpty(env["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"]) !== undefined
+  );
+}
+
+/**
+ * The runner's `browsers`: the bundled Chromium, then the generic remote browser the
+ * `SHELF_REMOTE_BROWSER_*` variables declare, then `chromium@azure` when an Azure Playwright
+ * Workspace is configured.
+ */
 export function browsersFromEnv(env: Env): (BrowserName | RemoteBrowser)[] {
+  const browsers: (BrowserName | RemoteBrowser)[] = ["chromium"];
+  const generic = remoteBrowserFromEnv(env);
+  if (generic !== undefined) {
+    browsers.push(generic);
+  }
   const endpoint = nonEmpty(env["PLAYWRIGHT_SERVICE_URL"]);
   const token = nonEmpty(env["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"]);
-  if (endpoint === undefined || token === undefined) {
-    return ["chromium"];
+  if (endpoint !== undefined && token !== undefined) {
+    browsers.push(azurePlaywright({ endpoint, token, engines: ["chromium"] }));
   }
-  return ["chromium", azurePlaywright({ endpoint, token, engines: ["chromium"] })];
+  return browsers;
 }
 
 /** How the image signs people in: the local password admin, or nobody (an explicit `SHELF_AUTH=none`). */

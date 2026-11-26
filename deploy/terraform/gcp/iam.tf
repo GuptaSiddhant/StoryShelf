@@ -8,6 +8,8 @@ locals {
     google_secret_manager_secret.auth_password.secret_id,
     var.github_app_private_key_secret_id,
     var.gitlab_token_secret_id,
+    var.remote_browser_endpoint_secret_id,
+    var.remote_browser_token_secret_id,
   ])
 }
 
