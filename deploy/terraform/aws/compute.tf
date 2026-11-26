@@ -76,6 +76,25 @@ locals {
     var.github_app_private_key_secret_arn == "" ? [] : [{ name = "SHELF_GITHUB_APP_PRIVATE_KEY", valueFrom = var.github_app_private_key_secret_arn }],
     var.gitlab_token_secret_arn == "" ? [] : [{ name = "SHELF_GITLAB_TOKEN", valueFrom = var.gitlab_token_secret_arn }],
   )
+
+  # Remote browsers (ADR 0050): on only with an endpoint. The endpoint and the token are secret
+  # references; protocol and reach are declared, never inferred.
+  remote_browser_on = var.remote_browser_endpoint_secret_arn != ""
+
+  remote_browser_environment = local.remote_browser_on ? concat(
+    [
+      { name = "SHELF_REMOTE_BROWSER_PROTOCOL", value = var.remote_browser_protocol },
+      { name = "SHELF_REMOTE_BROWSER_REACH", value = var.remote_browser_reach },
+    ],
+    var.remote_browser_engines == "" ? [] : [{ name = "SHELF_REMOTE_BROWSER_ENGINES", value = var.remote_browser_engines }],
+    var.remote_browser_sessions == 0 ? [] : [{ name = "SHELF_REMOTE_BROWSER_SESSIONS", value = tostring(var.remote_browser_sessions) }],
+    var.remote_browser_max_connections == 0 ? [] : [{ name = "SHELF_REMOTE_BROWSER_MAX_CONNECTIONS", value = tostring(var.remote_browser_max_connections) }],
+  ) : []
+
+  remote_browser_secrets = local.remote_browser_on ? concat(
+    [{ name = "SHELF_REMOTE_BROWSER_ENDPOINT", valueFrom = var.remote_browser_endpoint_secret_arn }],
+    var.remote_browser_token_secret_arn == "" ? [] : [{ name = "SHELF_REMOTE_BROWSER_TOKEN", valueFrom = var.remote_browser_token_secret_arn }],
+  ) : []
 }
 
 resource "aws_lb" "main" {
@@ -195,12 +214,12 @@ resource "aws_ecs_task_definition" "app" {
       { name = "SHELF_SHUTDOWN_GRACE_SECONDS", value = tostring(var.shutdown_grace_seconds) },
       { name = "SHELF_DATABASE_POOL_MAX", value = tostring(var.database_pool_size) },
       { name = "SHELF_ADMIN_EMAIL", value = var.admin_email },
-    ], local.database_environment, local.git_environment)
+    ], local.database_environment, local.git_environment, local.remote_browser_environment)
     secrets = concat([
       { name = "SHELF_SECRET", valueFrom = aws_secretsmanager_secret.shelf_secret.arn },
       { name = "SHELF_ADMIN_PASSWORD", valueFrom = aws_secretsmanager_secret.auth_password.arn },
       { name = "SHELF_ADMIN_TOKEN", valueFrom = aws_secretsmanager_secret.admin_token.arn },
-    ], local.oidc_secrets, local.database_secrets, local.git_secrets)
+    ], local.oidc_secrets, local.database_secrets, local.git_secrets, local.remote_browser_secrets)
     logConfiguration = {
       logDriver = "awslogs"
       options = {

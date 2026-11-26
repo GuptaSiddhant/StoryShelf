@@ -16,6 +16,8 @@ locals {
     },
     var.github_app_private_key_secret_id == "" ? {} : { SHELF_GITHUB_APP_PRIVATE_KEY = var.github_app_private_key_secret_id },
     var.gitlab_token_secret_id == "" ? {} : { SHELF_GITLAB_TOKEN = var.gitlab_token_secret_id },
+    var.remote_browser_endpoint_secret_id == "" ? {} : { SHELF_REMOTE_BROWSER_ENDPOINT = var.remote_browser_endpoint_secret_id },
+    var.remote_browser_endpoint_secret_id == "" || var.remote_browser_token_secret_id == "" ? {} : { SHELF_REMOTE_BROWSER_TOKEN = var.remote_browser_token_secret_id },
   )
 
   # Secret versions the service pins instead of "latest". A created database's URL is pinned, so a
@@ -33,6 +35,16 @@ locals {
     SHELF_GITHUB_API_URL       = var.github_api_url
     SHELF_GITLAB_TOKEN_EXPIRES = var.gitlab_token_expires
     SHELF_GITLAB_HOST          = var.gitlab_host
+  } : name => value if value != "" }
+
+  # Remote browsers (ADR 0050): on only with an endpoint; the endpoint and the token are in
+  # secret_env, and protocol and reach are declared, never inferred.
+  remote_browser_env = var.remote_browser_endpoint_secret_id == "" ? {} : { for name, value in {
+    SHELF_REMOTE_BROWSER_PROTOCOL        = var.remote_browser_protocol
+    SHELF_REMOTE_BROWSER_REACH           = var.remote_browser_reach
+    SHELF_REMOTE_BROWSER_ENGINES         = var.remote_browser_engines
+    SHELF_REMOTE_BROWSER_SESSIONS        = var.remote_browser_sessions == 0 ? "" : tostring(var.remote_browser_sessions)
+    SHELF_REMOTE_BROWSER_MAX_CONNECTIONS = var.remote_browser_max_connections == 0 ? "" : tostring(var.remote_browser_max_connections)
   } : name => value if value != "" }
 }
 
@@ -162,6 +174,15 @@ resource "google_cloud_run_v2_service" "app" {
 
       dynamic "env" {
         for_each = local.git_env
+
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.remote_browser_env
 
         content {
           name  = env.key

@@ -72,6 +72,23 @@ Presets validate when the runner is created, not when the first build runs: a ba
 
 The presets other than `playwrightServer` follow each vendor's published connection format and have been checked against a mock, not against a live account (BrowserStack and Azure accounts are not available to this project's tests); report differences you meet.
 
+## From the environment (the product image)
+
+The product image builds no code of yours, so it reads one generic remote browser from its environment and adds it beside the bundled Chromium as `chromium@remote` (the name is configurable). Nothing is on unless a `SHELF_REMOTE_BROWSER_*` variable is set.
+
+| Variable                               | Meaning                                                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `SHELF_REMOTE_BROWSER_ENDPOINT`        | Required. `ws(s)://...` (CDP also takes `http(s)://...`). It can carry a key: keep it in your platform's secret store.     |
+| `SHELF_REMOTE_BROWSER_PROTOCOL`        | Required, declared: `playwright` or `cdp` (Chromium only).                                                                 |
+| `SHELF_REMOTE_BROWSER_REACH`           | Required, declared: `loopback` (the service routes back to the host; `playwright` only) or `url` (a signed Storybook URL). |
+| `SHELF_REMOTE_BROWSER_TOKEN`           | Optional. Sent as `Authorization: Bearer <token>`. A secret.                                                               |
+| `SHELF_REMOTE_BROWSER_NAME`            | Target name half, default `remote`. Not `azure` while an Azure Playwright Workspace is configured.                         |
+| `SHELF_REMOTE_BROWSER_ENGINES`         | Comma-separated engines, default `chromium`.                                                                               |
+| `SHELF_REMOTE_BROWSER_SESSIONS`        | Parallel pages the plan allows, per process; default 1.                                                                    |
+| `SHELF_REMOTE_BROWSER_MAX_CONNECTIONS` | Most connections this process holds at once; default no cap.                                                               |
+
+`protocol` and `reach` are declared, never inferred. With `reach` set to `url` the image also needs `SHELF_SECRET` and `SHELF_PUBLIC_BASE_URL` (see below). A half-set, unknown or malformed configuration stops the server at boot with a message naming the variable and never its value. The endpoint and token are removed from every message the runner surfaces and are never logged; the startup log lists only the names of the remote targets. The Terraform modules take the endpoint and token as secret references (`remote_browser_*`, see [AWS](/guides/deployment/aws/) and [GCP](/guides/deployment/gcp/)), and `PLAYWRIGHT_SERVICE_URL` with `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` still adds `chromium@azure`.
+
 ## How the browser reaches the Storybook
 
 The Storybook is extracted on the host and served on `127.0.0.1`, which a remote browser cannot open on its own. There are two ways in (ADR 0007, decision 5):
