@@ -164,6 +164,7 @@ export default defineConfig({
             { label: "Without git", slug: "guides/without-git" },
             { label: "Modes", slug: "guides/modes" },
             { label: "Interaction testing", slug: "guides/interaction-testing" },
+            { label: "Test app pages", slug: "guides/app-pages" },
             { label: "Image engines", slug: "guides/image-engines" },
             { label: "Remote browsers", slug: "guides/remote-browsers" },
           ],
