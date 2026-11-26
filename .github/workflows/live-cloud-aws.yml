@@ -6,10 +6,17 @@ name: Live Cloud AWS
 # `deploy/terraform/aws`); the `live-s3` job only consumes `terraform output -json` values as
 # secrets and never creates infrastructure. The `module-apply` job applies the module itself.
 #
-# Required repository secrets:
-# - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or an assumed IAM role)
+# Both jobs run in the `live-cloud` environment, so a dispatch waits for a reviewer before any
+# secret is exposed (#1305). Credentials: OIDC when the variable AWS_ROLE_ARN is set (an IAM role
+# that trusts this repository's `live-cloud` environment), else the static keys. The owner's setup
+# steps are in docs/testing.md, "Live-cloud credentials".
+#
+# Required secrets:
 # - AWS_REGION (e.g. us-east-1)
 # - LIVE_S3_BUCKET (terraform output: s3_bucket)
+# - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, only until AWS_ROLE_ARN is set
+#
+# Third-party actions are pinned by commit SHA (the tag is in the comment).
 on:
   workflow_dispatch:
 
@@ -27,36 +34,56 @@ jobs:
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-s3:
     runs-on: ubuntu-latest
+    environment: live-cloud
+    permissions:
+      contents: read
+      id-token: write # OIDC to the cloud; unused while the static keys are the fallback
     env:
       LIVE_CLOUD: "1"
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+        uses: nubjs/setup-nub@8c7bade1432a9acf9a7ad169aa7288713d046161 # v0.6.2
         with:
           # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
           nub-version: "0.10.0"
 
+      # Before any credential exists, so no install script can read one.
       - name: Install dependencies
         run: nub ci
 
       - name: Fail fast on missing secrets
+        env:
+          HAS_AWS_REGION: ${{ secrets.AWS_REGION != '' }}
+          HAS_S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET != '' }}
+          HAS_CREDENTIALS: ${{ vars.AWS_ROLE_ARN != '' || (secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '') }}
         run: |
           set -e
-          for v in AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY S3_BUCKET; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Missing required secret (or env): $v. See workflow header."
+          for v in HAS_AWS_REGION HAS_S3_BUCKET HAS_CREDENTIALS; do
+            if [ "${!v}" != "true" ]; then
+              echo "::error::Missing ${v#HAS_}: set the secret (or AWS_ROLE_ARN for credentials). See the workflow header."
               exit 1
             fi
           done
 
+      # One step for both paths: with AWS_ROLE_ARN it assumes the role by OIDC and gets no keys;
+      # without it, it exports the static keys.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: storyshelf-live-s3-${{ github.run_id }}
+          aws-access-key-id: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID || '' }}
+          aws-secret-access-key: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
+
       - name: Run S3 suites (hermetic + live)
+        env:
+          S3_BUCKET: ${{ secrets.LIVE_S3_BUCKET }}
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/storage' --force -- src/s3
 
@@ -65,41 +92,57 @@ jobs:
   # repository variable LIVE_AWS_MODULE_APPLY is "1". First boot is unattended: each task's `db-init`
   # container creates the app database user and grants it `rds_iam` before the app starts (module
   # README, "Database: IAM authentication"), so the smoke test needs no manual step. Uses the same AWS
-  # secrets as live-s3. Destroy runs even when the apply or the smoke test fails.
+  # credentials as live-s3. Destroy runs even when the apply or the smoke test fails.
   module-apply:
     runs-on: ubuntu-latest
     if: ${{ vars.LIVE_AWS_MODULE_APPLY == '1' }}
+    environment: live-cloud
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # OIDC to the cloud; unused while the static keys are the fallback
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      GH_TOKEN: ${{ github.token }}
       # Unique per run (the module caps a name at 20 characters), so runs never collide.
       TF_VAR_name: shelf-ci-${{ github.run_id }}
-      TF_VAR_region: ${{ secrets.AWS_REGION }}
     defaults:
       run:
         working-directory: deploy/terraform/aws/examples/minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.9.x"
           terraform_wrapper: false
 
       - name: Resolve the current release image
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
           echo "TF_VAR_image_version=${tag#v}" >> "$GITHUB_ENV"
           echo "applying the module with image ${tag#v}"
 
+      # Two hours, so the credentials outlive the job's 60-minute timeout and the destroy after it.
+      # With OIDC the role's maximum session duration must allow it (docs/testing.md).
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: storyshelf-module-apply-${{ github.run_id }}
+          role-duration-seconds: 7200
+          aws-access-key-id: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID || '' }}
+          aws-secret-access-key: ${{ vars.AWS_ROLE_ARN == '' && secrets.AWS_SECRET_ACCESS_KEY || '' }}
+
       - name: Apply
+        env:
+          TF_VAR_region: ${{ secrets.AWS_REGION }}
         run: |
           set -e
           terraform init -input=false
@@ -117,4 +160,6 @@ jobs:
 
       - name: Destroy
         if: ${{ always() }}
+        env:
+          TF_VAR_region: ${{ secrets.AWS_REGION }}
         run: terraform destroy -input=false -auto-approve
