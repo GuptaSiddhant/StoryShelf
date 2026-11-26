@@ -28,15 +28,15 @@ changing both versions together and reading the release notes. A runnable exampl
 
 ## What it creates
 
-| Part     | Resources                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------ |
-| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                            |
-| Compute  | Container Apps environment (Consumption profile), one app of identical copies                                |
-| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)                         |
-| Storage  | Storage account and a private `storybook` Blob container                                                     |
-| Identity | One user-assigned managed identity for the app                                                               |
-| Secrets  | Key Vault (RBAC): `SHELF_SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`, `OIDC-CLIENT-SHELF_SECRET`, `DATABASE-URL` |
-| Logs     | Log Analytics workspace                                                                                      |
+| Part     | Resources                                                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network  | VNet with a Container Apps subnet and a delegated Postgres subnet                                                                                    |
+| Compute  | Container Apps environment (Consumption profile), one app of identical copies                                                                        |
+| Database | Postgres Flexible Server 16, private access only, private DNS zone (or your own URL)                                                                 |
+| Storage  | Storage account and a private `storybook` Blob container                                                                                             |
+| Identity | One user-assigned managed identity for the app                                                                                                       |
+| Secrets  | Key Vault (RBAC): `SHELF-SECRET`, `SHELF-ADMIN-PASSWORD`, `SHELF-ADMIN-TOKEN`, `SHELF-OIDC-CLIENT-SECRET`, `DATABASE-URL`, `DATABASE-ADMIN-PASSWORD` |
+| Logs     | Log Analytics workspace                                                                                                                              |
 
 The app is served on the Container Apps default domain over HTTPS; `allowed_cidr_blocks` becomes its
 ingress IP restrictions. A custom domain and sign-in federation (Entra) are not part of the module.
@@ -44,33 +44,34 @@ The database has no public endpoint: only the VNet reaches it.
 
 ## Inputs
 
-| Name                                                           | Default                            | Meaning                                                                 |
-| -------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| `name`                                                         | required                           | Name prefix, 2-20 characters                                            |
-| `image_version`                                                | required                           | Release version of the image (no `v`)                                   |
-| `allowed_cidr_blocks`                                          | required                           | Who may reach the app                                                   |
-| `location`                                                     | `eastus`                           | Region                                                                  |
-| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf` | Registry path, for a mirror                                             |
-| `cpu` / `memory`                                               | `2` / `4Gi`                        | Capture renders in the container: do not go much lower                  |
-| `min_instances` / `max_instances`                              | `1` / `1`                          | Identical copies; at least 1 (see "Capture, scaling and shutdown")      |
-| `database_pool_size`                                           | `10`                               | Connections per copy: `max_instances` x this must fit the database      |
-| `shutdown_grace_seconds`                                       | `30`                               | See "Capture, scaling and shutdown"                                     |
-| `existing_database_url_secret_id`                              | `""`                               | A Postgres URL in Key Vault; no database is created                     |
-| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`        | Created database only                                                   |
-| `deletion_protection`                                          | `true`                             | Delete lock on the database, purge protection on the vault              |
-| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none)   |
-| `github_app_id` / `github_app_private_key_secret_id`           | `""`                               | Server-wide GitHub App connection (both or none; see "Git connections") |
-| `github_api_url`                                               | `""`                               | GitHub Enterprise Server API base; empty means github.com               |
-| `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                               | Server-wide GitLab connection (both or none)                            |
-| `gitlab_host`                                                  | `""`                               | GitLab base URL; empty means gitlab.com                                 |
-| `admin_email`                                                  | `admin@example.com`                | Local admin login email (`SHELF_ADMIN_EMAIL`)                           |
-| `log_retention_days`                                           | `30`                               | Log Analytics retention                                                 |
-| `tags`                                                         | `{}`                               | Added to every taggable resource                                        |
+| Name                                                           | Default                                   | Meaning                                                                                                                       |
+| -------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                                         | required                                  | Name prefix, 2-20 characters                                                                                                  |
+| `image_version`                                                | required                                  | Release version of the image (no `v`)                                                                                         |
+| `allowed_cidr_blocks`                                          | required                                  | Who may reach the app                                                                                                         |
+| `location`                                                     | `eastus`                                  | Region                                                                                                                        |
+| `image_repository`                                             | `ghcr.io/guptasiddhant/storyshelf`        | Registry path, for a mirror                                                                                                   |
+| `cpu` / `memory`                                               | `2` / `4Gi`                               | Capture renders in the container: do not go much lower                                                                        |
+| `min_instances` / `max_instances`                              | `1` / `1`                                 | Identical copies; at least 1 (see "Capture, scaling and shutdown")                                                            |
+| `database_pool_size`                                           | `10`                                      | Connections per copy: `max_instances` x this must fit the database                                                            |
+| `shutdown_grace_seconds`                                       | `30`                                      | See "Capture, scaling and shutdown"                                                                                           |
+| `existing_database_url_secret_id`                              | `""`                                      | A Postgres URL in Key Vault; no database is created                                                                           |
+| `database_sku_name` / `database_storage_mb`                    | `B_Standard_B1ms` / `32768`               | Created database only                                                                                                         |
+| `deletion_protection`                                          | `true`                                    | Delete lock on the database, purge protection on the vault                                                                    |
+| `database_init_image`                                          | ECR Public `postgres:16-alpine` by digest | Image of the `db-init` init container (needs `psql` 16+); it receives the administrator's password, so pin a mirror by digest |
+| `playwright_workspace_endpoint_secret_id` / `_token_secret_id` | `""`                                      | Optional Azure Playwright Workspace (secret references, both or none)                                                         |
+| `github_app_id` / `github_app_private_key_secret_id`           | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                                       |
+| `github_api_url`                                               | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                                     |
+| `gitlab_token_secret_id` / `gitlab_token_expires`              | `""`                                      | Server-wide GitLab connection (both or none)                                                                                  |
+| `gitlab_host`                                                  | `""`                                      | GitLab base URL; empty means gitlab.com                                                                                       |
+| `admin_email`                                                  | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                                 |
+| `log_retention_days`                                           | `30`                                      | Log Analytics retention                                                                                                       |
+| `tags`                                                         | `{}`                                      | Added to every taggable resource                                                                                              |
 
 ## Outputs
 
 `url`, `resource_group_name`, `container_app_name`, `storage_account_name`, `storage_container_name`,
-`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `admin_password_secret_id`, `oidc_client_secret_id`,
+`database_fqdn`, `key_vault_name`, `admin_token_secret_id`, `admin_password_secret_id`, `database_admin_password_secret_id`, `oidc_client_secret_id`,
 `identity_principal_id`, `identity_client_id` and `role_assignments`. Secret outputs are Key Vault
 ids (references), never values.
 
@@ -79,19 +80,20 @@ ids (references), never values.
 The app gets every secret as a Container Apps secret that is a **Key Vault reference** resolved by its
 managed identity. No output carries a value.
 
-- **`SHELF_SECRET`, `AUTH-PASSWORD`, `ADMIN-TOKEN`** are generated. Their values, the database password,
-  the storage account's access keys and connection strings, and the Log Analytics workspace's shared
-  keys are also in the Terraform state (the provider records the keys as computed attributes, whether
-  or not anything uses them): keep the state in an encrypted backend with restricted access.
+- **`SHELF-SECRET`, `SHELF-ADMIN-PASSWORD`, `SHELF-ADMIN-TOKEN`** are generated. What lands in the
+  Terraform state: their values, both database passwords (the administrator's and the app role's,
+  inside `DATABASE-URL`), the storage account's access keys and connection strings, and the Log
+  Analytics workspace's shared keys (the provider records the keys as computed attributes, whether or
+  not anything uses them). Keep the state in an encrypted backend with restricted access.
 - **Sign-in.** The image turns sign-in on from `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET`, and the module always
   sets both, so the app never boots open. Read the password with
-  `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`
+  `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name SHELF-ADMIN-PASSWORD --query value -o tsv`
   and sign in as `admin@example.com` (or `admin_email`).
-- **`OIDC-CLIENT-SHELF_SECRET`** is an operator step. Terraform writes `change-me` once and never
+- **`SHELF-OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never
   overwrites it:
 
   ```sh
-  az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name OIDC-CLIENT-SHELF_SECRET --value "<client secret>"
+  az keyvault secret set --vault-name "$(terraform output -raw key_vault_name)" --name SHELF-OIDC-CLIENT-SECRET --value "<client secret>"
   az containerapp revision restart --name "$(terraform output -raw container_app_name)" --resource-group "$(terraform output -raw resource_group_name)" --revision <revision>
   ```
 
@@ -190,10 +192,45 @@ Server certificates chain to public roots and name that FQDN, so the app verifie
 against the system CAs and never sends the password to an unverified peer. _Unverified:_ no live run
 has confirmed the check over the private DNS zone yet.
 
+## Database roles
+
+The app does not log in as the server's administrator. Two logins:
+
+- **`shelf`** is the Flexible Server's `administrator_login` (a member of `azure_pg_admin`), kept for
+  operators. Its password is `DATABASE-ADMIN-PASSWORD` in the vault (output
+  `database_admin_password_secret_id`); the app container's environment never has it. The name stays
+  `shelf` because a Flexible Server's administrator cannot be renamed without replacing the server.
+- **`shelf_app`** is the app's role, in `DATABASE_URL`. It is an ordinary role (no `CREATEROLE`, no
+  `CREATEDB`, not in `azure_pg_admin`) with all rights on the `shelf` database and its `public`
+  schema, and it owns the tables the app creates.
+
+**First boot needs no operator step.** Each replica runs a `db-init` init container before the app
+container (`database_init_image`: `postgres:16-alpine` from the ECR Public mirror, which has `psql`,
+pinned by digest because it receives the administrator's password). It logs in as `shelf` over TLS
+verified against the system roots (`sslmode=verify-full`, `sslrootcert=system`, by the FQDN), then
+idempotently creates `shelf_app` (or resets its password to the one in `DATABASE-URL`) and grants it the
+database and the `public` schema. The app container starts only after `db-init` exits successfully;
+its output is in the Log Analytics workspace under the `db-init` container.
+
+**Upgrading a stack from 0.17 or earlier**, where the app logged in as `shelf` and so `shelf` owns its
+tables: `db-init` also hands every table, view and sequence that `shelf` owns in `public` to
+`shelf_app` (it grants `shelf_app` to `shelf` to be allowed to). The apply rewrites `DATABASE-URL` and
+rolls a new revision; nothing else changes.
+
+> **Unverified.** `db-init` has been run against a local Postgres 16 with a non-superuser
+> administrator (fresh install, upgrade with existing tables, and a second run), and the module passes
+> `terraform validate`, but it has not yet run against a real Flexible Server.
+
+The init container gets the administrator's password through a Container Apps secret, so the app
+container never sees it. The app's managed identity still holds `Key Vault Secrets User` on the whole
+vault, so code running as the app could read `DATABASE-ADMIN-PASSWORD` from Key Vault directly; the
+separation is from the app's environment, not from its identity.
+
 ## Existing database
 
 With `existing_database_url_secret_id` the module creates no database, subnet or private DNS zone and
-passes the URL as `DATABASE_URL`. The network path to that database is yours.
+passes the URL as `DATABASE_URL`, and runs no `db-init`: give it a URL for an unprivileged role. The
+network path to that database is yours.
 
 ## Destroying
 

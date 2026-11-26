@@ -55,6 +55,39 @@ resource "azurerm_container_app" "app" {
     # SIGTERM arrives, the app drains for shutdown_grace_seconds, then the process is killed.
     termination_grace_period_seconds = local.termination_secs
 
+    # db-init (database.tf) runs to completion before the app container on every replica start,
+    # so the app role exists before the app logs in. It alone gets the administrator's password.
+    # 0.25 vCPU / 0.5Gi keeps the app's 1:2 CPU-to-memory ratio.
+    dynamic "init_container" {
+      for_each = local.create_database ? [1] : []
+
+      content {
+        name    = "db-init"
+        image   = var.database_init_image
+        cpu     = 0.25
+        memory  = "0.5Gi"
+        command = ["sh", "-c", local.db_init_script]
+
+        dynamic "env" {
+          for_each = local.db_init_env
+
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
+
+        dynamic "env" {
+          for_each = local.db_init_secret_env
+
+          content {
+            name        = env.key
+            secret_name = env.value
+          }
+        }
+      }
+    }
+
     container {
       name   = "app"
       image  = local.image

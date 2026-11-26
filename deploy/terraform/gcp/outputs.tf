@@ -28,6 +28,16 @@ output "database_url_secret_id" {
   value       = local.create_database ? google_secret_manager_secret.database_url[0].secret_id : var.existing_database_url_secret_id
 }
 
+output "database_admin_password_secret_id" {
+  description = "Secret Manager id of the database admin's password (operators only; the app cannot read it). Null with an existing database URL."
+  value       = local.create_database ? google_secret_manager_secret.database_admin_password[0].secret_id : null
+}
+
+output "db_init_job_name" {
+  description = "Cloud Run job that creates the app's database role (null with an existing database URL)."
+  value       = local.create_database ? google_cloud_run_v2_job.db_init[0].name : null
+}
+
 output "admin_token_secret_id" {
   description = "Secret Manager secret id of the break-glass SHELF_ADMIN_TOKEN (read it with gcloud; it is not an output value)."
   value       = google_secret_manager_secret.admin_token.secret_id

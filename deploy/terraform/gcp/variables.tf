@@ -122,6 +122,12 @@ variable "database_disk_size_gb" {
   default     = 10
 }
 
+variable "database_init_image" {
+  description = "Image of the db-init job that creates the app's database role (it needs psql 15 or later). It receives the admin password, so the default (postgres 16-alpine from Docker Hub) is pinned by digest; pin a mirror by digest too."
+  type        = string
+  default     = "docker.io/library/postgres@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857"
+}
+
 variable "deletion_protection" {
   description = "Protect the created database from deletion; with false the bucket is also emptied on destroy. Turn it off for throwaway stacks."
   type        = bool

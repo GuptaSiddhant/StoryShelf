@@ -43,6 +43,11 @@ output "admin_password_secret_id" {
   value       = azurerm_key_vault_secret.auth_password.versionless_id
 }
 
+output "database_admin_password_secret_id" {
+  description = "Versionless Key Vault id of the database administrator's password (operators only; never in the app container's environment). Null with an existing database URL."
+  value       = local.create_database ? azurerm_key_vault_secret.database_admin_password[0].versionless_id : null
+}
+
 output "oidc_client_secret_id" {
   description = "Versionless Key Vault id to put the real OIDC client secret into."
   value       = azurerm_key_vault_secret.oidc_client_secret.versionless_id

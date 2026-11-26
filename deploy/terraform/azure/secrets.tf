@@ -79,14 +79,26 @@ resource "azurerm_key_vault_secret" "oidc_client_secret" {
 }
 
 # verify-full: the server's certificate chains to a public root and names this FQDN, so the app
-# checks it against the system CAs and never sends the password to an unverified peer.
+# checks it against the system CAs and never sends the password to an unverified peer. The user is
+# the app role `shelf_app`, never the administrator.
 resource "azurerm_key_vault_secret" "database_url" {
   count        = local.create_database ? 1 : 0
   name         = "DATABASE-URL"
-  value        = "postgresql://shelf:${random_password.database[0].result}@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/shelf?sslmode=verify-full"
+  value        = "postgresql://${local.database_app_user}:${random_password.database_app[0].result}@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/${local.database_name}?sslmode=verify-full"
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [time_sleep.role_propagation, azurerm_postgresql_flexible_server_database.shelf]
+}
+
+# The administrator's password, for operators and the db-init init container only. The app
+# container's environment never has it.
+resource "azurerm_key_vault_secret" "database_admin_password" {
+  count        = local.create_database ? 1 : 0
+  name         = "DATABASE-ADMIN-PASSWORD"
+  value        = random_password.database[0].result
+  key_vault_id = azurerm_key_vault.main.id
+
+  depends_on = [time_sleep.role_propagation]
 }
 
 locals {
@@ -99,6 +111,7 @@ locals {
       "shelf-oidc-client-secret" = azurerm_key_vault_secret.oidc_client_secret.versionless_id
       "database-url"             = local.create_database ? azurerm_key_vault_secret.database_url[0].versionless_id : var.existing_database_url_secret_id
     },
+    local.create_database ? { "database-admin-password" = azurerm_key_vault_secret.database_admin_password[0].versionless_id } : {},
     local.playwright ? {
       "playwright-endpoint" = var.playwright_workspace_endpoint_secret_id
       "playwright-token"    = var.playwright_workspace_token_secret_id
