@@ -502,7 +502,8 @@ const OPENAPI_CONFIG = {
     title: "StoryShelf API",
     description:
       "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
-    version: "1.0.0",
+    // The release this server is: the bundler's `__PKG_VERSION__`, "0.0.0" from source.
+    version: packageVersion(),
   },
   tags: [
     {

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-changelog.mjs",
-    "openapi": "nub ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json",
+    "openapi": "nub ../../packages/app/scripts/generate-openapi.ts --out ./public/openapi.json --release-version",
     "prebuild": "nub run openapi && nub run sync",
     "predev": "nub run openapi && nub run sync",
     "dev": "astro dev",
