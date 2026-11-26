@@ -40,20 +40,40 @@ describe("mirrorAttemptLog", () => {
     expect(calls.at(-1)).toEqual(["info", "plain message"]);
   });
 
-  it("records an Error as its capped message", async () => {
+  it("records an Error as its name, capped message and cause chain, redacted", async () => {
     const lines: unknown[] = [];
     const mirror = mirrorAttemptLog(fakeLogger().logger, async (_level, _message, fields) => {
       await Promise.resolve();
       lines.push(fields);
     });
 
+    const unknown = Object.assign(new Error(""), { name: "UnknownError" });
     mirror.logger.error(
-      { storyId: "a", err: new Error("x".repeat(900)) },
+      { storyId: "a", err: Object.assign(unknown, { cause: new Error("api_key=supersecret") }) },
+      "render failed for story",
+    );
+    mirror.logger.error({ storyId: "b", err: new Error("x".repeat(900)) }, "render failed");
+    mirror.logger.error({ storyId: "c", err: "token=hunter2hunter2" }, "render failed");
+    await mirror.flush();
+
+    expect(lines[0]).toMatchObject({ err: { name: "UnknownError", message: "" } });
+    expect(JSON.stringify(lines[0])).not.toContain("supersecret");
+    expect(lines[1]).toMatchObject({ err: { message: "x".repeat(300) } });
+    expect(JSON.stringify(lines[2])).not.toContain("hunter2");
+  });
+
+  it("keeps the step of a failure a runner already built", async () => {
+    const lines: unknown[] = [];
+    const mirror = mirrorAttemptLog(fakeLogger().logger, async (_level, _message, fields) => {
+      await Promise.resolve();
+      lines.push(fields);
+    });
+    mirror.logger.error(
+      { err: { name: "UnknownError", message: "", step: "settle", causes: [] } },
       "render failed for story",
     );
     await mirror.flush();
-
-    expect((lines[0] as { err: string }).err).toHaveLength(500);
+    expect(lines[0]).toEqual({ err: { name: "UnknownError", message: "", step: "settle" } });
   });
 
   it("writes lines one at a time so concurrent failures cannot collide", async () => {
