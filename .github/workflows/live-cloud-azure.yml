@@ -7,9 +7,19 @@ name: Live Cloud Azure
 # live job only consumes `terraform output -json` values as secrets and
 # never creates infrastructure; `module-apply` applies the module itself.
 #
-# Required repository secrets:
+# Both jobs run in the `live-cloud` environment, so a dispatch waits for a reviewer before any
+# secret is exposed (#1305). module-apply signs in by OIDC when the variable AZURE_CLIENT_ID is set
+# (an app registration with a federated credential for this repository's `live-cloud`
+# environment), else with ARM_CLIENT_ID / ARM_CLIENT_SECRET. The owner's setup steps are in
+# docs/testing.md, "Live-cloud credentials".
+#
+# Required secrets:
 # - AZURE_STORAGE_CONNECTION (terraform output: storage_connection_string)
 # - LIVE_AZURE_CONTAINER (existing blob container name)
+# - ARM_TENANT_ID / ARM_SUBSCRIPTION_ID (module-apply)
+# - ARM_CLIENT_ID / ARM_CLIENT_SECRET (module-apply), only until AZURE_CLIENT_ID is set
+#
+# Third-party actions are pinned by commit SHA (the tag is in the comment).
 on:
   workflow_dispatch:
 
@@ -27,55 +37,65 @@ jobs:
   # stay green); live files skip without LIVE_CLOUD=1.
   live-azure:
     runs-on: ubuntu-latest
+    environment: live-cloud
     env:
       LIVE_CLOUD: "1"
-      AZURE_STORAGE_CONNECTION: ${{ secrets.AZURE_STORAGE_CONNECTION }}
-      LIVE_AZURE_CONTAINER: ${{ secrets.LIVE_AZURE_CONTAINER }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+        uses: nubjs/setup-nub@8c7bade1432a9acf9a7ad169aa7288713d046161 # v0.6.2
         with:
           # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
           nub-version: "0.10.0"
 
+      # Before any credential exists, so no install script can read one.
       - name: Install dependencies
         run: nub ci
 
       - name: Fail fast on missing secrets
+        env:
+          HAS_AZURE_STORAGE_CONNECTION: ${{ secrets.AZURE_STORAGE_CONNECTION != '' }}
+          HAS_LIVE_AZURE_CONTAINER: ${{ secrets.LIVE_AZURE_CONTAINER != '' }}
         run: |
           set -e
-          for v in AZURE_STORAGE_CONNECTION LIVE_AZURE_CONTAINER; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Missing required secret (or env): $v. See workflow header."
+          for v in HAS_AZURE_STORAGE_CONNECTION HAS_LIVE_AZURE_CONTAINER; do
+            if [ "${!v}" != "true" ]; then
+              echo "::error::Missing required secret: ${v#HAS_}. See the workflow header."
               exit 1
             fi
           done
 
       - name: Run Blob suites (hermetic + live)
+        env:
+          AZURE_STORAGE_CONNECTION: ${{ secrets.AZURE_STORAGE_CONNECTION }}
+          LIVE_AZURE_CONTAINER: ${{ secrets.LIVE_AZURE_CONTAINER }}
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/storage' --force -- src/azure
 
   # The customer path (#893, ADR 0050): apply the Azure module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real Azure, billed: it runs only when the
   # repository variable LIVE_AZURE_MODULE_APPLY is "1", which the owner turns on (billed). The image
-  # reads the module's Blob settings (see the module README, "Image contract"). Needs a service principal that
-  # may create resources and role assignments in the subscription: secrets ARM_CLIENT_ID,
-  # ARM_CLIENT_SECRET, ARM_TENANT_ID, ARM_SUBSCRIPTION_ID. Destroy runs even when the apply or the
-  # smoke test fails. The Azure Playwright Workspace capture (experimental preset) is not part of
-  # this job yet: it needs a workspace and its token in a Key Vault (module README, "Capture").
+  # reads the module's Blob settings (see the module README, "Image contract"). Needs a principal that
+  # may create resources and role assignments in the subscription (see the header for how it signs
+  # in). Destroy runs even when the apply or the smoke test fails. The Azure Playwright Workspace
+  # capture (experimental preset) is not part of this job yet: it needs a workspace and its token in
+  # a Key Vault (module README, "Capture").
+  #
+  # The azurerm provider reads the ARM_* variables; with ARM_USE_OIDC it requests the job's OIDC
+  # token itself, so no login action is needed. They are set on the Terraform steps only.
   module-apply:
     runs-on: ubuntu-latest
     if: ${{ vars.LIVE_AZURE_MODULE_APPLY == '1' }}
+    environment: live-cloud
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # OIDC to the cloud; unused while the static keys are the fallback
     env:
-      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      GH_TOKEN: ${{ github.token }}
       # Unique per run (the module caps a name at 20 characters), so runs never collide.
       TF_VAR_name: shelf-ci-${{ github.run_id }}
     defaults:
@@ -83,25 +103,33 @@ jobs:
         working-directory: deploy/terraform/azure/examples/minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.9.x"
           terraform_wrapper: false
 
       - name: Fail fast on missing secrets
+        env:
+          HAS_ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID != '' }}
+          HAS_ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID != '' }}
+          HAS_CREDENTIALS: ${{ vars.AZURE_CLIENT_ID != '' || (secrets.ARM_CLIENT_ID != '' && secrets.ARM_CLIENT_SECRET != '') }}
         run: |
           set -e
-          for v in ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_TENANT_ID ARM_SUBSCRIPTION_ID; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Missing required secret (or env): $v. See the job comment."
+          for v in HAS_ARM_TENANT_ID HAS_ARM_SUBSCRIPTION_ID HAS_CREDENTIALS; do
+            if [ "${!v}" != "true" ]; then
+              echo "::error::Missing ${v#HAS_}: set the secret (or AZURE_CLIENT_ID for credentials). See the workflow header."
               exit 1
             fi
           done
 
       - name: Resolve the current release image
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
@@ -109,6 +137,12 @@ jobs:
           echo "applying the module with image ${tag#v}"
 
       - name: Apply
+        env:
+          ARM_USE_OIDC: ${{ vars.AZURE_CLIENT_ID != '' }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID || secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ vars.AZURE_CLIENT_ID == '' && secrets.ARM_CLIENT_SECRET || '' }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         run: |
           set -e
           terraform init -input=false
@@ -126,4 +160,10 @@ jobs:
 
       - name: Destroy
         if: ${{ always() }}
+        env:
+          ARM_USE_OIDC: ${{ vars.AZURE_CLIENT_ID != '' }}
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID || secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ vars.AZURE_CLIENT_ID == '' && secrets.ARM_CLIENT_SECRET || '' }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         run: terraform destroy -input=false -auto-approve

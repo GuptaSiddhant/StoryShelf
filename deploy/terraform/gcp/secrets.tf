@@ -36,8 +36,9 @@ resource "google_secret_manager_secret" "admin_token" {
   depends_on = [google_project_service.apis]
 }
 
-# SHELF_SECRET, SHELF_ADMIN_PASSWORD and SHELF_ADMIN_TOKEN are generated, so their values also sit in the Terraform
-# state: keep the state in an encrypted backend with restricted access.
+# SHELF_SECRET, SHELF_ADMIN_PASSWORD, SHELF_ADMIN_TOKEN and both database passwords are generated, so
+# their values also sit in the Terraform state: keep the state in an encrypted backend with
+# restricted access.
 resource "random_password" "shelf_secret" {
   length  = 48
   special = false
@@ -68,8 +69,9 @@ resource "google_secret_manager_secret_version" "admin_token" {
   secret_data = random_password.admin_token.result
 }
 
-# The created database's URL (with its password) lives only in Secret Manager. verify-full plus
-# SHELF_DATABASE_CA: the app checks the server certificate, whose CAS-issued SAN covers the private IP.
+# The created database's URL (with the app role's password) lives only in Secret Manager. verify-full
+# plus SHELF_DATABASE_CA: the app checks the server certificate, whose CAS-issued SAN covers the
+# private IP. The user is `shelf_app`, never the admin.
 resource "google_secret_manager_secret" "database_url" {
   count = local.create_database ? 1 : 0
 
@@ -90,9 +92,32 @@ resource "google_secret_manager_secret_version" "database_url" {
   secret = google_secret_manager_secret.database_url[0].id
   secret_data = format(
     "postgresql://%s:%s@%s:5432/%s?sslmode=verify-full",
-    google_sql_user.shelf[0].name,
-    random_password.database[0].result,
+    local.database_app_user,
+    random_password.database_app[0].result,
     google_sql_database_instance.main[0].private_ip_address,
     google_sql_database.shelf[0].name,
   )
+}
+
+# The admin's password, for operators and the db-init job only. The app's service account has no
+# grant on it, and it never reaches the app's environment.
+resource "google_secret_manager_secret" "database_admin_password" {
+  count = local.create_database ? 1 : 0
+
+  project   = var.project_id
+  secret_id = "${var.name}-database-admin-password"
+  labels    = local.labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "database_admin_password" {
+  count = local.create_database ? 1 : 0
+
+  secret      = google_secret_manager_secret.database_admin_password[0].id
+  secret_data = random_password.database[0].result
 }

@@ -23,7 +23,7 @@ Internet ──▶ Container Apps environment (ingress, HTTPS)
 ```
 
 - One container service runs the UI, the API and capture (the image bundles Chromium). Every copy also consumes the database queue, so scaling means more identical copies.
-- Azure Database for PostgreSQL, Flexible Server is reachable only on private networking.
+- Azure Database for PostgreSQL, Flexible Server is reachable only on private networking. The app logs in as an unprivileged role, `shelf_app`, never as the server's administrator; a `db-init` init container creates it (see [Database roles](#database-roles)).
 - The app signs in to Blob storage and Key Vault with one user-assigned managed identity. The storage account refuses shared keys.
 - Secrets come from Key Vault as references, never as plain outputs.
 
@@ -60,22 +60,23 @@ The provider needs `features {}`, `storage_use_azuread = true` (see [Blob access
 | `existing_database_url_secret_id`                                                 | `""`                               | A Postgres URL in Key Vault. No database is created                                                          |
 | `database_sku_name`, `database_storage_mb`                                        | `B_Standard_B1ms`, `32768`         | Created database only                                                                                        |
 | `deletion_protection`                                                             | `true`                             | Delete lock on the database, purge protection on the vault                                                   |
+| `database_init_image`                                                             | `postgres:16-alpine` by digest     | Image of the `db-init` init container. It receives the administrator's password, so pin a mirror by digest   |
 | `playwright_workspace_endpoint_secret_id`, `playwright_workspace_token_secret_id` | `""`                               | Optional Azure Playwright Workspace (secret references, both or none)                                        |
-| `auth_email`                                                                      | `admin@example.com`                | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                |
+| `admin_email`                                                                     | `admin@example.com`                | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                |
 | `log_retention_days`                                                              | `30`                               | Log Analytics retention                                                                                      |
 | `tags`                                                                            | `{}`                               | Added to every taggable resource                                                                             |
 
 ### Outputs
 
-| Output                                                                                        | Meaning                                                      |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `url`                                                                                         | The app's HTTPS address on the Container Apps default domain |
-| `resource_group_name`, `container_app_name`                                                   | For `az containerapp` commands                               |
-| `storage_account_name`, `storage_container_name`                                              | The Blob container for Storybooks                            |
-| `database_fqdn`                                                                               | The Postgres server's private hostname                       |
-| `key_vault_name`, `admin_token_secret_id`, `auth_password_secret_id`, `oidc_client_secret_id` | The vault and secret ids (references), never values          |
-| `identity_principal_id`, `identity_client_id`                                                 | The app's managed identity                                   |
-| `role_assignments`                                                                            | The exact roles (next section)                               |
+| Output                                                                                                                              | Meaning                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `url`                                                                                                                               | The app's HTTPS address on the Container Apps default domain |
+| `resource_group_name`, `container_app_name`                                                                                         | For `az containerapp` commands                               |
+| `storage_account_name`, `storage_container_name`                                                                                    | The Blob container for Storybooks                            |
+| `database_fqdn`                                                                                                                     | The Postgres server's private hostname                       |
+| `key_vault_name`, `admin_token_secret_id`, `admin_password_secret_id`, `database_admin_password_secret_id`, `oidc_client_secret_id` | The vault and secret ids (references), never values          |
+| `identity_principal_id`, `identity_client_id`                                                                                       | The app's managed identity                                   |
+| `role_assignments`                                                                                                                  | The exact roles (next section)                               |
 
 ## Permissions
 
@@ -103,10 +104,21 @@ Outside Azure, the image also takes `SHELF_AZURE_CONNECTION_STRING` (a connectio
 ## Database and secrets
 
 - **Private database.** Postgres Flexible Server has no public endpoint. Only the VNet reaches it, through a private DNS zone. The module's URL says `sslmode=verify-full` and uses the server's FQDN, whose certificate chains to a public root, so the app verifies it with the system CAs. No live run has confirmed this yet. With your own database URL, see [Verify the database certificate](/guides/deployment/cloud/#verify-the-database-certificate).
-- **Sign-in.** The module generates `AUTH-PASSWORD` and passes it with `SHELF_ADMIN_EMAIL` (default `admin@example.com`), so sign-in is on from the first boot. Read the password from the vault with `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name AUTH-PASSWORD --query value -o tsv`.
-- **Secrets.** `SHELF_SECRET`, `AUTH-PASSWORD` and `ADMIN-TOKEN` are generated and reach the app as Container Apps secrets that are Key Vault references, resolved by the managed identity. Their values and the database password are also in the Terraform state, so keep the state in an encrypted backend with restricted access.
-- **`OIDC-CLIENT-SHELF_SECRET`** is an operator step. Terraform writes `change-me` once and never overwrites it. Put the real value in with `az keyvault secret set` and restart the revision. The image does not read OIDC settings yet.
-- **Existing database.** With `existing_database_url_secret_id` the module creates no database, subnet or private DNS zone. The network path to that database is yours.
+- **Sign-in.** The module generates `SHELF-ADMIN-PASSWORD` and passes it with `SHELF_ADMIN_EMAIL` (default `admin@example.com`), so sign-in is on from the first boot. Read the password from the vault with `az keyvault secret show --vault-name "$(terraform output -raw key_vault_name)" --name SHELF-ADMIN-PASSWORD --query value -o tsv`.
+- **Secrets.** `SHELF-SECRET`, `SHELF-ADMIN-PASSWORD` and `SHELF-ADMIN-TOKEN` are generated and reach the app as Container Apps secrets that are Key Vault references, resolved by the managed identity. **What lands in the Terraform state:** their values and both database passwords (the administrator's, `DATABASE-ADMIN-PASSWORD`, and the app role's, inside `DATABASE-URL`), plus the storage keys above. Keep the state in an encrypted backend with restricted access.
+- **`SHELF-OIDC-CLIENT-SECRET`** is an operator step. Terraform writes `change-me` once and never overwrites it. Put the real value in with `az keyvault secret set` and restart the revision. The image does not read OIDC settings yet.
+- **Existing database.** With `existing_database_url_secret_id` the module creates no database, subnet or private DNS zone, and runs no `db-init`, so give it a URL for an unprivileged role. The network path to that database is yours.
+
+### Database roles
+
+The app does not log in as the server's administrator:
+
+- **`shelf`** is the Flexible Server's administrator (a member of `azure_pg_admin`), kept for operators. Its password is `DATABASE-ADMIN-PASSWORD` in the vault (`database_admin_password_secret_id`). The name stays `shelf` because the administrator cannot be renamed without replacing the server.
+- **`shelf_app`** is the app's role, in `DATABASE_URL`: an ordinary role with all rights on the `shelf` database and its `public` schema, which owns the tables the app creates.
+
+Each replica runs a `db-init` init container before the app container. It logs in as `shelf` over TLS verified against the system roots (`sslmode=verify-full`, `sslrootcert=system`), and idempotently creates `shelf_app` (or resets its password) and grants it the database and the schema. Its image is `postgres:16-alpine`, pinned by digest because it receives the administrator's password. Only the init container gets that password, so it is never in the app container's environment. The app's managed identity can still read the whole vault, so the separation is from the app's environment, not from its identity.
+
+**Upgrading from 0.17 or earlier.** The app used to log in as `shelf`, so `shelf` owns its tables. `db-init` hands every table, view and sequence that `shelf` owns in `public` to `shelf_app`; the apply rewrites `DATABASE-URL` and rolls a new revision. No live run has confirmed `db-init` against a Flexible Server yet; it has run against a local Postgres 16.
 
 ## Domain and TLS
 
