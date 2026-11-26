@@ -196,6 +196,8 @@ has confirmed the check over the private DNS zone yet.
 
 The app does not log in as the server's administrator. Two logins:
 
+**Names differ by cloud:** on AWS the admin is `shelf_admin` and the app logs in as `shelf`; on GCP and Azure the admin is `shelf` and the app logs in as `shelf_app`, because renaming an existing admin would replace the server or the user that owns the tables.
+
 - **`shelf`** is the Flexible Server's `administrator_login` (a member of `azure_pg_admin`), kept for
   operators. Its password is `DATABASE-ADMIN-PASSWORD` in the vault (output
   `database_admin_password_secret_id`); the app container's environment never has it. The name stays

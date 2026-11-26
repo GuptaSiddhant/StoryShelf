@@ -130,6 +130,8 @@ certificate check against a real instance yet. An existing database URL brings i
 
 The app does not log in as an administrator. Two logins:
 
+**Names differ by cloud:** on AWS the admin is `shelf_admin` and the app logs in as `shelf`; on GCP and Azure the admin is `shelf` and the app logs in as `shelf_app`, because renaming an existing admin would replace the server or the user that owns the tables.
+
 - **`shelf`** is created through the Cloud SQL API, which makes it a member of `cloudsqlsuperuser`.
   It is the operators' admin. Its password is in its own secret (output
   `database_admin_password_secret_id`), which the app's service account cannot read. The name stays

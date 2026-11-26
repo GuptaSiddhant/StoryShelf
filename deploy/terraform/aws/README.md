@@ -116,6 +116,8 @@ database and the `public` schema. The app container starts only after `db-init` 
 
 > **Unverified.** The first-boot database step (db-init: app user, rds_iam grant, backups) is checked by `terraform validate` only and has not yet run against a real RDS; tracked in #1096.
 
+**Names differ by cloud:** on AWS the admin is `shelf_admin` and the app logs in as `shelf`; on GCP and Azure the admin is `shelf` and the app logs in as `shelf_app`, because renaming an existing admin would replace the server or the user that owns the tables.
+
 The master user (`shelf_admin`) is separate and keeps its password, so operators can still log in
 with the secret in `db_master_secret_arn` (from inside the VPC). Only `shelf` is IAM-only.
 
