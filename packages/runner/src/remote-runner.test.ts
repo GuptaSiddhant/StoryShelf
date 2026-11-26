@@ -584,6 +584,39 @@ describe("a remote browser lost mid-pass", () => {
     expect(result.failures[0]?.error).toContain("Page crashed");
   });
 
+  it("stores a remote failure with its name, step and a cause chain with no connection in it", async () => {
+    const unknown = Object.assign(new Error(""), { name: "UnknownError" });
+    fake.state.screenshotErrors.push(
+      Object.assign(unknown, {
+        cause: new Error("ws wss://farm.example/?key=sekret-key rejected Bearer sekret-token"),
+      }),
+    );
+    const logged: { fields: Record<string, unknown>; message: string }[] = [];
+    const logger = {
+      info: () => {},
+      warn: () => {},
+      error: (fields: Record<string, unknown>, message: string) => {
+        logged.push({ fields, message });
+      },
+      debug: () => {},
+    };
+    const runner = createCaptureRunner({ browsers: [farm()], concurrency: 1 });
+    const result = await runner.render(input({ stories: [STORIES[0]], logger: logger as never }));
+    const text = result.failures[0]?.error ?? "";
+    expect(text).toContain("screenshot: UnknownError");
+    expect(text).toContain("caused by Error: ws");
+    const stored = JSON.stringify([text, logged]);
+    for (const secret of ["sekret-key", "sekret-token", "farm.example"]) {
+      expect(stored).not.toContain(secret);
+    }
+    const line = logged.find((entry) => entry.message === "render failed for story");
+    expect(line?.fields["err"]).toMatchObject({
+      name: "UnknownError",
+      step: "screenshot",
+      causes: [{ name: "Error" }],
+    });
+  });
+
   it("keeps a cancel a cancel when it closes the browser under the run", async () => {
     const { service, released } = leased();
     const runner = createCaptureRunner({ browsers: [service] });

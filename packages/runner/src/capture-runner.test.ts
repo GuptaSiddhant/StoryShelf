@@ -324,7 +324,7 @@ describe("createCaptureRunner.render", () => {
       },
     });
 
-    expect(result.failures.map((f) => f.error)).toEqual(["disk full"]);
+    expect(result.failures.map((f) => f.error)).toEqual(["Error: disk full"]);
   }, 30_000);
 
   it("cancels one render of a build by its run id, leaving a concurrent sibling running", async () => {

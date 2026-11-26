@@ -11,6 +11,7 @@ import { checkA11y } from "./a11y/a11y.ts";
 import { capturePhase, TransientCaptureError } from "./capture-retry.ts";
 import { acquirePage, type PageLease } from "./pages.ts";
 import { runPlay } from "./play.ts";
+import { inStep } from "./render-step.ts";
 import { runtimeParametersForStory } from "./runtime-params.ts";
 import { awaitPaint, settleTimeoutOf, waitForSettled, type SettleReport } from "./settle.ts";
 import type { CaptureContext, RuntimeParamsPage } from "./types.ts";
@@ -22,7 +23,10 @@ export async function captureScreenshot(
   viewport: Viewport,
   fresh = false,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
-  const lease = await acquirePage(fresh ? { browser: ctx.browser } : ctx, viewport);
+  const lease = await inStep(
+    "page",
+    async () => await acquirePage(fresh ? { browser: ctx.browser } : ctx, viewport),
+  );
   return await captureLeased(ctx, inputStory, viewport, lease);
 }
 
@@ -67,16 +71,30 @@ async function runCapture(
   inputStory: StoryEntry,
   viewport: Viewport,
 ): Promise<{ screenshot: Buffer; a11yViolations: string[]; story: StoryEntry }> {
-  const story = await navigateAndEnrich(ctx, page, inputStory, viewport);
-  await waitUntilReady(ctx, page, story);
-  if (ctx.executePlay) await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
-  const a11yViolations = await getA11y(ctx, page, story);
-  await settlePage(page, story);
-  await maskIgnoredRegions(ctx, page, story);
-  const plan = await resolvePlan(page, viewport, story);
-  if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height)
-    await page.setViewportSize(plan.viewport);
-  const screenshot = await burstShots(page, plan, story);
+  const story = await inStep(
+    "navigate",
+    async () => await navigateAndEnrich(ctx, page, inputStory, viewport),
+  );
+  await inStep("ready", async () => {
+    await waitUntilReady(ctx, page, story);
+  });
+  if (ctx.executePlay)
+    await inStep("play", async () => {
+      await runPlay(page, story.id, ctx.playTimeoutMs ?? 10_000);
+    });
+  const a11yViolations = await inStep("a11y", async () => await getA11y(ctx, page, story));
+  await inStep("settle", async () => {
+    await settlePage(page, story);
+  });
+  await inStep("mask", async () => {
+    await maskIgnoredRegions(ctx, page, story);
+  });
+  const plan = await inStep("plan", async () => await resolvePlan(page, viewport, story));
+  const screenshot = await inStep("screenshot", async () => {
+    if (plan.viewport.width !== viewport.width || plan.viewport.height !== viewport.height)
+      await page.setViewportSize(plan.viewport);
+    return await burstShots(page, plan, story);
+  });
   return { screenshot, a11yViolations, story };
 }
 
