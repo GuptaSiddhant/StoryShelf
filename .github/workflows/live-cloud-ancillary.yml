@@ -14,6 +14,10 @@ name: Live Cloud Ancillary
 # - git: LIVE_GH_TOKEN + LIVE_GH_OWNER / LIVE_GH_REPO / LIVE_GH_SHA;
 #   LIVE_GL_TOKEN + LIVE_GL_OWNER / LIVE_GL_REPO / LIVE_GL_SHA
 #   (+ optional LIVE_GL_HOST for self-managed GitLab)
+#
+# The job runs in the `live-cloud` environment, so a dispatch waits for a reviewer before any
+# secret is exposed, and each secret reaches only the step that runs its leg (#1305). Third-party
+# actions are pinned by commit SHA (the tag is in the comment).
 on:
   workflow_dispatch:
 
@@ -31,56 +35,49 @@ jobs:
       fail-fast: false
       matrix:
         suite: [db, auth, git]
+    environment: live-cloud
     env:
       LIVE_CLOUD: "1"
-      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-      TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      MYSQL_DATABASE_URL: ${{ secrets.MYSQL_DATABASE_URL }}
-      OIDC_ISSUER: ${{ secrets.OIDC_ISSUER }}
-      OIDC_CLIENT_ID: ${{ secrets.OIDC_CLIENT_ID }}
-      OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
-      OIDC_REDIRECT_URL: ${{ secrets.OIDC_REDIRECT_URL }}
-      LIVE_GH_TOKEN: ${{ secrets.LIVE_GH_TOKEN }}
-      LIVE_GH_OWNER: ${{ secrets.LIVE_GH_OWNER }}
-      LIVE_GH_REPO: ${{ secrets.LIVE_GH_REPO }}
-      LIVE_GH_SHA: ${{ secrets.LIVE_GH_SHA }}
-      LIVE_GL_TOKEN: ${{ secrets.LIVE_GL_TOKEN }}
-      LIVE_GL_OWNER: ${{ secrets.LIVE_GL_OWNER }}
-      LIVE_GL_REPO: ${{ secrets.LIVE_GL_REPO }}
-      LIVE_GL_SHA: ${{ secrets.LIVE_GL_SHA }}
-      LIVE_GL_HOST: ${{ secrets.LIVE_GL_HOST }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+        uses: nubjs/setup-nub@8c7bade1432a9acf9a7ad169aa7288713d046161 # v0.6.2
         with:
           # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
           nub-version: "0.10.0"
 
+      # Before any secret is in the environment, so no install script can read one.
       - name: Install dependencies
         run: nub ci
 
+      # Presence only: this step sees whether each secret is set, never its value.
       - name: Fail fast on missing secrets
+        env:
+          SUITE: ${{ matrix.suite }}
+          HAS_DB: ${{ secrets.TURSO_DATABASE_URL != '' || secrets.DATABASE_URL != '' || secrets.MYSQL_DATABASE_URL != '' }}
+          HAS_AUTH: ${{ secrets.OIDC_ISSUER != '' }}
+          HAS_GIT: ${{ secrets.LIVE_GH_TOKEN != '' || secrets.LIVE_GL_TOKEN != '' }}
         run: |
           set -e
-          case "${{ matrix.suite }}" in
+          case "$SUITE" in
             db)
-              if [ -z "$TURSO_DATABASE_URL" ] && [ -z "$DATABASE_URL" ] && [ -z "$MYSQL_DATABASE_URL" ]; then
+              if [ "$HAS_DB" != "true" ]; then
                 echo "::error::db leg needs TURSO_DATABASE_URL, DATABASE_URL and/or MYSQL_DATABASE_URL."
                 exit 1
               fi
               ;;
             auth)
-              if [ -z "$OIDC_ISSUER" ]; then
+              if [ "$HAS_AUTH" != "true" ]; then
                 echo "::error::auth leg needs OIDC_ISSUER."
                 exit 1
               fi
               ;;
             git)
-              if [ -z "$LIVE_GH_TOKEN" ] && [ -z "$LIVE_GL_TOKEN" ]; then
+              if [ "$HAS_GIT" != "true" ]; then
                 echo "::error::git leg needs LIVE_GH_TOKEN and/or LIVE_GL_TOKEN."
                 exit 1
               fi
@@ -89,15 +86,35 @@ jobs:
 
       - name: Run db suites (hermetic + live)
         if: matrix.suite == 'db'
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MYSQL_DATABASE_URL: ${{ secrets.MYSQL_DATABASE_URL }}
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/db' --force
 
       - name: Run auth suite (hermetic + live)
         if: matrix.suite == 'auth'
+        env:
+          OIDC_ISSUER: ${{ secrets.OIDC_ISSUER }}
+          OIDC_CLIENT_ID: ${{ secrets.OIDC_CLIENT_ID }}
+          OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
+          OIDC_REDIRECT_URL: ${{ secrets.OIDC_REDIRECT_URL }}
         run: nubx turbo test --filter='@storyshelf/auth' --force
 
       - name: Run git suites (hermetic + live)
         if: matrix.suite == 'git'
+        env:
+          LIVE_GH_TOKEN: ${{ secrets.LIVE_GH_TOKEN }}
+          LIVE_GH_OWNER: ${{ secrets.LIVE_GH_OWNER }}
+          LIVE_GH_REPO: ${{ secrets.LIVE_GH_REPO }}
+          LIVE_GH_SHA: ${{ secrets.LIVE_GH_SHA }}
+          LIVE_GL_TOKEN: ${{ secrets.LIVE_GL_TOKEN }}
+          LIVE_GL_OWNER: ${{ secrets.LIVE_GL_OWNER }}
+          LIVE_GL_REPO: ${{ secrets.LIVE_GL_REPO }}
+          LIVE_GL_SHA: ${{ secrets.LIVE_GL_SHA }}
+          LIVE_GL_HOST: ${{ secrets.LIVE_GL_HOST }}
         # The git integrations live in core (ADR 0049).
         # Runs the git folder directly (no turbo, so never a cached result).
         working-directory: packages/core

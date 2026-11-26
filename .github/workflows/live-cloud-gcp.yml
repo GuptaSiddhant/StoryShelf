@@ -7,10 +7,17 @@ name: Live Cloud GCP
 # live job only consumes `terraform output -json` values as secrets and
 # never creates infrastructure; `module-apply` applies the module itself.
 #
-# Required repository secrets:
+# Both jobs run in the `live-cloud` environment, so a dispatch waits for a reviewer before any
+# secret is exposed (#1305). Credentials: Workload Identity Federation when the variable
+# GCP_WORKLOAD_IDENTITY_PROVIDER is set (with GCP_SERVICE_ACCOUNT to impersonate), else the
+# service-account key. The owner's setup steps are in docs/testing.md, "Live-cloud credentials".
+#
+# Required secrets:
 # - GCP_PROJECT_ID (GCP project id)
-# - GCP_SERVICE_ACCOUNT_JSON (service-account key JSON with storage roles)
 # - LIVE_GCS_BUCKET (terraform output: gcs_bucket)
+# - GCP_SERVICE_ACCOUNT_JSON (service-account key JSON), only until GCP_WORKLOAD_IDENTITY_PROVIDER is set
+#
+# Third-party actions are pinned by commit SHA (the tag is in the comment).
 on:
   workflow_dispatch:
 
@@ -28,81 +35,113 @@ jobs:
   # (they must stay green); live files skip without LIVE_CLOUD=1.
   live-gcp:
     runs-on: ubuntu-latest
+    environment: live-cloud
+    permissions:
+      contents: read
+      id-token: write # OIDC to the cloud; unused while the static keys are the fallback
     env:
       LIVE_CLOUD: "1"
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      LIVE_GCS_BUCKET: ${{ secrets.LIVE_GCS_BUCKET }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          persist-credentials: false
 
       - name: Setup Nub
-        uses: nubjs/setup-nub@v0
+        uses: nubjs/setup-nub@8c7bade1432a9acf9a7ad169aa7288713d046161 # v0.6.2
         with:
           # Pinned (#782, now 0.10.0): exact, so no job drifts to a new nub. protobufjs's build script is denied in package.json `allowScripts`.
           nub-version: "0.10.0"
 
+      # Before any credential exists, so no install script can read one.
       - name: Install dependencies
         run: nub ci
 
       - name: Fail fast on missing secrets
+        env:
+          HAS_GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID != '' }}
+          HAS_LIVE_GCS_BUCKET: ${{ secrets.LIVE_GCS_BUCKET != '' }}
+          HAS_CREDENTIALS: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' || secrets.GCP_SERVICE_ACCOUNT_JSON != '' }}
         run: |
           set -e
-          for v in GCP_PROJECT_ID LIVE_GCS_BUCKET; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Missing required secret (or env): $v. See workflow header."
+          for v in HAS_GCP_PROJECT_ID HAS_LIVE_GCS_BUCKET HAS_CREDENTIALS; do
+            if [ "${!v}" != "true" ]; then
+              echo "::error::Missing ${v#HAS_}: set the secret (or GCP_WORKLOAD_IDENTITY_PROVIDER for credentials). See the workflow header."
               exit 1
             fi
           done
-          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] && [ -z "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
-            echo "::error::Missing GCP credentials (GCP_SERVICE_ACCOUNT_JSON)."
-            exit 1
-          fi
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Run GCS suites (hermetic + live)
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          LIVE_GCS_BUCKET: ${{ secrets.LIVE_GCS_BUCKET }}
         # --force: live results must never come from the turbo cache.
         run: nubx turbo test --filter='@storyshelf/storage' --force -- src/gcs
 
   # The customer path (#892, ADR 0050): apply the GCP module's `examples/minimal` with the current
   # release image, smoke-test the running stack, destroy it. Real GCP, billed: it runs only when the
   # repository variable LIVE_GCP_MODULE_APPLY is "1", which the owner turns on (billed). The image
-  # selects GCS from GCS_BUCKET (see the module README, "Image contract"). Uses the same GCP secrets as live-gcp.
+  # selects GCS from GCS_BUCKET (see the module README, "Image contract"). Uses the same GCP credentials as live-gcp.
   # Destroy runs even when the apply or the smoke test fails.
   module-apply:
     runs-on: ubuntu-latest
     if: ${{ vars.LIVE_GCP_MODULE_APPLY == '1' }}
+    environment: live-cloud
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # OIDC to the cloud; unused while the static keys are the fallback
     env:
-      GH_TOKEN: ${{ github.token }}
       # Unique per run (the module caps a name at 20 characters), so runs never collide.
       TF_VAR_name: shelf-ci-${{ github.run_id }}
-      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
     defaults:
       run:
         working-directory: deploy/terraform/gcp/examples/minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER == '' }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.9.x"
           terraform_wrapper: false
 
       - name: Resolve the current release image
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
@@ -110,6 +149,8 @@ jobs:
           echo "applying the module with image ${tag#v}"
 
       - name: Apply
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           set -e
           terraform init -input=false
@@ -127,4 +168,6 @@ jobs:
 
       - name: Destroy
         if: ${{ always() }}
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
         run: terraform destroy -input=false -auto-approve

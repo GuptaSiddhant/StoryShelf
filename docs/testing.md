@@ -54,7 +54,7 @@ Every adapter package must satisfy this matrix. New adapters ship with all
 rows; existing adapters backfill on touch. The `adapter-layout` skill enforces
 the file placement (colocated `<module>.test.ts`, move cases with the code).
 
-| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                                | Runner / git / auth / notify                               |
+| Requirement                                   | Storage (`@storyshelf/storage`)                                                                          | DB (`@storyshelf/db`)                                      | Runner / git / auth / notify                               |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
 | `metadata`                                    | `kind` + `category` asserted once per factory                                                            | same                                                       | same                                                       |
 | `lifecycle` all-or-nothing                    | `setup` creates root (idempotent x2), `health.ok` true then false after `rm -rf`, `teardown` x2 no-throw | `migrate` twice + `ping` ok, `close` x2 no-throw           | same shape; runners assert browser launch/close            |
@@ -249,6 +249,73 @@ The Terraform modules under `deploy/terraform/` are checked by the deploy checks
 (`fmt`, `validate`, `tflint`). Each workflow's `module-apply` job applies the module's
 `examples/minimal` (see the module README, "Checks"); it stays off until its repository variable
 is `1`.
+
+### Live-cloud credentials (owner setup, #1305)
+
+Every job in the four `live-cloud-*.yml` workflows runs in the `live-cloud` GitHub Environment, each
+secret reaches only the steps that use it, and every third-party action is pinned by commit SHA (the
+tag is in a comment; a bump changes both). Until the steps below are done nothing breaks: GitHub
+creates a missing environment on the first run without protection, and each cloud falls back to its
+static secrets. A cloud switches to OIDC as soon as its variable is set. Every trust below is
+scoped to one subject, case included:
+`repo:GuptaSiddhant/StoryShelf:environment:live-cloud`.
+
+**Environment** (once, Settings → Environments → `live-cloud`):
+
+- [ ] Required reviewers: the owner. Leave "Prevent self-review" off if the owner dispatches alone.
+- [ ] Deployment branches and tags: `main` only, so a job on any other branch cannot enter the
+      environment. That alone guards only what the environment holds: the OIDC trusts below
+      (their subject names the environment) and environment secrets. A repository secret stays
+      readable by any workflow pushed to a branch, which can simply leave `environment:` out.
+- [ ] Move every live secret (all the names in the four workflow headers) to the environment's
+      secrets, then delete the repository copies. Do this before relying on the branch rule; the
+      workflows read `secrets.*` the same way from either place.
+
+**AWS** (`live-cloud-aws.yml`, variable `AWS_ROLE_ARN`):
+
+- [ ] IAM → Identity providers: add `token.actions.githubusercontent.com`, audience
+      `sts.amazonaws.com` (once per account).
+- [ ] Create a role whose trust policy allows `sts:AssumeRoleWithWebIdentity` from that provider
+      with `StringEquals` on `token.actions.githubusercontent.com:aud` = `sts.amazonaws.com` and
+      `token.actions.githubusercontent.com:sub` = the subject above.
+- [ ] Give it the permissions the static user has, and a maximum session duration of 2 hours
+      (`module-apply` asks for 7200 seconds).
+- [ ] Set `AWS_ROLE_ARN`, dispatch once, then delete `AWS_ACCESS_KEY_ID` /
+      `AWS_SECRET_ACCESS_KEY` and the user's access keys.
+
+**GCP** (`live-cloud-gcp.yml`, variables `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`):
+
+- [ ] Create the pool and provider, then let the subject impersonate the service account whose key is
+      `GCP_SERVICE_ACCOUNT_JSON`:
+  ```sh
+  gcloud iam workload-identity-pools create github --location=global
+  gcloud iam workload-identity-pools providers create-oidc storyshelf --location=global \
+    --workload-identity-pool=github --issuer-uri=https://token.actions.githubusercontent.com \
+    --attribute-mapping=google.subject=assertion.sub \
+    --attribute-condition="assertion.sub == 'repo:GuptaSiddhant/StoryShelf:environment:live-cloud'"
+  gcloud iam service-accounts add-iam-policy-binding <sa-email> --role=roles/iam.workloadIdentityUser \
+    --member="principal://iam.googleapis.com/projects/<project-number>/locations/global/workloadIdentityPools/github/subject/repo:GuptaSiddhant/StoryShelf:environment:live-cloud"
+  ```
+- [ ] Set `GCP_WORKLOAD_IDENTITY_PROVIDER` to
+      `projects/<project-number>/locations/global/workloadIdentityPools/github/providers/storyshelf`
+      and `GCP_SERVICE_ACCOUNT` to the service account's email.
+- [ ] Dispatch once, then delete `GCP_SERVICE_ACCOUNT_JSON` and the service account's key.
+
+**Azure** (`live-cloud-azure.yml`, variable `AZURE_CLIENT_ID`):
+
+- [ ] Add a federated credential to the app registration behind `ARM_CLIENT_ID`:
+  ```sh
+  az ad app federated-credential create --id <app-client-id> --parameters '{"name":"storyshelf-live-cloud",
+    "issuer":"https://token.actions.githubusercontent.com","audiences":["api://AzureADTokenExchange"],
+    "subject":"repo:GuptaSiddhant/StoryShelf:environment:live-cloud"}'
+  ```
+- [ ] Set `AZURE_CLIENT_ID` to the app's client id. `ARM_TENANT_ID` and `ARM_SUBSCRIPTION_ID` stay.
+- [ ] Dispatch once, then delete `ARM_CLIENT_SECRET` (and `ARM_CLIENT_ID`) and the app's client
+      secret.
+
+`live-azure` still uses `AZURE_STORAGE_CONNECTION`, because the Blob suite reads a connection
+string, and the ancillary tokens (Turso, databases, OIDC, GitHub, GitLab) stay static. Both are
+behind the environment's approval.
 
 ### Output → env map
 
