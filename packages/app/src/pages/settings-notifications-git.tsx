@@ -121,7 +121,7 @@ export const CreateGitChannelCard: FC<{
       />
       <GitChannelFields errors={formState?.errors} />
       <FormActions>
-        <Button variant="primary" type="submit" icon="plus">
+        <Button variant="primary" type="submit">
           Add git channel
         </Button>
       </FormActions>

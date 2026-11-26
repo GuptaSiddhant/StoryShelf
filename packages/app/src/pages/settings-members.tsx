@@ -31,7 +31,7 @@ const RemoveForm: FC<{ action: string; confirm: string }> = ({ action, confirm }
   return (
     <form method="post" action={action} hx-post={action} hx-target="body" hx-confirm={confirm}>
       {csrfField()}
-      <Button variant="ghost" size="sm" type="submit">
+      <Button variant="danger-secondary" size="sm" type="submit">
         Remove
       </Button>
     </form>
@@ -42,7 +42,7 @@ function memberItems(project: Project, members: SettingsMember[], isAdmin: boole
   return members.map((member) => ({
     id: member.id,
     name: member.userId,
-    state: { label: statusLabel(member.role), tone: member.role === "admin" ? "danger" : "info" },
+    state: { label: statusLabel(member.role), tone: "neutral" },
     details: `Since ${formatAbsolute(member.createdAt, "date")}`,
     actions: isAdmin ? (
       <RemoveForm
@@ -61,7 +61,7 @@ function mappingItems(
   return mappings.map((mapping) => ({
     id: mapping.id,
     name: mapping.groupName,
-    state: { label: statusLabel(mapping.role), tone: mapping.role === "admin" ? "danger" : "info" },
+    state: { label: statusLabel(mapping.role), tone: "neutral" },
     actions: isAdmin ? (
       <RemoveForm
         action={`/projects/${project.slug}/settings/members/groups/${mapping.id}/remove`}

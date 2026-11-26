@@ -9,6 +9,7 @@ import {
   Card,
   Field,
   FormActions,
+  HStack,
   Meta,
   SectionTitle,
   Table,
@@ -21,10 +22,10 @@ function LabelTypeActions(props: { project: Project; labelType: LabelType }): Re
   const editable = labelType.key !== "persistent";
   const deletable = editable && labelType.key !== "branch";
   return (
-    <>
+    <HStack gap="sm">
       {editable ? (
         <Button
-          variant="ghost"
+          variant="secondary"
           size="sm"
           href={`/projects/${project.slug}/settings/review?edit=${encodeURIComponent(labelType.key)}#labels`}
           aria-label={`Edit ${labelType.key}`}
@@ -41,14 +42,19 @@ function LabelTypeActions(props: { project: Project; labelType: LabelType }): Re
           hx-confirm="Delete this label type?"
         >
           {csrfField()}
-          <Button variant="ghost" type="submit" aria-label={`Delete ${labelType.key}`}>
+          <Button
+            variant="danger-secondary"
+            size="sm"
+            type="submit"
+            aria-label={`Delete ${labelType.key}`}
+          >
             Delete
           </Button>
         </form>
       ) : (
         <Meta as="span">built-in</Meta>
       )}
-    </>
+    </HStack>
   );
 }
 
@@ -187,7 +193,7 @@ function CreateLabelTypeCard(props: { project: Project }): Rendered {
           hint="Use {value} placeholder. Optional."
         />
         <FormActions>
-          <Button variant="primary" type="submit" icon="plus">
+          <Button variant="primary" type="submit">
             Add label type
           </Button>
         </FormActions>

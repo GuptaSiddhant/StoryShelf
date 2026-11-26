@@ -40,7 +40,7 @@ function webhookItems(
           hx-confirm="Delete this webhook?"
         >
           {csrfField()}
-          <Button variant="ghost" size="sm" type="submit">
+          <Button variant="danger-secondary" size="sm" type="submit">
             Delete
           </Button>
         </form>

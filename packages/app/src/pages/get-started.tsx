@@ -117,7 +117,7 @@ const TokenStep: FC<{ base: string; created: GetStartedProps["created"] }> = ({
           hx-swap="outerHTML"
         >
           {csrfField()}
-          <Button variant="primary" type="submit" icon="plus">
+          <Button variant="primary" type="submit">
             Create a token
           </Button>
         </form>

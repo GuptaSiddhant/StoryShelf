@@ -54,7 +54,7 @@ export function renderSettingsThresholds(
           <ThresholdFields project={project} />
           {isAdmin ? (
             <FormActions>
-              <Button variant="primary" type="submit" icon="check">
+              <Button variant="primary" type="submit">
                 Save thresholds
               </Button>
             </FormActions>

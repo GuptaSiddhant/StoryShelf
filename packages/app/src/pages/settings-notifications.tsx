@@ -147,7 +147,7 @@ const MyNotificationsCard: FC<{
           </p>
         )}
         <FormActions>
-          <Button variant="primary" type="submit" icon="check">
+          <Button variant="primary" type="submit">
             Save my preferences
           </Button>
         </FormActions>
@@ -226,7 +226,7 @@ const DeleteForm: FC<{ project: Project; channel: SettingsNotificationChannel }>
     hx-confirm="Remove this channel?"
   >
     {csrfField()}
-    <Button variant="ghost" size="sm" type="submit">
+    <Button variant="danger-secondary" size="sm" type="submit">
       Delete
     </Button>
   </form>

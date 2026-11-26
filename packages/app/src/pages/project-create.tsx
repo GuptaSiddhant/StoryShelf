@@ -14,7 +14,7 @@ function ProjectCreateActions(): ReturnType<typeof HStack> {
   return (
     <div class="mt-1">
       <HStack>
-        <Button variant="primary" type="submit" icon="plus">
+        <Button variant="primary" type="submit">
           Create project
         </Button>
         <Button variant="secondary" href="/projects">
@@ -86,8 +86,8 @@ export function renderProjectCreatePage(state: ProjectCreateFormState = {}): Ren
   return (
     <DocumentLayout
       layout="form"
-      title="New project"
-      nav={{ active: "projects", trail: [{ label: "New project" }] }}
+      title="Create project"
+      nav={{ active: "projects", trail: [{ label: "Create project" }] }}
     >
       <PageHeader
         title="Create project"

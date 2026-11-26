@@ -131,7 +131,7 @@ function ConnectionActions(props: {
           hx-confirm={`Remove ${connection.name}? Links through it stop posting.`}
         >
           {csrfField()}
-          <Button type="submit" variant="danger" size="sm">
+          <Button type="submit" variant="danger-secondary" size="sm">
             Remove
           </Button>
         </form>
@@ -144,7 +144,7 @@ function ConnectionsCard(props: {
   data: AdminGitData;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const add = (
-    <Button size="sm" href="/admin/git/connections/new">
+    <Button variant="secondary" size="sm" href="/admin/git/connections/new">
       Add connection
     </Button>
   );
@@ -261,7 +261,7 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
           hint="On: a link a project admin asks for is approved at once when the connection covers it. Off: a site admin approves each one. Turning it off keeps existing links."
         />
         <div class="mt-1">
-          <Button type="submit" variant="secondary" size="sm">
+          <Button type="submit" variant="primary">
             Save
           </Button>
         </div>

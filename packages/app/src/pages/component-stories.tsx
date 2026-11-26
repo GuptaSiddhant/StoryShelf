@@ -225,7 +225,7 @@ function PublishedBuildRow(props: { data: ComponentPageData; row: CatalogHistory
 function ChangeCell(props: { row: CatalogHistoryRow }): Rendered {
   const { row } = props;
   if (row.change === "new") {
-    return <Badge tone="info">new here</Badge>;
+    return <Badge tone="info">New here</Badge>;
   }
   if (row.change === "unchanged") {
     return <Meta as="span">unchanged</Meta>;

@@ -89,7 +89,7 @@ function SizeChangeNote(props: {
       <span class="mono">
         {formatSize(from)} → {formatSize(to)}
       </span>
-      <Badge tone="warning">sizes differ</Badge>
+      <Badge tone="warning">Sizes differ</Badge>
     </HStack>
   );
 }

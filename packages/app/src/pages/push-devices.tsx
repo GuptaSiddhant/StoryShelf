@@ -45,7 +45,7 @@ const DeviceRow: FC<{ device: PushDeviceView }> = ({ device }) => (
       {device.lastSuccessAt ? <RelativeTime value={device.lastSuccessAt} /> : "No delivery yet"}
     </td>
     <td>
-      <Button variant="secondary" size="sm" type="button" data-push-remove={device.id}>
+      <Button variant="danger-secondary" size="sm" type="button" data-push-remove={device.id}>
         Remove
       </Button>
     </td>
