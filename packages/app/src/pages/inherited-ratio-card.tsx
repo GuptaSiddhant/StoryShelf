@@ -9,7 +9,7 @@ import { Card, Meta, Stat } from "../ui/components.tsx";
  */
 export function InheritedRatioCard(props: { builds: Build[] }): ReturnType<typeof Card> | null {
   const average = averageInheritedRatio(props.builds);
-  if (average === null) {
+  if (average === null || !Number.isFinite(average.ratio)) {
     return null;
   }
   return (

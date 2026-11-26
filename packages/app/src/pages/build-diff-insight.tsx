@@ -12,6 +12,7 @@ import {
   SectionTitle,
   VStack,
   statusLabel,
+  RelativeTime,
 } from "../ui/components.tsx";
 interface TriageItem {
   snapshotKey: string;
@@ -57,12 +58,12 @@ function InsightBody(props: {
       <ul>
         {itemsOf(latest.output).map((item) => (
           <li>
-            <strong>{item.snapshotKey}</strong> ({item.severity}): {item.note}
+            <strong>{item.snapshotKey}</strong> ({statusLabel(item.severity)}): {item.note}
           </li>
         ))}
       </ul>
       <Meta>
-        {latest.profile} · {latest.model} · {latest.createdAt.slice(0, 16).replace("T", " ")}
+        {latest.profile} · {latest.model} · <RelativeTime value={latest.createdAt} />
       </Meta>
     </>
   );

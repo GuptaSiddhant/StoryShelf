@@ -442,3 +442,16 @@ export const Meta: FC<{
   }
   return <p class={cls}>{children}</p>;
 };
+
+/** The one rendering of an absent value: a dash for sight, "none" for a screen reader. */
+export const Absent: FC = () => (
+  <>
+    <span aria-hidden="true">—</span>
+    <span class="visually-hidden">none</span>
+  </>
+);
+
+/** A number with its unit ("30 days"), or "not set" when there is no number to attach it to. */
+export function valueWithUnit(value: number | null | undefined, unit: string): string {
+  return value === null || value === undefined ? "not set" : `${value} ${unit}`;
+}

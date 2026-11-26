@@ -84,7 +84,7 @@ function aiTarget(sources: AdapterSetupSources): ProbeTarget | undefined {
     return undefined;
   }
   return {
-    metadata: { category: "ai", kind: "ai", name: "AI", version: "-" },
+    metadata: { category: "ai", kind: "ai", name: "AI", version: "" },
     lifecycle: { health: async () => await ai.health() },
   };
 }
@@ -92,7 +92,7 @@ function aiTarget(sources: AdapterSetupSources): ProbeTarget | undefined {
 /** One target per OIDC login provider: a discovery fetch, bounded by the probe timeout. */
 function authProviderTargets(sources: AdapterSetupSources): ProbeTarget[] {
   return (sources.authProviders ?? []).map((provider) => ({
-    metadata: { category: "auth", kind: "oidc", name: provider.label, version: "-" },
+    metadata: { category: "auth", kind: "oidc", name: provider.label, version: "" },
     lifecycle: { health: async () => await provider.check() },
   }));
 }
@@ -248,7 +248,7 @@ function unprobedSetupFailures(
     category: failure.category,
     kind: failure.kind,
     name: failure.name,
-    version: "-",
+    version: "",
     hasLifecycle: false,
     state: "failed",
     detail: sanitize(failure.error),
@@ -268,7 +268,7 @@ function credentialsEntry(probe: CredentialProbe): AdapterReportFull {
     category: "credentials",
     kind: "secret",
     name: "Credential encryption",
-    version: "-",
+    version: "",
     hasLifecycle: false,
     state: unreadable > 0 ? "failed" : "ok",
     ...(detail === undefined ? {} : { detail }),

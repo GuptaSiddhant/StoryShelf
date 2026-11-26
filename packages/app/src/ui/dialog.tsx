@@ -44,6 +44,7 @@ const dialogClose = css`
   justify-content: center;
   width: 32px;
   height: var(--control-sm);
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;

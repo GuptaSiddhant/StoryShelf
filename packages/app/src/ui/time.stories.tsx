@@ -1,7 +1,7 @@
 // oxlint-disable typescript/promise-function-async -- story factories return Hono JSX (a Promise<HtmlEscapedString>)
 import type { Meta } from "@storybook/html-vite";
 import { jsxStory } from "../../.storybook/render.tsx";
-import { RelativeTime, Time, VStack } from "./components.tsx";
+import { Absent, RelativeTime, Time, VStack, valueWithUnit } from "./components.tsx";
 
 const meta: Meta = { title: "UI/Time" };
 export default meta;
@@ -27,5 +27,14 @@ export const Absolute = jsxStory(() => (
     <Time value={STAMP} format="date" />
     <Time value={STAMP} format="time" />
     <Time value="not a date" />
+  </VStack>
+));
+
+/** An absent value is one dash with a hidden "none"; a unit never trails a missing number. */
+export const AbsentValue = jsxStory(() => (
+  <VStack>
+    <Absent />
+    <span>Purge TTL {valueWithUnit(null, "days")}</span>
+    <span>Purge TTL {valueWithUnit(30, "days")}</span>
   </VStack>
 ));

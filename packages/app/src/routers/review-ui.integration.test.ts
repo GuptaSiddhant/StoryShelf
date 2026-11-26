@@ -475,7 +475,7 @@ describe("the build page without testing", () => {
     const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     expect(html).toContain("Approve build");
     expect(html).toContain("Reject build");
-    expect(html).toContain("waiting for review");
+    expect(html).toContain("Waiting for review");
     expect(html).toContain("0 of 1 approval given");
     expect(html).toContain("Changes in this build");
     expect(html).toContain("Table");

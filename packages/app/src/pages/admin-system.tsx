@@ -23,6 +23,8 @@ import {
   Table,
   VStack,
   statusLabel,
+  Absent,
+  valueWithUnit,
 } from "../ui/components.tsx";
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
 import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
@@ -140,12 +142,12 @@ function AdapterRow(props: {
       </td>
       <td>
         <Meta as="span" mono>
-          {adapter.version}
+          {adapter.version || <Absent />}
         </Meta>
       </td>
       <td>
         <Badge tone={healthTone(adapter.state)} icon>
-          {adapter.state}
+          {statusLabel(adapter.state)}
         </Badge>
       </td>
       <td class="nowrap">
@@ -226,15 +228,13 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
       </StatGroup>
       <Meta>
         Auth {authEnabled ? "enabled" : "disabled — all operations permitted"} · Purge TTL{" "}
-        {formatOptional(config.purgeTtlDays)} days · Branch TTL{" "}
-        {config.branchTtlDays === null
-          ? "disabled"
-          : `${formatOptional(config.branchTtlDays)} days`}
+        {valueWithUnit(config.purgeTtlDays, "days")} · Branch TTL{" "}
+        {config.branchTtlDays === null ? "disabled" : valueWithUnit(config.branchTtlDays, "days")}
       </Meta>
       {authMethods && authMethods.length > 0 ? (
         <HStack>
           {authMethods.map((method) => (
-            <Badge key={method}>{method}</Badge>
+            <Badge key={method}>{statusLabel(method)}</Badge>
           ))}
         </HStack>
       ) : null}
@@ -242,7 +242,7 @@ function ServerFacts(props: ServerFactsProps): HtmlEscapedString | Promise<HtmlE
       <Meta>
         Scratch dir {formatOptional(config.scratchDir)} · Published domain{" "}
         {formatOptional(storybookHostingOf(config)?.baseDomain)} · Max upload{" "}
-        {formatOptional(config.maxUploadBytes)} bytes
+        {valueWithUnit(config.maxUploadBytes, "bytes")}
       </Meta>
     </Card>
   );

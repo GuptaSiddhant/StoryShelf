@@ -31,7 +31,7 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
         <SectionTitle>Review</SectionTitle>
         <HStack>
           {open > 0 ? <Badge tone="warning">{openRequestsLabel(open)}</Badge> : null}
-          <Badge tone={statusTone(data.state.status)}>{standing(data)}</Badge>
+          <Badge tone={statusTone(data.state.status)}>{statusLabel(standing(data))}</Badge>
         </HStack>
       </HStack>
       <Meta>{nothingToReview(data) ?? summary(data)}</Meta>

@@ -11,6 +11,7 @@
  */
 export { Button, Tabs } from "./buttons.tsx";
 export {
+  Absent,
   Alert,
   Badge,
   EmptyState,
@@ -19,6 +20,7 @@ export {
   StatGroup,
   statusLabel,
   statusTone,
+  valueWithUnit,
 } from "./feedback.tsx";
 export { CheckField, Field, FormActions, SelectField, TextareaField } from "./forms.tsx";
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";

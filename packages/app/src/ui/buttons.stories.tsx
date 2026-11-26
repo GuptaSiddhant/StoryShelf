@@ -91,3 +91,15 @@ export const TabBarOverflowingOnAPhone = onAPhone(
     />
   )),
 );
+
+/** A `<button>` and an `<a>` of one variant draw in the same typeface (the reset sets it on controls). */
+export const ButtonAndLinkSideBySide = jsxStory(() => (
+  <HStack>
+    <Button variant="secondary" size="sm" href="/example">
+      Install on GitHub
+    </Button>
+    <Button variant="secondary" size="sm" type="button">
+      Remove
+    </Button>
+  </HStack>
+));

@@ -13,6 +13,7 @@ import {
   Progress,
   SelectField,
   Table,
+  RelativeTime,
   VStack,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
@@ -106,7 +107,7 @@ const ProjectRow: FC<{
       {row ? formatBytes(row.size) : "—"}
     </td>
     <td class="nowrap" data-offline-synced>
-      {row ? row.syncedAt.slice(0, 16).replace("T", " ") : "Not kept"}
+      {row ? <RelativeTime value={row.syncedAt} /> : "Not kept"}
     </td>
     <td>
       <Button

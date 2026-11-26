@@ -1,6 +1,6 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { StatusRow, StatusTone } from "../routers/health-status.ts";
-import { Badge, Card, Meta, SectionTitle, Table } from "../ui/components.tsx";
+import { Absent, Badge, Card, Meta, SectionTitle, statusLabel, Table } from "../ui/components.tsx";
 
 const TONES: Record<StatusTone, "success" | "warning" | "neutral"> = {
   ok: "success",
@@ -31,10 +31,10 @@ export function RuntimeStatusCard(props: {
                   <strong>{row.label}</strong>
                 </td>
                 <td>
-                  <Badge tone={TONES[row.tone]}>{row.value}</Badge>
+                  <Badge tone={TONES[row.tone]}>{statusLabel(row.value)}</Badge>
                 </td>
                 <td>
-                  <Meta as="span">{row.detail ?? "—"}</Meta>
+                  <Meta as="span">{row.detail ?? <Absent />}</Meta>
                 </td>
               </tr>
             ))}

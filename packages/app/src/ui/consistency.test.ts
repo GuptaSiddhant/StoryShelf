@@ -364,8 +364,13 @@ describe("type and colour tokens", () => {
 
   it("prints no raw status, verdict, role, kind or provider enum as a badge label", async () => {
     const raw =
-      /<Badge[^>]*>\s*\{[^{}()]*\.(?:status|verdict|role|kind|provider|level)\}\s*<\/Badge>/gu;
+      /<Badge[^>]*>\s*\{[^{}()]*\.(?:status|verdict|role|kind|provider|level|value|state|method)\}\s*<\/Badge>/gu;
     expect(await offendersOf(raw)).toEqual([]);
+  });
+
+  it("formats no date by slicing an ISO string in pages or the shell", async () => {
+    const slicing = /\.slice\(0, (?:10|16)\)|\btoISOString\(\)/gu;
+    expect(await offendersOf(slicing, /^ui\/|^shell\/service-worker-sync\.ts$/u)).toEqual([]);
   });
 
   it("writes no hex colour in styles outside the theme and token modules", async () => {
