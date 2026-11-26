@@ -40,30 +40,33 @@ The module enables the APIs it needs (`run`, `storage`, `secretmanager`, `artifa
 
 ## Inputs
 
-| Name                                                 | Default                                   | Meaning                                                                                                  |
-| ---------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `name`                                               | required                                  | Name prefix, 2-20 characters                                                                             |
-| `project_id`                                         | required                                  | GCP project                                                                                              |
-| `image_version`                                      | required                                  | Release version of the image (no `v`)                                                                    |
-| `region`                                             | `us-central1`                             | Must match the provider's region                                                                         |
-| `image_repository`                                   | `""`                                      | A full registry path (your mirror). Empty creates the ghcr.io proxy                                      |
-| `public_base_url`                                    | `""`                                      | `SHELF_PUBLIC_BASE_URL` for a domain you map yourself; empty means the service's `run.app` URL           |
-| `network` / `subnetwork`                             | `""`                                      | Existing VPC and subnet (self links). Empty creates them                                                 |
-| `cpu` / `memory`                                     | `2` / `4Gi`                               | Capture renders in the container: do not go much lower                                                   |
-| `min_instances` / `max_instances`                    | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                    |
-| `database_pool_size`                                 | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                               |
-| `shutdown_grace_seconds`                             | `8`                                       | See "Shutdown"                                                                                           |
-| `existing_database_url_secret_id`                    | `""`                                      | A Postgres URL in Secret Manager; no database is created                                                 |
-| `database_tier`                                      | `db-custom-1-3840`                        | Created database only                                                                                    |
-| `database_disk_size_gb`                              | `10`                                      | Created database only                                                                                    |
-| `deletion_protection`                                | `true`                                    | Protects the database and service; `false` also empties the bucket on destroy                            |
-| `database_init_image`                                | Docker Hub `postgres:16-alpine` by digest | Image of the `db-init` job (needs `psql` 15+); it receives the admin password, so pin a mirror by digest |
-| `github_app_id` / `github_app_private_key_secret_id` | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                  |
-| `github_api_url`                                     | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                |
-| `gitlab_token_secret_id` / `gitlab_token_expires`    | `""`                                      | Server-wide GitLab connection (both or none)                                                             |
-| `gitlab_host`                                        | `""`                                      | GitLab base URL; empty means gitlab.com                                                                  |
-| `admin_email`                                        | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                            |
-| `labels`                                             | `{}`                                      | Added to every resource that supports them                                                               |
+| Name                                                                                  | Default                                   | Meaning                                                                                                        |
+| ------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`                                                                                | required                                  | Name prefix, 2-20 characters                                                                                   |
+| `project_id`                                                                          | required                                  | GCP project                                                                                                    |
+| `image_version`                                                                       | required                                  | Release version of the image (no `v`)                                                                          |
+| `region`                                                                              | `us-central1`                             | Must match the provider's region                                                                               |
+| `image_repository`                                                                    | `""`                                      | A full registry path (your mirror). Empty creates the ghcr.io proxy                                            |
+| `public_base_url`                                                                     | `""`                                      | `SHELF_PUBLIC_BASE_URL` for a domain you map yourself; empty means the service's `run.app` URL                 |
+| `network` / `subnetwork`                                                              | `""`                                      | Existing VPC and subnet (self links). Empty creates them                                                       |
+| `cpu` / `memory`                                                                      | `2` / `4Gi`                               | Capture renders in the container: do not go much lower                                                         |
+| `min_instances` / `max_instances`                                                     | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                          |
+| `database_pool_size`                                                                  | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                                     |
+| `shutdown_grace_seconds`                                                              | `8`                                       | See "Shutdown"                                                                                                 |
+| `existing_database_url_secret_id`                                                     | `""`                                      | A Postgres URL in Secret Manager; no database is created                                                       |
+| `database_tier`                                                                       | `db-custom-1-3840`                        | Created database only                                                                                          |
+| `database_disk_size_gb`                                                               | `10`                                      | Created database only                                                                                          |
+| `deletion_protection`                                                                 | `true`                                    | Protects the database and service; `false` also empties the bucket on destroy                                  |
+| `database_init_image`                                                                 | Docker Hub `postgres:16-alpine` by digest | Image of the `db-init` job (needs `psql` 15+); it receives the admin password, so pin a mirror by digest       |
+| `github_app_id` / `github_app_private_key_secret_id`                                  | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                        |
+| `github_api_url`                                                                      | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                      |
+| `gitlab_token_secret_id` / `gitlab_token_expires`                                     | `""`                                      | Server-wide GitLab connection (both or none)                                                                   |
+| `gitlab_host`                                                                         | `""`                                      | GitLab base URL; empty means gitlab.com                                                                        |
+| `remote_browser_endpoint_secret_id` / `remote_browser_token_secret_id`                | `""`                                      | Optional remote browser (secret references; the token is optional, the endpoint is not; see "Remote browsers") |
+| `remote_browser_protocol` / `remote_browser_reach`                                    | `""`                                      | Declared, never inferred: `playwright` or `cdp`, and `loopback` or `url`. Required with the endpoint           |
+| `remote_browser_engines`, `remote_browser_sessions`, `remote_browser_max_connections` | `""`, `0`, `0`                            | Engines (default `chromium`), parallel pages and most connections per copy; `0` leaves the image default       |
+| `admin_email`                                                                         | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                  |
+| `labels`                                                                              | `{}`                                      | Added to every resource that supports them                                                                     |
 
 ## Outputs
 
@@ -170,7 +173,7 @@ unprivileged role.
 ## Capture, scaling and shutdown
 
 - **Capture runs in the container** (the image ships Chromium). The module builds no browser
-  service, and has no remote-browser input until the image reads one from its environment.
+  service. To render in an existing remote browser as well, see "Remote browsers" below.
 - **The queue consumers poll in the background**, so the service sets `cpu_idle = false` (CPU stays
   allocated between requests) and `min_instances >= 1` (validated). Without them captures stall.
   The serverless check (`isServerlessHost`) looks only for AWS Lambda, Vercel and Netlify, so it
@@ -205,6 +208,23 @@ a new secret version and a new revision.
 gcloud secrets create shelf-github-app-key --data-file=app.private-key.pem
 ```
 
+## Remote browsers
+
+Set `remote_browser_endpoint_secret_id` to add one remote browser target (`chromium@remote`) beside the
+bundled Chromium. The image reads it from `SHELF_REMOTE_BROWSER_*` and refuses to start when the
+configuration is half set or malformed, naming the variable and never its value.
+
+- The endpoint (`ws(s)://...`, which can carry a key) and the optional token are Secret Manager secrets
+  you create outside Terraform, so their values never enter configuration or state. They reach the
+  container as secret references, and the service account may read exactly those secrets.
+- `remote_browser_protocol` (`playwright` or `cdp`) and `remote_browser_reach` (`loopback` or `url`) are
+  declared, never inferred, and required with the endpoint. `reach = "url"` makes the browser open a
+  signed Storybook URL on the public origin; the module always sets `SHELF_SECRET` and
+  `SHELF_PUBLIC_BASE_URL`, so it is available. `loopback` needs the `playwright` protocol.
+- `remote_browser_max_connections` caps connections per copy (`SHELF_REMOTE_BROWSER_MAX_CONNECTIONS`).
+  The plan's own limit is shared by every copy, so divide it by `max_instances`.
+- Projects opt in to the target under Settings, Capture. See the remote browsers guide on the website.
+
 ## Image contract
 
 | Variable                                                                                         | Source                               | Status |
@@ -217,6 +237,8 @@ gcloud secrets create shelf-github-app-key --data-file=app.private-key.pem
 | `SHELF_SHUTDOWN_GRACE_SECONDS`                                                                   | `shutdown_grace_seconds`             | read   |
 | `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)                | read   |
 | `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secret Manager references (optional) | read   |
+| `SHELF_REMOTE_BROWSER_ENDPOINT`, `SHELF_REMOTE_BROWSER_TOKEN`                                    | Secret Manager references (optional) | read   |
+| `SHELF_REMOTE_BROWSER_PROTOCOL`, `_REACH`, `_ENGINES`, `_SESSIONS`, `_MAX_CONNECTIONS`           | `remote_browser_*` inputs (optional) | read   |
 
 The image selects Google Cloud Storage from `SHELF_GCS_BUCKET` (credentials from the service account via
 Application Default Credentials) and refuses to boot when another storage backend is also set. The live apply stays behind the

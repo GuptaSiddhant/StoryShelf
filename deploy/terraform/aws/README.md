@@ -42,35 +42,38 @@ security group admits only the ALB. The database is reachable from the task secu
 
 ## Inputs
 
-| Name                                                  | Default                                   | Meaning                                                                                                        |
-| ----------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `name`                                                | required                                  | Name prefix, 2-20 characters                                                                                   |
-| `image_version`                                       | required                                  | Release version of the image (no `v`)                                                                          |
-| `region`                                              | `us-east-1`                               | Must match the provider's region                                                                               |
-| `image_repository`                                    | `ghcr.io/guptasiddhant/storyshelf`        | Registry path, for a mirror                                                                                    |
-| `vpc_id`                                              | `""`                                      | Existing VPC; subnets are found by their `Tier` tag (`public`, `private`)                                      |
-| `allowed_cidr_blocks`                                 | required                                  | IPv4 ranges that may reach the load balancer; `["0.0.0.0/0"]` publishes the app                                |
-| `allow_http`                                          | `false`                                   | Plain HTTP without a domain; the plan fails otherwise                                                          |
-| `domain_name`                                         | `""`                                      | Enables HTTPS (see "Domain and TLS")                                                                           |
-| `saml_metadata_url`                                   | `""`                                      | Cognito SAML federation                                                                                        |
-| `task_cpu` / `task_memory`                            | `2048` / `4096`                           | Capture renders in the container: do not go much lower                                                         |
-| `min_instances` / `max_instances`                     | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                          |
-| `database_pool_size`                                  | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                                     |
-| `shutdown_grace_seconds`                              | `30`                                      | See "Shutdown"                                                                                                 |
-| `existing_database_url_secret_arn`                    | `""`                                      | A Postgres URL in Secrets Manager; no database is created                                                      |
-| `database_instance_class`                             | `db.t4g.micro`                            | Created database only                                                                                          |
-| `database_allocated_storage`                          | `20`                                      | GiB, created database only                                                                                     |
-| `database_backup_retention_days`                      | `7`                                       | Automated backup retention in days (1-35)                                                                      |
-| `database_init_image`                                 | ECR Public `postgres:16-alpine` by digest | Image of the `db-init` container (needs `psql`); it receives the master credentials, so pin a mirror by digest |
-| `enable_cognito`                                      | `false`                                   | Create the Cognito pool, client and `SHELF_OIDC_CLIENT_SECRET` (image does not read OIDC yet)                  |
-| `admin_email`                                         | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                  |
-| `deletion_protection`                                 | `true`                                    | Database protection and final snapshot; `false` also empties the bucket on destroy                             |
-| `github_app_id` / `github_app_private_key_secret_arn` | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                        |
-| `github_api_url`                                      | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                      |
-| `gitlab_token_secret_arn` / `gitlab_token_expires`    | `""`                                      | Server-wide GitLab connection (both or none)                                                                   |
-| `gitlab_host`                                         | `""`                                      | GitLab base URL; empty means gitlab.com                                                                        |
-| `log_retention_days`                                  | `30`                                      | CloudWatch retention                                                                                           |
-| `tags`                                                | `{}`                                      | Added to every taggable resource                                                                               |
+| Name                                                                                  | Default                                   | Meaning                                                                                                        |
+| ------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`                                                                                | required                                  | Name prefix, 2-20 characters                                                                                   |
+| `image_version`                                                                       | required                                  | Release version of the image (no `v`)                                                                          |
+| `region`                                                                              | `us-east-1`                               | Must match the provider's region                                                                               |
+| `image_repository`                                                                    | `ghcr.io/guptasiddhant/storyshelf`        | Registry path, for a mirror                                                                                    |
+| `vpc_id`                                                                              | `""`                                      | Existing VPC; subnets are found by their `Tier` tag (`public`, `private`)                                      |
+| `allowed_cidr_blocks`                                                                 | required                                  | IPv4 ranges that may reach the load balancer; `["0.0.0.0/0"]` publishes the app                                |
+| `allow_http`                                                                          | `false`                                   | Plain HTTP without a domain; the plan fails otherwise                                                          |
+| `domain_name`                                                                         | `""`                                      | Enables HTTPS (see "Domain and TLS")                                                                           |
+| `saml_metadata_url`                                                                   | `""`                                      | Cognito SAML federation                                                                                        |
+| `task_cpu` / `task_memory`                                                            | `2048` / `4096`                           | Capture renders in the container: do not go much lower                                                         |
+| `min_instances` / `max_instances`                                                     | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                          |
+| `database_pool_size`                                                                  | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                                     |
+| `shutdown_grace_seconds`                                                              | `30`                                      | See "Shutdown"                                                                                                 |
+| `existing_database_url_secret_arn`                                                    | `""`                                      | A Postgres URL in Secrets Manager; no database is created                                                      |
+| `database_instance_class`                                                             | `db.t4g.micro`                            | Created database only                                                                                          |
+| `database_allocated_storage`                                                          | `20`                                      | GiB, created database only                                                                                     |
+| `database_backup_retention_days`                                                      | `7`                                       | Automated backup retention in days (1-35)                                                                      |
+| `database_init_image`                                                                 | ECR Public `postgres:16-alpine` by digest | Image of the `db-init` container (needs `psql`); it receives the master credentials, so pin a mirror by digest |
+| `enable_cognito`                                                                      | `false`                                   | Create the Cognito pool, client and `SHELF_OIDC_CLIENT_SECRET` (image does not read OIDC yet)                  |
+| `admin_email`                                                                         | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                  |
+| `deletion_protection`                                                                 | `true`                                    | Database protection and final snapshot; `false` also empties the bucket on destroy                             |
+| `github_app_id` / `github_app_private_key_secret_arn`                                 | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                        |
+| `github_api_url`                                                                      | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                      |
+| `gitlab_token_secret_arn` / `gitlab_token_expires`                                    | `""`                                      | Server-wide GitLab connection (both or none)                                                                   |
+| `gitlab_host`                                                                         | `""`                                      | GitLab base URL; empty means gitlab.com                                                                        |
+| `remote_browser_endpoint_secret_arn` / `remote_browser_token_secret_arn`              | `""`                                      | Optional remote browser (secret references; the token is optional, the endpoint is not; see "Remote browsers") |
+| `remote_browser_protocol` / `remote_browser_reach`                                    | `""`                                      | Declared, never inferred: `playwright` or `cdp`, and `loopback` or `url`. Required with the endpoint           |
+| `remote_browser_engines`, `remote_browser_sessions`, `remote_browser_max_connections` | `""`, `0`, `0`                            | Engines (default `chromium`), parallel pages and most connections per copy; `0` leaves the image default       |
+| `log_retention_days`                                                                  | `30`                                      | CloudWatch retention                                                                                           |
+| `tags`                                                                                | `{}`                                      | Added to every taggable resource                                                                               |
 
 ## Outputs
 
@@ -166,7 +169,7 @@ execution role, so the task role has no logs permission.
 ## Capture, scaling and shutdown
 
 - **Capture runs in the container** (the image ships Chromium). The module builds no browser
-  service, and has no remote-browser input until the image reads one from its environment.
+  service. To render in an existing remote browser as well, see "Remote browsers" below.
 - **Scaling** is more identical copies between `min_instances` and `max_instances`, tracked on CPU.
   Per-copy limits (remote-browser connections, rate limits, the AI budget) are in the scaling docs.
 - **Shutdown.** On a deploy ECS sends SIGTERM and the app drains running captures, then hands the
@@ -208,6 +211,23 @@ a new secret version and a new revision.
 aws secretsmanager create-secret --name "<name>/GITHUB_APP_PRIVATE_KEY" --secret-string file://app.private-key.pem
 ```
 
+## Remote browsers
+
+Set `remote_browser_endpoint_secret_arn` to add one remote browser target (`chromium@remote`) beside the
+bundled Chromium. The image reads it from `SHELF_REMOTE_BROWSER_*` and refuses to start when the
+configuration is half set or malformed, naming the variable and never its value.
+
+- The endpoint (`ws(s)://...`, which can carry a key) and the optional token are Secrets Manager secrets
+  you create outside Terraform, so their values never enter configuration or state. They reach the
+  container as secret references, and the execution role may read exactly those secrets.
+- `remote_browser_protocol` (`playwright` or `cdp`) and `remote_browser_reach` (`loopback` or `url`) are
+  declared, never inferred, and required with the endpoint. `reach = "url"` makes the browser open a
+  signed Storybook URL on the public origin; the module always sets `SHELF_SECRET` and
+  `SHELF_PUBLIC_BASE_URL`, so it is available. `loopback` needs the `playwright` protocol.
+- `remote_browser_max_connections` caps connections per copy (`SHELF_REMOTE_BROWSER_MAX_CONNECTIONS`).
+  The plan's own limit is shared by every copy, so divide it by `max_instances`.
+- Projects opt in to the target under Settings, Capture. See the remote browsers guide on the website.
+
 ## Image contract
 
 The module passes these to the image. Every variable below is read by the image except those
@@ -224,6 +244,8 @@ marked _not read_, which the image does not use yet.
 | `SHELF_DATABASE_POOL_MAX`                                                                        | `database_pool_size`                  | read     |
 | `SHELF_GITHUB_APP_ID`, `SHELF_GITHUB_API_URL`, `SHELF_GITLAB_HOST`, `SHELF_GITLAB_TOKEN_EXPIRES` | git inputs (optional)                 | read     |
 | `SHELF_GITHUB_APP_PRIVATE_KEY`, `SHELF_GITLAB_TOKEN`                                             | Secrets Manager references (optional) | read     |
+| `SHELF_REMOTE_BROWSER_ENDPOINT`, `SHELF_REMOTE_BROWSER_TOKEN`                                    | Secrets Manager references (optional) | read     |
+| `SHELF_REMOTE_BROWSER_PROTOCOL`, `_REACH`, `_ENGINES`, `_SESSIONS`, `_MAX_CONNECTIONS`           | `remote_browser_*` inputs (optional)  | read     |
 | `SHELF_OIDC_CLIENT_SECRET` (with `enable_cognito`)                                               | Secrets Manager                       | not read |
 
 The image reads the `SHELF_DATABASE_IAM_*` variables through the `@storyshelf/db/postgres/rds-iam` preset. It refuses

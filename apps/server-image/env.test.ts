@@ -1,4 +1,5 @@
 import { refuseRenamedSettings } from "@storyshelf/core/config";
+import { isRemoteBrowser, scrubConnection, type RemoteBrowser } from "@storyshelf/runner/remote";
 import { describe, expect, it, vi } from "vitest";
 import {
   authFromEnv,
@@ -9,6 +10,7 @@ import {
   databaseFromEnv,
   isLoopback,
   poolMaxFromEnv,
+  remoteBrowserFromEnv,
   storageFromEnv,
   storybookHostingFromEnv,
   unverifiedDatabaseTls,
@@ -333,6 +335,191 @@ describe("browsersFromEnv", () => {
     expect(browsers).toHaveLength(2);
     expect(browsers[0]).toBe("chromium");
     expect(typeof browsers[1]).toBe("object");
+  });
+});
+
+describe("remoteBrowserFromEnv (SHELF_REMOTE_BROWSER_*)", () => {
+  const ENDPOINT = "wss://farm.example/ws?key=endpoint-key-9f3a";
+  const TOKEN = "token-value-77c1";
+  const SECRET = "s".repeat(32);
+  const base = {
+    SHELF_REMOTE_BROWSER_ENDPOINT: ENDPOINT,
+    SHELF_REMOTE_BROWSER_TOKEN: TOKEN,
+    SHELF_REMOTE_BROWSER_PROTOCOL: "playwright",
+    SHELF_REMOTE_BROWSER_REACH: "loopback",
+  };
+  const urlReach = {
+    ...base,
+    SHELF_REMOTE_BROWSER_REACH: "url",
+    SHELF_SECRET: SECRET,
+    SHELF_PUBLIC_BASE_URL: "https://shelf.example",
+  };
+
+  /** The refusal's message, which must name `variable` and never carry a secret value. */
+  function refusal(env: Record<string, string>): string {
+    try {
+      remoteBrowserFromEnv(env);
+    } catch (error) {
+      expect(error).toBeInstanceOf(BootRefusal);
+      const { message } = error as Error;
+      for (const secret of [ENDPOINT, "endpoint-key-9f3a", "farm.example", TOKEN, SECRET]) {
+        expect(message).not.toContain(secret);
+      }
+      return message;
+    }
+    throw new Error("expected a BootRefusal");
+  }
+
+  it("is off when no SHELF_REMOTE_BROWSER_* variable is set", () => {
+    expect(remoteBrowserFromEnv({})).toBeUndefined();
+    expect(remoteBrowserFromEnv({ SHELF_REMOTE_BROWSER_ENDPOINT: "" })).toBeUndefined();
+  });
+
+  it("declares playwright over loopback, with chromium and one session by default", () => {
+    const remote = remoteBrowserFromEnv(base) as RemoteBrowser;
+    expect(isRemoteBrowser(remote)).toBe(true);
+    expect(remote).toMatchObject({
+      name: "remote",
+      engines: ["chromium"],
+      protocol: "playwright",
+      reach: "loopback",
+      sessions: 1,
+      maxConnections: undefined,
+      connect: { endpoint: ENDPOINT, headers: { authorization: `Bearer ${TOKEN}` } },
+    });
+  });
+
+  it("reads every declared combination", () => {
+    const pw = remoteBrowserFromEnv(urlReach) as RemoteBrowser;
+    expect([pw.protocol, pw.reach]).toEqual(["playwright", "url"]);
+    const cdp = remoteBrowserFromEnv({
+      ...urlReach,
+      SHELF_REMOTE_BROWSER_PROTOCOL: "cdp",
+      SHELF_REMOTE_BROWSER_ENDPOINT: "https://farm.example/cdp",
+    }) as RemoteBrowser;
+    expect([cdp.protocol, cdp.reach]).toEqual(["cdp", "url"]);
+  });
+
+  it("takes a name, engines, sessions and maxConnections, and sends no header without a token", () => {
+    const remote = remoteBrowserFromEnv({
+      SHELF_REMOTE_BROWSER_ENDPOINT: ENDPOINT,
+      SHELF_REMOTE_BROWSER_PROTOCOL: "playwright",
+      SHELF_REMOTE_BROWSER_REACH: "loopback",
+      SHELF_REMOTE_BROWSER_NAME: "grid",
+      SHELF_REMOTE_BROWSER_ENGINES: "chromium, firefox",
+      SHELF_REMOTE_BROWSER_SESSIONS: "8",
+      SHELF_REMOTE_BROWSER_MAX_CONNECTIONS: "2",
+    }) as RemoteBrowser;
+    expect(remote).toMatchObject({
+      name: "grid",
+      engines: ["chromium", "firefox"],
+      sessions: 8,
+      maxConnections: 2,
+      connect: { endpoint: ENDPOINT },
+    });
+    expect((remote.connect as { headers?: unknown }).headers).toBeUndefined();
+  });
+
+  it("refuses a half-set configuration, naming the variable", () => {
+    const { SHELF_REMOTE_BROWSER_ENDPOINT: _endpoint, ...noEndpoint } = base;
+    expect(refusal(noEndpoint)).toContain("SHELF_REMOTE_BROWSER_ENDPOINT");
+    const { SHELF_REMOTE_BROWSER_PROTOCOL: _protocol, ...noProtocol } = base;
+    expect(refusal(noProtocol)).toContain("SHELF_REMOTE_BROWSER_PROTOCOL");
+    const { SHELF_REMOTE_BROWSER_REACH: _reach, ...noReach } = base;
+    expect(refusal(noReach)).toContain("SHELF_REMOTE_BROWSER_REACH");
+    expect(refusal({ SHELF_REMOTE_BROWSER_TOKEN: TOKEN })).toContain("SHELF_REMOTE_BROWSER_");
+  });
+
+  it("refuses unknown and malformed values, never echoing them", () => {
+    expect(refusal({ ...base, SHELF_REMOTE_BROWSER_PROTOCOL: "bidi" })).toContain(
+      "SHELF_REMOTE_BROWSER_PROTOCOL",
+    );
+    expect(refusal({ ...base, SHELF_REMOTE_BROWSER_REACH: "tunnel" })).toContain(
+      "SHELF_REMOTE_BROWSER_REACH",
+    );
+    expect(
+      refusal({ ...base, SHELF_REMOTE_BROWSER_ENDPOINT: "http://farm.example/k-1234" }),
+    ).toContain("SHELF_REMOTE_BROWSER_ENDPOINT");
+    expect(refusal({ ...base, SHELF_REMOTE_BROWSER_ENDPOINT: "not a url key-1234" })).toContain(
+      "SHELF_REMOTE_BROWSER_ENDPOINT",
+    );
+    expect(refusal({ ...base, SHELF_REMOTE_BROWSER_NAME: "Bad Name" })).toContain(
+      "SHELF_REMOTE_BROWSER_NAME",
+    );
+    for (const engines of ["opera", "chromium,chromium"]) {
+      expect(refusal({ ...base, SHELF_REMOTE_BROWSER_ENGINES: engines })).toContain(
+        "SHELF_REMOTE_BROWSER_ENGINES",
+      );
+    }
+    for (const bad of ["0", "-1", "1.5", "many"]) {
+      expect(refusal({ ...base, SHELF_REMOTE_BROWSER_SESSIONS: bad })).toContain(
+        "SHELF_REMOTE_BROWSER_SESSIONS",
+      );
+      expect(refusal({ ...base, SHELF_REMOTE_BROWSER_MAX_CONNECTIONS: bad })).toContain(
+        "SHELF_REMOTE_BROWSER_MAX_CONNECTIONS",
+      );
+    }
+  });
+
+  it("refuses combinations the runner cannot serve", () => {
+    expect(
+      refusal({
+        ...base,
+        SHELF_REMOTE_BROWSER_PROTOCOL: "cdp",
+        SHELF_REMOTE_BROWSER_ENDPOINT: "wss://f.example/k",
+      }),
+    ).toContain("SHELF_REMOTE_BROWSER_REACH");
+    expect(
+      refusal({
+        ...urlReach,
+        SHELF_REMOTE_BROWSER_PROTOCOL: "cdp",
+        SHELF_REMOTE_BROWSER_ENGINES: "firefox",
+      }),
+    ).toContain("SHELF_REMOTE_BROWSER_ENGINES");
+  });
+
+  it("needs SHELF_SECRET and a public origin for reach url", () => {
+    const { SHELF_SECRET: _secret, ...noSecret } = urlReach;
+    expect(refusal(noSecret)).toContain("SHELF_SECRET");
+    const { SHELF_PUBLIC_BASE_URL: _origin, ...noOrigin } = urlReach;
+    expect(refusal(noOrigin)).toContain("SHELF_PUBLIC_BASE_URL");
+    expect(remoteBrowserFromEnv(base)).toBeDefined();
+  });
+
+  it("never lets the endpoint or token reach text the runner surfaces", () => {
+    const remote = remoteBrowserFromEnv(base) as RemoteBrowser;
+    const connection = remote.connect as { endpoint: string; headers: Record<string, string> };
+    const text = scrubConnection(
+      `connect ECONNREFUSED ${ENDPOINT} with Authorization: Bearer ${TOKEN}`,
+      connection,
+    );
+    for (const secret of [ENDPOINT, "endpoint-key-9f3a", "farm.example", TOKEN]) {
+      expect(text).not.toContain(secret);
+    }
+  });
+
+  it("lists it after chromium and before chromium@azure, and refuses the azure name beside a workspace", () => {
+    const azure = {
+      PLAYWRIGHT_SERVICE_URL: "wss://x.example/browsers",
+      PLAYWRIGHT_SERVICE_ACCESS_TOKEN: "t",
+    };
+    const browsers = browsersFromEnv({ ...base, ...azure });
+    expect(browsers.map((entry) => (typeof entry === "string" ? entry : entry.name))).toEqual([
+      "chromium",
+      "remote",
+      "azure",
+    ]);
+    expect(refusal({ ...base, ...azure, SHELF_REMOTE_BROWSER_NAME: "azure" })).toContain(
+      "SHELF_REMOTE_BROWSER_NAME",
+    );
+    expect(remoteBrowserFromEnv({ ...base, SHELF_REMOTE_BROWSER_NAME: "azure" })).toBeDefined();
+  });
+
+  it("collapses an invalid remote() into a refusal that names only the variables", () => {
+    // 10 sessions is fine; a name the runner rejects is caught by our own check first, so force remote() to throw via an unusable endpoint.
+    expect(refusal({ ...base, SHELF_REMOTE_BROWSER_ENDPOINT: "ws://" })).toContain(
+      "SHELF_REMOTE_BROWSER_",
+    );
   });
 });
 
