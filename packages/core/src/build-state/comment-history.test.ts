@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SnapshotModel } from "../models/snapshot.ts";
 import { catalogPath } from "../utils/paths.ts";
 import { EARLIER_BUILDS_SHOWN } from "./comment-history.ts";
 import { deliverBuildState } from "./deliver.ts";
@@ -20,9 +21,9 @@ async function writeCatalog(w: World, buildId: string, entries: object[]): Promi
   await w.storage.write(catalogPath(w.project.id, buildId), bytes);
 }
 
-/** The comment text the channel last received. */
-async function commentOf(w: World): Promise<string> {
-  await deliverBuildState(w.deps, { buildId: w.build.id, channelId: w.channelId });
+/** The comment text the channel last received for `buildId` (the world's build by default). */
+async function commentOf(w: World, buildId = w.build.id): Promise<string> {
+  await deliverBuildState(w.deps, { buildId, channelId: w.channelId });
   const comments = w.git.calls.flatMap((call) =>
     call.target.kind === "comment" ? [call.target.markdown] : [],
   );
@@ -52,6 +53,20 @@ async function approvedBefore(w: World, sha: string, branch = "feature/x"): Prom
   return id;
 }
 
+/** What the capture froze on one of `buildId`'s snapshots: the baseline image came from `sourceBuildId`. */
+async function recordBaseline(w: World, buildId: string, sourceBuildId: string): Promise<void> {
+  await new SnapshotModel(w.db).create(w.project.id, buildId, {
+    storyId: "k--keep",
+    storyName: "Kept",
+    storyTitle: "Keep",
+    viewportName: "desktop",
+    viewportWidth: 1280,
+    viewportHeight: 720,
+    screenshotPath: `${w.project.id}/builds/${buildId}/k.png`,
+    comparisonMetadata: JSON.stringify({ version: 1, baselineId: "b", sourceBuildId }),
+  });
+}
+
 describe("removed stories", () => {
   it("lists the stories the baseline had and this build lacks, escaped", async () => {
     const w = await world();
@@ -66,6 +81,7 @@ describe("removed stories", () => {
       entry("k--keep", "Keep", "Kept"),
     ]);
     await writeCatalog(w, current.id, [entry("k--keep", "Keep", "Kept")]);
+    await recordBaseline(w, current.id, baseline);
     await review(w, current.id);
     await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
     const body = w.git.calls.flatMap((c) =>
@@ -86,6 +102,7 @@ describe("removed stories", () => {
     });
     await writeCatalog(w, main, [entry("g--gone", "Gone", "Story")]);
     await writeCatalog(w, current.id, []);
+    await recordBaseline(w, current.id, main);
     await review(w, current.id);
     await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
     const calls = w.git.calls.flatMap((c) =>
@@ -103,6 +120,7 @@ describe("removed stories", () => {
     );
     await writeCatalog(w, baseline, gone);
     await writeCatalog(w, current.id, []);
+    await recordBaseline(w, current.id, baseline);
     await review(w, current.id);
     await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
     const body = w.git.calls.flatMap((c) =>
@@ -118,6 +136,7 @@ describe("removed stories", () => {
     const current = { id: await buildAt(w, "new222", "feature/x") };
     await writeCatalog(w, baseline, [entry("a--one", "Old", "One")]);
     await writeCatalog(w, current.id, [null as unknown as object, "text" as unknown as object]);
+    await recordBaseline(w, current.id, baseline);
     await review(w, current.id);
     await expect(
       deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId }),
@@ -137,12 +156,47 @@ describe("removed stories", () => {
       gitBranch: "feature/x",
     });
     await writeCatalog(w, baseline, [entry("a--one", "Old", "One")]);
+    await recordBaseline(w, current.id, baseline);
     await review(w, current.id);
     await deliverBuildState(w.deps, { buildId: current.id, channelId: w.channelId });
     const body = w.git.calls.flatMap((c) =>
       c.target.kind === "comment" ? [c.target.markdown] : [],
     )[0];
     expect(body).not.toContain("removed");
+  });
+
+  it("keeps the recorded baseline when an older build is approved between deliveries", async () => {
+    const w = await world();
+    const recorded = await approvedBefore(w, "base111");
+    const older = await buildAt(w, "old0001", "feature/x");
+    const current = await buildAt(w, "new222", "feature/x");
+    await writeCatalog(w, recorded, [
+      entry("a--one", "Old", "One"),
+      entry("k--keep", "Keep", "Kept"),
+    ]);
+    await writeCatalog(w, older, [entry("k--keep", "Keep", "Kept")]);
+    await writeCatalog(w, current, [entry("k--keep", "Keep", "Kept")]);
+    await recordBaseline(w, current, recorded);
+    await review(w, current);
+    const first = await commentOf(w, current);
+    await w.builds.setStatus(older, "approved");
+    const second = await commentOf(w, current);
+    expect(first).toContain("**1 removed story**");
+    expect(first).toContain("Old / One");
+    // The earlier-builds list changes with the approval; the removed-stories part must not.
+    expect(second).toContain("**1 removed story**");
+    expect(second).toContain("Old / One");
+    expect(second).not.toContain("Keep / Kept");
+  });
+
+  it("names nothing when the capture recorded no baseline", async () => {
+    const w = await world();
+    const approved = await approvedBefore(w, "base111");
+    const current = await buildAt(w, "new222", "feature/x");
+    await writeCatalog(w, approved, [entry("a--one", "Old", "One")]);
+    await writeCatalog(w, current, []);
+    await review(w, current);
+    expect(await commentOf(w, current)).not.toContain("removed");
   });
 });
 
