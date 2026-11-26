@@ -351,8 +351,11 @@ async function untilHandedBack(pending: () => Enqueued[], deadline: number): Pro
 /** This checkout's consumers alone, until each synthetic job was claimed and handed back by them. */
 async function refuse(database: DatabaseAdapter): Promise<void> {
   const jobs = syntheticJobs();
+  // Hand-backs `consume` already logged do not count: only entries written after this point.
+  const before = readLog("current").length;
   const stop = startConsumers(database);
-  const pending = (): Enqueued[] => jobs.filter((job) => !handedBackBy(readLog("current"), job.id));
+  const pending = (): Enqueued[] =>
+    jobs.filter((job) => !handedBackBy(readLog("current").slice(before), job.id));
   const left = await untilHandedBack(pending, Date.now() + CONSUME_TIMEOUT_MS);
   await stop();
   if (left.length > 0)
