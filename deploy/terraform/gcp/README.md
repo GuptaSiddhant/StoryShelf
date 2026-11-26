@@ -25,47 +25,50 @@ Each stable release also attaches `storyshelf-terraform-<version>.tar.gz` (the w
 
 ## What it creates
 
-| Part     | Resources                                                                                        |
-| -------- | ------------------------------------------------------------------------------------------------ |
-| Network  | VPC and subnet for Direct VPC egress, private services range (or your own network)               |
-| Compute  | One Cloud Run service of identical copies, running as its own service account                    |
-| Database | Cloud SQL Postgres 16, **private IP only**, TLS verified (or your own URL)                       |
-| Storage  | GCS bucket: private, versioned, public access prevented                                          |
-| Secrets  | Secret Manager: `SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN` and the database URL |
-| Image    | Artifact Registry remote repository that proxies ghcr.io (Cloud Run cannot pull it)              |
+| Part     | Resources                                                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Network  | VPC and subnet for Direct VPC egress, private services range (or your own network)                                              |
+| Compute  | One Cloud Run service of identical copies, running as its own service account                                                   |
+| Database | Cloud SQL Postgres 16, **private IP only**, TLS verified, an unprivileged app role (or your own URL)                            |
+| Storage  | GCS bucket: private, versioned, public access prevented                                                                         |
+| Secrets  | Secret Manager: `SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, the database URL and the database admin's password |
+| db-init  | A Cloud Run job, with its own service account, that creates the app's database role on apply                                    |
+| Image    | Artifact Registry remote repository that proxies ghcr.io (Cloud Run cannot pull it)                                             |
 
 The module enables the APIs it needs (`run`, `storage`, `secretmanager`, `artifactregistry`, and
 `sqladmin`, `servicenetworking`, `compute` for the database) and leaves them on at destroy.
 
 ## Inputs
 
-| Name                                                 | Default             | Meaning                                                                                        |
-| ---------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
-| `name`                                               | required            | Name prefix, 2-20 characters                                                                   |
-| `project_id`                                         | required            | GCP project                                                                                    |
-| `image_version`                                      | required            | Release version of the image (no `v`)                                                          |
-| `region`                                             | `us-central1`       | Must match the provider's region                                                               |
-| `image_repository`                                   | `""`                | A full registry path (your mirror). Empty creates the ghcr.io proxy                            |
-| `public_base_url`                                    | `""`                | `SHELF_PUBLIC_BASE_URL` for a domain you map yourself; empty means the service's `run.app` URL |
-| `network` / `subnetwork`                             | `""`                | Existing VPC and subnet (self links). Empty creates them                                       |
-| `cpu` / `memory`                                     | `2` / `4Gi`         | Capture renders in the container: do not go much lower                                         |
-| `min_instances` / `max_instances`                    | `1` / `1`           | Identical copies; every copy serves and consumes the queue (ADR 0006)                          |
-| `database_pool_size`                                 | `10`                | Connections per copy: `max_instances` x this must fit the database's limit                     |
-| `shutdown_grace_seconds`                             | `8`                 | See "Shutdown"                                                                                 |
-| `existing_database_url_secret_id`                    | `""`                | A Postgres URL in Secret Manager; no database is created                                       |
-| `database_tier`                                      | `db-custom-1-3840`  | Created database only                                                                          |
-| `database_disk_size_gb`                              | `10`                | Created database only                                                                          |
-| `deletion_protection`                                | `true`              | Protects the database and service; `false` also empties the bucket on destroy                  |
-| `github_app_id` / `github_app_private_key_secret_id` | `""`                | Server-wide GitHub App connection (both or none; see "Git connections")                        |
-| `github_api_url`                                     | `""`                | GitHub Enterprise Server API base; empty means github.com                                      |
-| `gitlab_token_secret_id` / `gitlab_token_expires`    | `""`                | Server-wide GitLab connection (both or none)                                                   |
-| `gitlab_host`                                        | `""`                | GitLab base URL; empty means gitlab.com                                                        |
-| `admin_email`                                        | `admin@example.com` | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                  |
-| `labels`                                             | `{}`                | Added to every resource that supports them                                                     |
+| Name                                                 | Default                                   | Meaning                                                                                                  |
+| ---------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `name`                                               | required                                  | Name prefix, 2-20 characters                                                                             |
+| `project_id`                                         | required                                  | GCP project                                                                                              |
+| `image_version`                                      | required                                  | Release version of the image (no `v`)                                                                    |
+| `region`                                             | `us-central1`                             | Must match the provider's region                                                                         |
+| `image_repository`                                   | `""`                                      | A full registry path (your mirror). Empty creates the ghcr.io proxy                                      |
+| `public_base_url`                                    | `""`                                      | `SHELF_PUBLIC_BASE_URL` for a domain you map yourself; empty means the service's `run.app` URL           |
+| `network` / `subnetwork`                             | `""`                                      | Existing VPC and subnet (self links). Empty creates them                                                 |
+| `cpu` / `memory`                                     | `2` / `4Gi`                               | Capture renders in the container: do not go much lower                                                   |
+| `min_instances` / `max_instances`                    | `1` / `1`                                 | Identical copies; every copy serves and consumes the queue (ADR 0006)                                    |
+| `database_pool_size`                                 | `10`                                      | Connections per copy: `max_instances` x this must fit the database's limit                               |
+| `shutdown_grace_seconds`                             | `8`                                       | See "Shutdown"                                                                                           |
+| `existing_database_url_secret_id`                    | `""`                                      | A Postgres URL in Secret Manager; no database is created                                                 |
+| `database_tier`                                      | `db-custom-1-3840`                        | Created database only                                                                                    |
+| `database_disk_size_gb`                              | `10`                                      | Created database only                                                                                    |
+| `deletion_protection`                                | `true`                                    | Protects the database and service; `false` also empties the bucket on destroy                            |
+| `database_init_image`                                | Docker Hub `postgres:16-alpine` by digest | Image of the `db-init` job (needs `psql` 15+); it receives the admin password, so pin a mirror by digest |
+| `github_app_id` / `github_app_private_key_secret_id` | `""`                                      | Server-wide GitHub App connection (both or none; see "Git connections")                                  |
+| `github_api_url`                                     | `""`                                      | GitHub Enterprise Server API base; empty means github.com                                                |
+| `gitlab_token_secret_id` / `gitlab_token_expires`    | `""`                                      | Server-wide GitLab connection (both or none)                                                             |
+| `gitlab_host`                                        | `""`                                      | GitLab base URL; empty means gitlab.com                                                                  |
+| `admin_email`                                        | `admin@example.com`                       | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                            |
+| `labels`                                             | `{}`                                      | Added to every resource that supports them                                                               |
 
 ## Outputs
 
 `url`, `service_name`, `gcs_bucket`, `db_instance`, `db_private_ip`, `database_url_secret_id`,
+`database_admin_password_secret_id`, `db_init_job_name`,
 `admin_token_secret_id`, `admin_password_secret_id`, `service_account_email` and `service_account_roles`. Secret outputs are
 Secret Manager ids (references), never values; the database URL and its password are not an output.
 
@@ -73,8 +76,10 @@ Secret Manager ids (references), never values; the database URL and its password
 
 Secrets reach Cloud Run as Secret Manager references (`value_source.secret_key_ref`).
 
-- **`SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`** and the database password are generated. Their values
-  are also in the Terraform state: keep the state in an encrypted backend with restricted access.
+- **`SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`** and both database passwords (the admin's
+  and the app role's) are generated. What lands in the Terraform state: all of these values, including
+  the app role's password inside the database URL. Keep the state in an encrypted backend with
+  restricted access.
 - **Sign-in.** The image turns sign-in on from `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET`, and the module always
   sets both, so the app never boots open. Read the password with
   `gcloud secrets versions access latest --secret "$(terraform output -raw admin_password_secret_id)"`
@@ -94,6 +99,11 @@ Nothing is granted at project level:
 | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | The storybook bucket                                                                                             | `roles/storage.objectUser`           |
 | Each app secret (`SHELF_SECRET`, `SHELF_ADMIN_PASSWORD`, `SHELF_ADMIN_TOKEN`, the database URL, any git secrets) | `roles/secretmanager.secretAccessor` |
+
+The database admin's password is not among them. Only the `db-init` job's own service account
+(`<name>-db-init`) reads it, with `roles/secretmanager.secretAccessor` on that secret and the database
+URL and nothing else. The identity running Terraform starts the job, so it needs `run.jobs.run` and
+may act as that service account, as it does for the app's.
 
 Cloud Run writes the container's logs itself, and the database is reached over its private IP with a
 password from Secret Manager, so no logging or Cloud SQL role is needed. Anyone can reach the
@@ -115,6 +125,47 @@ the instance. The URL connects by the private IP, which the CAS certificate name
 record for the instance on private services access. _Unverified:_ no live run has confirmed the
 certificate check against a real instance yet. An existing database URL brings its own TLS settings
 (see the deployment docs, "Verify the database certificate").
+
+## Database roles
+
+The app does not log in as an administrator. Two logins:
+
+**Names differ by cloud:** on AWS the admin is `shelf_admin` and the app logs in as `shelf`; on GCP and Azure the admin is `shelf` and the app logs in as `shelf_app`, because renaming an existing admin would replace the server or the user that owns the tables.
+
+- **`shelf`** is created through the Cloud SQL API, which makes it a member of `cloudsqlsuperuser`.
+  It is the operators' admin. Its password is in its own secret (output
+  `database_admin_password_secret_id`), which the app's service account cannot read. The name stays
+  `shelf` so an existing stack keeps its user: renaming would replace it, and on a stack from 0.17 or
+  earlier it owns the app's tables.
+- **`shelf_app`** is the app's role, in `DATABASE_URL`. It is an ordinary role (no `CREATEROLE`, no
+  `CREATEDB`, not in `cloudsqlsuperuser`) with all rights on the `shelf` database and its `public`
+  schema, and it owns the tables the app creates.
+
+**First boot needs no operator step.** The `db-init` Cloud Run job (output `db_init_job_name`) runs
+as its own service account, which can read exactly the admin password and the database URL. It logs
+in as `shelf` over TLS verified against the instance's CA (`sslmode=verify-full` by the private IP),
+then idempotently creates `shelf_app` (or resets its password to the one in the database URL) and
+grants it the database and the `public` schema. Its image (`database_init_image`) is
+`postgres:16-alpine` from Docker Hub, pinned by digest because it receives the admin password.
+
+Terraform runs the job and waits for it to succeed (`run_execution_token`, a `google-beta` argument:
+configure `provider "google-beta"` like `provider "google"`, as `examples/minimal` does). It runs when
+the job is created and again whenever an input it reads changes (the script, the image, the
+instance's address or either password's secret version); the service depends on it, so a revision
+that logs in as `shelf_app` never starts before the role exists. Its logs are under the job in Cloud
+Run. The service pins the database URL's secret version, so a new URL rolls a new revision.
+
+**Upgrading a stack from 0.17 or earlier**, where the app logged in as `shelf` and so `shelf` owns its
+tables: `db-init` also hands every table, view and sequence that `shelf` owns in `public` to
+`shelf_app` (it grants `shelf_app` to `shelf` to be allowed to). The apply adds the admin password's
+secret, rewrites the database URL and rolls a new revision; nothing else changes.
+
+> **Unverified.** `db-init` has been run against a local Postgres 16 with a non-superuser admin
+> (fresh install, upgrade with existing tables, and a second run), and the module passes
+> `terraform validate`, but it has not yet run against a real Cloud SQL instance.
+
+With `existing_database_url_secret_id` the module runs no `db-init`: give it a URL for an
+unprivileged role.
 
 ## Capture, scaling and shutdown
 

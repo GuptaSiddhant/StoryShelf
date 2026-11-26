@@ -109,6 +109,12 @@ variable "database_storage_mb" {
   default     = 32768
 }
 
+variable "database_init_image" {
+  description = "Image of the db-init init container that creates the app's database role (it needs psql 16 or later, for sslrootcert=system). It receives the administrator's password, so the default (postgres 16-alpine from the ECR Public mirror of Docker Hub) is pinned by digest; pin a mirror by digest too."
+  type        = string
+  default     = "public.ecr.aws/docker/library/postgres@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857"
+}
+
 variable "deletion_protection" {
   description = "Put a CanNotDelete lock on the created database and turn on purge protection for the Key Vault. Turn it off (and apply) before destroying a throwaway stack."
   type        = bool

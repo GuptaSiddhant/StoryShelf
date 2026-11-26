@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 6.0"
+    }
   }
 }
 
@@ -32,6 +36,12 @@ variable "image_version" {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+# The module's db-init job uses google-beta; configure it like google.
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }

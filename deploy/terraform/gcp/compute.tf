@@ -18,6 +18,11 @@ locals {
     var.gitlab_token_secret_id == "" ? {} : { SHELF_GITLAB_TOKEN = var.gitlab_token_secret_id },
   )
 
+  # Secret versions the service pins instead of "latest". A created database's URL is pinned, so a
+  # new URL (the app role on upgrade, or a new password) rolls a new revision instead of waiting
+  # for the next restart.
+  secret_versions = local.create_database ? { DATABASE_URL = google_secret_manager_secret_version.database_url[0].version } : {}
+
   # The created database's CA (a public certificate, not a secret): the app verifies the server
   # certificate against it (SHELF_DATABASE_CA), so the password is never sent to an unverified peer.
   database_env = local.create_database ? { SHELF_DATABASE_CA = google_sql_database_instance.main[0].server_ca_cert[0].cert } : {}
@@ -173,7 +178,7 @@ resource "google_cloud_run_v2_service" "app" {
           value_source {
             secret_key_ref {
               secret  = env.value
-              version = "latest"
+              version = lookup(local.secret_versions, env.key, "latest")
             }
           }
         }
@@ -181,9 +186,10 @@ resource "google_cloud_run_v2_service" "app" {
     }
   }
 
-  # The service account must be able to read the secrets, and the secrets must have a version,
-  # before the first revision starts.
+  # The service account must be able to read the secrets, the secrets must have a version, and
+  # db-init must have created the app role, before the first revision starts.
   depends_on = [
+    google_cloud_run_v2_job.db_init,
     google_secret_manager_secret_iam_member.app,
     google_storage_bucket_iam_member.app,
     google_secret_manager_secret_version.shelf_secret,
