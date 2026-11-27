@@ -73,17 +73,19 @@ const Marker: FC<{ n: number; state: StepState }> = ({ n, state }) => (
 /** Placeholder shown for the server URL while no public origin is confirmed. */
 export const ORIGIN_PLACEHOLDER = "<your-storyshelf-url>";
 
-/** The upload command: `--url` is the confirmed public origin, never the request's Host. */
+/**
+ * The quick-start: `init` writes `.storybook/storyshelf.json` (no secret), then bare `storyshelf`
+ * uploads. `--url` is the confirmed public origin, never the request's Host.
+ */
 export function uploadCommand(input: {
   slug: string;
   origin: string | undefined;
   token: string | undefined;
 }): string {
   return [
-    `SHELF_TOKEN=${input.token ?? "<token>"} npx storyshelf upload`,
-    `  --url ${input.origin ?? ORIGIN_PLACEHOLDER}`,
-    `  --slug ${input.slug}`,
-  ].join(" \\\n");
+    `npx storyshelf init --url ${input.origin ?? ORIGIN_PLACEHOLDER} --slug ${input.slug}`,
+    `SHELF_TOKEN=${input.token ?? "<token>"} npx storyshelf`,
+  ].join("\n");
 }
 
 export interface GetStartedProps {
