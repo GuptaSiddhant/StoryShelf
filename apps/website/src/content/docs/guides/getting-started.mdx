@@ -50,7 +50,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
     <PackageManagers type="create" pkg="storyshelf" />
 
-    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example` and a README (Docker files only if you ask for them), then prints the next steps:
+    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example`, a README and Docker files, then prints the next steps:
 
     ```sh
     cd my-storyshelf
@@ -66,7 +66,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
     The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
 
-    `create-storyshelf` asks its questions in a terminal. Pass `--yes` (`-y`) to accept every default without asking, for CI, a Dockerfile or an AI agent: `npm create storyshelf my-storyshelf -- --yes`. `--dir <path>` picks the output directory and `--install` installs the dependencies with the package manager that ran it. The server needs Node 24 or newer and stops with one line on an older one.
+    `create-storyshelf` asks its questions in a terminal. Pass `--yes` (`-y`) to accept every default (CI, agents). `--dir <path>` picks the output directory and `--install` installs the dependencies with the package manager that ran it.
 
   </TabItem>
 </Tabs>
