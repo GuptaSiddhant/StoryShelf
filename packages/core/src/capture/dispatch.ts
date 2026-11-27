@@ -18,6 +18,7 @@ import type { CaptureAttempt } from "../schema/capture-attempt.ts";
 import type { Project } from "../schema/project.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { redactSecrets } from "../utils/redact.ts";
+import { isUserFacingError } from "../utils/user-facing-error.ts";
 import { executeCaptureJob, type CaptureJobOptions, type CaptureSummary } from "./orchestrator.ts";
 import { leaseProgress, type CaptureProgress } from "./progress.ts";
 import { executeCaptureShard } from "./shards/execute.ts";
@@ -162,9 +163,15 @@ async function finishAttempt(
   );
 }
 
-/** Full error text for an attempt row (message plus stack when available). */
+/**
+ * Error text for an attempt row: message plus stack when available. A user-facing error was written
+ * for the reader, so its message stands alone, without the class name and frames.
+ */
 function errorText(reason: unknown): string {
   // A runner's error can quote the signed Storybook URL it failed to open.
+  if (isUserFacingError(reason) && reason instanceof Error) {
+    return redactSecrets(reason.message);
+  }
   return redactSecrets(reason instanceof Error ? (reason.stack ?? reason.message) : String(reason));
 }
 

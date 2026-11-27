@@ -20,6 +20,7 @@ import { makeFakeStateNotifier } from "../test-helpers/fake-notifier.ts";
 import { pngImageEngine } from "../test-helpers/png-image-engine.ts";
 import { JobAbortedError } from "../utils/job-aborted.ts";
 import { storybookZipPath } from "../utils/paths.ts";
+import { UserFacingError } from "../utils/user-facing-error.ts";
 import { createDispatchJob, type DispatchDeps } from "./dispatch.ts";
 import { SignedUrlLifetimeError } from "./token-chunks.ts";
 
@@ -315,6 +316,23 @@ describe("createDispatchJob attempt history", () => {
 
     expect(buildState.request).toHaveBeenCalledTimes(1);
     expect(await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id)).toEqual([]);
+  });
+
+  it("records a user-facing error as its message alone, without the class name", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const { project, build } = await seedBuild(db);
+    await storage.write(storybookZipPath(project.id, build.id), zipWithIndex());
+    const render = vi.fn(async () => {
+      await Promise.resolve();
+      throw new UserFacingError("chromium is unavailable: declared, not installed");
+    });
+    const runJob = createDispatchJob(depsFor(db, storage, fakeRunner(render)));
+
+    await expect(runJob({ buildId: build.id })).rejects.toThrow("declared, not installed");
+
+    const attempts = await new CaptureAttemptModel(db, tables(db)).listByBuild(build.id);
+    expect(attempts[0]?.error).toBe("chromium is unavailable: declared, not installed");
   });
 
   it("records a failed attempt with the full error text", async () => {
