@@ -49,6 +49,20 @@ export class RequestError extends Error {
   }
 }
 
+/** True when the server refused the credential (401) or the token's project (403). */
+export function isTokenRefusal(error: unknown): error is RequestError {
+  return error instanceof RequestError && (error.status === 401 || error.status === 403);
+}
+
+/**
+ * The one line a refused token prints instead of `Request failed (401)`. It names the server's
+ * origin and the project, points at `SHELF_TOKEN` and `storyshelf whoami`, and never the token.
+ */
+export function tokenRefusedMessage(serverUrl: string, slug: string): string {
+  const origin = URL.canParse(serverUrl) ? new URL(serverUrl).origin : "[invalid url]";
+  return `The server at ${origin} refused the token for project ${slug}. Check SHELF_TOKEN (it may be wrong, revoked, or for another project), or run \`storyshelf whoami\` to see which token is in use`;
+}
+
 /** One stored file of a file-by-file upload. */
 export interface ManifestFile {
   rel: string;
@@ -446,6 +460,29 @@ function cancelOlderApi(
     })) as CancelOlderResult;
 }
 
+/** Build creation: a refused token becomes the one clear line (`tokenRefusedMessage`). */
+function createBuildJson(
+  baseUrl: string,
+  requestHeaders: (contentType?: string) => Record<string, string>,
+): Client["projects"]["builds"]["createJson"] {
+  return async (slug, json) => {
+    try {
+      return (await fetchJsonRetrying(`${baseUrl}/api/v1/projects/${slug}/builds`, {
+        method: "POST",
+        headers: requestHeaders("application/json"),
+        body: JSON.stringify(json),
+      })) as BuildCreated;
+    } catch (error) {
+      if (!isTokenRefusal(error)) {
+        throw error;
+      }
+      const refused = new RequestError(error.status, "", error.retryAfterMs);
+      refused.message = tokenRefusedMessage(baseUrl, slug);
+      throw refused;
+    }
+  };
+}
+
 function createBuildsApi(
   baseUrl: string,
   authHeaders: Record<string, string>,
@@ -454,12 +491,7 @@ function createBuildsApi(
   return {
     ...createFileUploadApi(baseUrl, requestHeaders),
     ...createSkipApi(baseUrl, requestHeaders),
-    createJson: async (slug: string, json: BuildCreateInput) =>
-      (await fetchJsonRetrying(`${baseUrl}/api/v1/projects/${slug}/builds`, {
-        method: "POST",
-        headers: requestHeaders("application/json"),
-        body: JSON.stringify(json),
-      })) as BuildCreated,
+    createJson: createBuildJson(baseUrl, requestHeaders),
     ...createInFlightApi(baseUrl, requestHeaders),
     get: async (slug: string, buildId: string) =>
       (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${encodeURIComponent(buildId)}`, {

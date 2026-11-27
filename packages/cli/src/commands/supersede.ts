@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import type { createClient } from "../client.ts";
-import { RequestError } from "../client.ts";
+import { RequestError, isTokenRefusal } from "../client.ts";
 import { printLine } from "../output.ts";
 
 /** One in-flight build of the branch, as the server lists it. */
@@ -92,7 +92,8 @@ function remoteTipIs(
 /**
  * Ask the server for the branch's in-flight builds and return the ids this upload supersedes.
  * Never throws: a 404 (an old server, or testing off), any other failure, or any git error sends
- * nothing and the upload carries on.
+ * nothing and the upload carries on. A refused token (401/403) prints nothing here: the build
+ * creation that follows reports it in one line.
  */
 export async function findSupersedes(
   client: ReturnType<typeof createClient>,
@@ -105,12 +106,17 @@ export async function findSupersedes(
     const sent = decision.superseded.slice(0, MAX_SUPERSEDES);
     return sent.length > 0 ? sent : undefined;
   } catch (error) {
-    if (!(error instanceof RequestError && error.status === 404)) {
+    if (!isSilentLookupFailure(error)) {
       const reason = error instanceof Error ? error.message : String(error);
       printLine(`Superseded builds not checked: ${reason}`);
     }
     return undefined;
   }
+}
+
+/** Failures that print nothing: no in-flight endpoint (404), or a refused token (401/403). */
+function isSilentLookupFailure(error: unknown): boolean {
+  return isTokenRefusal(error) || (error instanceof RequestError && error.status === 404);
 }
 
 function announce({ superseded, undecided }: SupersedeDecision): void {

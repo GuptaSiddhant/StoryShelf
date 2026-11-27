@@ -162,6 +162,33 @@ describe("findSupersedes", () => {
     expect(ids).toBeUndefined();
   });
 
+  it.each([401, 403])("prints no supersede line on a refused token (%i)", async (status) => {
+    const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const ids = await findSupersedes(
+      client(async () => {
+        throw new RequestError(status, "Unauthorized");
+      }),
+      { slug: "p", cwd: work, branch: "main", headSha: "x" },
+    );
+    const printed = log.mock.calls.map(([line]) => String(line)).join("");
+    log.mockRestore();
+    expect(ids).toBeUndefined();
+    expect(printed).not.toContain("Superseded builds not checked");
+  });
+
+  it("still reports another failure as not checked", async () => {
+    const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    await findSupersedes(
+      client(async () => {
+        throw new RequestError(500, "boom");
+      }),
+      { slug: "p", cwd: work, branch: "main", headSha: "x" },
+    );
+    const printed = log.mock.calls.map(([line]) => String(line)).join("");
+    log.mockRestore();
+    expect(printed).toContain("Superseded builds not checked: Request failed (500): boom");
+  });
+
   it("never throws on another failure", async () => {
     const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ids = await findSupersedes(
