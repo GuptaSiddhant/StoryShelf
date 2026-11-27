@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { Button, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
+import { Button, Card, Command, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 
 /** Landing hero card: card surface with centered marketing padding. */
@@ -49,11 +49,11 @@ const Hero: FC = () => (
       </HStack>
       <Meta>
         Tip: use{" "}
-        <code>
+        <Command>
           npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token $SHELF_ADMIN_TOKEN
-        </code>{" "}
-        to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
-        <code>.storybook/storyshelf.json</code>.
+        </Command>{" "}
+        to create a project and token for CI, or <Command>npx storyshelf init</Command> to write{" "}
+        <Command>.storybook/storyshelf.json</Command>.
       </Meta>
     </VStack>
   </div>
