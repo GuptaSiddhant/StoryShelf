@@ -426,6 +426,9 @@ describe("type and colour tokens", () => {
     const bareLink =
       /\bactions[:=]\s*\{?\s*\(?\s*<a\b|<td[^>]*class="[^"]*\bnowrap\b[^"]*"[^>]*>\s*<a\b/gu;
     expect(await offendersOf(bareLink, /^ui\//u)).toEqual([]);
+    // A `DialogLink` with no `variant` renders a bare link too (the Git requests table, #1284 B2).
+    const bareDialogLink = /<DialogLink\b(?![^>]*\bvariant=)[^>]*>/gu;
+    expect(await offendersOf(bareDialogLink, /^ui\//u)).toEqual([]);
   });
 
   it("keeps one primary button on a list: the title-row Add is secondary, the empty state's is primary", async () => {
@@ -476,30 +479,52 @@ describe("type and colour tokens", () => {
     expect(await offendersOf(spacing, /^ui\/(?:styles\/base|stacks)\.(?:ts|tsx)$/u)).toEqual([]);
   });
 
-  it("puts every section title (h2) of a page inside a Card", async () => {
+  it("puts every section title (h2) of a page inside a Card, and no h3 is a card's only title", async () => {
     // A section is a `Card` whose first child is a `SectionTitle`; a heading on the page background
     // (with its description outside the card) made sibling sections look different (#1286 L5).
-    // h3 (`level={3}`) is a subsection and may sit in a component a card wraps.
+    // h3 (`level={3}`) is a subsection: it needs an h2 title earlier in the same card (a component a
+    // card wraps in another file is not visible here). The only title of a card is an h2, as its
+    // neighbours are (#1286 L5, the h3 "Component owners" and "Create label type" cards).
     const offenders = (await pageSources())
       .filter(({ file }) => !file.endsWith(".stories.tsx"))
       .flatMap(({ file, source }) => {
-        let depth = 0;
+        const cards: boolean[] = [];
         const found: string[] = [];
         for (const match of source.matchAll(
           /<Card\b[^>]*?(?<self>\/?)>|<\/Card>|<SectionTitle(?<level>[^>]*)>/gu,
         )) {
           const [token = ""] = match;
+          const where = `${file}: ${source.slice(0, match.index).split("\n").length}`;
           if (token.startsWith("</Card")) {
-            depth -= 1;
+            cards.pop();
           } else if (token.startsWith("<Card")) {
-            depth += token.endsWith("/>") ? 0 : 1;
-          } else if (depth <= 0 && !/level=\{3\}/u.test(match.groups?.["level"] ?? "")) {
-            found.push(`${file}: ${source.slice(0, match.index).split("\n").length}`);
+            if (!token.endsWith("/>")) {
+              cards.push(false);
+            }
+          } else if (!/level=\{3\}/u.test(match.groups?.["level"] ?? "")) {
+            if (cards.length === 0) {
+              found.push(where);
+            }
+            cards[cards.length - 1] = true;
+          } else if (cards.length > 0 && cards[cards.length - 1] === false) {
+            found.push(where);
           }
         }
         return found;
       });
     expect(offenders).toEqual([]);
+  });
+
+  it('stacks the cards of a page with one gap (VStack gap="lg"), never the default', async () => {
+    // Cards under a default `VStack` sat 12 px apart where `.grid` and the settings tabs put 16 (#1286 L4).
+    const stack = /<VStack>\s*(?:\{[^\n]*\}\s*|<[A-Z]\w*\b[^\n]*\/>\s*)*<Card\b/gu;
+    expect(await offendersOf(stack, /^ui\//u)).toEqual([]);
+  });
+
+  it("starts a badge's text with a capital (sentence case), never a lower-case word", async () => {
+    // "ready", "default", "unreachable" and "health: watch" sat among capitalised badges (#1287 T3).
+    const lower = /<Badge\b[^>]*>\s*[a-z][^<{]*<\/Badge>/gu;
+    expect(await offendersOf(lower, /^ui\//u)).toEqual([]);
   });
 
   it("writes no hex colour or font-family literal in a page outside a css template", async () => {

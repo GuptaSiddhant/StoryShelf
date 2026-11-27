@@ -256,7 +256,7 @@ export function DiffComments(
   );
   return (
     <Card id={SNAPSHOT_COMMENTS_ID}>
-      <SectionTitle level={3}>Comments</SectionTitle>
+      <SectionTitle>Comments</SectionTitle>
       <VStack>
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <CommentCard

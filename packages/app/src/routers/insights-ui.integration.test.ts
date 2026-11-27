@@ -103,7 +103,7 @@ describe("build review insight panel", () => {
       form({ force: "false" }),
     );
     expect(started.status).toBe(200);
-    expect(await started.text()).toContain("generating");
+    expect(await started.text()).toContain("Generating");
     await settleInsightJobs();
     const [row] = await new InsightModel(db).listForBuild(build.id, 1);
     await db.update(db.tables.insights, row!.id, {
@@ -159,13 +159,13 @@ describe("project health UI", () => {
       form({ force: "false" }),
     );
     expect(started.status).toBe(200);
-    expect(await started.text()).toContain("generating");
+    expect(await started.text()).toContain("Generating");
     await settleInsightJobs();
     const panel = await (await shelf.request("/projects/p/insights/health/panel")).text();
     expect(panel).toContain("Healthy");
     expect(panel).toContain("Refresh health");
     const cards = await (await shelf.request("/projects")).text();
-    expect(cards).toContain("health: healthy");
+    expect(cards).toContain("Health: Healthy");
     expect(cards).toContain("90");
   });
 

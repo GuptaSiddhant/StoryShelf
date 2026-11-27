@@ -44,11 +44,28 @@ export interface SettingsGitLink {
   commentAllowed: boolean;
 }
 
+/** One repository the picker offers: its URL (what the form posts) and how it reads. */
+export interface PickerRepository {
+  url: string;
+  label: string;
+}
+
+/**
+ * The link form's repository picker (ADR 0054, decision 2). Absent while the operator switch is
+ * off: the form is URL-only and the host is never asked. `listed: false` is a listing that
+ * failed; the form falls back to the typed URL and says nothing about why.
+ */
+export type RepositoryPicker =
+  | { listed: true; repositories: PickerRepository[]; truncated: boolean }
+  | { listed: false };
+
 /** What the Git section renders. */
 export interface SettingsGitData {
   links: SettingsGitLink[];
   /** The prefix the link form proposes. */
   proposedPrefix: string;
+  /** Set only for the link form, and only while the operator switch is on. */
+  picker?: RepositoryPicker | undefined;
 }
 
 /** Form values and errors of a refused link form. */

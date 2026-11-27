@@ -33,7 +33,7 @@ export function CommentsCard(props: { data: ReviewSectionData }): Rendered {
             canTriage={canTriage}
             names={names}
             anchor={
-              <Badge tone="neutral">{comment.storyId ? `story ${comment.storyId}` : "build"}</Badge>
+              <Badge tone="neutral">{comment.storyId ? `Story ${comment.storyId}` : "Build"}</Badge>
             }
           />
         ))}

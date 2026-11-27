@@ -97,7 +97,12 @@ export function GitChannelsCard(props: {
     state: { label: "Stops in " + release, tone: "warning" as const },
     details: channelDetails(channel),
     actions: (
-      <DialogLink dialogId={CHANNEL_DIALOG_ID} href={`/admin/git/channels/${channel.id}/move`}>
+      <DialogLink
+        dialogId={CHANNEL_DIALOG_ID}
+        href={`/admin/git/channels/${channel.id}/move`}
+        variant="secondary"
+        size="sm"
+      >
         Move
       </DialogLink>
     ),

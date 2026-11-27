@@ -111,6 +111,20 @@ const data = (overrides: Partial<AdminSystemData> = {}): AdminSystemData => ({
 
 export const Healthy = pageStory(() => renderAdminSystemPage(data()));
 
+/** Retention and upload limits that are not set read "not set", never a unit with no number. */
+export const UnsetLimits = pageStory(() =>
+  renderAdminSystemPage(
+    data({
+      config: {
+        purgeTtlDays: undefined,
+        branchTtlDays: undefined,
+        publishedBaseDomain: undefined,
+        maxUploadBytes: undefined,
+      },
+    }),
+  ),
+);
+
 export const Degraded = pageStory(() =>
   renderAdminSystemPage(data({ report: report("degraded", true) })),
 );

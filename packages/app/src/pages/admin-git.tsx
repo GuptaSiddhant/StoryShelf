@@ -14,6 +14,7 @@ import {
   CheckField,
   Dialog,
   DialogLink,
+  FormActions,
   HStack,
   Meta,
   PageHeader,
@@ -105,12 +106,17 @@ function expiryNote(connection: GitConnectionView): string {
     : "";
 }
 
+/** The health line names the expiry as an ISO date; show it the way every other date reads. */
+function isoDatesAsText(text: string): string {
+  return text.replaceAll(/\d{4}-\d{2}-\d{2}/gu, (day) => formatAbsolute(day, "date"));
+}
+
 /** One line of facts: provider, account, coverage, health, expiry, what it posts and who manages it. */
 function connectionDetails(connection: GitConnectionView): string {
   const parts = [
     `${connection.providerLabel} · ${connection.account}`,
     `${connection.linked} linked ${connection.linked === 1 ? "repository" : "repositories"}`,
-    connection.health.detail,
+    isoDatesAsText(connection.health.detail),
     expiryNote(connection),
     `Posts ${connection.posts.join(", ")}`,
     connection.managed ? "Managed by configuration" : "",
@@ -199,12 +205,22 @@ function RequestActions(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { request } = props;
   return (
-    <HStack gap="sm">
-      <DialogLink dialogId={LINK_DIALOG_ID} href={`/admin/git/links/${request.id}/approve`}>
+    <HStack gap="sm" wrap={false}>
+      <DialogLink
+        dialogId={LINK_DIALOG_ID}
+        href={`/admin/git/links/${request.id}/approve`}
+        variant="secondary"
+        size="sm"
+      >
         {request.state === "broken" ? "Reconnect" : "Review and approve"}
       </DialogLink>
       {request.state === "pending" ? (
-        <DialogLink dialogId={LINK_DIALOG_ID} href={`/admin/git/links/${request.id}/refuse`}>
+        <DialogLink
+          dialogId={LINK_DIALOG_ID}
+          href={`/admin/git/links/${request.id}/refuse`}
+          variant="danger-secondary"
+          size="sm"
+        >
           Refuse
         </DialogLink>
       ) : null}
@@ -277,9 +293,11 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
           hint="On: a link a project admin asks for is approved at once when the connection covers it. Off: a site admin approves each one. Turning it off keeps existing links."
         />
 
-        <Button type="submit" variant="primary">
-          Save
-        </Button>
+        <FormActions>
+          <Button type="submit" variant="primary">
+            Save
+          </Button>
+        </FormActions>
       </Form>
     </Card>
   );

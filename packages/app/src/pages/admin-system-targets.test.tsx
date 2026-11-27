@@ -17,7 +17,7 @@ const targets: RunnerTarget[] = [
 describe("CaptureTargetsCard reachability", () => {
   it("shows nothing extra while every target is reachable", async () => {
     const text = await html(CaptureTargetsCard({ targets, unreachable: new Map() }));
-    expect(text).not.toContain("unreachable");
+    expect(text).not.toContain("Unreachable");
     expect(text).not.toContain(REMOTE_BROWSERS_GUIDE);
   });
 
@@ -30,7 +30,7 @@ describe("CaptureTargetsCard reachability", () => {
         ]),
       }),
     );
-    expect(text.match(/unreachable/gu)).toHaveLength(1);
+    expect(text.match(/Unreachable/gu)).toHaveLength(1);
     expect(text).toContain("did not accept a connection");
     expect(text).toContain("2026");
     expect(text).toContain(`href="${REMOTE_BROWSERS_GUIDE}"`);
@@ -47,8 +47,8 @@ describe("CaptureTargetsCard reachability", () => {
       }),
     );
     expect(text).toContain("firefox");
-    expect(text).toContain("unreachable");
-    expect(text).not.toContain(">default<");
+    expect(text).toContain("Unreachable");
+    expect(text).not.toContain(">Default<");
     const both = await html(
       CaptureTargetsCard({
         targets,
@@ -58,6 +58,6 @@ describe("CaptureTargetsCard reachability", () => {
       }),
     );
     expect(both.indexOf("chromium@sprite")).toBeLessThan(both.indexOf("firefox"));
-    expect(both.match(/>default</gu)).toHaveLength(1);
+    expect(both.match(/>Default</gu)).toHaveLength(1);
   });
 });

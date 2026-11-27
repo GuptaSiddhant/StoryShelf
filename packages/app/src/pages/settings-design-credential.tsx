@@ -96,7 +96,7 @@ export const CredentialsSection: FC<{
     ),
   }));
   return (
-    <VStack>
+    <VStack gap="lg">
       <Card>
         <SectionTitle>Design tokens</SectionTitle>
         <SummaryList label="Design tokens" items={items} emptyTitle="No design providers" />

@@ -80,7 +80,7 @@ export const FilesCard: FC<{
       </DialogLink>
     ) : undefined;
   return (
-    <VStack>
+    <VStack gap="lg">
       <Card>
         <SectionTitle actions={files.length > 0 ? add(false) : null}>Design files</SectionTitle>
         <Meta>
@@ -132,7 +132,7 @@ export const ComponentsCard: FC<{
     </DialogLink>
   );
   return (
-    <VStack>
+    <VStack gap="lg">
       <Card>
         <SectionTitle actions={components.length > 0 ? add(false) : null}>
           Component mapping

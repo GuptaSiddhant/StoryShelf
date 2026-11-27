@@ -5,11 +5,24 @@
  */
 import { DEFAULT_STATUS_PREFIX } from "@storyshelf/core/adapter/notifier";
 import { postsComments } from "@storyshelf/core/build-state";
-import { GitRepositoryLinkModel, linkOutputsOf, type GitConnection } from "@storyshelf/core/models";
+import { listCoveredRepositories } from "@storyshelf/core/integrations";
+import {
+  anyRepositoryLinkAllowed,
+  GitRepositoryLinkModel,
+  linkOutputsOf,
+  SiteSettingsModel,
+  type GitConnection,
+} from "@storyshelf/core/models";
 import type { GitRepositoryLinkRow, Project } from "@storyshelf/core/schema";
+import { redactSecrets } from "@storyshelf/core/utils";
 import { gitConnectionModel } from "../git-admin.ts";
 import { proposedPrefix, webHostOf } from "../git-link-request.ts";
-import type { SettingsGitData, SettingsGitLink } from "../pages/settings-git.tsx";
+import type {
+  PickerRepository,
+  RepositoryPicker,
+  SettingsGitData,
+  SettingsGitLink,
+} from "../pages/settings-git.tsx";
 import { getStore } from "../store.ts";
 
 /** The server's usable git connections (a stored row shadowed by configuration is not one). */
@@ -64,4 +77,67 @@ export async function loadGitSection(project: Project): Promise<SettingsGitData 
     links,
     proposedPrefix: proposedPrefix(project.slug, new Set(links.map((link) => link.prefix))),
   };
+}
+
+/** A listing is bounded, so a slow host never holds the form. */
+const LIST_TIMEOUT_MS = 10_000;
+
+/**
+ * The repositories the server's connections cover, for the link form's picker, or undefined while
+ * the operator switch is off: then the provider is never asked, so coverage cannot leak. A
+ * connection that fails is skipped and the list is marked cut short; when none can be listed the
+ * form falls back to the typed URL.
+ */
+export async function loadRepositoryPicker(): Promise<RepositoryPicker | undefined> {
+  const store = getStore();
+  if (!(await anyRepositoryLinkAllowed(new SiteSettingsModel(store.db)))) {
+    return undefined;
+  }
+  const connections = await usableConnections();
+  const listings = await Promise.all(
+    connections.map(async (connection) => await listOne(connection, connections.length > 1)),
+  );
+  const repositories = listings.flatMap((listing) => listing?.repositories ?? []);
+  if (repositories.length === 0 && listings.every((listing) => listing === null)) {
+    return { listed: false };
+  }
+  return {
+    listed: true,
+    repositories,
+    truncated: listings.some((listing) => listing === null || listing.truncated),
+  };
+}
+
+/** One connection's repositories, or null when it cannot be listed (logged without a secret). */
+async function listOne(
+  connection: GitConnection,
+  several: boolean,
+): Promise<{ repositories: PickerRepository[]; truncated: boolean } | null> {
+  const store = getStore();
+  try {
+    const secret = await gitConnectionModel(store).secretOf(connection.id);
+    if (secret === null) {
+      return null;
+    }
+    const covered = await listCoveredRepositories(connection, secret, {
+      signal: AbortSignal.timeout(LIST_TIMEOUT_MS),
+    });
+    const host = webHostOf(connection);
+    return {
+      truncated: covered.truncated,
+      repositories: covered.repositories.map(({ fullName }) => ({
+        url: `https://${host}/${fullName}`,
+        label: several ? `${fullName} (${connection.name})` : fullName,
+      })),
+    };
+  } catch (error) {
+    store.logger.warn(
+      {
+        connectionId: connection.id,
+        reason: redactSecrets(error instanceof Error ? error.message : "failed"),
+      },
+      "git repository listing failed",
+    );
+    return null;
+  }
 }
