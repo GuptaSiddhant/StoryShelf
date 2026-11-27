@@ -12,7 +12,12 @@ export const LOCAL_BRANCH = "local";
 
 /** Run a git subcommand, returning trimmed stdout. Throws on failure. */
 function git(cwd: string, args: string[]): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  // stderr is piped, never inherited: outside a checkout git's `fatal:` lines must not reach the terminal.
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
 }
 
 /** Repository git status relevant to affected capture. */
