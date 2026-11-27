@@ -126,6 +126,37 @@ function coreCopyCheck(project: string, installed: Installed[]): Check {
       };
 }
 
+/** Whether the project itself names `playwright-core` (Docker installs do not). */
+function pinsPlaywright(project: InstalledManifest): boolean {
+  return [project.dependencies, project.devDependencies].some(
+    (field) => field?.["playwright-core"] !== undefined,
+  );
+}
+
+/**
+ * A warning when the project's `playwright-core` is not the one `@storyshelf/runner` resolves, since
+ * `playwright-core install` would then fetch the wrong browser revision. Nothing when they match,
+ * when the project does not pin `playwright-core`, or when either is not installed.
+ */
+export function playwrightPinCheck(projectDir: string, project: InstalledManifest): Check[] {
+  const runner = pinsPlaywright(project)
+    ? findInstalled("@storyshelf/runner", projectDir)
+    : undefined;
+  const pinned = runner && findInstalled("playwright-core", projectDir);
+  const used = runner && findInstalled("playwright-core", runner.dir);
+  const pinnedVersion = pinned?.manifest.version;
+  const usedVersion = used?.manifest.version;
+  if (pinnedVersion === undefined || usedVersion === undefined || pinnedVersion === usedVersion) {
+    return [];
+  }
+  return [
+    {
+      status: "warn",
+      message: `playwright-core ${pinnedVersion} in the project differs from ${usedVersion}, the one @storyshelf/runner uses: the browser install would fetch the wrong revision. Set playwright-core to ${usedVersion} in package.json, install, then run npx playwright-core install chromium.`,
+    },
+  ];
+}
+
 /**
  * The checks that need only the installed packages, run before the instance module is imported: every
  * `@storyshelf/*` package the project names is installed, they share one version and one core, and
@@ -149,5 +180,6 @@ export function peerChecks(projectDir: string): Check[] {
     skewCheck(present),
     coreCopyCheck(projectDir, present),
     ...present.flatMap((installed) => peersOf(installed)),
+    ...(project === undefined ? [] : playwrightPinCheck(projectDir, project)),
   ];
 }
