@@ -29,6 +29,7 @@ import {
   setHumanOutputToStderr,
 } from "../output.ts";
 import { readSetting } from "../settings.ts";
+import { missingConnectionMessage } from "./connection.ts";
 import {
   HashRoutesMissingError,
   isOverInlineLimit,
@@ -302,13 +303,13 @@ function assertUploadOptions(
   collected: CollectedUploadOptions,
 ): asserts collected is ResolvedUploadOptions {
   if (!collected.url) {
-    throw new Error("--url is required (or .storybook/storyshelf.json / SHELF_URL)");
+    throw new Error(missingConnectionMessage("url"));
   }
   if (!collected.slug) {
-    throw new Error("--slug is required (or .storybook/storyshelf.json / SHELF_SLUG)");
+    throw new Error(missingConnectionMessage("slug"));
   }
   if (!collected.token) {
-    throw new Error("--token is required (or SHELF_TOKEN env)");
+    throw new Error(missingConnectionMessage("token"));
   }
 }
 

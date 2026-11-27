@@ -3,6 +3,16 @@ title: CI setup
 description: Run StoryShelf in GitHub Actions and GitLab CI.
 ---
 
+## One-time setup
+
+Run this once on your machine and commit the file it writes:
+
+```bash
+npx storyshelf init --url https://shelf.example.com --slug my-design-system
+```
+
+`init` writes `.storybook/storyshelf.json` (url and slug, no secret). From then on a CI step is just `npx storyshelf` with the token in the environment. Bare `storyshelf` is the same command as `storyshelf upload`; it runs when that file exists and otherwise prints help.
+
 ## GitHub Actions
 
 ```yaml
@@ -22,19 +32,16 @@ jobs:
         run: npx storybook build -o storybook-static --stats-json
       - name: Upload to StoryShelf
         id: upload
-        run: npx storyshelf upload
+        run: npx storyshelf
         env:
           SHELF_TOKEN: ${{ secrets.SHELF_TOKEN }}
-          # Only when .storybook/storyshelf.json has no url or slug:
-          # SHELF_URL: ${{ vars.SHELF_URL }}
-          # SHELF_SLUG: ${{ vars.SHELF_SLUG }}
       - name: Link the build
         env:
           BUILD_URL: ${{ steps.upload.outputs.build-url }}
         run: echo "Storybook build: $BUILD_URL" >> "$GITHUB_STEP_SUMMARY"
 ```
 
-The upload step needs no `--sha` or `--branch`, and no `ref:` on the checkout. `storyshelf upload` reads the run's own environment and the event file GitHub writes (`GITHUB_EVENT_PATH`):
+The upload step needs no `--sha` or `--branch`, and no `ref:` on the checkout. `storyshelf` reads the run's own environment and the event file GitHub writes (`GITHUB_EVENT_PATH`):
 
 | Event                                | Commit                                  | Branch                              |
 | ------------------------------------ | --------------------------------------- | ----------------------------------- |
@@ -42,13 +49,13 @@ The upload step needs no `--sha` or `--branch`, and no `ref:` on the checkout. `
 | `push`                               | `GITHUB_SHA`                            | `GITHUB_REF_NAME` (the tag for a tag) |
 | `merge_group`                        | the queue's head (`merge_group.head_sha`) | the branch it merges into           |
 
-On a pull request GitHub's own `GITHUB_SHA` is a temporary merge commit and `GITHUB_REF_NAME` is `<n>/merge`; neither is used, so builds and statuses land on the commit and branch the PR shows. The commit message and author come from `git log` on that commit (hence `fetch-depth: 0`). `storyshelf doctor` and `storyshelf upload --verbose` list every value with where it came from. The token is the only secret: keep it in `SHELF_TOKEN`, never in `--token` (arguments show in the process list) and never in `.storybook/storyshelf.json`, which is refused when it holds a `token` key.
+On a pull request GitHub's own `GITHUB_SHA` is a temporary merge commit and `GITHUB_REF_NAME` is `<n>/merge`; neither is used, so builds and statuses land on the commit and branch the PR shows. The commit message and author come from `git log` on that commit (hence `fetch-depth: 0`). `storyshelf doctor` and `storyshelf upload --verbose` (flags go on `upload`) list every value with where it came from. The token is the only secret: keep it in `SHELF_TOKEN`, never in `--token` (arguments show in the process list) and never in `.storybook/storyshelf.json`, which is refused when it holds a `token` key.
 
 On GitHub Actions the upload step sets the outputs `build-id` and `build-url` (read them through `env`, as above). Elsewhere, `storyshelf upload --json` prints `{ "buildId", "url", "status", "skipped" }` on stdout, with every other message on stderr: `npx storyshelf upload --json | jq -r .url`. See [Machine-readable output](/guides/cli/client/#machine-readable-output).
 
 Run `npx storyshelf doctor` after the build to check the setup before uploading. It reports a shallow clone or a missing `preview-stats.json` as a **warning** (the upload still works, rendering every story); fail the step on a warning if you want affected capture to be a requirement. `upload` itself also warns on a shallow clone and never fails because of it.
 
-If you commit `.storybook/storyshelf.json` (url and slug), `SHELF_URL` and `SHELF_SLUG` can go too, and only the token comes from CI.
+`SHELF_URL` and `SHELF_SLUG`, when set, take precedence over the committed file (an empty value counts as unset); the token is the only variable a pipeline needs.
 
 ## GitLab CI
 
@@ -59,14 +66,14 @@ visual:
     # SHELF_TOKEN is a masked CI/CD variable; the CLI reads it from the environment.
   script:
     - npx storybook build -o storybook-static --stats-json # the stats file is what affected capture reads
-    - npx storyshelf upload
+    - npx storyshelf
 ```
 
-A merge request pipeline uploads the source branch (`CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`) and its head commit (`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` when GitLab sets it, else `CI_COMMIT_SHA`); a branch pipeline uses `CI_COMMIT_SHA` and `CI_COMMIT_REF_NAME`. Set `SHELF_URL` and `SHELF_SLUG` as variables only when they are not in `.storybook/storyshelf.json`.
+A merge request pipeline uploads the source branch (`CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`) and its head commit (`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` when GitLab sets it, else `CI_COMMIT_SHA`); a branch pipeline uses `CI_COMMIT_SHA` and `CI_COMMIT_REF_NAME`. The url and slug come from the committed `.storybook/storyshelf.json`.
 
 ## Other CI providers
 
-The same two lines work on Vercel, Netlify, CircleCI, Buildkite, Bitbucket Pipelines, Azure Pipelines and Jenkins: check out the full history, set `SHELF_TOKEN`, run `npx storyshelf upload`. The variables each provider supplies are listed under [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from). Any other system passes `--sha` and `--branch`, or relies on local git.
+The same two lines work on Vercel, Netlify, CircleCI, Buildkite, Bitbucket Pipelines, Azure Pipelines and Jenkins: check out the full history, set `SHELF_TOKEN`, run `npx storyshelf`. The variables each provider supplies are listed under [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from). Any other system passes `--sha` and `--branch`, or relies on local git.
 
 ## Storybook in a monorepo package
 
@@ -77,7 +84,7 @@ When Storybook lives in a package of the repository (`packages/app`, a workspace
   working-directory: packages/app
   run: |
     npx build-storybook -o storybook-static --stats-json
-    npx storyshelf upload # SHELF_TOKEN (and SHELF_URL / SHELF_SLUG without a config file) come from env
+    npx storyshelf # SHELF_TOKEN comes from env; url and slug from this package's .storybook/storyshelf.json
 ```
 
 Changes in the package and in sibling workspace packages it imports both trigger the stories that depend on them. See [Affected capture](/concepts/affected-capture/#storybook-in-a-monorepo-package).

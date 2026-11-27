@@ -47,7 +47,8 @@ Then get a first build:
 3. From your Storybook project, run it (it builds Storybook first if `storybook-static` is missing):
 
    ```sh
-   SHELF_TOKEN=shelf_… npx storyshelf upload --url http://localhost:3000 --slug my-design-system
+   npx storyshelf init --url http://localhost:3000 --slug my-design-system   # once; commit .storybook/storyshelf.json
+   SHELF_TOKEN=shelf_… npx storyshelf
    ```
 
 4. Open the build, approve it as the baseline, and upload again: the second build is compared with it.

@@ -51,11 +51,11 @@ Prints `Build ready: <dir>` and fails fast when the output lacks `index.json`.
 
 ## `storyshelf upload`
 
-Build (optionally), zip, and upload a Storybook build for capture.
+Build (optionally), zip, and upload a Storybook build for capture. Bare `storyshelf` with no subcommand is this same command with no flags: it runs when `.storybook/storyshelf.json` exists (run `storyshelf init` once to write it) and otherwise prints help. Flags below go on `storyshelf upload`.
 
 ```bash
 # in CI, with .storybook/storyshelf.json committed: only the token, from the environment
-SHELF_TOKEN=shelf_xxx storyshelf upload
+SHELF_TOKEN=shelf_xxx storyshelf
 
 # no config file: url and slug as flags or SHELF_URL / SHELF_SLUG
 SHELF_TOKEN=shelf_xxx storyshelf upload --url http://localhost:3000 --slug my-design-system
