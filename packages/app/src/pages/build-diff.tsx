@@ -31,7 +31,10 @@ export interface BuildDiffData {
   snapshots: Snapshot[];
   comments: Comment[];
   selectedId?: string;
+  /** Whether the viewer may decide (approve, reject); the server's `canVerdict`. */
   canReview: boolean;
+  /** Whether the viewer may comment; the server's `canComment`. */
+  canComment: boolean;
   /** Whether the viewer may retry or cancel the build; omitted, the header hides the menu. */
   canManage?: boolean;
   /** Whether the viewer may resolve and reopen comments. */
@@ -64,6 +67,7 @@ export interface DiffReviewGridProps {
   comments: Comment[];
   selected?: Snapshot;
   canReview: boolean;
+  canComment: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
   /** Display names of the users behind comments, by user id. */
@@ -101,6 +105,7 @@ function SnapshotComments(props: {
       selectedStoryId={selected.storyId}
       comments={grid.comments}
       canTriage={grid.canTriage}
+      canComment={grid.canComment}
       names={grid.names}
     />
   );

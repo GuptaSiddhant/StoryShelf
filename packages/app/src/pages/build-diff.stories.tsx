@@ -154,12 +154,17 @@ export const NewStory = pageStory(() =>
   renderBuildDiffPage(reviewData({ selectedId: NEW_STORY_ID })),
 );
 
-/** A viewer who cannot decide: the same stage without the approve and reject controls. */
-export const ReadOnly = pageStory(() => renderBuildDiffPage(reviewData({ canReview: false })));
+/** A Viewer: the stage without the approve, reject and comment controls, and one read-only line. */
+export const ReadOnly = pageStory(() =>
+  renderBuildDiffPage(reviewData({ canReview: false, canComment: false, canTriage: false })),
+);
 
 /** A read-only shared account (#1274): the banner, and no review, triage or comment control. */
 export const SharedReadOnlyAccount = pageStory(
-  () => renderBuildDiffPage(reviewData({ canReview: false, canTriage: false, canManage: false })),
+  () =>
+    renderBuildDiffPage(
+      reviewData({ canReview: false, canComment: false, canTriage: false, canManage: false }),
+    ),
   { store: { authEnabled: true, user: SHARED_READ_ONLY_ACCOUNT } },
 );
 

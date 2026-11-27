@@ -32,11 +32,12 @@ export async function loadBuildDiffData(
   build: Build,
   view: BuildDiffView,
 ): Promise<BuildDiffData> {
-  const { db, user, authEnabled, config } = getStore();
+  const { db, config } = getStore();
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   const comments = await new CommentModel(db).listByBuild(build.id);
   const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
-  const canManage = (await reviewCapabilities(project)).canComment;
+  const capabilities = await reviewCapabilities(project);
+  const canManage = capabilities.canComment;
   const selected = selectedSnapshot(snapshots, view.snapshotId);
   const design = selected
     ? await loadReviewDesign(
@@ -52,7 +53,8 @@ export async function loadBuildDiffData(
     snapshots,
     comments,
     selectedId: view.snapshotId,
-    canReview: !authEnabled || (Boolean(user) && user?.readOnly !== true),
+    canReview: capabilities.canVerdict,
+    canComment: capabilities.canComment,
     canTriage: canManage || isBuildAuthor(build),
     canManage,
     names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
