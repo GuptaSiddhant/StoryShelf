@@ -63,6 +63,12 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 ## Sign-in and access
 
+**"This is not the address the server is configured for" at sign-in.** The page was opened at another address than `SHELF_PUBLIC_BASE_URL`, for example `http://127.0.0.1:3000` or the VM's IP while the value is `http://localhost:3000`. Sign-in only accepts the configured origin, so your password was not checked: open the address the message names, or set `SHELF_PUBLIC_BASE_URL` to the address people use and restart the server. Behind a proxy, that is the address the browser shows.
+
+**The server stops with "requires SHELF_PUBLIC_BASE_URL … starting with http:// or https://".** The value has no scheme, such as `localhost:3000/`. Write the full URL: `SHELF_PUBLIC_BASE_URL=http://localhost:3000`.
+
+**The server stops with "SHELF_ADMIN_PASSWORD must be at least 12 characters".** The local admin's password is too short. Set a longer `SHELF_ADMIN_PASSWORD` and start it again.
+
 **Nobody is an admin yet.** With authentication on and an empty database, set `SHELF_ADMIN_TOKEN` on the server: its bearer token grants site-admin API access without a session. See [Roles & tokens](/concepts/roles/#first-admin-bootstrap).
 
 **"Invalid or expired invite".** Invite links are single-use and expire after seven days. Ask an admin to re-invite: that is also how a password is recovered. See [Local accounts](/guides/auth/local/).

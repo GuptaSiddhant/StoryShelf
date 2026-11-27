@@ -151,6 +151,7 @@ export function buildAdapter(
   const isReadOnly = readOnlyAccountMatcher(options.readOnlyAccounts);
   return {
     hostSessionCookie: options.hostSessionCookie === true,
+    configuredOrigin: (): string => new URL(options.baseURL).origin,
     handler: async (request: Request): Promise<Response> => await shelf.handler(request),
     loginMethods: (): EngineLoginMethod[] => describeLoginMethods(options),
     providerChecks: () => providerChecksOf(options),

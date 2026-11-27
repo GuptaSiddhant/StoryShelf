@@ -1,3 +1,4 @@
+import type { FC } from "hono/jsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
 import {
@@ -30,6 +31,11 @@ export interface LoginPageState {
   email?: string;
   /** The same-site page to land on after signing in; the home page when absent. */
   returnTo?: string;
+  /**
+   * The engine refused the address this page was opened at (#1431): `configuredOrigin` is the one
+   * it accepts, when known. Shown instead of `error`, as text: never a link.
+   */
+  wrongAddress?: { configuredOrigin: string | undefined };
 }
 
 /** Resolve auth UI text with defaults. */
@@ -46,6 +52,30 @@ function ssoLabel(template: string | undefined, label: string): string {
   return raw.includes("{label}") ? raw.replaceAll("{label}", label) : `${raw} ${label}`;
 }
 
+/** Why the sign-in was refused: the wrong address names the configured origin, anything else is `error`. */
+const LoginError: FC<{ state: LoginPageState }> = ({ state }) => {
+  if (state.wrongAddress) {
+    const origin = state.wrongAddress.configuredOrigin;
+    return (
+      <Alert tone="warning" title="This is not the address the server is configured for">
+        {origin === undefined ? (
+          <>Open the server at its configured address, </>
+        ) : (
+          <>
+            This server is configured for <code>{origin}</code>. Open it there,{" "}
+          </>
+        )}
+        or change <code>SHELF_PUBLIC_BASE_URL</code> to the address you use and restart it.
+      </Alert>
+    );
+  }
+  return state.error ? (
+    <Alert tone="danger" title="Could not sign in">
+      {state.error}
+    </Alert>
+  ) : null;
+};
+
 /** Sign-in page with engine login widgets. */
 // oxlint-disable-next-line eslint/max-lines-per-function -- page composes a few sections, still one concern
 export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
@@ -60,11 +90,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
         <VStack gap="lg">
           <PageHeader title={title} description={subtitle} />
 
-          {state.error ? (
-            <Alert tone="danger" title="Could not sign in">
-              {state.error}
-            </Alert>
-          ) : null}
+          <LoginError state={state} />
 
           {state.engineMethods?.some((method) => method.kind === "password") ? (
             <Form method="post" action="/auth/engine/login" novalidate>
