@@ -103,28 +103,29 @@ const CARD_BOTTOM_LIMIT_PX = 24;
 
 /** The cards of a document (a bordered, rounded, padded surface) whose last child leaves a band. */
 function cardsWithBand(limit) {
+  // Runs in the page, so it cannot call anything defined outside it.
   const doc = globalThis.document;
-  const bands = [];
-  for (const card of doc.querySelectorAll("main div, main section, body > div")) {
+  const cards = [...doc.querySelectorAll("main div, main section, body > div")].filter((card) => {
     const style = globalThis.getComputedStyle(card);
-    const isCard =
+    return (
       style.paddingBottom === "16px" &&
       style.borderBottomWidth === "1px" &&
       style.borderBottomStyle === "solid" &&
       style.borderTopLeftRadius !== "0px" &&
-      style.display === "grid";
-    const last = [...card.children].reverse().find((child) => {
-      const box = child.getBoundingClientRect();
-      return box.height > 0 && globalThis.getComputedStyle(child).visibility !== "hidden";
-    });
-    if (isCard && last) {
-      const gap = card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
-      if (gap > limit) {
-        bands.push(`${Math.round(gap)}px below <${last.tagName.toLowerCase()}>`);
-      }
-    }
-  }
-  return bands;
+      style.display === "grid"
+    );
+  });
+  return cards.flatMap((card) => {
+    const last = [...card.children]
+      .toReversed()
+      .find((child) => child.getBoundingClientRect().height > 0);
+    const gap = last
+      ? card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom
+      : 0;
+    return last && gap > limit
+      ? [`${Math.round(gap)}px below <${last.tagName.toLowerCase()}>`]
+      : [];
+  });
 }
 
 /** Fail a story whose card ends in a blank band: a margin or an empty line under its last child. */
