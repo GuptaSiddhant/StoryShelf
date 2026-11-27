@@ -7,6 +7,7 @@
  */
 import { LOCAL_SHA_PREFIX } from "@storyshelf/affected";
 import type { UrlBuilder } from "../../urls.ts";
+import { openChanges } from "./build-comment-headline.ts";
 import { percentOf } from "./build-comment-text.ts";
 import { buildCommentMarkdown, skippedCommentMarkdown } from "./build-comment.ts";
 import type { CommentChange } from "./build-comment.ts";
@@ -72,7 +73,7 @@ export interface BuildStateSource {
 /** The part of a snapshot row the annotations read. */
 export interface BuildStateChange {
   id: string;
-  /** `changed` or `new`; anything else is not a change to review. */
+  /** `changed` or `new` is open; `approved` counts as an approved change; the rest is ignored. */
   status: string;
   storyTitle: string;
   storyName: string;
@@ -207,7 +208,7 @@ function withOutputs(states: BuildStateSet, input: BuildStateInput): BuildStateS
   const statuses = states.statuses
     .filter((status) => outputs.storybook || status.name !== "storybook")
     .map((status) => (outputs.annotations ? status : withoutAnnotations(status)));
-  return { statuses, comment: commentWanted(outputs, input.build) ? states.comment : null };
+  return { statuses, comment: commentWanted(outputs, input) ? states.comment : null };
 }
 
 function withoutAnnotations(status: DesiredStatus): DesiredStatus {
@@ -215,10 +216,17 @@ function withoutAnnotations(status: DesiredStatus): DesiredStatus {
   return rest;
 }
 
-/** `on-changes` keeps the comment only for a build with visual changes to review. */
-function commentWanted(outputs: StateOutputs, build: BuildStateBuild): boolean {
+/**
+ * `on-changes` keeps the comment for a build with visual changes to review, and, once every change
+ * is approved (`changedCount` is then 0), for one whose approved changes are known: the comment
+ * shrinks to its approved line instead of vanishing.
+ */
+function commentWanted(outputs: StateOutputs, input: BuildStateInput): boolean {
+  const { build } = input;
   return (
-    outputs.comment === "always" || (outputs.comment === "on-changes" && build.changedCount > 0)
+    outputs.comment === "always" ||
+    (outputs.comment === "on-changes" &&
+      (openChanges(build) > 0 || (approvedChanges(input.changes) ?? 0) > 0))
   );
 }
 
@@ -486,7 +494,7 @@ function linksOf(input: BuildStateInput): Links {
 function gateStatus(input: BuildStateInput, url: string): DesiredStatus[] {
   const { flags, build, prefix } = input;
   if (flags.testing) {
-    return [{ name: "testing", context: `${prefix}/testing`, url, ...testingOutcome(build) }];
+    return [{ name: "testing", context: `${prefix}/testing`, url, ...testingOutcome(input) }];
   }
   if (flags.review) {
     return [
@@ -533,17 +541,18 @@ type Outcome = Pick<DesiredStatus, "state" | "description">;
 const CANCELLED: Outcome = { state: "cancelled", description: "Cancelled" };
 
 /** `pending` until captured, `pending` while review is open, then the review's result. */
-function testingOutcome(build: BuildStateBuild): Outcome {
+function testingOutcome(input: BuildStateInput): Outcome {
+  const { build } = input;
   switch (build.status) {
     case "reviewing": {
       const why = unconfirmedClaim(build);
       return {
         state: "pending",
-        description: `${why ?? "Review open"}: ${plural(openCount(build), "change")} to review`,
+        description: `${why ?? "Review open"}: ${plural(openChanges(build), "change")} to review`,
       };
     }
     case "approved": {
-      return { state: "success", description: approvedText(build) };
+      return { state: "success", description: approvedText(input) };
     }
     case "rejected": {
       return {
@@ -646,14 +655,21 @@ function waitingText(approvals: BuildStateInput["approvals"]): string {
   return `Waiting for approvals: ${String(approvals.given)} of ${String(approvals.required)}`;
 }
 
-function openCount(build: BuildStateBuild): number {
-  return Math.max(0, build.changedCount - build.approvedCount - build.rejectedCount);
+/** Snapshots a reviewer approved; `unchanged` ones (in `approvedCount`) are not changes. */
+function approvedChanges(changes: BuildStateInput["changes"]): number | undefined {
+  return changes?.filter((change) => change.status === "approved").length;
 }
 
-function approvedText(build: BuildStateBuild): string {
-  return build.changedCount === 0
+function approvedText(input: BuildStateInput): string {
+  const approved = approvedChanges(input.changes);
+  if (approved === undefined) {
+    return input.build.snapshotCount === 0
+      ? "Review closed: no visual changes"
+      : "Review closed: changes approved";
+  }
+  return approved === 0
     ? "Review closed: no visual changes"
-    : `Review closed: ${plural(build.approvedCount, "change")} approved`;
+    : `Review closed: ${plural(approved, "change")} approved`;
 }
 
 function plural(count: number, noun: string): string {
