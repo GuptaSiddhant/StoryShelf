@@ -4,13 +4,14 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
+  Card,
   CodeBlock,
   DialogLink,
   Meta,
-  formatAbsolute,
   SectionTitle,
   SummaryList,
   VStack,
+  formatAbsolute,
   type SummaryItem,
 } from "../ui/components.tsx";
 import { FormDialog } from "./dialog-form.tsx";
@@ -85,16 +86,18 @@ export function renderSettingsTokens(
         </Alert>
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <SectionTitle>API tokens</SectionTitle>
-      <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
-      <SummaryList
-        label="API tokens"
-        items={tokenItems(project, tokens, isAdmin)}
-        emptyTitle="No tokens yet"
-        emptyDescription="Create one for CI."
-        add={add}
-      />
-      {tokens.length > 0 ? add : null}
+      <Card>
+        <SectionTitle>API tokens</SectionTitle>
+        <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
+        <SummaryList
+          label="API tokens"
+          items={tokenItems(project, tokens, isAdmin)}
+          emptyTitle="No tokens yet"
+          emptyDescription="Create one for CI."
+          add={add}
+        />
+        {tokens.length > 0 ? add : null}
+      </Card>
       {isAdmin ? (
         <FormDialog id={CREATE_TOKEN_DIALOG} title="Create token" submitLabel="Create token" />
       ) : null}

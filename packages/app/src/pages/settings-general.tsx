@@ -92,16 +92,21 @@ export function renderSettingsGeneral(
   return (
     <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <SectionTitle>General</SectionTitle>
-      <SummaryList label="General" items={generalItems(project, isAdmin)} emptyTitle="No project" />
+      <Card>
+        <SectionTitle>General</SectionTitle>
+        <SummaryList
+          label="General"
+          items={generalItems(project, isAdmin)}
+          emptyTitle="No project"
+        />
+        {isAdmin ? null : <Meta>You need admin access to edit settings.</Meta>}
+      </Card>
       {isAdmin ? (
         <>
           <FormDialog id={EDIT_GENERAL_DIALOG} title="Edit project" submitLabel="Save changes" />
           {canDeleteProject ? <DangerZoneCard project={project} /> : null}
         </>
-      ) : (
-        <Meta>You need admin access to edit settings.</Meta>
-      )}
+      ) : null}
     </VStack>
   );
 }

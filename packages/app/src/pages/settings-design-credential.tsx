@@ -1,5 +1,6 @@
 import type { FC } from "hono/jsx";
 import {
+  Card,
   DialogLink,
   SectionTitle,
   SummaryList,
@@ -96,8 +97,10 @@ export const CredentialsSection: FC<{
   }));
   return (
     <VStack>
-      <SectionTitle>Design tokens</SectionTitle>
-      <SummaryList label="Design tokens" items={items} emptyTitle="No design providers" />
+      <Card>
+        <SectionTitle>Design tokens</SectionTitle>
+        <SummaryList label="Design tokens" items={items} emptyTitle="No design providers" />
+      </Card>
       <FormDialog id={DESIGN_TOKEN_DIALOG} title="Design token" submitLabel="Save token" />
     </VStack>
   );
