@@ -63,10 +63,10 @@ describe("build-comment-text", () => {
 
 describe("build-comment-headline", () => {
   it("counts open changes and words the headline", () => {
-    expect(openChanges(base.counts)).toBe(2);
-    expect(headlineOf(base)).toEqual({ emoji: "🟡", text: "2 visual changes need review" });
+    expect(openChanges(base.counts)).toBe(4);
+    expect(headlineOf(base)).toEqual({ emoji: "🟡", text: "4 visual changes need review" });
     expect(
-      headlineOf({ ...base, counts: { ...base.counts, approvedCount: 0, rejectedCount: 3 } }).text,
+      headlineOf({ ...base, counts: { ...base.counts, changedCount: 1, approvedCount: 380 } }).text,
     ).toBe("1 visual change needs review");
     expect(headlineOf({ ...base, status: "comparing" }).emoji).toBe("⏳");
     expect(headlineOf({ ...base, status: "failed" }).text).toBe("Capture failed");
