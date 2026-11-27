@@ -92,7 +92,7 @@ const SCRIPT = `(function(){
     slugs.forEach(function(slug){ chain=chain.then(function(ok){ return keepOne(slug).then(function(r){ return apply(r)&&ok; }); }); });
     chain.then(function(){ btn.disabled=false; },function(){ btn.disabled=false; say('Offline storage is not available in this browser.'); });
   }
-  function refresh(){ return send({type:'usage'}).then(paint,function(){
+  function refresh(){ return send({type:'usage'}).then(apply,function(){
     document.querySelectorAll('[data-offline-unsupported]').forEach(function(el){ el.hidden=false; });
   }); }
   document.addEventListener('click',function(event){
