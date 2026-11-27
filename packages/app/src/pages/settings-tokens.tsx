@@ -56,16 +56,18 @@ export function renderSettingsTokens(
   isAdmin: boolean,
   formState?: { globalError?: string; secret?: string; origin?: string },
 ): unknown {
-  const add = isAdmin ? (
-    <DialogLink
-      dialogId={CREATE_TOKEN_DIALOG}
-      href={`/projects/${project.slug}/settings/tokens/new`}
-      variant="primary"
-      icon="plus"
-    >
-      Create token
-    </DialogLink>
-  ) : undefined;
+  const add = (primary: boolean): unknown =>
+    isAdmin ? (
+      <DialogLink
+        dialogId={CREATE_TOKEN_DIALOG}
+        href={`/projects/${project.slug}/settings/tokens/new`}
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        icon="plus"
+      >
+        Create token
+      </DialogLink>
+    ) : undefined;
   return (
     <VStack>
       {formState?.secret ? (
@@ -87,16 +89,15 @@ export function renderSettingsTokens(
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <SectionTitle>API tokens</SectionTitle>
+        <SectionTitle actions={tokens.length > 0 ? add(false) : null}>API tokens</SectionTitle>
         <Meta>Tokens are used by the CLI to upload builds. They are scoped to this project.</Meta>
         <SummaryList
           label="API tokens"
           items={tokenItems(project, tokens, isAdmin)}
           emptyTitle="No tokens yet"
           emptyDescription="Create one for CI."
-          add={add}
+          add={add(true)}
         />
-        {tokens.length > 0 ? add : null}
       </Card>
       {isAdmin ? (
         <FormDialog id={CREATE_TOKEN_DIALOG} title="Create token" submitLabel="Create token" />

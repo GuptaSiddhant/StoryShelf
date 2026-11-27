@@ -114,6 +114,19 @@ function connectionDetails(connection: GitConnectionView): string {
   return parts.filter((part) => part !== "").join(" · ");
 }
 
+/** The Add connection button: primary in the empty state, a small secondary in the title row. */
+function addConnection(primary: boolean): unknown {
+  return (
+    <Button
+      variant={primary ? "primary" : "secondary"}
+      size={primary ? "md" : "sm"}
+      href="/admin/git/connections/new"
+    >
+      Add connection
+    </Button>
+  );
+}
+
 /** Install and Remove; a configured connection is changed in configuration only. */
 function ConnectionActions(props: {
   connection: GitConnectionView;
@@ -147,11 +160,6 @@ function ConnectionActions(props: {
 function ConnectionsCard(props: {
   data: AdminGitData;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  const add = (
-    <Button variant="secondary" size="sm" href="/admin/git/connections/new">
-      Add connection
-    </Button>
-  );
   const items = props.data.connections.map((connection) => ({
     id: connection.id,
     name: connection.name,
@@ -162,8 +170,9 @@ function ConnectionsCard(props: {
   return (
     <Card>
       <HStack justify="between">
-        <SectionTitle>Connections</SectionTitle>
-        {items.length > 0 ? add : null}
+        <SectionTitle actions={items.length > 0 ? addConnection(false) : null}>
+          Connections
+        </SectionTitle>
       </HStack>
       <Meta>
         One GitHub App or GitLab token serves every project. StoryShelf reads which pull request
@@ -175,7 +184,7 @@ function ConnectionsCard(props: {
         items={items}
         emptyTitle="No git connections"
         emptyDescription="Connect GitHub or GitLab once, and projects can post merge gates and comments."
-        add={add}
+        add={addConnection(true)}
       />
     </Card>
   );

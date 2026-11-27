@@ -152,12 +152,21 @@ export function renderSettingsGit(
   formState?: { globalError?: string },
 ): unknown {
   const base = createUrlBuilder("/").settingsTab(project.slug, "git");
-  const add = isAdmin ? <Button {...opener(`${base}/new`)}>Link a repository</Button> : null;
+  const add = (primary: boolean): unknown =>
+    isAdmin ? (
+      <Button
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        {...opener(`${base}/new`)}
+      >
+        Link a repository
+      </Button>
+    ) : null;
   return (
     <div class="grid max-w-form">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <SectionTitle>Git</SectionTitle>
+        <SectionTitle actions={data.links.length > 0 ? add(false) : null}>Git</SectionTitle>
         <Meta>
           Post this project's builds to a repository as the required check. A new link waits for a
           site admin before anything is posted.
@@ -167,9 +176,8 @@ export function renderSettingsGit(
           items={data.links.map((link) => itemOf(project, link, isAdmin))}
           emptyTitle="No repository linked"
           emptyDescription="Link a repository to show build status on its commits and pull requests."
-          add={add}
+          add={add(true)}
         />
-        {data.links.length > 0 ? add : null}
       </Card>
       <Dialog id="git-dialog" title="Repository link" />
     </div>

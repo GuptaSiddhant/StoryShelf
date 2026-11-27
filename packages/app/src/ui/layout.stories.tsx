@@ -162,3 +162,19 @@ export const AlertAboveField = jsxStory(() => (
     </VStack>
   </Card>
 ));
+
+/** A list's Add is a small secondary button at the end of the title row; the primary stays for the empty state. */
+export const SectionTitleWithAction = jsxStory(() => (
+  <Card>
+    <SectionTitle
+      actions={
+        <Button variant="secondary" size="sm" icon="plus" href="#add">
+          Add token
+        </Button>
+      }
+    >
+      API tokens
+    </SectionTitle>
+    <MetaText>Tokens are used by the CLI to upload builds.</MetaText>
+  </Card>
+));

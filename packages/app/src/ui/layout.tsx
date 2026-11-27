@@ -114,6 +114,15 @@ const sectionTitleH2 = css`
   letter-spacing: -0.01em;
 `;
 
+const sectionTitleRow = css`
+  /* section-title-row */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+`;
+
 const sectionTitleH3 = css`
   /* section-title-sm */
   ${sectionTitleH2}
@@ -321,14 +330,27 @@ export const PageHeader: FC<{
   );
 };
 
-/** Card or section heading (h2 by default, h3 for subsections). */
+/**
+ * Card or section heading (h2 by default, h3 for subsections). `actions` (an h2 only) sit at the end
+ * of the title row: the one place a list's secondary "Add" button goes, so the primary stays for the
+ * empty state.
+ */
 export const SectionTitle: FC<{
   level?: 2 | 3;
   tone?: "neutral" | "danger";
+  actions?: unknown;
   children?: unknown;
-}> = ({ level = 2, tone = "neutral", children }) => {
+}> = ({ level = 2, tone = "neutral", actions, children }) => {
   if (level === 3) {
     return <h3 class={tone === "danger" ? sectionTitleDanger : sectionTitleH3}>{children}</h3>;
   }
-  return <h2 class={sectionTitleH2}>{children}</h2>;
+  const title = <h2 class={sectionTitleH2}>{children}</h2>;
+  return actions ? (
+    <div class={sectionTitleRow}>
+      {title}
+      {actions}
+    </div>
+  ) : (
+    title
+  );
 };
