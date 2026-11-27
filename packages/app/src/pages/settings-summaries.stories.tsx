@@ -56,16 +56,20 @@ const accessMembers = [
   {
     id: "m1",
     projectId: project.id,
-    userId: "ana@example.com",
+    userId: "ana-id",
     role: "admin",
     createdAt: hoursAgo(900),
+    name: "Ana Rivera",
+    email: "ana@example.com",
   },
   {
     id: "m2",
     projectId: project.id,
-    userId: "li@example.com",
+    userId: "li-id",
     role: "viewer",
     createdAt: hoursAgo(300),
+    name: "li@example.com",
+    email: "li@example.com",
   },
 ];
 
@@ -112,6 +116,23 @@ export const AccessList = pageStory(() =>
 );
 
 /** Access when nothing is configured: each list shows its empty state with the Add action. */
+/** A member whose account row is gone: the roster says so, never the user id. */
+export const AccessMemberUnknown = pageStory(() =>
+  page("access", {
+    members: [
+      {
+        id: "m3",
+        projectId: project.id,
+        userId: "deleted-user-id",
+        role: "viewer",
+        createdAt: hoursAgo(120),
+        name: "Unknown user",
+        email: null,
+      },
+    ],
+  }),
+);
+
 export const AccessEmpty = pageStory(() => page("access", {}));
 
 /** Access for a member who is not an admin: no Add, Edit or Remove. */
@@ -122,9 +143,11 @@ export const AccessNotAdmin = pageStory(() =>
       {
         id: "m1",
         projectId: project.id,
-        userId: "ana@example.com",
+        userId: "ana-id",
         role: "admin",
         createdAt: hoursAgo(900),
+        name: "Ana Rivera",
+        email: "ana@example.com",
       },
     ],
   }),
