@@ -48,7 +48,7 @@ const Hero: FC = () => {
             View projects
           </Button>
           <Button variant={createFirst ? "primary" : "secondary"} href="/projects/new">
-            Create project
+            New project
           </Button>
         </HStack>
         {viaCli ? (
@@ -62,7 +62,7 @@ const Hero: FC = () => {
           </Meta>
         ) : (
           <Meta>
-            Start with Create project. It gives you a token for CI, and{" "}
+            Start with New project. It gives you a token for CI, and{" "}
             <Command>npx storyshelf init</Command> writes{" "}
             <Command>.storybook/storyshelf.json</Command>.
           </Meta>

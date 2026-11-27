@@ -20,10 +20,10 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 <Aside type="caution" title="Three values you must set">
   The server starts with sign-in on and refuses to start without these.
 
-  - `SHELF_SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
-  - `SHELF_PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
-  - `SHELF_ADMIN_PASSWORD`: the first admin's password, at least 12 characters.
-</Aside>
+- `SHELF_SECRET`: at least 32 random characters. Generate it once and keep it; the data volume needs the same value on every start.
+- `SHELF_PUBLIC_BASE_URL`: the address people open in a browser, for example `http://localhost:3000`.
+- `SHELF_ADMIN_PASSWORD`: the first admin's password, at least 12 characters.
+  </Aside>
 
 ## 1. Start the server
 
@@ -88,20 +88,29 @@ From your Storybook project, save the URL and slug once. This writes `.storybook
   args="init --url http://localhost:3000 --slug my-design-system"
 />
 
-Then upload with the token in the environment: `SHELF_TOKEN=shelf_… npx storyshelf` (bare `storyshelf` is `storyshelf upload`; the card's command is the same with the settings as flags). It builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
+Then upload with the token in the environment: `SHELF_TOKEN=shelf_… npx storyshelf` (bare `storyshelf` is `storyshelf upload`; the card's command is the same with the settings as flags). It builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build. Each phase ends with its elapsed time, which varies per run; the sample shows it as `<time>`:
 
 ```text
+==> Checking config
+--> Checked config (<time>)
+==> Building Storybook
+--> Built Storybook (<time>)
 ==> Creating build
---> Created build (0.1s)
+--> Created build (<time>)
+==> Selecting affected stories
+Full capture (no baseline build yet): rendering all stories
+--> Selected affected stories (<time>)
+==> Recording package usage
+--> Recorded package usage (<time>)
 ==> Uploading Storybook
 Uploading 26 of 32 files (the server has the rest)
---> Uploaded Storybook (0.1s)
+--> Uploaded Storybook (<time>)
 Summary
   Files:    32
   Size:     4.8 MiB
   Stories:  full capture (24 stories)
   Build:    01M7YHNPPVYK1EGAKNAC3APM01
-  Time:     5.3s
+  Time:     <time>
 View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNPPVYK1EGAKNAC3APM01/diff
 ```
 

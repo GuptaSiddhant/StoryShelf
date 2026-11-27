@@ -55,7 +55,7 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
               <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $SHELF_ADMIN_TOKEN' />
             </>
           ) : null}
-          {open && !withCli ? <Meta>1. Choose Create project, above.</Meta> : null}
+          {open && !withCli ? <Meta>1. Choose New project, above.</Meta> : null}
           <Meta>
             {open ? "2" : "1"}. Open your project: its Library shows a token and the upload command.
           </Meta>
@@ -125,7 +125,7 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
         {projects.length === 0 ? (
           <EmptyState
             title="No projects yet"
-            description="Create your first project to start visual testing. Projects are free and unlimited."
+            description="Create your first project to start visual testing."
             action={newProject}
           />
         ) : (

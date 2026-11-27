@@ -3,6 +3,7 @@ import { BuildModel, ProjectModel, SnapshotModel } from "@storyshelf/core/models
 import { makeDatabase, makeStorage } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { stubAuth } from "../stub-auth.ts";
 
 type Db = ReturnType<typeof makeDatabase>["db"];
 
@@ -81,5 +82,36 @@ describe("project builds list", () => {
     const miss = await get("/projects/docs/builds?branch=nope", seedProject);
     expect(hit).toContain("<table");
     expect(miss).toContain("No builds match the current filter.");
+  });
+});
+
+/** A default install's app, with sign-in on and no admin token (the CLI cannot create a project). */
+async function getSignedInNoToken(path: string): Promise<string> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const user = { id: "user_1", email: "ada@example.com", name: "Ada", role: "admin" as const };
+  const app = createShelfApp({
+    database: db,
+    storage,
+    auth: stubAuth(user),
+    logger: createShelfLogger({ level: "silent" }),
+    config: { secret: "s" },
+  });
+  return await (await app.request(path)).text();
+}
+
+describe("first-run copy", () => {
+  it("names the one button New project on an empty overview, and drops the pricing sentence", async () => {
+    const html = await get("/projects");
+    expect(html).toContain("New project");
+    expect(html).not.toContain("Create project");
+    expect(html).not.toContain("free and unlimited");
+  });
+
+  it("tells a signed-in user with no admin token to choose New project, above", async () => {
+    const html = await getSignedInNoToken("/projects");
+    expect(html).toContain("1. Choose New project, above.");
+    expect(html).not.toContain("Choose Create project");
+    expect(html).not.toContain("free and unlimited");
   });
 });
