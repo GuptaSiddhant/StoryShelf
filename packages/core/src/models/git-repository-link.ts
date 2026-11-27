@@ -61,6 +61,36 @@ export function linkOutputsOf(link: Pick<GitRepositoryLinkRow, "outputs">): Stat
   return parseOutputs(link.outputs);
 }
 
+/**
+ * A new link row: `pending`, or `approved` (with the pins and outputs a move carries over) when
+ * `approved` is given. Not yet written; {@link GitRepositoryLinkModel.create} and a channel move
+ * insert it.
+ */
+export function newLinkRow(
+  input: GitRepositoryLinkInput,
+  key: LinkKey,
+  approved?: { approvedBy: string | null; pins?: GitLinkPins; outputs?: StateOutputs },
+): GitRepositoryLinkRow {
+  const now = new Date().toISOString();
+  return {
+    id: ulid(),
+    projectId: input.projectId,
+    connectionId: input.connectionId,
+    ...key,
+    hostRepositoryId: approved?.pins?.hostRepositoryId ?? null,
+    state: approved ? "approved" : "pending",
+    reason: null,
+    outputs: approved?.outputs ? JSON.stringify(approved.outputs) : "{}",
+    installationId: approved?.pins?.installationId ?? null,
+    requestedBy: input.requestedBy ?? null,
+    approvedBy: approved?.approvedBy ?? null,
+    approvedAt: approved ? now : null,
+    lastDeliveredAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 /** Data operations for repository links. */
 export class GitRepositoryLinkModel {
   readonly #db: DatabaseAdapter;
@@ -102,24 +132,10 @@ export class GitRepositoryLinkModel {
     key: LinkKey,
     approved: { approvedBy: string | null } | undefined,
   ): Promise<GitRepositoryLinkRow> {
-    const now = new Date().toISOString();
-    return (await this.#db.insert(this.#tables.gitRepositoryLinks, {
-      id: ulid(),
-      projectId: input.projectId,
-      connectionId: input.connectionId,
-      ...key,
-      hostRepositoryId: null,
-      state: approved ? "approved" : "pending",
-      reason: null,
-      outputs: "{}",
-      installationId: null,
-      requestedBy: input.requestedBy ?? null,
-      approvedBy: approved?.approvedBy ?? null,
-      approvedAt: approved ? now : null,
-      lastDeliveredAt: null,
-      createdAt: now,
-      updatedAt: now,
-    })) as unknown as GitRepositoryLinkRow;
+    return (await this.#db.insert(
+      this.#tables.gitRepositoryLinks,
+      newLinkRow(input, key, approved),
+    )) as unknown as GitRepositoryLinkRow;
   }
 
   /**

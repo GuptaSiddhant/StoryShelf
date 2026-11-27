@@ -21,7 +21,7 @@ import { respondWithForm } from "./form-response.tsx";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect, isHxRequest } from "./htmx.ts";
 import { notificationChannelModel } from "./scoped-models.ts";
-import { createGitChannel } from "./settings-git-channel.ts";
+import { refuseGitChannel } from "./settings-git-channel.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 
 /** Notifications settings (message and git channels plus my preferences). */
@@ -60,9 +60,8 @@ function parseChecks(form: FormData, name: string): string[] {
 async function handleCreateChannel(c: Context): Promise<Response> {
   const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
   const form = await c.req.formData();
-  const gitProvider = asString(form.get("gitProvider"));
-  return gitProvider
-    ? await createGitChannel(c, project, gitProvider, form)
+  return asString(form.get("gitProvider"))
+    ? await refuseGitChannel(c)
     : await createMessageChannel(c, project, form);
 }
 

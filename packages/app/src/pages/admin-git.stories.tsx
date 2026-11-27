@@ -108,6 +108,8 @@ const page = (overrides: Partial<AdminGitData> = {}): AdminGitData => ({
   requests: [pending, broken],
   anyRepository: false,
   origin: ORIGIN,
+  channels: [],
+  stopRelease: "0.19.0",
   ...overrides,
 });
 

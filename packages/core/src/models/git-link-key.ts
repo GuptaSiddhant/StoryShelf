@@ -53,6 +53,29 @@ export function channelHoldsKey(row: NotificationChannelRow, key: LinkKey): bool
 }
 
 /**
+ * The key a per-project git channel holds, the way a link stores it (the default prefix as the
+ * empty string), or null for a row that is not a project's git channel.
+ */
+export function channelKeyOf(row: NotificationChannelRow): LinkKey | null {
+  if (row.projectId === null || (row.provider !== "github" && row.provider !== "gitlab")) {
+    return null;
+  }
+  const config = parseConfig(row.config);
+  const owner = config["owner"];
+  const repo = config["repo"];
+  if (typeof owner !== "string" || typeof repo !== "string") {
+    return null;
+  }
+  const prefix = effectivePrefix(config["prefix"]);
+  return linkKeyOf({
+    host: channelHost(row.provider, config),
+    owner,
+    repo,
+    prefix: prefix === DEFAULT_STATUS_PREFIX ? "" : prefix,
+  });
+}
+
+/**
  * The host a connection's API answers on, lower case: a GitHub App's API base (api.github.com by
  * default) or a GitLab origin (gitlab.com by default). Links of the connection carry it.
  */

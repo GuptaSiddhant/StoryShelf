@@ -273,3 +273,16 @@ export const NoneOfferedRefusedForm = pageStory(() =>
     },
   ),
 );
+
+/** A project with per-project git channels left: the warning names the release they stop in. */
+export const GitChannelsStopping = pageStory(() =>
+  settingsPage({
+    notificationChannels: [githubChannel, { ...githubChannel, id: "01JD000000000000000000CHN004" }],
+    notifyProviders: providers,
+    mySubscription: subscribed,
+    isAdmin: false,
+  }),
+);
+
+/** No git channel: a project admin is pointed to Settings › Git, never offered a channel form. */
+export const GitThroughRepositoryLinks = pageStory(() => oneChannel(slackChannel));

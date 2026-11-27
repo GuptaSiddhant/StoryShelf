@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { NotifierProvider } from "../adapters/notifier/index.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { overrideOutboundResolver } from "../utils/outbound.ts";
+import { GIT_CHANNELS_CLOSED } from "./git-channel.ts";
 import { NotificationChannelModel } from "./notification-channel.ts";
 
 const TEST_SECRET = "test-server-secret-32-chars-long!!";
@@ -117,7 +118,7 @@ describe("NotificationChannelModel", () => {
     });
   });
 
-  it("requires a project and a token for state (git) providers", async () => {
+  it("refuses every new state (git) channel, pointing a project to the server's connection", async () => {
     const git = {
       metadata: { kind: "github", delivery: "state", schema: z.object({ owner: z.string() }) },
     } as unknown as NotifierProvider;
@@ -127,19 +128,17 @@ describe("NotificationChannelModel", () => {
         projectId: "p1",
         hasSecret: true,
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: false, field: "provider", message: GIT_CHANNELS_CLOSED });
     expect(
       await NotificationChannelModel.validateInput([git], "github", config, {
         projectId: null,
         hasSecret: true,
       }),
-    ).toMatchObject({ ok: false, field: "provider" });
-    expect(
-      await NotificationChannelModel.validateInput([git], "github", config, {
-        projectId: "p1",
-        hasSecret: false,
-      }),
-    ).toMatchObject({ ok: false, field: "secret" });
+    ).toMatchObject({ ok: false, field: "provider", message: "Git channels belong to a project" });
+    // An edit passes no scope: an existing channel keeps working until it is moved.
+    expect(await NotificationChannelModel.validateInput([git], "github", config)).toEqual({
+      ok: true,
+    });
     expect(NotificationChannelModel.isStateKind([git], "github")).toBe(true);
     expect(NotificationChannelModel.isStateKind([git], "slack")).toBe(false);
   });

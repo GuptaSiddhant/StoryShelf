@@ -26,6 +26,7 @@ import {
   Absent,
   valueWithUnit,
 } from "../ui/components.tsx";
+import { GitChannelsWarning } from "./admin-git-channels.tsx";
 import { UnverifiedDefaultNotice, type UnverifiedDefaultProject } from "./admin-system-branch.tsx";
 import { IntegrationsCard, type IntegrationsView } from "./admin-system-integrations.tsx";
 import { PublicOriginCard, type PublicOriginView } from "./admin-system-origin.tsx";
@@ -64,6 +65,8 @@ export interface AdminSystemData {
   unverifiedDefault?: readonly UnverifiedDefaultProject[] | undefined;
   /** Integrations and whether projects are offered them (issue #1126); omitted when none is known. */
   integrations?: IntegrationsView | undefined;
+  /** Per-project git channels not yet moved, and the release they stop in (ADR 0054, decision 8). */
+  gitChannels?: { count: number; release: string } | undefined;
 }
 
 /** What the deployment has paused and why: notifications (no public URL) and build retention. */
@@ -404,6 +407,11 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
         actions={<SystemActions aiEnabled={data.aiEnabled === true} />}
       />
       <PausedNotices data={data} />
+      {data.gitChannels && data.gitChannels.count > 0 ? (
+        <div>
+          <GitChannelsWarning {...data.gitChannels} href="/admin/git" />
+        </div>
+      ) : null}
       <TestingNotice data={data} />
       <ServerFacts data={data} />
       <CaptureCards data={data} />

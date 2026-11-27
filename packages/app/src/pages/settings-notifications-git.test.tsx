@@ -1,62 +1,39 @@
 import type { Project } from "@storyshelf/core/schema";
 import { Hono } from "hono";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { runWithStore, type Store } from "../store.ts";
-import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
+import { describe, expect, it } from "vitest";
+import { ProjectGitChannelsNotice } from "./settings-notifications-git.tsx";
 
 const project = { slug: "docs" } as Project;
-const providers = [{ kind: "github", name: "GitHub", delivery: "state" }] as never;
-const store = { sessionId: "s", config: { secret: "test-secret" } } as unknown as Store;
 
-async function render(): Promise<string> {
+async function render(channels: number): Promise<string> {
   const app = new Hono();
-  app.get("/", async (c) => {
-    return await runWithStore(
-      store,
-      async () =>
-        await c.html(
-          <body>
-            <CreateGitChannelCard project={project} providers={providers} />
-          </body>,
-        ),
-    );
-  });
+  app.get(
+    "/",
+    async (c) =>
+      await c.html(
+        <body>
+          <ProjectGitChannelsNotice project={project} channels={channels} />
+        </body>,
+      ),
+  );
   return await (await app.request("/")).text();
 }
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
-describe("CreateGitChannelCard", () => {
-  it("names the statuses the prefix creates", async () => {
-    expect(await render()).toContain("&lt;prefix&gt;/storybook");
+describe("ProjectGitChannelsNotice", () => {
+  it("warns about the remaining channels and names the release in which they stop", async () => {
+    const html = await render(2);
+    expect(html).toContain("These 2 git channels stop posting in 0.19.0");
+    expect(html).toContain("System › Git");
+    expect(html).not.toContain('name="privateKey"');
   });
 
-  it("offers a GitHub Enterprise Server API base and points at the operator allowlist", async () => {
-    const html = await render();
-    expect(html).toContain('name="apiUrl"');
-    expect(html).toContain("outbound.allowHosts");
+  it("names one channel in the singular", async () => {
+    expect(await render(1)).toContain("This git channel stops posting in 0.19.0");
   });
 
-  it("offers GitHub App check runs next to commit statuses, with the key as a separate field", async () => {
-    const html = await render();
-    expect(html).toContain("Check runs (GitHub App)");
-    expect(html).toContain('name="appId"');
-    expect(html).toContain('name="installationId"');
-    expect(html).toContain('name="privateKey"');
-    expect(html).toContain("storyshelf protect");
-  });
-
-  it("says state is delivered inline on a host with no job consumer", async () => {
-    vi.stubEnv("VERCEL", "1");
-    expect(await render()).toContain("Statuses are delivered inline");
-  });
-
-  it("stays quiet on a long-running host", async () => {
-    vi.stubEnv("VERCEL", "");
-    vi.stubEnv("NETLIFY", "");
-    vi.stubEnv("AWS_LAMBDA_FUNCTION_NAME", "");
-    expect(await render()).not.toContain("delivered inline");
+  it("points a project without channels to its repository links, offering no channel form", async () => {
+    const html = await render(0);
+    expect(html).toContain('href="/projects/docs/settings/git"');
+    expect(html).not.toContain("<form");
   });
 });

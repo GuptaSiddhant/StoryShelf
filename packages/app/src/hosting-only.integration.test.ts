@@ -93,7 +93,7 @@ describe("hosting-only navigation", () => {
 });
 
 describe("hosting-only git channels", () => {
-  it("offers the git channel form: a hosting-only instance still shows the Storybook status", async () => {
+  it("points git hosts to repository links: a hosting-only instance still shows the Storybook status", async () => {
     const { db } = makeDatabase();
     const { slug } = await seedSnapshot(db);
     const { storage } = makeStorage();
@@ -104,7 +104,8 @@ describe("hosting-only git channels", () => {
       notifications: { notifiers: [makeFakeStateNotifier("github-a").provider] },
     });
     const html = await (await app.request(`/projects/${slug}/settings/review`)).text();
-    expect(html).toContain("Add a git channel");
+    expect(html).toContain(`/projects/${slug}/settings/git`);
+    expect(html).not.toContain("Add a git channel");
     await app.lifecycle.teardown();
   });
 });

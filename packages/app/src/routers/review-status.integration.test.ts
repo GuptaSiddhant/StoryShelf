@@ -3,6 +3,7 @@ import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/co
 import { pino } from "pino";
 import { describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { seedGitChannel } from "../test-git-channel.ts";
 import { stubRunner } from "../test-runner.ts";
 
 const T1 = "2026-01-01T00:00:00.000Z";
@@ -110,16 +111,12 @@ async function setup(storyCount = 2) {
     logger: pino({ level: "info" }, logSink),
   });
   await bootReplay;
-  const created = await app.request("/api/v1/projects/gate/notification-channels", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      provider: "fake-host",
-      config: { owner: "acme", repo: "widgets" },
-      secret: "t",
-    }),
+  await seedGitChannel(db, {
+    project: "gate",
+    provider: "fake-host",
+    config: { owner: "acme", repo: "widgets" },
+    secret: "t",
   });
-  expect(created.status).toBe(201);
   const post = async (path: string) =>
     await app.request(`/api/v1/projects/gate/builds/f1/${path}`, { method: "POST" });
   /** The commit statuses shown so far (the comment writes are not part of this gate). */

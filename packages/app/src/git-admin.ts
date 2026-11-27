@@ -6,6 +6,7 @@
 import { gitConnectionHealth, type GitConnectionHealth } from "@storyshelf/core/integrations";
 import {
   anyRepositoryLinkAllowed,
+  GIT_CHANNELS_STOP_RELEASE,
   GitConnectionModel,
   GitRepositoryLinkModel,
   ProjectModel,
@@ -15,6 +16,7 @@ import {
 import type { GitRepositoryLinkRow } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import { credentialKeys } from "./credential-keys.ts";
+import { loadGitChannelViews } from "./git-channels-admin.ts";
 import { notificationOrigin } from "./notifications-pause.ts";
 import type {
   AdminGitData,
@@ -49,6 +51,8 @@ export async function loadAdminGitData(): Promise<AdminGitData> {
     requests: await requestViews(links, connections),
     anyRepository: await anyRepositoryLinkAllowed(new SiteSettingsModel(store.db)),
     origin: await confirmedOrigin(store),
+    channels: await loadGitChannelViews(connections),
+    stopRelease: GIT_CHANNELS_STOP_RELEASE,
   };
 }
 

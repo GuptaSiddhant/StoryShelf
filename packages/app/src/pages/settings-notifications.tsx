@@ -23,7 +23,7 @@ import { ADD_CHANNEL_DIALOG, EDIT_CHANNEL_DIALOG, type ChannelKind } from "./cha
 import { FormDialog } from "./dialog-form.tsx";
 import { UnofferedNotice, type UnofferedIntegrationView } from "./integrations-unoffered.tsx";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
-import { CreateGitChannelCard } from "./settings-notifications-git.tsx";
+import { ProjectGitChannelsNotice } from "./settings-notifications-git.tsx";
 
 /** A wired provider as offered by the create forms. */
 export interface SettingsNotifyProvider {
@@ -379,12 +379,16 @@ export function renderSettingsNotifications(
   }
   const messageProviders = providers.filter((provider) => provider.delivery === "message");
   const gitProviders = providers.filter((provider) => provider.delivery === "state");
+  const gitChannels = channels.filter((channel) => channel.delivery === "state").length;
   // The personal card's switches are about email: it shows only while email is offered.
   const personal = providers.some((provider) => provider.kind === "email");
   return (
     <VStack>
       <UnofferedNotice area="Some integrations are" integrations={unoffered} />
       <NotificationsPausedNotice paused={paused} />
+      {gitProviders.length > 0 && (isAdmin || gitChannels > 0) ? (
+        <ProjectGitChannelsNotice project={project} channels={gitChannels} />
+      ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       {personal ? <MyNotificationsCard project={project} mySubscription={mySubscription} /> : null}
       <ChannelsSection
@@ -394,9 +398,6 @@ export function renderSettingsNotifications(
         isAdmin={isAdmin}
         paused={paused === true}
       />
-      {isAdmin && gitProviders.length > 0 ? (
-        <CreateGitChannelCard project={project} providers={gitProviders} formState={formState} />
-      ) : null}
     </VStack>
   );
 }

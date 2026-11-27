@@ -1,6 +1,7 @@
 /**
  * System → Git (ADR 0054): the page, the operator switch and removing a stored connection. The
- * connect flows live in `admin-git-connect.ts`, the link requests in `admin-git-links.ts`. Every
+ * connect flows live in `admin-git-connect.ts`, the link requests in `admin-git-links.ts`, the
+ * per-project channel moves in `admin-git-channels.tsx`. Every
  * route is a site-admin page classed `hosting` (git delivery works with testing off), and every
  * write is under `CSRF_PATHS` (`/admin/git/*`).
  */
@@ -16,6 +17,7 @@ import type { ShelfRouter } from "../app-types.ts";
 import { gitConnectionModel, loadAdminGitData } from "../git-admin.ts";
 import { renderAdminGitPage } from "../pages/admin-git.tsx";
 import { getStore } from "../store.ts";
+import { registerGitChannelMoves } from "./admin-git-channels.tsx";
 import { registerGitConnect } from "./admin-git-connect.ts";
 import { registerGitLinkRequests } from "./admin-git-links.tsx";
 import { flash } from "./flash.ts";
@@ -32,6 +34,7 @@ export function registerAdminGit(app: ShelfRouter): void {
   app.post(`${ADMIN_GIT_PATH}/connections/:id/remove`, handleRemove);
   registerGitConnect(app);
   registerGitLinkRequests(app);
+  registerGitChannelMoves(app);
 }
 
 async function handlePage(c: Context): Promise<Response> {
