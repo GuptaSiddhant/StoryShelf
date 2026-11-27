@@ -26,6 +26,7 @@ import {
   storeUploadStream,
 } from "./builds.handlers.ts";
 import { discardZip, planUpload, publishUpload } from "./publish-upload.ts";
+import { withUploadStorage } from "./upload-storage-errors.ts";
 
 /** SHA-256 of the manifest with its paths sorted, so the same files hash the same in any order. */
 function manifestHash(manifest: Record<string, string>): string {
@@ -52,10 +53,12 @@ async function publishManifest(
   }
   try {
     await recordUses(projectId, buildId, files);
-    await getStore().storage.write(
-      `${projectId}/builds/${buildId}/storybook/manifest.json`,
-      Buffer.from(JSON.stringify(manifest)),
-    );
+    await withUploadStorage("manifest", buildId, async () => {
+      await getStore().storage.write(
+        `${projectId}/builds/${buildId}/storybook/manifest.json`,
+        Buffer.from(JSON.stringify(manifest)),
+      );
+    });
     // The files are stored content-addressed: nothing to extract, so publishing is complete.
     await getStore().publish?.completer.complete(buildId, { ok: true });
   } catch (error) {
@@ -202,12 +205,14 @@ export function registerBuilds(app: ShelfRouter): void {
       });
     }
     const maxBytes = getStore().config.maxUploadBytes ?? DEFAULT_MAX_UPLOAD_BYTES;
-    const zipBytes = await storeUploadStream(
-      getStore().storage,
-      storybookZipPath(project.id, build.id),
-      c.req.raw.body,
-      maxBytes,
-    );
+    const zipBytes = await withUploadStorage("zip", build.id, async () => {
+      return await storeUploadStream(
+        getStore().storage,
+        storybookZipPath(project.id, build.id),
+        c.req.raw.body,
+        maxBytes,
+      );
+    });
     const route = await planOrDiscard(zipBytes, project.id, build.id);
     const reqId = c.get("requestId");
     const published = await publishUpload(route, build, reqId);
@@ -240,7 +245,9 @@ export function registerBuilds(app: ShelfRouter): void {
       const files = await verifiedUploads(await c.req.formData());
       for (const { hash, buffer } of files) {
         // oxlint-disable-next-line no-await-in-loop -- one write at a time keeps the order stable
-        await getStore().storage.write(contentKey(hash), buffer);
+        await withUploadStorage("content", buildId, async () => {
+          await getStore().storage.write(contentKey(hash), buffer);
+        });
       }
       await recordUses(
         project.id,
@@ -254,7 +261,9 @@ export function registerBuilds(app: ShelfRouter): void {
       refuseInvalidHash(hash);
       const buffer = Buffer.from(await c.req.arrayBuffer());
       refuseMismatch(hash, buffer);
-      await getStore().storage.write(contentKey(hash), buffer);
+      await withUploadStorage("content", buildId, async () => {
+        await getStore().storage.write(contentKey(hash), buffer);
+      });
       await recordUses(project.id, buildId, [{ hash }], new Map([[hash, buffer.length]]));
     }
     return c.json({ ok: true });
