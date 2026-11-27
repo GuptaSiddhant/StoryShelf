@@ -19,6 +19,7 @@ import {
   Disclosure,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
+import { cliCreateAvailable } from "./cli-create.ts";
 import { ProjectCard, type ProjectSummary } from "./projects-card.tsx";
 const projectGrid = css`
   /* project-grid */
@@ -43,16 +44,18 @@ async function summarize(project: Project): Promise<ProjectSummary> {
 
 /** Copy-ready steps to get a first build uploaded; `create` is suggested only while no project exists. */
 function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
+  const withCli = cliCreateAvailable();
   return (
     <Card>
       <Disclosure variant="inline" title="Set up your first upload" open={open}>
         <VStack>
-          {open ? (
+          {open && withCli ? (
             <>
               <Meta>1. Create a project (writes .storybook/storyshelf.json for later runs).</Meta>
               <CodeBlock code='npx storyshelf create --url http://localhost:3000 --name "My Storybook" --token $SHELF_ADMIN_TOKEN' />
             </>
           ) : null}
+          {open && !withCli ? <Meta>1. Choose Create project, above.</Meta> : null}
           <Meta>
             {open ? "2" : "1"}. Open your project: its Library shows a token and the upload command.
           </Meta>

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -145,5 +145,27 @@ describe("gitRepoStatus", () => {
 
   it("reports no-git outside a repository", () => {
     expect(gitRepoStatus(tmpdir())).toBe("no-git");
+  });
+});
+
+describe("outside a git checkout", () => {
+  it("prints nothing on stderr while detecting", () => {
+    const bare = realpathSync(mkdtempSync(join(tmpdir(), "storyshelf-affected-nogit-")));
+    try {
+      const script = `
+        import { gitRepoStatus, gitHeadSha, gitBranchName, gitRepoRoot } from ${JSON.stringify(new URL("./git.ts", import.meta.url).href)};
+        const cwd = ${JSON.stringify(bare)};
+        gitRepoStatus(cwd); gitHeadSha(cwd); gitBranchName(cwd); gitRepoRoot(cwd);
+      `;
+      const result = spawnSync(process.execPath, ["--input-type=module", "--eval", script], {
+        cwd: bare,
+        encoding: "utf8",
+        env: { ...process.env, GIT_CEILING_DIRECTORIES: tmpdir() },
+      });
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+    } finally {
+      rmSync(bare, { recursive: true, force: true });
+    }
   });
 });
