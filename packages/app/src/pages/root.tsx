@@ -2,7 +2,7 @@ import type { FC } from "hono/jsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { Button, Card, Command, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
-import { cliCreateAvailable } from "./cli-create.ts";
+import { cliCreateAvailable, leadWithCreateProject } from "./cli-create.ts";
 
 /** Landing hero card: card surface with centered marketing padding. */
 const heroCard = css`
@@ -34,6 +34,7 @@ const heroDesc = css`
 /** The welcome card: the pitch, the two entry buttons and the CLI tip. */
 const Hero: FC = () => {
   const viaCli = cliCreateAvailable();
+  const createFirst = leadWithCreateProject();
   return (
     <div class={heroCard}>
       <h1 class={heroTitle}>Welcome to StoryShelf</h1>
@@ -43,10 +44,10 @@ const Hero: FC = () => {
       </p>
       <VStack>
         <HStack justify="center">
-          <Button variant={viaCli ? "primary" : "secondary"} href="/projects">
+          <Button variant={createFirst ? "secondary" : "primary"} href="/projects">
             View projects
           </Button>
-          <Button variant={viaCli ? "secondary" : "primary"} href="/projects/new">
+          <Button variant={createFirst ? "primary" : "secondary"} href="/projects/new">
             Create project
           </Button>
         </HStack>

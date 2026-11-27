@@ -153,7 +153,7 @@ describe("outside a git checkout", () => {
     const bare = realpathSync(mkdtempSync(join(tmpdir(), "storyshelf-affected-nogit-")));
     try {
       const script = `
-        import { gitRepoStatus, gitHeadSha, gitBranchName, gitRepoRoot } from ${JSON.stringify(join(import.meta.dirname, "git.ts"))};
+        import { gitRepoStatus, gitHeadSha, gitBranchName, gitRepoRoot } from ${JSON.stringify(new URL("./git.ts", import.meta.url).href)};
         const cwd = ${JSON.stringify(bare)};
         gitRepoStatus(cwd); gitHeadSha(cwd); gitBranchName(cwd); gitRepoRoot(cwd);
       `;

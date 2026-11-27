@@ -8,3 +8,8 @@ export function cliCreateAvailable(): boolean {
   const { authEnabled, config } = getStore();
   return !authEnabled || Boolean(config.adminToken);
 }
+
+/** With sign-in on, the home page leads with "Create project", whether or not the CLI could do it. */
+export function leadWithCreateProject(): boolean {
+  return getStore().authEnabled;
+}
