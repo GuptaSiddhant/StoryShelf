@@ -133,11 +133,10 @@ export function renderGitHubFlowEnded(data: { message: string }): RenderedConten
       <Alert tone="warning" title="This setup cannot be finished">
         {data.message}
       </Alert>
-      <div class="mt-1">
-        <Button variant="secondary" href="/admin/git/connections/new">
-          Start again
-        </Button>
-      </div>
+
+      <Button variant="secondary" href="/admin/git/connections/new">
+        Start again
+      </Button>
     </FlowPage>
   );
 }

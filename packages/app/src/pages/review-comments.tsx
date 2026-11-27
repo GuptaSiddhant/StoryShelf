@@ -85,7 +85,7 @@ function CommentForm(props: {
   const { project, build, storyId } = props;
   const url = `/projects/${project.slug}/builds/${build.id}/comments`;
   return (
-    <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1 max-w-prose">
+    <form method="post" action={url} hx-post={url} hx-target="body" class="max-w-prose">
       {csrfField()}
       <VStack>
         {storyId ? <input type="hidden" name="storyId" value={storyId} /> : null}

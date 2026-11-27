@@ -55,7 +55,7 @@ function reachesAppState(specifier: string): boolean {
 }
 
 const PAGE_UI_IMPORTS = /^\.\.\/ui\/(?:components\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)$/u;
-const PAGE_SHELL_IMPORTS = /^\.\.\/shell\/(?:document|csrf-field)\.tsx$/u;
+const PAGE_SHELL_IMPORTS = /^\.\.\/shell\/(?:document|csrf-field|form-page)\.tsx$/u;
 
 /** A page import that bypasses the facade, or reaches a shell module other than document and csrf-field. */
 function breaksPageContract(specifier: string): boolean {
@@ -371,6 +371,11 @@ describe("type and colour tokens", () => {
   it("draws no small solid danger button (a row action is danger-secondary)", async () => {
     const solid = /<Button\b(?=[^>]*variant="danger")(?=[^>]*size="sm")[^>]*>/gu;
     expect(await offendersOf(solid, /^ui\//u)).toEqual([]);
+  });
+
+  it("spaces page blocks with the page column and stacks, not margin wrappers", async () => {
+    // `.mt-1` / `.mb-1` inside the page column or a card doubled the gap (32 px, #1286 L4).
+    expect(await offendersOf(/class="(?:[\w-]+ )*m[tb]-1(?: [\w-]+)*"/gu, /^ui\//u)).toEqual([]);
   });
 
   it("formats no date by slicing an ISO string in pages or the shell", async () => {

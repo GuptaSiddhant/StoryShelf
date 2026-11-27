@@ -101,17 +101,16 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
             </Meta>
           </summary>
           {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
-          <div class="mt-1">
-            <VStack>
-              {logs.map((line): Rendered => (
-                <HStack key={line.id} align="baseline" wrap={false}>
-                  <Badge tone={logTone(line.level)}>{statusLabel(line.level)}</Badge>
-                  <span>{line.message}</span>
-                  {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
-                </HStack>
-              ))}
-            </VStack>
-          </div>
+
+          <VStack>
+            {logs.map((line): Rendered => (
+              <HStack key={line.id} align="baseline" wrap={false}>
+                <Badge tone={logTone(line.level)}>{statusLabel(line.level)}</Badge>
+                <span>{line.message}</span>
+                {line.fields ? <Meta as="code">{line.fields}</Meta> : null}
+              </HStack>
+            ))}
+          </VStack>
         </details>
       ))}
     </Card>

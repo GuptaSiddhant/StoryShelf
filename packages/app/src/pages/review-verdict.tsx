@@ -180,7 +180,7 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
   const url = `/projects/${project.slug}/builds/${build.id}/reviews`;
   const open = openChangeRequests(props.data).length;
   return (
-    <form method="post" action={url} hx-post={url} hx-target="body" class="mt-1 max-w-prose">
+    <form method="post" action={url} hx-post={url} hx-target="body" class="max-w-prose">
       {csrfField()}
       <VStack>
         <TextareaField

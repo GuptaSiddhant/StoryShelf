@@ -67,45 +67,43 @@ function UndeliveredChannels(props: {
     return null;
   }
   return (
-    <div class="mt-1">
-      <VStack>
-        <SectionTitle level={3}>Channels not delivered to</SectionTitle>
-        <Meta>
-          These channels are kept, but hidden from their project and not delivered to while their
-          integration is not offered. Turning it back on brings them back.
-        </Meta>
-        <Table label="Channels not delivered to">
-          <table>
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Provider</th>
-                <th>Reason</th>
+    <VStack>
+      <SectionTitle level={3}>Channels not delivered to</SectionTitle>
+      <Meta>
+        These channels are kept, but hidden from their project and not delivered to while their
+        integration is not offered. Turning it back on brings them back.
+      </Meta>
+      <Table label="Channels not delivered to">
+        <table>
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Provider</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {channels.map((channel) => (
+              <tr key={channel.id}>
+                <td>
+                  {channel.project === null ? (
+                    <Meta as="span">site-wide</Meta>
+                  ) : (
+                    <a href={channel.project.href}>{channel.project.name}</a>
+                  )}
+                </td>
+                <td>
+                  <Badge tone="neutral">{channel.providerName}</Badge>
+                </td>
+                <td>
+                  <Meta as="span">{channel.reason}</Meta>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {channels.map((channel) => (
-                <tr key={channel.id}>
-                  <td>
-                    {channel.project === null ? (
-                      <Meta as="span">site-wide</Meta>
-                    ) : (
-                      <a href={channel.project.href}>{channel.project.name}</a>
-                    )}
-                  </td>
-                  <td>
-                    <Badge tone="neutral">{channel.providerName}</Badge>
-                  </td>
-                  <td>
-                    <Meta as="span">{channel.reason}</Meta>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Table>
-      </VStack>
-    </div>
+            ))}
+          </tbody>
+        </table>
+      </Table>
+    </VStack>
   );
 }
 

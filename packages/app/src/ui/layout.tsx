@@ -92,6 +92,10 @@ const pageHeaderMeta = css`
   align-items: center;
   flex-wrap: wrap;
   font-variant-numeric: tabular-nums;
+  /* A date never breaks across lines while the line has room: wrap between items instead. */
+  & time {
+    white-space: nowrap;
+  }
 `;
 
 const pageHeaderActions = css`

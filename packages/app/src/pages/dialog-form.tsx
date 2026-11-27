@@ -2,9 +2,9 @@ import type { Project } from "@storyshelf/core/schema";
 import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
-import { DocumentLayout } from "../shell/document.tsx";
+import { FormPage } from "../shell/form-page.tsx";
 import { getStore } from "../store.ts";
-import { Button, Dialog, FormActions, PageHeader } from "../ui/components.tsx";
+import { Button, Dialog, FormActions } from "../ui/components.tsx";
 import { TAB_LABELS, type SettingsTab } from "./settings-tabs.ts";
 
 /** What a form of a dialog needs: its dialog id, where it posts and the label of its save button. */
@@ -89,18 +89,17 @@ export const FormDialog: FC<{
   );
 };
 
-/** The one frame of a form page: header, then the form in a readable column. */
+/** The one frame of a form page: header, then the form in the shared form-page column. */
 function formPage(
   title: string,
-  nav: Parameters<typeof DocumentLayout>[0]["nav"],
+  nav: Parameters<typeof FormPage>[0]["nav"],
   pageTitle: string,
   form: unknown,
 ): unknown {
   return (
-    <DocumentLayout layout="form" title={pageTitle} nav={nav}>
-      <PageHeader title={title} />
+    <FormPage title={title} tabTitle={pageTitle} nav={nav}>
       {form}
-    </DocumentLayout>
+    </FormPage>
   );
 }
 

@@ -96,11 +96,11 @@ function LabelTypesCard(props: {
         Labels attach typed values to builds (e.g. pr=123, jira=ABC-123). Values link out via the
         template.
       </Meta>
-      <div class="mt-1">
-        <Button variant="secondary" size="sm" href={browseUrl}>
-          Browse labels
-        </Button>
-      </div>
+
+      <Button variant="secondary" size="sm" href={browseUrl}>
+        Browse labels
+      </Button>
+
       <Table label="Label types">
         <table>
           <thead>

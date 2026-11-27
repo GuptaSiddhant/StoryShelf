@@ -443,6 +443,26 @@ export const Meta: FC<{
   return <p class={cls}>{children}</p>;
 };
 
+const liveStatus = css`
+  /* live-status */
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  /* Empty until a script writes a message, and then it takes no room (no blank band). */
+  &:empty {
+    display: none;
+  }
+`;
+
+/**
+ * A polite live region a script fills with progress or an error. `hook` names its
+ * `data-<hook>` attribute. It is hidden while empty, so it adds no gap to the stack around it.
+ */
+export const LiveStatus: FC<{ hook: string }> = ({ hook }) => {
+  const attrs = { [`data-${hook}`]: "true" };
+  return <p class={liveStatus} aria-live="polite" {...attrs} />;
+};
+
 /** The one rendering of an absent value: a dash for sight, "none" for a screen reader. */
 export const Absent: FC = () => (
   <>

@@ -260,11 +260,10 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
           checked={props.on}
           hint="On: a link a project admin asks for is approved at once when the connection covers it. Off: a site admin approves each one. Turning it off keeps existing links."
         />
-        <div class="mt-1">
-          <Button type="submit" variant="primary">
-            Save
-          </Button>
-        </div>
+
+        <Button type="submit" variant="primary">
+          Save
+        </Button>
       </form>
     </Card>
   );
@@ -275,13 +274,11 @@ function OriginNotice(props: {
   origin: string | null;
 }): HtmlEscapedString | Promise<HtmlEscapedString> | null {
   return props.origin === null ? (
-    <div class="mb-1">
-      <Alert tone="warning" title="Connect GitHub needs a public origin">
-        GitHub returns to this server's public address, and none is confirmed yet. Confirm it on the{" "}
-        <a href="/admin">System page</a>, or set <code>SHELF_PUBLIC_BASE_URL</code>. An existing App
-        and a GitLab token can still be added.
-      </Alert>
-    </div>
+    <Alert tone="warning" title="Connect GitHub needs a public origin">
+      GitHub returns to this server's public address, and none is confirmed yet. Confirm it on the{" "}
+      <a href="/admin">System page</a>, or set <code>SHELF_PUBLIC_BASE_URL</code>. An existing App
+      and a GitLab token can still be added.
+    </Alert>
   ) : null;
 }
 
@@ -298,12 +295,10 @@ export function renderAdminGitPage(data: AdminGitData): RenderedContent {
       />
       <OriginNotice origin={data.origin} />
       <ConnectionsCard data={data} />
-      <div class="mt-1">
-        <RequestsCard requests={data.requests} />
-      </div>
-      <div class="mt-1">
-        <SwitchCard on={data.anyRepository} />
-      </div>
+
+      <RequestsCard requests={data.requests} />
+
+      <SwitchCard on={data.anyRepository} />
     </DocumentLayout>
   );
 }
