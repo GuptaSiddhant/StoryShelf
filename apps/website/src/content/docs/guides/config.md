@@ -57,7 +57,7 @@ flags (--url/--slug/--build-dir) > env (SHELF_URL/SLUG/TOKEN) > file (.storybook
 ```
 
 - `token` **never** stored in file — a `token` key is refused with an error. Use `SHELF_TOKEN` (project) or `SHELF_ADMIN_TOKEN` (site-admin for `create`/`purge`); `--token` works but warns, because arguments show in the process list.
-- `sha`/`branch` resolve per field as flags > the CI provider (GitHub Actions, GitLab CI, Vercel, Netlify, CircleCI, Buildkite, Bitbucket Pipelines, Azure Pipelines, Jenkins: see [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from); on a pull request the PR head, not the merge commit) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Uploading without git](/guides/without-git/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
+- `sha`/`branch` resolve per field as flags > the CI provider (on a pull request the PR head, not the merge commit; see [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from)) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Uploading without git](/guides/without-git/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
 
 ## Monorepo
 

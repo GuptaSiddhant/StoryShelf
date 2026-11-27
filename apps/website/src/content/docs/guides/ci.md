@@ -11,7 +11,7 @@ Run this once on your machine and commit the file it writes:
 npx storyshelf init --url https://shelf.example.com --slug my-design-system
 ```
 
-`init` writes `.storybook/storyshelf.json` (url and slug, no secret). From then on a CI step is just `npx storyshelf` with the token in the environment. Bare `storyshelf` is the same command as `storyshelf upload`; it runs when that file exists and otherwise prints help.
+`init` writes `.storybook/storyshelf.json` (url and slug, no secret). A CI step is then just `npx storyshelf` with the token in the environment: bare `storyshelf` is `storyshelf upload`, and runs when that file exists.
 
 ## GitHub Actions
 
@@ -41,21 +41,11 @@ jobs:
         run: echo "Storybook build: $BUILD_URL" >> "$GITHUB_STEP_SUMMARY"
 ```
 
-The upload step needs no `--sha` or `--branch`, and no `ref:` on the checkout. `storyshelf` reads the run's own environment and the event file GitHub writes (`GITHUB_EVENT_PATH`):
-
-| Event                                | Commit                                  | Branch                              |
-| ------------------------------------ | --------------------------------------- | ----------------------------------- |
-| `pull_request`, `pull_request_target` | the PR head (`pull_request.head.sha`)   | `GITHUB_HEAD_REF`                   |
-| `push`                               | `GITHUB_SHA`                            | `GITHUB_REF_NAME` (the tag for a tag) |
-| `merge_group`                        | the queue's head (`merge_group.head_sha`) | the branch it merges into           |
-
-On a pull request GitHub's own `GITHUB_SHA` is a temporary merge commit and `GITHUB_REF_NAME` is `<n>/merge`; neither is used, so builds and statuses land on the commit and branch the PR shows. The commit message and author come from `git log` on that commit (hence `fetch-depth: 0`). `storyshelf doctor` and `storyshelf upload --verbose` (flags go on `upload`) list every value with where it came from. The token is the only secret: keep it in `SHELF_TOKEN`, never in `--token` (arguments show in the process list) and never in `.storybook/storyshelf.json`, which is refused when it holds a `token` key.
+The step needs no `--sha`, `--branch` or `ref:` on the checkout. On a pull request GitHub's `GITHUB_SHA` is a temporary merge commit and `GITHUB_REF_NAME` is `<n>/merge`, so `storyshelf` reads the PR head commit and branch from the event file instead (`GITHUB_EVENT_PATH`), and builds and statuses land on what the PR shows. Pushes, tags and merge queues are covered; see [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from). The message and author come from `git log` on that commit (hence `fetch-depth: 0`). `storyshelf doctor` and `storyshelf upload --verbose` list every value with its source. Keep the token in `SHELF_TOKEN`, never in `--token` or the config file.
 
 On GitHub Actions the upload step sets the outputs `build-id` and `build-url` (read them through `env`, as above). Elsewhere, `storyshelf upload --json` prints `{ "buildId", "url", "status", "skipped" }` on stdout, with every other message on stderr: `npx storyshelf upload --json | jq -r .url`. See [Machine-readable output](/guides/cli/client/#machine-readable-output).
 
 Run `npx storyshelf doctor` after the build to check the setup before uploading. It reports a shallow clone or a missing `preview-stats.json` as a **warning** (the upload still works, rendering every story); fail the step on a warning if you want affected capture to be a requirement. `upload` itself also warns on a shallow clone and never fails because of it.
-
-`SHELF_URL` and `SHELF_SLUG`, when set, take precedence over the committed file (an empty value counts as unset); the token is the only variable a pipeline needs.
 
 ## GitLab CI
 
@@ -69,11 +59,7 @@ visual:
     - npx storyshelf
 ```
 
-A merge request pipeline uploads the source branch (`CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`) and its head commit (`CI_MERGE_REQUEST_SOURCE_BRANCH_SHA` when GitLab sets it, else `CI_COMMIT_SHA`); a branch pipeline uses `CI_COMMIT_SHA` and `CI_COMMIT_REF_NAME`. The url and slug come from the committed `.storybook/storyshelf.json`.
-
-## Other CI providers
-
-The same two lines work on Vercel, Netlify, CircleCI, Buildkite, Bitbucket Pipelines, Azure Pipelines and Jenkins: check out the full history, set `SHELF_TOKEN`, run `npx storyshelf`. The variables each provider supplies are listed under [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from). Any other system passes `--sha` and `--branch`, or relies on local git.
+Merge request pipelines upload the source branch and its head commit. Vercel, Netlify, CircleCI, Buildkite, Bitbucket Pipelines, Azure Pipelines and Jenkins work the same way: full history, `SHELF_TOKEN`, `npx storyshelf`.
 
 ## Storybook in a monorepo package
 
