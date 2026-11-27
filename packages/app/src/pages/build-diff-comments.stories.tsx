@@ -35,3 +35,8 @@ export const AfterPosting = jsxStory(() => {
   });
   return <DiffComments {...props} comments={[...props.comments, posted]} refocus />;
 });
+
+/** A role that cannot comment (a Viewer): the thread stays, the box gives way to one read-only line. */
+export const ReadOnly = jsxStory(() => (
+  <DiffComments {...thread()} canComment={false} canTriage={false} />
+));

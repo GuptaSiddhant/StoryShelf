@@ -4,7 +4,7 @@ import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { Badge, Button, Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
-import { CommentCard, RequestChangeField } from "./build-diff-comments.tsx";
+import { CommentCard, READ_ONLY_LINE, RequestChangeField } from "./build-diff-comments.tsx";
 import { CommentBodyField } from "./comment-body-field.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -17,10 +17,8 @@ export function CommentsCard(props: { data: ReviewSectionData }): Rendered {
       <SectionTitle>Comments</SectionTitle>
       {comments.length === 0 ? (
         <Meta>
-          No comments yet.{" "}
-          {canComment
-            ? "Comment on the build here, or on a story from its component page."
-            : "Developers, approvers and admins can comment."}
+          No comments yet.
+          {canComment ? " Comment on the build here, or on a story from its component page." : ""}
         </Meta>
       ) : null}
       <VStack>
@@ -38,7 +36,11 @@ export function CommentsCard(props: { data: ReviewSectionData }): Rendered {
           />
         ))}
       </VStack>
-      {canComment ? <CommentForm project={project} build={build} storyId={undefined} /> : null}
+      {canComment ? (
+        <CommentForm project={project} build={build} storyId={undefined} />
+      ) : (
+        <Meta>{READ_ONLY_LINE}</Meta>
+      )}
     </Card>
   );
 }
@@ -72,7 +74,11 @@ export function StoryComments(props: {
           />
         ))}
       </VStack>
-      {canComment ? <CommentForm project={project} build={build} storyId={storyId} /> : null}
+      {canComment ? (
+        <CommentForm project={project} build={build} storyId={storyId} />
+      ) : (
+        <Meta>{READ_ONLY_LINE}</Meta>
+      )}
     </Card>
   );
 }

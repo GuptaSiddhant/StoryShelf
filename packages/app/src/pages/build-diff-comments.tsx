@@ -36,10 +36,18 @@ export interface DiffCommentsProps {
   comments: Comment[];
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  /**
+   * Whether the viewer may comment (the server's `canComment`). Without it the box is replaced by
+   * one read-only line. Omitted counts as true: the swap answers a comment that was just posted.
+   */
+  canComment?: boolean;
   names?: ReadonlyMap<string, string>;
   /** Answering a posted comment in place: render the box empty and focused for the next one. */
   refocus?: boolean;
 }
+
+/** The one line a role that cannot review sees where the verdict and comment controls would be. */
+export const READ_ONLY_LINE = "Your role is read-only, so you can't comment or review.";
 
 /** The id the snapshot comment form swaps in place: the thread and its (emptied) box. */
 export const SNAPSHOT_COMMENTS_ID = "snapshot-comments";
@@ -251,6 +259,7 @@ export function DiffComments(
   props: DiffCommentsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selectedId, selectedStoryId, comments, canTriage, names } = props;
+  const canComment = props.canComment !== false;
   const visible = comments.filter((c) =>
     c.snapshotId ? c.snapshotId === selectedId : !c.storyId || c.storyId === selectedStoryId,
   );
@@ -271,12 +280,16 @@ export function DiffComments(
         {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
       </VStack>
 
-      <CommentForm
-        project={project}
-        build={build}
-        selectedId={selectedId}
-        refocus={props.refocus}
-      />
+      {canComment ? (
+        <CommentForm
+          project={project}
+          build={build}
+          selectedId={selectedId}
+          refocus={props.refocus}
+        />
+      ) : (
+        <Meta>{READ_ONLY_LINE}</Meta>
+      )}
     </Card>
   );
 }
