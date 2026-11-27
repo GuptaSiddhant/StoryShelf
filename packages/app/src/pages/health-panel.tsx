@@ -61,13 +61,13 @@ function HealthBody(props: {
   return (
     <>
       <span>{latest.summary}</span>
-      <ul>
+      <VStack gap="sm">
         {trendsOf(latest.output).map((trend) => (
-          <li>
+          <div key={trend.label}>
             <strong>{trend.label}</strong> ({statusLabel(trend.direction)}): {trend.note}
-          </li>
+          </div>
         ))}
-      </ul>
+      </VStack>
       <Meta>
         {latest.profile} · {latest.model} · <RelativeTime value={latest.createdAt} />
         {scoreText(latest.output)}

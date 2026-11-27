@@ -55,13 +55,13 @@ function InsightBody(props: {
   return (
     <>
       <span>{latest.summary}</span>
-      <ul>
+      <VStack gap="sm">
         {itemsOf(latest.output).map((item) => (
-          <li>
+          <div key={item.snapshotKey}>
             <strong>{item.snapshotKey}</strong> ({statusLabel(item.severity)}): {item.note}
-          </li>
+          </div>
         ))}
-      </ul>
+      </VStack>
       <Meta>
         {latest.profile} · {latest.model} · <RelativeTime value={latest.createdAt} />
       </Meta>

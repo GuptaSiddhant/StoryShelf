@@ -28,6 +28,34 @@ const disclosureSummary = css`
   }
 `;
 
+const disclosureRootInline = css`
+  /* disclosure-inline */
+  background: none;
+`;
+
+const disclosureSummaryInline = css`
+  /* disclosure-summary-inline */
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  list-style: none;
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &:hover {
+    color: var(--accent-fg);
+  }
+`;
+
+const disclosureBodyInline = css`
+  /* disclosure-body-inline */
+  padding: var(--space-2) 0 0;
+`;
+
 const disclosureBody = css`
   /* disclosure-body */
   padding: var(--space-3) var(--space-4) var(--space-4);
@@ -41,14 +69,31 @@ const disclosureHint = css`
   color: var(--text-secondary);
 `;
 
-/** Collapsible panel on native `<details>`; collapsed unless `open`. */
+/**
+ * Collapsible panel on native `<details>`; collapsed unless `open`. `variant="inline"` has no
+ * border or card: the same chevron row at `--control-sm`, for a fold inside a card or a list.
+ */
 export const Disclosure: FC<{
-  title: string;
+  /** The row's label; the inline variant also takes a badge or other inline content. */
+  title: unknown;
+  variant?: "panel" | "inline";
   /** Short text after the title, e.g. a count. */
   hint?: string;
   open?: boolean;
   children?: unknown;
-}> = ({ title, hint, open = false, children }) => {
+}> = ({ title, hint, open = false, variant = "panel", children }) => {
+  if (variant === "inline") {
+    return (
+      <details class={disclosureRootInline} open={open}>
+        <summary class={disclosureSummaryInline}>
+          <Icon name="chevron-down" size="sm" />
+          {title}
+          {hint ? <span class={disclosureHint}>{hint}</span> : null}
+        </summary>
+        <div class={disclosureBodyInline}>{children}</div>
+      </details>
+    );
+  }
   return (
     <details class={disclosureRoot} open={open}>
       <summary class={disclosureSummary}>

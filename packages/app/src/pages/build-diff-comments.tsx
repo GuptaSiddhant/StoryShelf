@@ -15,6 +15,7 @@ import {
   RelativeTime,
   SectionTitle,
   VStack,
+  Disclosure,
 } from "../ui/components.tsx";
 import { Style } from "../ui/css.ts";
 import {
@@ -98,20 +99,17 @@ export function CommentCard(
       <div class={reviewCommentHead}>
         <strong>{who}</strong>
         <span>
-          · <RelativeTime value={comment.createdAt} />
+          <RelativeTime value={comment.createdAt} />
         </span>
         {anchor ?? null}
         <KindBadge comment={comment} />
       </div>
       {folded ? (
-        <details>
-          <summary>
-            <ResolvedLine comment={comment} names={names} />
-          </summary>
+        <Disclosure variant="inline" title={<ResolvedLine comment={comment} names={names} />}>
           <p class={reviewCommentBody}>
             <CommentText comment={comment} />
           </p>
-        </details>
+        </Disclosure>
       ) : (
         <p class={reviewCommentBody}>
           <CommentText comment={comment} />

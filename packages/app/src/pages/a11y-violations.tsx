@@ -6,7 +6,7 @@ import {
 } from "@storyshelf/core/models";
 import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Alert, Badge, Meta } from "../ui/components.tsx";
+import { Alert, Badge, Disclosure, Meta } from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** The axe violation texts stored on a snapshot (`rule (impact): help [selector] n node(s)`); empty when none. */
@@ -231,36 +231,40 @@ export function A11yViolationsDetails(props: {
       return null;
     }
     return (
-      <details>
-        <summary>
+      <Disclosure
+        variant="inline"
+        title={
           <Badge tone="neutral">
             {unavailable === undefined ? "story parameters not applied" : "axe did not run"}
             {onTarget(props.snapshot)}
           </Badge>
-        </summary>
+        }
+      >
         {unavailable === undefined ? null : (
           <Meta>
             <code>{unavailable}</code>
           </Meta>
         )}
         {parameters === undefined ? null : <Meta>{parametersLine(parameters)}</Meta>}
-      </details>
+      </Disclosure>
     );
   }
   return (
-    <details>
-      <summary>
+    <Disclosure
+      variant="inline"
+      title={
         <Badge tone="warning" icon>
           a11y {a11yCountOf(props.snapshot)}
           {sha === undefined ? onTarget(props.snapshot) : ` from baseline ${sha}`}
         </Badge>
-      </summary>
+      }
+    >
       {violations.map((text) => (
         <Meta key={text}>
           <code>{text}</code>
         </Meta>
       ))}
       {parameters === undefined ? null : <Meta>{parametersLine(parameters)}</Meta>}
-    </details>
+    </Disclosure>
   );
 }
