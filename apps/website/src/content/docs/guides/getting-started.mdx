@@ -60,8 +60,11 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
     export SHELF_ADMIN_PASSWORD
     npm install   # or pass --install to create-storyshelf
+    npx playwright-core install chromium   # once; add --with-deps on Linux
     npm start
     ```
+
+    `npm install` does not download a browser, and the server renders stories in one. Install it with the project's own `playwright-core` as above: `npx playwright install` would fetch the latest Playwright's revision, which this server cannot use. Without a browser the server still starts and logs a warning, but the first build fails.
 
     The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
 
