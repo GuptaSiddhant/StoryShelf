@@ -65,7 +65,8 @@ export async function ensurePasswordAdmin(
     );
   }
   if (input.password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error("Password must be at least 12 characters");
+    // Name the variable: the env admin's password comes from SHELF_ADMIN_PASSWORD (#1431). Never echo it.
+    throw new Error(`SHELF_ADMIN_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters`);
   }
   const now = new Date().toISOString();
   const shelfUser = await stagePasswordAdmin(db, email, input.name ?? "Admin", now);

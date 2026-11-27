@@ -19,6 +19,22 @@ export function installCommand(runner: PackageRunner): string {
   return RUNNER_COMMANDS[runner].install;
 }
 
+const EXEC_COMMANDS: Record<PackageRunner, string> = {
+  npm: "npx",
+  pnpm: "pnpm exec",
+  yarn: "yarn",
+  bun: "bunx",
+  nub: "nubx",
+};
+
+/**
+ * The command that installs the project's browser: `playwright-core` is the project's own pinned
+ * copy, so it fetches the revision the server needs (a bare `playwright` would resolve the latest).
+ */
+export function browserInstallCommand(runner: PackageRunner): string {
+  return `${EXEC_COMMANDS[runner]} playwright-core install chromium`;
+}
+
 /** Start command for a runner (e.g. `pnpm start`). */
 export function startCommand(runner: PackageRunner): string {
   return RUNNER_COMMANDS[runner].start;

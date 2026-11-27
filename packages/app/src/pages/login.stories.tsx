@@ -45,6 +45,15 @@ export const WrongPassword = pageStory(() =>
   }),
 );
 
+/** The page was opened at another address than `SHELF_PUBLIC_BASE_URL` (#1431). */
+export const WrongAddress = pageStory(() =>
+  renderLoginPage({
+    engineMethods: [password],
+    email: "ada@example.com",
+    wrongAddress: { configuredOrigin: "http://localhost:3000" },
+  }),
+);
+
 export const NoMethodsConfigured = pageStory(() => renderLoginPage({ engineMethods: [] }));
 
 export const WithPublicLink = pageStory(() => renderLoginPage({ engineMethods: [password] }), {

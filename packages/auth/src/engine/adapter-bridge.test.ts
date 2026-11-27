@@ -144,6 +144,15 @@ describe("buildAdapter", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("names the origin of its base URL as the configured origin, path and slash dropped", async () => {
+    const adapter = buildAdapter(
+      instance(),
+      await testDb(),
+      options({ baseURL: "https://shelf.example.com:8443/base/" }),
+    );
+    expect(adapter.configuredOrigin?.()).toBe("https://shelf.example.com:8443");
+  });
+
   it("never mints a session itself", async () => {
     const adapter = buildAdapter(instance(), await testDb(), options());
     await expect(adapter.createSession({} as never)).rejects.toThrow(

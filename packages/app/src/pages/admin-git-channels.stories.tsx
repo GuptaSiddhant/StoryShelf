@@ -71,6 +71,9 @@ const move = (
 
 export const MoveToConnection = pageStory(() => move(tokenChannel));
 
+/** A disabled channel: the dialog says the repository link will post once it is moved. */
+export const MoveDisabled = pageStory(() => move({ ...tokenChannel, enabled: false }));
+
 export const MoveFromChannelApp = pageStory(() => move(appChannel));
 
 export const MoveNeedsConnection = pageStory(() => move(gitlabChannel));

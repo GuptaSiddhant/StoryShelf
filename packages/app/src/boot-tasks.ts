@@ -3,6 +3,7 @@ import type { ResolvedShelfOptions } from "@storyshelf/core/config";
 import type { Logger } from "@storyshelf/core/logger";
 import { sweepOrphanedScratch } from "@storyshelf/core/publish";
 import { backfillContentUses } from "@storyshelf/core/retention";
+import { warnDefaultTargetAfterSetup } from "./browser-warning.ts";
 import { checkCredentialsAfterSetup } from "./credentials.ts";
 import { syncGitLinks } from "./git-connections.ts";
 import { logHostingOnlyMode } from "./hidden-data.ts";
@@ -27,7 +28,7 @@ export function runBootTasks(
   startConsumerAfterSetup(cell, runtime.logger);
   sweepScratchOnBoot(cell, runtime.config.scratchDir, runtime.logger);
   checkCredentialsAfterSetup(cell, scoped.database, runtime.config, runtime.logger);
-  logHostingOnlyAfterSetup(cell, scoped, runtime.logger);
+  logModeAfterSetup(cell, scoped, runtime.logger);
   logPausedAfterSetup(cell, runtime);
   backfillContentUsesAfterSetup(cell, scoped, runtime.logger);
   warnMissingReadOnlyAccountsAfterSetup(cell, scoped.auth, scoped.database, runtime.logger);
@@ -141,6 +142,16 @@ function logPausedAfterSetup(cell: LifecycleCell, runtime: ServerRuntime): void 
         runtime.logger.warn({ err: error }, "could not check the public origin for notifications");
       }),
   );
+}
+
+/** What the testing mode means for this instance: hosting-only data it hides, or a default browser it lacks. */
+function logModeAfterSetup(
+  cell: LifecycleCell,
+  scoped: ResolvedShelfOptions,
+  logger: Logger,
+): void {
+  logHostingOnlyAfterSetup(cell, scoped, logger);
+  warnDefaultTargetAfterSetup(cell, scoped, logger);
 }
 
 /** Without `testing`, once adapters are ready, log the mode and any snapshots it hides. */

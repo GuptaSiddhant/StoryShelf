@@ -2,7 +2,7 @@ import type { Auth, EngineLoginMethod } from "@storyshelf/core/auth";
 import { MIN_PASSWORD_LENGTH } from "@storyshelf/core/auth";
 import { UserModel } from "@storyshelf/core/models";
 import { HOST_SESSION_COOKIE, SESSION_COOKIE } from "@storyshelf/core/types";
-import { UserFacingError } from "@storyshelf/core/utils";
+import { redactUrlForLog, UserFacingError } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
@@ -11,7 +11,7 @@ import { renderInviteInvalidPage, renderInvitePage } from "../pages/invite.tsx";
 import { renderLoginPage } from "../pages/login.tsx";
 import { PUSH_ENDPOINT_HEADER } from "../shell/service-worker-push.ts";
 import { getStore } from "../store.ts";
-import { loginFailureOf } from "./auth-login-failure.ts";
+import { engineErrorCode, loginFailureOf, type LoginFailure } from "./auth-login-failure.ts";
 import { syncLoginMemberships } from "./auth-sync.ts";
 import { requestForEngine, setEngineClient } from "./engine-client.ts";
 import { publicMessage } from "./helpers.ts";
@@ -116,9 +116,11 @@ function loginLinks(
 interface LoginView {
   error?: string;
   email?: string;
-  status?: 200 | 400 | 401 | 429 | 500 | 502;
+  status?: 200 | 400 | 401 | 403 | 429 | 500 | 502;
   /** The page to land on after signing in (a same-site path). */
   returnTo: string;
+  /** Set when the engine refused the page's address: the origin it is configured for, if known. */
+  wrongAddress?: { configuredOrigin: string | undefined };
 }
 
 async function renderEngineLogin(c: Context, engine: Auth, view: LoginView): Promise<Response> {
@@ -127,6 +129,7 @@ async function renderEngineLogin(c: Context, engine: Auth, view: LoginView): Pro
       error: view.error,
       email: view.email,
       returnTo: view.returnTo,
+      ...(view.wrongAddress ? { wrongAddress: view.wrongAddress } : {}),
       engineMethods: loginLinks(engine.loginMethods(), view.returnTo),
     }),
     view.status ?? 200,
@@ -169,25 +172,54 @@ async function readCredentials(c: Context): Promise<Credentials> {
   };
 }
 
+/**
+ * The engine refused the address the page was opened at (#1431). The origin check is the engine's and
+ * stays as strict as it is: this only says which origin it wants. One structured line, with the
+ * request's origin reduced to scheme and host, never a cookie or token.
+ */
+function wrongAddressOf(c: Context, engine: Auth): { configuredOrigin: string | undefined } {
+  const configuredOrigin = engine.configuredOrigin?.();
+  const seen = c.req.header("origin") ?? c.req.header("referer");
+  getStore().logger.warn(
+    {
+      requestOrigin: seen === undefined ? undefined : redactUrlForLog(seen),
+      configuredOrigin,
+    },
+    "sign-in refused: the page was opened at another address than the configured origin (SHELF_PUBLIC_BASE_URL)",
+  );
+  return { configuredOrigin };
+}
+
+async function answerLoginFailure(
+  c: Context,
+  engine: Auth,
+  failure: LoginFailure,
+  { email, returnTo }: Credentials,
+): Promise<Response> {
+  if (failure.notify) {
+    // Admins opted into sys:* see a login-attempt signal. Spray attempts can fan out
+    // here; the /auth/* rate-limit bucket bounds it.
+    await notifySystem("sys:auth-failed", { email });
+  }
+  return renderEngineLogin(c, engine, {
+    error: failure.message,
+    email,
+    status: failure.status,
+    returnTo,
+    ...(failure.wrongAddress ? { wrongAddress: wrongAddressOf(c, engine) } : {}),
+  });
+}
+
 async function finishCredentialLogin(
   c: Context,
   engine: Auth,
-  { email, password, returnTo }: Credentials,
+  credentials: Credentials,
 ): Promise<Response> {
+  const { email, password, returnTo } = credentials;
   const res = await forwardToEngine(c, engine, "/api/auth/sign-in/email", { email, password });
   if (res.status !== 200) {
-    const failure = loginFailureOf(res.status);
-    if (failure.notify) {
-      // Admins opted into sys:* see a login-attempt signal. Spray attempts can fan out
-      // here; the /auth/* rate-limit bucket bounds it.
-      await notifySystem("sys:auth-failed", { email });
-    }
-    return renderEngineLogin(c, engine, {
-      error: failure.message,
-      email,
-      status: failure.status,
-      returnTo,
-    });
+    const failure = loginFailureOf(res.status, await engineErrorCode(res));
+    return await answerLoginFailure(c, engine, failure, credentials);
   }
   copySetCookies(c, res);
   const body = (await res.json()) as { user: { id: string; email: string; name: string } };

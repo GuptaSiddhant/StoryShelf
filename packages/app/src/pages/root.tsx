@@ -1,6 +1,6 @@
 import type { FC } from "hono/jsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { Button, Card, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
+import { Button, Card, Command, HStack, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { cliCreateAvailable } from "./cli-create.ts";
 
@@ -53,16 +53,17 @@ const Hero: FC = () => {
         {viaCli ? (
           <Meta>
             Tip: use{" "}
-            <code>
+            <Command>
               npx storyshelf create --url &lt;url&gt; --name &lt;name&gt; --token $SHELF_ADMIN_TOKEN
-            </code>{" "}
-            to create a project and token for CI, or <code>npx storyshelf init</code> to write{" "}
-            <code>.storybook/storyshelf.json</code>.
+            </Command>{" "}
+            to create a project and token for CI, or <Command>npx storyshelf init</Command> to write{" "}
+            <Command>.storybook/storyshelf.json</Command>.
           </Meta>
         ) : (
           <Meta>
             Start with Create project. It gives you a token for CI, and{" "}
-            <code>npx storyshelf init</code> writes <code>.storybook/storyshelf.json</code>.
+            <Command>npx storyshelf init</Command> writes{" "}
+            <Command>.storybook/storyshelf.json</Command>.
           </Meta>
         )}
       </VStack>

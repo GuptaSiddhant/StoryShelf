@@ -129,6 +129,16 @@ describe("Avatar", () => {
     expect(fallback).toContain('aria-label="Ada Lovelace"');
     expect(fallback).toContain(">AL<");
   });
+
+  it("hides an avatar with no name from assistive tech instead of an empty-labelled image", async () => {
+    const blank = await render(<Avatar name=" " />);
+    const blankImg = await render(<Avatar name="" src="/a.png" />);
+    expect(blank).toContain('aria-hidden="true"');
+    expect(blank).not.toContain("role=");
+    expect(blank).not.toContain("aria-label");
+    expect(blank).toContain(">?<");
+    expect(blankImg).toContain('alt=""');
+  });
 });
 
 describe("Segmented", () => {

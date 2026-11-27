@@ -39,14 +39,24 @@ describe("printNextSteps", () => {
 
   it("installs and starts with the detected package runner on a local server", () => {
     printNextSteps(answers(), "pnpm");
-    expect(printed).toContain("  pnpm install\n  pnpm start\n");
+    expect(printed).toContain("  pnpm install\n  pnpm exec playwright-core install chromium");
+    expect(printed).toContain("  pnpm start\n");
     expect(printed).not.toContain("terraform");
     expect(printed).not.toContain("docker");
+  });
+
+  it("installs the project's own pinned browser, never a bare playwright, on a local server", () => {
+    printNextSteps(answers(), "npm");
+    expect(printed).toContain("  npx playwright-core install chromium");
+    expect(printed).toContain("--with-deps");
+    expect(printed).not.toMatch(/playwright install/u);
+    expect(printed.indexOf("playwright-core install")).toBeLessThan(printed.indexOf("npm start"));
   });
 
   it("leaves the install step out once --install ran it", () => {
     printNextSteps(answers(), "pnpm", true);
     expect(printed).not.toContain("pnpm install");
+    expect(printed).toContain("pnpm exec playwright-core install chromium");
     expect(printed).toContain("  pnpm start\n");
   });
 
