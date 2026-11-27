@@ -3,6 +3,7 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
+  Card,
   DialogLink,
   Meta,
   SectionTitle,
@@ -74,18 +75,20 @@ export function renderSettingsWebhooks(
         </Alert>
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <SectionTitle>Webhooks</SectionTitle>
-      <Meta>
-        Notify external services when builds are created, updated, approved or rejected. Payloads
-        are POSTed as JSON and signed with the webhook secret.
-      </Meta>
-      <SummaryList
-        label="Webhooks"
-        items={webhookItems(project, webhooks, isAdmin)}
-        emptyTitle="No webhooks configured"
-        add={add}
-      />
-      {webhooks.length > 0 ? add : null}
+      <Card>
+        <SectionTitle>Webhooks</SectionTitle>
+        <Meta>
+          Notify external services when builds are created, updated, approved or rejected. Payloads
+          are POSTed as JSON and signed with the webhook secret.
+        </Meta>
+        <SummaryList
+          label="Webhooks"
+          items={webhookItems(project, webhooks, isAdmin)}
+          emptyTitle="No webhooks configured"
+          add={add}
+        />
+        {webhooks.length > 0 ? add : null}
+      </Card>
       {isAdmin ? (
         <FormDialog id={ADD_WEBHOOK_DIALOG} title="Add webhook" submitLabel="Add webhook" />
       ) : null}

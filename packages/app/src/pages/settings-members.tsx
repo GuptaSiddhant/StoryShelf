@@ -5,6 +5,7 @@ import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Alert,
   Button,
+  Card,
   DialogLink,
   Meta,
   SectionTitle,
@@ -102,29 +103,33 @@ export function renderSettingsMembers(
   return (
     <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <SectionTitle>Members</SectionTitle>
-      <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
-      <SummaryList
-        label="Members"
-        items={memberItems(project, members, isAdmin)}
-        emptyTitle="No members yet"
-        emptyDescription="Add the people who work on this project."
-        add={addMember}
-      />
-      {members.length > 0 ? addMember : null}
-      <SectionTitle>Identity-provider group mappings</SectionTitle>
-      <Meta>
-        Map an IdP group (name or provider ID, exact match) to a project role. Members sync at next
-        login; removing a mapping revokes synced grants but never manual ones. Wildcards are not
-        expanded.
-      </Meta>
-      <SummaryList
-        label="Identity-provider group mappings"
-        items={mappingItems(project, groupMappings, isAdmin)}
-        emptyTitle="No group mappings yet"
-        add={addMapping}
-      />
-      {groupMappings.length > 0 ? addMapping : null}
+      <Card>
+        <SectionTitle>Members</SectionTitle>
+        <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
+        <SummaryList
+          label="Members"
+          items={memberItems(project, members, isAdmin)}
+          emptyTitle="No members yet"
+          emptyDescription="Add the people who work on this project."
+          add={addMember}
+        />
+        {members.length > 0 ? addMember : null}
+      </Card>
+      <Card>
+        <SectionTitle>Identity-provider group mappings</SectionTitle>
+        <Meta>
+          Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
+          next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
+          not expanded.
+        </Meta>
+        <SummaryList
+          label="Identity-provider group mappings"
+          items={mappingItems(project, groupMappings, isAdmin)}
+          emptyTitle="No group mappings yet"
+          add={addMapping}
+        />
+        {groupMappings.length > 0 ? addMapping : null}
+      </Card>
       {isAdmin ? (
         <>
           <FormDialog id={ADD_MEMBER_DIALOG} title="Add member" submitLabel="Add member" />

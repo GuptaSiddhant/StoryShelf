@@ -43,6 +43,8 @@ nubx turbo verify --filter='@storyshelf/core' --force   # one package and its de
 5. **Merges are squash merges.** One task is one commit on `main`, titled `feat(<task-id>): <short description>`. Reference the issue with `Closes #<n>`.
 6. **Add a changeset** when the change affects what a published package does: `nub run changeset <patch|minor|major> --message "<entry>"`, then commit the file it creates. Write it like a `CHANGELOG.md` entry. Docs, test and CI changes need none; put the `no-release` label on the pull request so the check passes. Never edit `CHANGELOG.md` or package versions by hand.
 
+   **Schema changes.** A pull request that changes a DDL, Drizzle schema or migration file (`packages/db/src/**` ddl, migrate and `schema/` files, `packages/core/src/db/tables/`, the auth tables) must add a changeset whose body has a line starting `Schema:` that names the step (expand, contract, backfill, or that every copy must stop). `Schema: none` does not satisfy the check. The release notes gather these lines into a "Database" section, or say "No schema changes."; a `Breaking:` changeset with a `Schema:` step also marks the upgrade stop-the-world. The rules are in ADR 0053 (decision 10 and its 2026-11-21 amendment).
+
 ## Releases and previews
 
 Packages are released from [Changesets](https://github.com/changesets/changesets)-format files, versioned by our own `scripts/version-packages.mjs` (ADR 0043). All published packages share one version.

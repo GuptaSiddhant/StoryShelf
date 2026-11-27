@@ -12,9 +12,13 @@ function byline(reviewer: string | undefined): string {
   return name === undefined || name === "" ? "" : ` by \`${name}\``;
 }
 
-/** Changes still waiting for a verdict. */
-export function openChanges(counts: BuildCommentInput["counts"]): number {
-  return Math.max(0, counts.changedCount - counts.approvedCount - counts.rejectedCount);
+/**
+ * Changes still waiting for a verdict. The stored `changedCount` already holds only the open
+ * snapshots (`changed` or `new`); `approvedCount` also holds `unchanged` ones, so no verdict count
+ * is subtracted from it.
+ */
+export function openChanges(counts: Pick<BuildCommentInput["counts"], "changedCount">): number {
+  return counts.changedCount;
 }
 
 /** Emoji and text of the state; the build status decides, never the accessibility count. */

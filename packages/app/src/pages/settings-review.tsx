@@ -1,6 +1,7 @@
 import type { Project } from "@storyshelf/core/schema";
 import {
   Alert,
+  Card,
   DialogLink,
   Meta,
   SectionTitle,
@@ -46,12 +47,14 @@ export function renderSettingsReview(
   return (
     <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
-      <SectionTitle>Review</SectionTitle>
-      <Meta>
-        Comments on builds and stories, and a build-level verdict from approvers and admins. The
-        default branch is never held for review.
-      </Meta>
-      <SummaryList label="Review" items={reviewItems(project, isAdmin)} emptyTitle="No review" />
+      <Card>
+        <SectionTitle>Review</SectionTitle>
+        <Meta>
+          Comments on builds and stories, and a build-level verdict from approvers and admins. The
+          default branch is never held for review.
+        </Meta>
+        <SummaryList label="Review" items={reviewItems(project, isAdmin)} emptyTitle="No review" />
+      </Card>
       {isAdmin ? (
         <FormDialog
           id={EDIT_REVIEW_DIALOG}

@@ -271,7 +271,7 @@ no-store`; never log a token (`redactSecrets`). Do not add routes under `/_s/` o
   thing. Rename = add, dual-write, drop over three releases. A new status value or job kind is read
   first and written one release later; backfills are batched, idempotent jobs, never boot work.
   Until the claim filter and payload version land, ship no new job kind or status value. A schema
-  change's changeset carries a `Schema:` line. Until 2027-01-01 contract steps ship in the release
+  change's changeset carries a `Schema:` line (`checkSchemaLine` fails a PR that touches a schema file without one; `Schema: none` does not count; release notes gain a "Database" section from them). Until 2027-01-01 contract steps ship in the release
   that needs them and the upgrade is stop-the-world (label `schema-break`; ADR 0053 amendment 2026-11-21).
 - **Story sources.** Storybook is the only source; a new one is built into core (ADR 0001 amendment 2026-11-11), and no new Storybook-specific sites outside the files that hold them.
 

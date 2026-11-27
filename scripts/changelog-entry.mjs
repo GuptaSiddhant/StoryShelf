@@ -148,7 +148,9 @@ export function shortNotes(section) {
   const blocks = section.split(/^(?=### )/mu).map((block) => block.trim());
   const lead = blocks[0]?.startsWith("### ") ? [] : [blocks.shift()];
   const internal = blocks.find((block) => block.startsWith("### Internal"));
-  const shown = blocks.filter((block) => block !== internal).map((block) => summariesOf(block));
+  const shown = blocks
+    .filter((block) => block !== internal)
+    .map((block) => (block.startsWith("### Database") ? block : summariesOf(block)));
   const count = internal === undefined ? 0 : bulletsOf(internal).length;
   const note = count === 0 ? [] : [`Plus ${count} internal change${count === 1 ? "" : "s"}.`];
   return [...lead, ...shown, ...note].filter(Boolean).join("\n\n");
