@@ -74,3 +74,22 @@ describe("releaseNotes", () => {
     assert.equal(releaseNotes(changelog, "v9.9.9"), null);
   });
 });
+
+describe("releaseNotes, Database section", () => {
+  it("keeps the whole Database block in the short notes", () => {
+    const changelog =
+      "## 0.15.0 - 2026-11-27\n\n### Added\n\n- A thing\n\n  Details.\n\n### Database\n\n- expand `x` (@storyshelf/db)\n\nThis upgrade is stop-the-world: stop every copy before migrating (ADR 0053).\n";
+    const text = releaseNotes(changelog, "v0.15.0");
+    assert.match(
+      text,
+      /### Database\n\n- expand `x` \(@storyshelf\/db\)\n\nThis upgrade is stop-the-world/u,
+    );
+    assert.doesNotMatch(text, /Details\./u);
+  });
+
+  it("keeps No schema changes.", () => {
+    const changelog =
+      "## 0.15.0 - 2026-11-27\n\n### Fixed\n\n- A fix\n\n### Database\n\nNo schema changes.\n";
+    assert.match(releaseNotes(changelog, "v0.15.0"), /### Database\n\nNo schema changes\./u);
+  });
+});

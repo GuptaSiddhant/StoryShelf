@@ -90,15 +90,14 @@ function rank(changeset) {
  * entries inside it largest bump first, then by file name.
  *
  * @param {ReturnType<typeof parseChangeset>[]} changesets Pending changesets.
- * @returns {string[]} Blocks in kind order (empty bodies are dropped).
+ * @returns {string[]} Blocks in kind order (empty bodies are dropped), then the `### Database` block.
  */
 export function renderEntries(changesets) {
-  return renderGrouped(
-    changesets
-      .toSorted((a, b) => rank(a) - rank(b) || a.file.localeCompare(b.file))
-      .map((changeset) => changeset.body)
-      .filter((body) => body !== ""),
+  const sorted = changesets.toSorted((a, b) => rank(a) - rank(b) || a.file.localeCompare(b.file));
+  const blocks = renderGrouped(
+    sorted.map((changeset) => changeset.body).filter((body) => body !== ""),
   );
+  return blocks.length === 0 ? blocks : [...blocks, databaseBlock(sorted)];
 }
 
 /**
@@ -445,6 +444,89 @@ function declaresSchemaBreak(text, path) {
   } catch {
     return false;
   }
+}
+
+/**
+ * The files that define the database schema (ADR 0053): each dialect's DDL, migration and Drizzle
+ * schema files under `packages/db/src/`, core's neutral tables, and the auth tables. Tests are not
+ * schema. A pull request that changes one needs a changeset with a `Schema:` line.
+ */
+export const SCHEMA_PATHS =
+  /^(?:packages\/db\/src\/(?:sqlite|postgres|mysql)\/(?:schema\/|[^/]*(?:ddl|migrat)[^/]*$)|packages\/core\/src\/db\/tables\/|packages\/auth\/src\/auth-(?:tables|ddl)[^/]*$)/u;
+
+/** Whether a changed path is a schema file: {@link SCHEMA_PATHS}, and not a test of one. */
+export function isSchemaFile(path) {
+  return SCHEMA_PATHS.test(path) && !/\.test\.tsx?$/u.test(path);
+}
+
+/**
+ * What a pull request that changes a schema file owes: a changeset it adds whose body has a
+ * `Schema: <step>` line, and `Schema: none` does not count (ADR 0053, decision 10).
+ *
+ * @param {object} input The pull request.
+ * @param {string[]} input.changed Paths changed by the PR.
+ * @param {string[]} input.added Paths the PR adds or modifies.
+ * @param {(path: string) => string} input.read Reads a file from the PR's tree.
+ * @returns {{ ok: boolean, reason: string }} The verdict and why.
+ */
+export function checkSchemaLine({ changed, added, read }) {
+  const files = changed.filter((path) => isSchemaFile(path));
+  if (files.length === 0) {
+    return { ok: true, reason: "changes no schema file" };
+  }
+  const declared = added
+    .filter((path) => CHANGESET_FILE.test(path))
+    .some((path) => schemaStepsOf(read(path), path).length > 0);
+  return declared
+    ? { ok: true, reason: "a changeset has a Schema: line" }
+    : {
+        ok: false,
+        reason: `changes schema files (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}) but adds no changeset with a "Schema: <step>" line ("Schema: none" does not count)`,
+      };
+}
+
+/** The `Schema:` steps in a changeset's body, `none` dropped; an unreadable file has none. */
+function schemaStepsOf(text, path) {
+  try {
+    const { body, releases } = parseChangeset(text, path);
+    return releases.length === 0 ? [] : stepsOf(body);
+  } catch {
+    return [];
+  }
+}
+
+/** Every `Schema: <step>` line of a body that names a real step. */
+function stepsOf(body) {
+  return [...body.matchAll(new RegExp(SCHEMA_LINE.source, "gmu"))]
+    .map((match) => match.groups?.step.trim() ?? "")
+    .filter((step) => step !== "" && !NO_SCHEMA_CHANGE.test(step));
+}
+
+/**
+ * The `### Database` block of a release (ADR 0053, decision 10): one bullet per `Schema:` line,
+ * with the packages of its changeset, `Schema: none` dropped; "No schema changes." when none is
+ * left. A `Breaking:` changeset with a schema step adds the stop-the-world line.
+ *
+ * @param {ReturnType<typeof parseChangeset>[]} changesets The changesets of the release.
+ * @returns {string} The block, without a trailing newline.
+ */
+export function databaseBlock(changesets) {
+  const bullets = changesets.flatMap((changeset) =>
+    stepsOf(changeset.body).map(
+      (step) => `- ${step} (${changeset.releases.map((release) => release.name).join(", ")})`,
+    ),
+  );
+  if (bullets.length === 0) {
+    return "### Database\n\nNo schema changes.";
+  }
+  const stop = changesets.some(
+    (changeset) =>
+      readEntry(changeset.body).kind === "Breaking" && stepsOf(changeset.body).length > 0,
+  );
+  const note = stop
+    ? "\n\nThis upgrade is stop-the-world: stop every copy before migrating (ADR 0053)."
+    : "";
+  return `### Database\n\n${bullets.join("\n")}${note}`;
 }
 
 const RELEASE_BRANCH = /^release\/v(?<version>\d+\.\d+\.\d+)$/u;

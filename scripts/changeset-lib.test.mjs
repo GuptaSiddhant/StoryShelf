@@ -6,6 +6,9 @@ import {
   changesetName,
   checkChangeset,
   checkSchemaBreak,
+  checkSchemaLine,
+  databaseBlock,
+  isSchemaFile,
   highestBump,
   malformedChangesets,
   manifestPublished,
@@ -75,8 +78,15 @@ describe("renderEntries", () => {
         make("d.md", "minor", ""),
         make("e.md", "minor", "Added: E"),
       ]),
-      ["### Added\n\n- E", "### Fixed\n\n- C\n- A\n- B"],
+      ["### Added\n\n- E", "### Fixed\n\n- C\n- A\n- B", "### Database\n\nNo schema changes."],
     );
+  });
+
+  it("ends with a Database block built from the Schema: lines", () => {
+    const blocks = renderEntries([
+      make("a.md", "minor", "Added: A\n\nSchema: new table `x` (expand)"),
+    ]);
+    assert.equal(blocks.at(-1), "### Database\n\n- new table `x` (expand) (p)");
   });
 });
 
@@ -531,5 +541,89 @@ describe("checkSchemaBreak", () => {
   it("ignores the changesets README and an unreadable changeset", () => {
     assert.equal(run("x", { added: [".changeset/README.md"] }).ok, false);
     assert.equal(run("no front matter").ok, false);
+  });
+});
+
+const verdictOf = (changed, files) =>
+  checkSchemaLine({ changed, added: Object.keys(files), read: (path) => files[path] });
+const changeset = (body) => `---\n"@storyshelf/db": minor\n---\n\n${body}\n`;
+const withBody = (body, name = "@storyshelf/db") => ({
+  file: "a.md",
+  releases: [{ name, bump: "minor" }],
+  body,
+});
+
+describe("isSchemaFile and checkSchemaLine", () => {
+  const REAL = [
+    "packages/db/src/postgres/ddl.ts",
+    "packages/db/src/sqlite/migrate.ts",
+    "packages/db/src/mysql/schema/build.ts",
+    "packages/db/src/postgres/migration-session.ts",
+    "packages/core/src/db/tables/build.ts",
+    "packages/auth/src/auth-tables.ts",
+  ];
+  const NOT = [
+    "packages/db/src/postgres/migrate.test.ts",
+    "packages/db/src/sqlite/index.ts",
+    "packages/core/src/db/tables/tables.test.ts",
+    "packages/app/src/middleware/csrf.ts",
+    "docs/testing.md",
+  ];
+  it("matches real schema paths and not tests or other code", () => {
+    for (const path of REAL) {
+      assert.equal(isSchemaFile(path), true, path);
+    }
+    for (const path of NOT) {
+      assert.equal(isSchemaFile(path), false, path);
+    }
+  });
+
+  it("passes a pull request that touches no schema file", () => {
+    assert.equal(verdictOf(["packages/app/src/x.ts"], {}).ok, true);
+  });
+  it("fails a schema change without a changeset", () => {
+    const verdict = verdictOf([REAL[0]], {});
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.reason, /packages\/db\/src\/postgres\/ddl\.ts/u);
+  });
+  it("fails a changeset without a Schema: line, and one that says Schema: none", () => {
+    const plain = { ".changeset/a.md": changeset("Added: a column") };
+    assert.equal(verdictOf([REAL[0]], plain).ok, false);
+    const none = { ".changeset/a.md": changeset("Added: a column\n\nSchema: none") };
+    assert.equal(verdictOf([REAL[0]], none).ok, false);
+  });
+  it("passes a changeset with a real Schema: line", () => {
+    const files = {
+      ".changeset/a.md": changeset("Added: a column\n\nSchema: expand, nullable `x`"),
+    };
+    assert.equal(verdictOf([REAL[0]], files).ok, true);
+  });
+});
+
+describe("databaseBlock", () => {
+  it("says no schema changes when there is no real line", () => {
+    assert.equal(
+      databaseBlock([withBody("Added: a\n\nSchema: none")]),
+      "### Database\n\nNo schema changes.",
+    );
+    assert.equal(databaseBlock([]), "### Database\n\nNo schema changes.");
+  });
+  it("lists one bullet per line with the package", () => {
+    const text = databaseBlock([
+      withBody("Added: a\n\nSchema: expand `a`\nSchema: backfill `b` (batched job)"),
+      withBody("Fixed: c\n\nSchema: none", "@storyshelf/core"),
+    ]);
+    assert.equal(
+      text,
+      "### Database\n\n- expand `a` (@storyshelf/db)\n- backfill `b` (batched job) (@storyshelf/db)",
+    );
+  });
+  it("adds the stop-the-world line for a Breaking changeset with a step", () => {
+    const text = databaseBlock([withBody("Breaking: drop x\n\nSchema: contract, drop `x`")]);
+    assert.match(text, /stop-the-world: stop every copy before migrating/u);
+    assert.doesNotMatch(
+      databaseBlock([withBody("Added: a\n\nSchema: expand `a`")]),
+      /stop-the-world/u,
+    );
   });
 });
