@@ -15,6 +15,23 @@ export const SERVICE_WORKER_REGISTRATION = `if('serviceWorker' in navigator){
     }`;
 
 /**
+ * The theme half of the boot script, for documents that have no sidebar or service worker (the
+ * Storybook viewer and its Preparing page): applies the saved light or dark choice before paint.
+ */
+export const THEME_BOOT_SCRIPT = `(function(){
+  var parts=document.cookie.split('; ');
+  for(var i=0;i<parts.length;i++){
+    var at=parts[i].indexOf('=');
+    if(at>0&&parts[i].slice(0,at)==='storyshelf_theme'){
+      var value=decodeURIComponent(parts[i].slice(at+1));
+      if(value==='light'||value==='dark'||value==='system'){
+        document.documentElement.setAttribute('data-theme',value);
+      }
+    }
+  }
+})();`;
+
+/**
  * Runs in `<head>` before first paint so the saved theme and sidebar state
  * apply without a flash. Exposes cookie helpers to the client script.
  */

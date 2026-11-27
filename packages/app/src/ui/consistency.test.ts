@@ -6,8 +6,7 @@ import { describe, expect, it } from "vitest";
  * Ratchet for the `ui-building-blocks` contract: pages compose facade
  * components, never raw classes or inline styles.
  *
- * - No component classes in `pages/` (use the facade; `btn-link` in
- *   storybook.tsx is a separate one-off outside the system).
+ * - No component classes in `pages/` (use the facade).
  * - No direct family imports in `pages/` (facade + document shell +
  *   shared review styles + page-local `ui/css.ts` only).
  * - No inline `style="..."` in `pages/` or `src/ui/` at all (zero ceiling).
@@ -55,7 +54,8 @@ function reachesAppState(specifier: string): boolean {
 }
 
 const PAGE_UI_IMPORTS = /^\.\.\/ui\/(?:components\.tsx|css\.ts|styles\/review(?:-[a-z]+)?\.ts)$/u;
-const PAGE_SHELL_IMPORTS = /^\.\.\/shell\/(?:document|csrf-field|form-page)\.tsx$/u;
+const PAGE_SHELL_IMPORTS =
+  /^\.\.\/shell\/(?:document|csrf-field|form-page|preview-document)\.tsx$/u;
 
 /** A page import that bypasses the facade, or reaches a shell module other than document and csrf-field. */
 function breaksPageContract(specifier: string): boolean {
@@ -308,7 +308,6 @@ describe("type and colour tokens", () => {
         const entries = await readdir(`${srcDir}${dir}`, { recursive: true });
         const files = entries
           .filter((entry) => /\.tsx?$/u.test(entry) && !/\.(?:test|stories)\.tsx?$/u.test(entry))
-          .filter((entry) => !(dir === "pages" && entry === "storybook.tsx"))
           .toSorted();
         return await Promise.all(
           files.map(async (file) => ({
@@ -395,12 +394,24 @@ describe("type and colour tokens", () => {
     // A value is `0`, `auto` or built from `var(--space-N)` (inside `calc` for a negative or a multiple).
     const spacing =
       /(?<![-\w])(?:padding|margin|gap)(?:-[a-z]+)*\s*:(?!\s*(?:(?:0|auto|var\(--swipe[^)]*\)|var\(--space-[1-8]\)|calc\([^;}\n]*var\(--space-[1-8]\)[^;}\n]*\))\s*)+(?:[;}\n`]|$))[^;}\n]*/gu;
-    expect(
-      await offendersOf(
-        spacing,
-        /^ui\/(?:styles\/base|stacks)\.(?:ts|tsx)$|^pages\/storybook\.tsx$/u,
-      ),
-    ).toEqual([]);
+    expect(await offendersOf(spacing, /^ui\/(?:styles\/base|stacks)\.(?:ts|tsx)$/u)).toEqual([]);
+  });
+
+  it("writes no hex colour or font-family literal in a page outside a css template", async () => {
+    // A plain `<style>` string in a page escaped the css-template checks and hard-coded #ddd and
+    // system-ui (#1285 V5). Colours and fonts come from the token stylesheet.
+    const literal =
+      /(?:(?:color|background|border|fill|stroke|outline|shadow)[\w-]*\s*[:=(][^;\n]*#[0-9a-fA-F]{3,8}\b|font-family\s*:)/u;
+    const outside = (await pageSources())
+      .filter(({ file }) => !file.endsWith(".stories.tsx"))
+      .flatMap(({ file, source }) =>
+        source
+          .replaceAll(/css`[^`]*`/gu, "")
+          .split("\n")
+          .filter((line) => literal.test(line))
+          .map((line) => `${file}: ${line.trim()}`),
+      );
+    expect(outside).toEqual([]);
   });
 
   it("sets the height of a control from the control tokens", async () => {

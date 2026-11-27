@@ -163,7 +163,26 @@ describe("storybook routes", () => {
     expect(body).toContain("iframe");
     // Landmarks: one h1 and a main around the frame.
     expect(body.match(/<h1[ >]/gu)).toHaveLength(1);
-    expect(body).toMatch(/<main>[\s\S]*<iframe/u);
+    expect(body).toMatch(/<main[^>]*>[\s\S]*<iframe/u);
+  });
+
+  it("gives the viewer bar the app's tokens, theme and small buttons (#1285)", async () => {
+    const { app } = await seededApp();
+    const body = await (await app.request("/projects/test-project/storybook/build/b1/")).text();
+    // The token stylesheet carries both themes, and the document declares them.
+    expect(body).toContain("--surface-card");
+    expect(body).toContain('[data-theme="dark"]');
+    expect(body).toContain('<meta name="color-scheme" content="light dark"/>');
+    expect(body).toContain("storyshelf_theme");
+    // The two bar controls are the app's small secondary button, in the page font.
+    expect(body.match(/class="ss-btn[^"]*"/gu)?.length).toBeGreaterThanOrEqual(2);
+    expect(body).toContain("View full Storybook");
+    expect(body).toContain("Copy link");
+    // Crumbs use the app's separator; no literal colour or font left in the document.
+    expect(body).toContain("›");
+    expect(body).not.toContain("var(--border, #ddd)");
+    expect(body).not.toContain("system-ui, sans-serif");
+    expect(body).not.toContain("btn-link");
   });
 
   it("serves a preparing state when statics are not yet extracted", async () => {
@@ -181,7 +200,14 @@ describe("storybook routes", () => {
     expect(body).not.toContain("http-equiv");
     expect(body).toContain('aria-live="polite"');
     expect(body).toContain("Pause automatic check");
+    // Without JavaScript the pause control stays hidden; the script shows it.
+    expect(body).toMatch(/<button[^>]*id="prep-toggle"[^>]*hidden/u);
     expect(body).toContain(">Check again</a>");
+    // The waiting state is the app's empty state with the shared tokens, not a faded block, and the old header rules are gone (#1285).
+    expect(body).toContain("--surface-card");
+    expect(body).toContain('<meta name="color-scheme" content="light dark"/>');
+    expect(body).not.toContain('class="crumb"');
+    expect(body).toMatch(/<h1 class="ss-empty-title[^"]*">Preparing preview<\/h1>/u);
   });
 
   it("serves a static JS asset with the correct content type", async () => {
