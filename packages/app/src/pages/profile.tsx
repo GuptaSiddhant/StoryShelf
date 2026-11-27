@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Field,
+  FormActions,
   HStack,
   LiveStatus,
   Meta,
@@ -121,7 +122,7 @@ const PasskeyTable: FC<{ passkeys: PasskeyState[] }> = ({ passkeys }) => {
                       action={`/profile/passkeys/${key.id}/delete`}
                       data-confirm="Remove this passkey?"
                     >
-                      <Button variant="secondary" size="sm" type="submit">
+                      <Button variant="danger-secondary" size="sm" type="submit">
                         Remove
                       </Button>
                     </form>
@@ -223,7 +224,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
         </Alert>
       ) : null}
       <PasskeyTable passkeys={security.passkeys} />
-      <HStack>
+      <HStack align="end">
         <Field label="Key name" name="keyName" type="text" placeholder="e.g. Security key" />
         <Button variant="primary" type="button" data-passkey-register="true">
           Register a passkey
@@ -242,9 +243,11 @@ const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
     <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
     <Form method="post" action="/profile" novalidate>
       <Field label="Display name" name="displayName" type="text" required value={displayName} />
-      <Button variant="primary" type="submit">
-        Save name
-      </Button>
+      <FormActions>
+        <Button variant="primary" type="submit">
+          Save name
+        </Button>
+      </FormActions>
     </Form>
   </Card>
 );

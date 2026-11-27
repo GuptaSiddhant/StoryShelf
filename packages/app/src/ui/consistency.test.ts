@@ -426,6 +426,9 @@ describe("type and colour tokens", () => {
     const bareLink =
       /\bactions[:=]\s*\{?\s*\(?\s*<a\b|<td[^>]*class="[^"]*\bnowrap\b[^"]*"[^>]*>\s*<a\b/gu;
     expect(await offendersOf(bareLink, /^ui\//u)).toEqual([]);
+    // A `DialogLink` with no `variant` renders a bare link too (the Git requests table, #1284 B2).
+    const bareDialogLink = /<DialogLink\b(?![^>]*\bvariant=)[^>]*>/gu;
+    expect(await offendersOf(bareDialogLink, /^ui\//u)).toEqual([]);
   });
 
   it("keeps one primary button on a list: the title-row Add is secondary, the empty state's is primary", async () => {

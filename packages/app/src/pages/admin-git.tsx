@@ -14,6 +14,7 @@ import {
   CheckField,
   Dialog,
   DialogLink,
+  FormActions,
   HStack,
   Meta,
   PageHeader,
@@ -194,12 +195,22 @@ function RequestActions(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { request } = props;
   return (
-    <HStack gap="sm">
-      <DialogLink dialogId={LINK_DIALOG_ID} href={`/admin/git/links/${request.id}/approve`}>
+    <HStack gap="sm" wrap={false}>
+      <DialogLink
+        dialogId={LINK_DIALOG_ID}
+        href={`/admin/git/links/${request.id}/approve`}
+        variant="secondary"
+        size="sm"
+      >
         {request.state === "broken" ? "Reconnect" : "Review and approve"}
       </DialogLink>
       {request.state === "pending" ? (
-        <DialogLink dialogId={LINK_DIALOG_ID} href={`/admin/git/links/${request.id}/refuse`}>
+        <DialogLink
+          dialogId={LINK_DIALOG_ID}
+          href={`/admin/git/links/${request.id}/refuse`}
+          variant="danger-secondary"
+          size="sm"
+        >
           Refuse
         </DialogLink>
       ) : null}
@@ -272,9 +283,11 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
           hint="On: a link a project admin asks for is approved at once when the connection covers it. Off: a site admin approves each one. Turning it off keeps existing links."
         />
 
-        <Button type="submit" variant="primary">
-          Save
-        </Button>
+        <FormActions>
+          <Button type="submit" variant="primary">
+            Save
+          </Button>
+        </FormActions>
       </Form>
     </Card>
   );
