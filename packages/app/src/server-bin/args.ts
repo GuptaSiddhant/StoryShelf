@@ -123,25 +123,41 @@ function parseOptions(
   }
 }
 
+/** Bind `invite`'s email into `flags`; the problem with the flags for `command`, if any. */
+function commandProblem(
+  command: ServerCommand,
+  flags: ServerFlags,
+  email: string | undefined,
+): string | undefined {
+  if (flags.watch === true && command !== "serve") return "--watch is only for `serve`";
+  if (command !== "invite") {
+    return flags.name === undefined && flags.role === undefined
+      ? undefined
+      : "--name and --role are only for `invite`";
+  }
+  if (email === undefined) return "invite needs an email: invite <email>";
+  flags.email = email;
+  return undefined;
+}
+
+/** The run (or the error) for a known command and its parsed options. */
+function runOf(
+  command: ServerCommand,
+  parsed: Exclude<ReturnType<typeof parseOptions>, Error>,
+): ParsedArgs {
+  const flags = flagsOf(parsed.values);
+  if (flags instanceof Error) return { kind: "error", message: flags.message };
+  const problem = commandProblem(command, flags, parsed.positionals[1]);
+  return problem === undefined
+    ? { kind: "run", command, flags }
+    : { kind: "error", message: problem };
+}
+
 /** Parse `argv` (without the node and script entries). Pure: loads nothing and connects nowhere. */
 export function parseServerArgs(argv: readonly string[]): ParsedArgs {
   const parsed = parseOptions(argv);
   if (parsed instanceof Error) return { kind: "error", message: parsed.message };
   if (parsed.values.version) return { kind: "version" };
   const command = commandOf(parsed.positionals, parsed.values.help === true);
-  if (typeof command !== "string") return command;
-  const flags = flagsOf(parsed.values);
-  if (flags instanceof Error) return { kind: "error", message: flags.message };
-  if (command === "invite") {
-    const email = parsed.positionals[1];
-    if (email === undefined)
-      return { kind: "error", message: "invite needs an email: invite <email>" };
-    flags.email = email;
-  } else if (flags.name !== undefined || flags.role !== undefined) {
-    return { kind: "error", message: "--name and --role are only for `invite`" };
-  }
-  if (flags.watch === true && command !== "serve") {
-    return { kind: "error", message: "--watch is only for `serve`" };
-  }
-  return { kind: "run", command, flags };
+  return typeof command === "string" ? runOf(command, parsed) : command;
 }

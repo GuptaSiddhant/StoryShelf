@@ -8,6 +8,7 @@ import {
   Meta,
   SelectField,
   statusLabel,
+  Time,
 } from "../ui/components.tsx";
 import { DialogForm } from "./dialog-form.tsx";
 
@@ -63,7 +64,7 @@ export const InviteLink: FC<{
       <CodeBlock code={link} label="Copy link" />
       <Meta>
         Copy it now and send it to {email} yourself (StoryShelf sends no email). It works once and
-        expires on {expiresAt.slice(0, 10)}.
+        expires on <Time value={expiresAt} format="date" />.
         {absolute ? "" : " No public origin is confirmed, so add your server's address in front."}
       </Meta>
       <FormActions>

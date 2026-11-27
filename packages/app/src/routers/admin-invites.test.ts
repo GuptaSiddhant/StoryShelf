@@ -119,26 +119,26 @@ describe("site admin invites", () => {
   });
 });
 
-describe("Add member offers an invite", () => {
-  async function refusal(role: AuthUser["role"]): Promise<string> {
-    const { app, db } = await seed(role);
-    const project = await createTestProject(db, db.tables);
-    await new MemberModel(db).set(project.id, "u1", "admin");
-    const page = await (await app.request(`/projects/${project.slug}/settings/access`)).text();
-    const token = /name="csrf-token" content="([^"]+)"/u.exec(page)?.[1] ?? "";
-    const response = await app.request(`/projects/${project.slug}/settings/members`, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        csrf_token: token,
-        email: "new@example.com",
-        role: "viewer",
-      }).toString(),
-    });
-    expect(response.status).toBe(400);
-    return await response.text();
-  }
+async function refusal(role: AuthUser["role"]): Promise<string> {
+  const { app, db } = await seed(role);
+  const project = await createTestProject(db, db.tables);
+  await new MemberModel(db).set(project.id, "u1", "admin");
+  const page = await (await app.request(`/projects/${project.slug}/settings/access`)).text();
+  const token = /name="csrf-token" content="([^"]+)"/u.exec(page)?.[1] ?? "";
+  const response = await app.request(`/projects/${project.slug}/settings/members`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      csrf_token: token,
+      email: "new@example.com",
+      role: "viewer",
+    }).toString(),
+  });
+  expect(response.status).toBe(400);
+  return await response.text();
+}
 
+describe("Add member offers an invite", () => {
   it("links a site admin to the invite form for that address", async () => {
     expect(await refusal("admin")).toContain("/admin/invites/new?email=new%40example.com");
   });
