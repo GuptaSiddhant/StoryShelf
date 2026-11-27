@@ -1,4 +1,4 @@
-import { exposedVersion, ownVersion, peerRange } from "../manifest.ts";
+import { exposedVersion, nodeRange, ownVersion, peerRange } from "../manifest.ts";
 import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_ENTRY } from "../scaffold.ts";
 import {
   needsCompose,
@@ -137,7 +137,7 @@ export function generatePackageJson(answers: Answers): string {
     type: "module",
     private: true,
     description: "StoryShelf self-hosted visual testing server.",
-    engines: { node: ">=24" },
+    engines: { node: nodeRange() },
     // Where \`storyshelf-server\` finds the instance module.
     storyshelf: { server: SERVER_ENTRY },
     scripts: scriptsFor(answers),

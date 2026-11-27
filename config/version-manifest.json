@@ -2,10 +2,16 @@
   "packages": {
     "@storyshelf/affected": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "@storyshelf/ai": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "@storyshelf/core": {
           "range": "0.17.0",
@@ -15,10 +21,16 @@
     },
     "@storyshelf/app": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "@storyshelf/auth": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "@storyshelf/core": {
           "range": "0.17.0",
@@ -28,10 +40,16 @@
     },
     "@storyshelf/common": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "@storyshelf/core": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "nodemailer": {
           "range": "^10.2.1",
@@ -46,6 +64,9 @@
     },
     "@storyshelf/db": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "@aws-sdk/rds-signer": {
           "range": "^3.0.0",
@@ -110,14 +131,23 @@
     },
     "@storyshelf/mcp": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "@storyshelf/observability": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "@storyshelf/runner": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "@storyshelf/core": {
           "range": "0.17.0",
@@ -134,6 +164,9 @@
     },
     "@storyshelf/storage": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "@aws-sdk/client-s3": {
           "range": "^3.700.0",
@@ -168,6 +201,9 @@
     },
     "@storyshelf/storybook-addon": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {
         "storybook": {
           "range": "^8.6.0 || ^9.0.0 || ^10.0.0",
@@ -177,10 +213,16 @@
     },
     "create-storyshelf": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     },
     "storyshelf": {
       "version": "0.17.0",
+      "engines": {
+        "node": ">=24"
+      },
       "peers": {}
     }
   }

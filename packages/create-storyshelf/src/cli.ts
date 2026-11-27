@@ -5,10 +5,11 @@ import { packageVersion } from "./version.ts";
 const HELP = `create-storyshelf: scaffold a StoryShelf server
 
 Usage: npm create storyshelf [dir] [-- --install]
-       create-storyshelf [dir] [--cloud aws|gcp|azure] [--install]
+       create-storyshelf [dir] [--cloud aws|gcp|azure] [--install] [--yes]
 
   dir            output directory (default: asked)
   --cloud NAME   write a Terraform module stub for aws, gcp or azure instead of a server
+  -y, --yes      accept every default without asking (no terminal needed)
   --install      run the package manager's install in the new project (off by default)
   -h, --help     print this help
   -v, --version  print the version
@@ -19,6 +20,7 @@ const OPTIONS = {
   dir: { type: "string" },
   cloud: { type: "string" },
   install: { type: "boolean" },
+  yes: { type: "boolean", short: "y" },
   help: { type: "boolean", short: "h" },
   version: { type: "boolean", short: "v" },
 } as const;
@@ -27,7 +29,7 @@ type ParseConfig = { options: typeof OPTIONS; allowPositionals: true };
 
 /** What the arguments ask for: scaffold, help, the version, or an error to print. */
 export type Parsed =
-  | { kind: "run"; dir?: string; cloud?: string; install: boolean }
+  | { kind: "run"; dir?: string; cloud?: string; install: boolean; yes: boolean }
   | { kind: "help" }
   | { kind: "version" }
   | { kind: "error"; message: string };
@@ -57,6 +59,7 @@ export function parseArguments(argv: readonly string[]): Parsed {
     ...(dir === undefined ? {} : { dir }),
     ...(values.cloud === undefined ? {} : { cloud: values.cloud }),
     install: values.install === true,
+    yes: values.yes === true,
   };
 }
 
@@ -85,6 +88,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       ...(parsed.dir === undefined ? {} : { dir: parsed.dir }),
       ...(parsed.cloud === undefined ? {} : { cloud: parsed.cloud }),
       install: parsed.install,
+      yes: parsed.yes,
     });
   } catch (error) {
     process.stderr.write(`create-storyshelf: ${(error as Error).message}\n`);

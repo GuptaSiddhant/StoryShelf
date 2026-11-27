@@ -3,7 +3,7 @@ title: Set up with an AI agent
 description: Hand StoryShelf setup to a coding agent with a task to paste, an AGENTS.md snippet for your repository, and the files agents read.
 ---
 
-A coding agent (Claude Code, Cursor, Codex and the like) can do the repetitive part of setting up StoryShelf in a repository: find the Storybook, write the client config, check the connection and add the CI step. This page gives you the task to paste, a snippet for your repository's `AGENTS.md`, and the files the docs publish for agents.
+A coding agent (Claude Code, Cursor, Codex and the like) can do the repetitive part of setting up StoryShelf in a repository: find the Storybook, write the client config, check the connection and add the CI step.
 
 ## What agents read
 
@@ -18,7 +18,7 @@ Every page of this site is also available as Markdown at its URL plus `index.md`
 | `/llms-full.txt`   | Everything above in one file (large; the changelog is left out)          |
 | `/openapi.json`    | The REST API as an OpenAPI 3 document                                    |
 
-Each file starts with the StoryShelf version it describes. If the server you run is older or newer, trust the CLI's `--help` over the docs.
+Each file starts with the StoryShelf version it describes; if your server differs, trust the CLI's `--help`.
 
 ## A task to paste
 
@@ -67,9 +67,13 @@ Add this to the `AGENTS.md` (or `CLAUDE.md`) of the repository that is tested wi
   check fails, explain which stories changed and leave the verdict to the reviewer.
 ```
 
+## Scaffolding a server
+
+Without a terminal, run `npm create storyshelf my-storyshelf -- --yes` to take every default.
+
 ## The MCP server
 
-To let an agent read builds and comment on reviews, set up the [MCP server](/ai/mcp/). It has no approve or reject tool, which matches the snippet above.
+To let an agent read builds and comment on reviews, set up the [MCP server](/ai/mcp/).
 
 ## Next steps
 

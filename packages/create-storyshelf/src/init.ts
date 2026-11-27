@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Answers } from "./init/answers.ts";
 import { isCloud, runCloudInit } from "./init/cloud.ts";
 import { printNextSteps } from "./init/next-steps.ts";
-import { collectAnswers } from "./init/prompts.ts";
+import { collectAnswers, defaultAnswers } from "./init/prompts.ts";
 import { writeFiles } from "./init/writers.ts";
 import { runInstall } from "./install.ts";
 import { createReporter, printError } from "./output.ts";
@@ -19,10 +19,12 @@ export interface InitOptions {
   cloud?: string;
   /** Run the package manager's install in the new project (opt in; never with `--cloud`). */
   install?: boolean;
+  /** Accept every default without prompting (`--yes`); needs no terminal. */
+  yes?: boolean;
 }
 
 const NO_TERMINAL =
-  "create-storyshelf asks questions and needs an interactive terminal; nothing was written. Run it in a terminal.";
+  "create-storyshelf asks questions and needs an interactive terminal; nothing was written. Run it in a terminal, or pass --yes to accept the defaults.";
 
 /** Input ended mid-question: say why, and leave exit code 1 for when Node finds nothing left to run. */
 function onInputEnd(): void {
@@ -34,7 +36,8 @@ function onInputEnd(): void {
  * Ask the questions. Input that ends before they are answered (no terminal, `< /dev/null`) would
  * leave the prompt pending and Node would exit 0 having written nothing: fail with the reason instead.
  */
-async function collectAnswersOrFail(dir?: string): Promise<Answers | null> {
+async function collectAnswersOrFail(dir?: string, yes = false): Promise<Answers | null> {
+  if (yes) return defaultAnswers(dir);
   process.stdin.once("end", onInputEnd);
   try {
     const answers = await collectAnswers(dir);
@@ -57,6 +60,7 @@ async function collectAnswersOrFail(dir?: string): Promise<Answers | null> {
  * With `--cloud` it writes a Terraform module stub for that cloud instead.
  *
  * @param options - `dir` skips the directory question (every other choice is asked interactively);
+ *   `yes` asks nothing and takes every default;
  *   `cloud` selects the Terraform stub
  */
 export async function runInit(options: InitOptions, deps: InitDeps = {}): Promise<void> {
@@ -64,7 +68,7 @@ export async function runInit(options: InitOptions, deps: InitDeps = {}): Promis
     await initCloud(options.cloud, options.dir);
     return;
   }
-  await scaffoldServer(options.dir, options.install === true, deps);
+  await scaffoldServer(options.dir, options.install === true, options.yes === true, deps);
 }
 
 /** What `runInit` calls out to; tests replace it. */
@@ -77,9 +81,10 @@ export interface InitDeps {
 async function scaffoldServer(
   dir: string | undefined,
   install: boolean,
+  yes: boolean,
   deps: InitDeps,
 ): Promise<void> {
-  const answers = await collectAnswersOrFail(dir);
+  const answers = await collectAnswersOrFail(dir, yes);
   if (answers === null) {
     process.exitCode = 1;
     return;

@@ -11,9 +11,26 @@ describe("parseArguments", () => {
       kind: "run",
       dir: "my-server",
       install: false,
+      yes: false,
     });
-    expect(parseArguments(["--dir", "d"])).toEqual({ kind: "run", dir: "d", install: false });
-    expect(parseArguments([])).toEqual({ kind: "run", install: false });
+    expect(parseArguments(["--dir", "d"])).toEqual({
+      kind: "run",
+      dir: "d",
+      install: false,
+      yes: false,
+    });
+    expect(parseArguments([])).toEqual({ kind: "run", install: false, yes: false });
+  });
+
+  it("takes --yes and -y, off by default", () => {
+    expect(parseArguments(["--yes", "d"])).toEqual({
+      kind: "run",
+      dir: "d",
+      install: false,
+      yes: true,
+    });
+    expect(parseArguments(["-y"])).toMatchObject({ yes: true });
+    expect(parseArguments([])).toMatchObject({ yes: false });
   });
 
   it("takes --cloud and --install", () => {
@@ -21,6 +38,7 @@ describe("parseArguments", () => {
       kind: "run",
       cloud: "aws",
       install: true,
+      yes: false,
     });
   });
 

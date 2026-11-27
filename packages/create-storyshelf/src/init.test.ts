@@ -12,6 +12,7 @@ vi.mock("prompts", () => ({
 
 import prompts from "prompts";
 import { runInit } from "./init.ts";
+import { defaultAnswers } from "./init/prompts.ts";
 
 vi.mock("./manifest.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./manifest.ts")>()),
@@ -190,6 +191,41 @@ describe("runInit", () => {
   });
 });
 
+describe("runInit --yes", () => {
+  it("asks nothing and scaffolds every default, with no terminal", async () => {
+    const stdinTty = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+    const cwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await runInit({ yes: true, dir: "my-server" });
+    } finally {
+      process.chdir(cwd);
+      if (stdinTty) Object.defineProperty(process.stdin, "isTTY", stdinTty);
+      else Reflect.deleteProperty(process.stdin, "isTTY");
+    }
+    expect(prompts).not.toHaveBeenCalled();
+    expect(existsSync(join(dir, "package.json"))).toBe(true);
+    expect(existsSync(join(dir, "Dockerfile"))).toBe(false);
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name: string };
+    expect(pkg.name).toBe("my-server");
+  });
+
+  it("names the project my-storyshelf when no directory is given", () => {
+    expect(defaultAnswers()).toMatchObject({
+      name: "my-storyshelf",
+      dir: "./my-storyshelf",
+      deployTarget: "local",
+      database: "sqlite",
+      storage: "local",
+      auth: "password",
+      docker: false,
+      notifications: false,
+      observability: false,
+    });
+  });
+});
+
 describe("runInit without answers", () => {
   it("fails with exit code 1 and says why when there is no terminal", async () => {
     vi.mocked(prompts).mockResolvedValue({});
@@ -209,5 +245,6 @@ describe("runInit without answers", () => {
     expect(process.exitCode).toBe(1);
     process.exitCode = undefined;
     expect(errors.join("")).toContain("interactive terminal");
+    expect(errors.join("")).toContain("--yes");
   });
 });
