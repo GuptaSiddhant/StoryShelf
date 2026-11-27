@@ -79,6 +79,36 @@ const DeviceList: FC<{ devices: PushDeviceView[] }> = ({ devices }) =>
     </Table>
   );
 
+/** One block per browser state; the page's script shows the one that applies. */
+const PushStates: FC<{ state: PushClientState }> = ({ state }) => (
+  <>
+    <div data-push-when="unsupported" hidden={state !== "unsupported"}>
+      <Alert tone="warning" title="Push is not available in this browser" role="status">
+        This browser cannot receive web push. Open StoryShelf over HTTPS in a current browser.
+      </Alert>
+    </div>
+    <div data-push-when="denied" hidden={state !== "denied"}>
+      <Alert tone="warning" title="Notifications are blocked" role="status">
+        This browser blocks notifications for StoryShelf. Allow them in the site settings of your
+        browser, then reload this page.
+      </Alert>
+    </div>
+    <div data-push-when="idle" hidden={state !== "idle"}>
+      <HStack align="end" wrap>
+        <Field label="Device name (optional)" name="pushLabel" />
+        <Button variant="primary" size="sm" type="button" data-push-enable>
+          Enable push on this device
+        </Button>
+      </HStack>
+    </div>
+    <div data-push-when="enabled" hidden={state !== "enabled"}>
+      <Alert tone="success" title="Push is on for this device" role="status">
+        Remove this device below to turn it off.
+      </Alert>
+    </div>
+  </>
+);
+
 /**
  * Push notifications per device (ADR 0048, decision 4). The caller renders it only when the server
  * has VAPID keys and the viewer is signed in; without either, push is off and nothing shows.
@@ -92,46 +122,25 @@ export const PushDevicesCard: FC<{
   return (
     <Card>
       <div data-push data-push-state={state}>
-        <SectionTitle>Push notifications</SectionTitle>
-        <p class={note}>
-          Choose which devices get push. Per-project delivery follows your notification
-          subscriptions.
-        </p>
         <VStack>
-          <div data-push-when="unsupported" hidden={state !== "unsupported"}>
-            <Alert tone="warning" title="Push is not available in this browser" role="status">
-              This browser cannot receive web push. Open StoryShelf over HTTPS in a current browser.
-            </Alert>
-          </div>
-          <div data-push-when="denied" hidden={state !== "denied"}>
-            <Alert tone="warning" title="Notifications are blocked" role="status">
-              This browser blocks notifications for StoryShelf. Allow them in the site settings of
-              your browser, then reload this page.
-            </Alert>
-          </div>
-          <div data-push-when="idle" hidden={state !== "idle"}>
-            <HStack align="end" wrap>
-              <Field label="Device name (optional)" name="pushLabel" />
-              <Button variant="primary" size="sm" type="button" data-push-enable>
-                Enable push on this device
-              </Button>
-            </HStack>
-          </div>
-          <div data-push-when="enabled" hidden={state !== "enabled"}>
-            <Alert tone="success" title="Push is on for this device" role="status">
-              Remove this device below to turn it off.
-            </Alert>
-          </div>
-          <p class={note} data-push-status aria-live="polite">
-            {""}
-          </p>
-          <DeviceList devices={props.devices} />
+          <SectionTitle>Push notifications</SectionTitle>
           <p class={note}>
-            On iPhone and iPad, push needs StoryShelf installed to the home screen: open the Share
-            menu and choose Add to Home Screen, then enable push from the installed app.
+            Choose which devices get push. Per-project delivery follows your notification
+            subscriptions.
           </p>
+          <VStack>
+            <PushStates state={state} />
+            <p class={note} data-push-status aria-live="polite">
+              {""}
+            </p>
+            <DeviceList devices={props.devices} />
+            <p class={note}>
+              On iPhone and iPad, push needs StoryShelf installed to the home screen: open the Share
+              menu and choose Add to Home Screen, then enable push from the installed app.
+            </p>
+          </VStack>
+          <script dangerouslySetInnerHTML={{ __html: pushDevicesScript() }} />
         </VStack>
-        <script dangerouslySetInnerHTML={{ __html: pushDevicesScript() }} />
       </div>
     </Card>
   );
