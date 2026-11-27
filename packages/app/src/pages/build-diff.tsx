@@ -203,7 +203,7 @@ function DetailsPanel(props: {
     return null;
   }
   return (
-    <div class="mb-1" id="build-details">
+    <div id="build-details">
       <BuildDetails
         project={project}
         build={build}

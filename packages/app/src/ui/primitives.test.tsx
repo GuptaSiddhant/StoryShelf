@@ -17,6 +17,7 @@ import {
   FilterInput,
   Icon,
   Kbd,
+  LiveStatus,
   Progress,
   RelativeTime,
   Segmented,
@@ -475,6 +476,14 @@ describe("statusTone", () => {
 
   it("shows a skipped build neutral: routine, neither good news nor a problem", () => {
     expect(statusTone("skipped")).toBe("neutral");
+  });
+});
+
+describe("live status", () => {
+  it("is an empty polite region with its hook, hidden by css until it has text", async () => {
+    const html = await render(<LiveStatus hook="passkey-status" />);
+    expect(html).toMatch(/<p class="[^"]+" aria-live="polite" data-passkey-status="true"><\/p>/u);
+    expect(html).toContain(":empty");
   });
 });
 

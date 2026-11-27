@@ -19,19 +19,17 @@ export function UnverifiedDefaultNotice(props: {
     return null;
   }
   return (
-    <div class="mt-1">
-      <Alert tone="warning" title="Default-branch builds counted unverified">
-        {projects.length === 1 ? "One project counts" : `${String(projects.length)} projects count`}{" "}
-        builds that name its default branch without a git host confirming the commit is on it:{" "}
-        {projects.map((project, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
-          <span key={project.slug}>
-            {index > 0 ? ", " : ""}
-            <a href={`/projects/${project.slug}/settings/tests`}>{project.name}</a>
-          </span>
-        ))}
-        . Any upload token of those projects can move their default-branch baselines. Connect a git
-        channel and turn verification back on in the project's Tests settings.
-      </Alert>
-    </div>
+    <Alert tone="warning" title="Default-branch builds counted unverified">
+      {projects.length === 1 ? "One project counts" : `${String(projects.length)} projects count`}{" "}
+      builds that name its default branch without a git host confirming the commit is on it:{" "}
+      {projects.map((project, index): HtmlEscapedString | Promise<HtmlEscapedString> => (
+        <span key={project.slug}>
+          {index > 0 ? ", " : ""}
+          <a href={`/projects/${project.slug}/settings/tests`}>{project.name}</a>
+        </span>
+      ))}
+      . Any upload token of those projects can move their default-branch baselines. Connect a git
+      channel and turn verification back on in the project's Tests settings.
+    </Alert>
   );
 }

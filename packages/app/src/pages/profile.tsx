@@ -11,6 +11,7 @@ import {
   Card,
   Field,
   HStack,
+  LiveStatus,
   Meta,
   PageHeader,
   SectionTitle,
@@ -226,9 +227,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
           Register a passkey
         </Button>
       </HStack>
-      <p class={profileMeta} data-passkey-status="true" aria-live="polite">
-        {""}
-      </p>
+      <LiveStatus hook="passkey-status" />
       <script dangerouslySetInnerHTML={{ __html: passkeyRegisterScript() }} />
     </Card>
   );
@@ -239,7 +238,7 @@ const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
   <Card>
     <SectionTitle>Display name</SectionTitle>
     <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
-    <form method="post" action="/profile" novalidate>
+    <form method="post" action="/profile" class="max-w-prose" novalidate>
       <Field label="Display name" name="displayName" type="text" required value={displayName} />
       <Button variant="primary" type="submit">
         Save name

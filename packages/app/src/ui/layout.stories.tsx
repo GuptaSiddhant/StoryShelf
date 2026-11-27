@@ -5,7 +5,9 @@ import {
   Badge,
   Button,
   Card,
+  Alert,
   CardSection,
+  Field,
   FilterInput,
   HStack,
   Meta as MetaText,
@@ -147,4 +149,16 @@ export const Toolbar = jsxStory(() => (
     <Button variant="secondary">View Storybook</Button>
     <Button>View</Button>
   </HStack>
+));
+
+/** An alert above a field keeps one stack gap between them (#1286 L3). */
+export const AlertAboveField = jsxStory(() => (
+  <Card>
+    <VStack>
+      <Alert tone="warning" title="No public origin">
+        GitHub returns to this server&apos;s public address. Confirm it on the System page first.
+      </Alert>
+      <Field label="App name" name="app-name" value="StoryShelf" />
+    </VStack>
+  </Card>
 ));

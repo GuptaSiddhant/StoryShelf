@@ -8,6 +8,7 @@ import {
   Button,
   EmptyState,
   HStack,
+  LiveStatus,
   Meta as MetaText,
   Stat,
   VStack,
@@ -153,4 +154,15 @@ export const SentenceCaseLabels = jsxStory(() => (
       <Badge key={label}>{statusLabel(label)}</Badge>
     ))}
   </HStack>
+));
+
+/** A live status line takes no room until a script writes into it (no blank band under a button). */
+export const LiveStatusEmptyAndFilled = jsxStory(() => (
+  <VStack>
+    <Button variant="secondary">Sign in with a passkey</Button>
+    <LiveStatus hook="story-empty-status" />
+    <MetaText>Above: an empty status line (no gap). Below: one with a message.</MetaText>
+    <Button variant="secondary">Register a passkey</Button>
+    <MetaText>Waiting for your device…</MetaText>
+  </VStack>
 ));

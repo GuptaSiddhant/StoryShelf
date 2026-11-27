@@ -25,7 +25,7 @@ export type RenderedContent = string | Promise<string>;
  * `wide` the full viewport (workspaces such as the review page), `bare` drops the app chrome
  * (sign-in, invites).
  */
-type PageLayout = "form" | "default" | "wide" | "bare";
+type PageLayout = "form" | "form-page" | "default" | "wide" | "bare";
 
 const shellRoot = css`
   /* shell */
@@ -70,8 +70,15 @@ const shellContentForm = css`
   max-width: 880px;
 `;
 
+const shellContentFormPage = css`
+  /* shell-content-form-page */
+  ${shellContent}
+  max-width: 640px;
+`;
+
 const CONTENT_CLASS = {
   form: shellContentForm,
+  "form-page": shellContentFormPage,
   default: shellContent,
   wide: shellContentWide,
 };

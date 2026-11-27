@@ -1,6 +1,15 @@
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
 import { getStore } from "../store.ts";
-import { Alert, Button, Card, Field, Meta, PageHeader, VStack } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  LiveStatus,
+  Meta,
+  PageHeader,
+  VStack,
+} from "../ui/components.tsx";
 import { passkeyLoginScript } from "./passkey-ceremony.ts";
 
 /** One engine login widget (descriptor-driven). */
@@ -97,7 +106,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
             )}
 
           {state.engineMethods?.some((method) => method.kind === "passkey") ? (
-            <div class="mt-1">
+            <>
               <VStack>
                 <Meta center>or</Meta>
                 <Button
@@ -108,12 +117,10 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
                 >
                   Sign in with a passkey
                 </Button>
-                <p class="login__help" data-passkey-login-status="true" aria-live="polite">
-                  <Meta />
-                </p>
+                <LiveStatus hook="passkey-login-status" />
               </VStack>
               <script dangerouslySetInnerHTML={{ __html: passkeyLoginScript() }} />
-            </div>
+            </>
           ) : null}
 
           {ui.publicLink ? (

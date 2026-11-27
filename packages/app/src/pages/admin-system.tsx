@@ -351,11 +351,7 @@ function CaptureCards(props: {
 function RuntimeSection(props: {
   rows: HealthReport["statuses"];
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
-  return (
-    <div class="mt-1">
-      <RuntimeStatusCard rows={props.rows} />
-    </div>
-  );
+  return <RuntimeStatusCard rows={props.rows} />;
 }
 
 /** The integrations card, anchored for the settings pages' link; absent when no status is known. */

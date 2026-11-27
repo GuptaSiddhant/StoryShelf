@@ -5,17 +5,16 @@
  */
 import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
-import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
+import type { RenderedContent } from "../shell/document.tsx";
+import { FormPage } from "../shell/form-page.tsx";
 import {
   Alert,
   Button,
-  Card,
   CheckField,
   Field,
   FormActions,
   Meta,
   OptionFields,
-  PageHeader,
   TextareaField,
   VStack,
 } from "../ui/components.tsx";
@@ -88,14 +87,16 @@ function ManifestFields(props: FieldProps): HtmlEscapedString | Promise<HtmlEsca
   const { data } = props;
   return (
     <>
-      <ManifestIntro data={data} />
-      <Field
-        label="App name"
-        name="gh_name"
-        value={value(data, "gh_name", "StoryShelf")}
-        error={data.errors["gh_name"]}
-        hint="Unique on GitHub; GitHub asks for another one if it is taken."
-      />
+      <VStack>
+        <ManifestIntro data={data} />
+        <Field
+          label="App name"
+          name="gh_name"
+          value={value(data, "gh_name", "StoryShelf")}
+          error={data.errors["gh_name"]}
+          hint="Unique on GitHub; GitHub asks for another one if it is taken."
+        />
+      </VStack>
       <Field
         label="Organization"
         name="gh_org"
@@ -293,6 +294,9 @@ function ConnectionForm(props: FieldProps): HtmlEscapedString | Promise<HtmlEsca
         <Button type="submit" name="intent" value="save">
           Continue
         </Button>
+        <Button variant="secondary" href="/admin/git">
+          Cancel
+        </Button>
       </FormActions>
     </form>
   );
@@ -301,8 +305,9 @@ function ConnectionForm(props: FieldProps): HtmlEscapedString | Promise<HtmlEsca
 /** The add-connection page; a failed post re-renders it with the errors (422). */
 export function renderGitConnectionForm(data: GitConnectionFormData): RenderedContent {
   return (
-    <DocumentLayout
+    <FormPage
       title="Add a git connection"
+      description="One connection serves every project the server links to its repositories."
       nav={{
         active: "admin",
         trail: [
@@ -311,26 +316,15 @@ export function renderGitConnectionForm(data: GitConnectionFormData): RenderedCo
           { label: "Add connection" },
         ],
       }}
-    >
-      <PageHeader
-        title="Add a git connection"
-        description="One connection serves every project the server links to its repositories."
-        actions={
-          <Button variant="secondary" size="sm" href="/admin/git">
-            Back
-          </Button>
-        }
-      />
-      {data.errors["form"] ? (
-        <div class="mb-1">
+      notice={
+        data.errors["form"] ? (
           <Alert tone="danger" role="alert">
             {data.errors["form"]}
           </Alert>
-        </div>
-      ) : null}
-      <Card>
-        <ConnectionForm data={data} />
-      </Card>
-    </DocumentLayout>
+        ) : null
+      }
+    >
+      <ConnectionForm data={data} />
+    </FormPage>
   );
 }

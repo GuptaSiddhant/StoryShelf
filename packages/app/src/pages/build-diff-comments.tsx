@@ -223,7 +223,7 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
       hx-post={`/projects/${project.slug}/builds/${build.id}/comments`}
       hx-target={`#${SNAPSHOT_COMMENTS_ID}`}
       hx-swap="outerHTML"
-      class="mt-1"
+      class="max-w-prose"
     >
       {csrfField()}
       <VStack>

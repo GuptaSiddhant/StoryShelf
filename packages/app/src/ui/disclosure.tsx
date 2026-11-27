@@ -30,7 +30,7 @@ const disclosureSummary = css`
 
 const disclosureBody = css`
   /* disclosure-body */
-  padding: var(--space-1) var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--border-subtle);
 `;
 
