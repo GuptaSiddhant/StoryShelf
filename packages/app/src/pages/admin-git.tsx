@@ -169,11 +169,9 @@ function ConnectionsCard(props: {
   }));
   return (
     <Card>
-      <HStack justify="between">
-        <SectionTitle actions={items.length > 0 ? addConnection(false) : null}>
-          Connections
-        </SectionTitle>
-      </HStack>
+      <SectionTitle actions={items.length > 0 ? addConnection(false) : null}>
+        Connections
+      </SectionTitle>
       <Meta>
         One GitHub App or GitLab token serves every project. StoryShelf reads which pull request
         holds a commit, its own comments, the repository's id and whether a commit is on the default
