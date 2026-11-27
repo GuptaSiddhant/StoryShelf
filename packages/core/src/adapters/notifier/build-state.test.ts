@@ -62,8 +62,8 @@ describe("statusesForBuild: the testing status", () => {
     ["pending", "pending", "Capturing and comparing screenshots"],
     ["capturing", "pending", "Capturing and comparing screenshots"],
     ["comparing", "pending", "Capturing and comparing screenshots"],
-    ["reviewing", "pending", "Review open: 1 change to review"],
-    ["approved", "success", "Review closed: 1 change approved"],
+    ["reviewing", "pending", "Review open: 4 changes to review"],
+    ["approved", "success", "Review closed: changes approved"],
     ["rejected", "failure", "Review closed: 2 changes rejected"],
     ["failed", "failure", "Capture failed"],
     ["cancelled", "cancelled", "Cancelled"],
@@ -79,8 +79,57 @@ describe("statusesForBuild: the testing status", () => {
   });
 
   it("says no visual changes when an approved build had none", () => {
-    const set = run({ build: { status: "approved", changedCount: 0, approvedCount: 0 } });
+    const set = run({
+      build: { status: "approved", changedCount: 0, approvedCount: 0 },
+      changes: [],
+    });
     expect(gate(set)?.description).toBe("Review closed: no visual changes");
+  });
+});
+
+const unchanged = (from: number, count: number) =>
+  Array.from({ length: count }, (_, idx) => change(from + idx, { status: "unchanged" }));
+const open = (from: number, count: number, status: string) =>
+  Array.from({ length: count }, (_, idx) => change(from + idx, { status }));
+
+describe("statusesForBuild: counting changes that need review (#1415)", () => {
+  const wide = { snapshotCount: 400, approvedCount: 382, changedCount: 18, rejectedCount: 0 };
+
+  it("counts the open snapshots, not changedCount minus the unchanged ones", () => {
+    const set = run({
+      build: { status: "reviewing", ...wide },
+      changes: [...unchanged(1, 382), ...open(400, 13, "changed"), ...open(500, 5, "new")],
+    });
+    expect(gate(set)?.description).toBe("Review open: 18 changes to review");
+    expect(set.comment?.markdown).toContain("18 visual changes need review");
+  });
+
+  it("counts approved snapshots only once every change is approved", () => {
+    const set = run({
+      build: { status: "approved", ...wide, changedCount: 0 },
+      changes: [...unchanged(1, 382), ...open(400, 18, "approved")],
+    });
+    expect(gate(set)?.description).toBe("Review closed: 18 changes approved");
+  });
+
+  it("counts approved changes of a mixed approved and rejected build", () => {
+    const set = run({
+      build: { status: "rejected", ...wide, changedCount: 0, rejectedCount: 2 },
+      changes: [...unchanged(1, 382), ...open(400, 16, "approved"), ...open(500, 2, "rejected")],
+    });
+    expect(gate(set)?.description).toBe("Review closed: 2 changes rejected");
+    expect(set.comment).not.toBeNull();
+  });
+
+  it("keeps the on-changes comment after every change is approved", () => {
+    const outputs = { ...ALL_OUTPUTS, comment: "on-changes" as const };
+    const approved = {
+      build: { status: "approved", ...wide, changedCount: 0 },
+      changes: [...unchanged(1, 382), ...open(400, 18, "approved")],
+      outputs,
+    };
+    expect(run(approved).comment).not.toBeNull();
+    expect(run({ ...approved, changes: unchanged(1, 382) }).comment).toBeNull();
   });
 });
 
@@ -277,7 +326,7 @@ describe("statusesForBuild: the comment", () => {
       url: "https://shelf.example.com/projects/web/builds/b1/diff",
       state: "pending",
     });
-    expect(comment?.markdown).toContain("### 🟡 StoryShelf: 3 visual changes need review");
+    expect(comment?.markdown).toContain("### 🟡 StoryShelf: 4 visual changes need review");
     expect(comment?.markdown).toContain(
       "[**Review changes →**](https://shelf.example.com/projects/web/builds/b1/diff)",
     );
@@ -395,9 +444,9 @@ const claim = (branchVerified: string | null, isDefault = false) => ({
 
 describe("statusesForBuild: a default-branch claim that did not count (#910)", () => {
   it.each([
-    ["refused", "Commit is not on main: 3 changes to review"],
-    ["unreachable", "Git host could not confirm main: 3 changes to review"],
-    ["unverified", "Default branch not verified: 3 changes to review"],
+    ["refused", "Commit is not on main: 4 changes to review"],
+    ["unreachable", "Git host could not confirm main: 4 changes to review"],
+    ["unverified", "Default branch not verified: 4 changes to review"],
   ])("says why a %s claim waits for review, and never passes", (verification, description) => {
     const status = gate(run({ build: claim(verification) }));
     expect(status).toMatchObject({ state: "pending", description });
@@ -405,20 +454,23 @@ describe("statusesForBuild: a default-branch claim that did not count (#910)", (
 
   it("reads like any review for a verified or unclaimed build", () => {
     expect(gate(run({ build: claim("verified", true) }))?.description).toBe(
-      "Review open: 3 changes to review",
+      "Review open: 4 changes to review",
     );
-    expect(gate(run({ build: claim(null) }))?.description).toBe("Review open: 3 changes to review");
+    expect(gate(run({ build: claim(null) }))?.description).toBe("Review open: 4 changes to review");
   });
 
   it("says nothing more for an unverified claim the project counts", () => {
     expect(gate(run({ build: claim("unverified", true) }))?.description).toBe(
-      "Review open: 3 changes to review",
+      "Review open: 4 changes to review",
     );
   });
 
   it("passes only after an approver accepted the changes", () => {
     const status = gate(
-      run({ build: { ...claim("refused"), status: "approved", approvedCount: 4 } }),
+      run({
+        build: { ...claim("refused"), status: "approved", changedCount: 0 },
+        changes: [1, 2, 3, 4].map((n) => change(n, { status: "approved" })),
+      }),
     );
     expect(status).toMatchObject({
       state: "success",

@@ -94,13 +94,13 @@ async function statesOf(
     publishing: await publishingOfBuild({ db: deps.db, storage: deps.storage }, build),
     source: (await skipSourceOf(deps, build)) ?? undefined,
     approvals: await approvalsOf(deps, build, project),
-    changes: snapshots.changes,
+    changes: snapshots,
     extras: await extrasOf(deps, {
       build,
       project,
       urls,
       testing: flags.testing,
-      snapshots: snapshots.all,
+      snapshots,
     }),
     supersededBy: await supersededByOf(deps, build),
     outputs: where.target.link?.outputs,
@@ -247,17 +247,14 @@ async function approvalsOf(
   };
 }
 
-/** The build's snapshots (with testing on): `changes` for the annotations only when something changed. */
+/** The build's snapshots (with testing on): annotations, rows and the approved count read them. */
 async function snapshotsOf(
   deps: BuildStateDeps,
   build: Build,
   testing: boolean,
-): Promise<{ all: Snapshot[] | undefined; changes: Snapshot[] | undefined }> {
-  const all =
-    testing && build.snapshotCount > 0
-      ? await new SnapshotModel(deps.db).listByBuild(build.id)
-      : undefined;
-  return { all, changes: build.changedCount > 0 ? all : undefined };
+): Promise<Snapshot[] | undefined> {
+  const wanted = testing && build.snapshotCount > 0;
+  return wanted ? await new SnapshotModel(deps.db).listByBuild(build.id) : undefined;
 }
 
 /** The newer build that cancelled this one (ADR 0045), or undefined for any other build. */
