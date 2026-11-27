@@ -24,6 +24,29 @@ const codeWrap = css`
   }
 `;
 
+const commandToken = css`
+  /* command-token */
+  white-space: nowrap;
+`;
+
+/**
+ * An inline command or file name in running text. It breaks only between words: each token (a
+ * flag such as `--name`, a value, a path) stays whole, so `--name` never splits into `-` and `-name`.
+ */
+export const Command: FC<{ children: string }> = ({ children }) => {
+  const tokens = children.split(/\s+/u).filter((token) => token.length > 0);
+  return (
+    <code>
+      {tokens.map((token, index) => (
+        <>
+          {index > 0 ? " " : null}
+          <span class={commandToken}>{token}</span>
+        </>
+      ))}
+    </code>
+  );
+};
+
 /**
  * Monospace command/snippet with a copy button (wired by the shell script). The snippet scrolls
  * sideways when it is wider than its box, so it takes keyboard focus (`tabindex`) and a keyboard can scroll it.
