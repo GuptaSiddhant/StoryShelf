@@ -47,25 +47,28 @@ Or let the CLI write this for you: `npx create-storyshelf --cloud gcp` writes a 
 
 ### Inputs
 
-| Name                                     | Default                        | Meaning                                                                                                                  |
-| ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `name`                                   | required                       | Name prefix, 2 to 20 characters                                                                                          |
-| `project_id`                             | required                       | The GCP project                                                                                                          |
-| `image_version`                          | required                       | Release version of the image (no `v`)                                                                                    |
-| `region`                                 | `us-central1`                  | Must match the provider's region                                                                                         |
-| `image_repository`                       | `""`                           | A full registry path (your mirror). Empty creates the ghcr.io proxy                                                      |
-| `public_base_url`                        | `""`                           | `SHELF_PUBLIC_BASE_URL`, for a domain you map yourself; empty means the service's `run.app` URL                          |
-| `admin_email`                            | `admin@example.com`            | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                            |
-| `network`, `subnetwork`                  | `""`                           | An existing VPC and subnet (self links). Empty creates them                                                              |
-| `cpu`, `memory`                          | `2`, `4Gi`                     | Capture renders in the container, so do not go much lower                                                                |
-| `min_instances`, `max_instances`         | `1`, `1`                       | Identical copies. At least 1 (validated). See [Running several instances](/guides/deployment/#running-several-instances) |
-| `database_pool_size`                     | `10`                           | Connections per copy. `max_instances` × this must fit the database's limit                                               |
-| `shutdown_grace_seconds`                 | `8`                            | Sets `SHELF_SHUTDOWN_GRACE_SECONDS`, 1 to 9 (see [Shutdown](#shutdown))                                                  |
-| `existing_database_url_secret_id`        | `""`                           | A Postgres URL in Secret Manager. No database is created                                                                 |
-| `database_tier`, `database_disk_size_gb` | `db-custom-1-3840`, `10`       | Created database only                                                                                                    |
-| `deletion_protection`                    | `true`                         | Protects the database and service. `false` also empties the bucket on destroy                                            |
-| `database_init_image`                    | `postgres:16-alpine` by digest | Image of the `db-init` job. It receives the admin password, so pin a mirror by digest                                    |
-| `labels`                                 | `{}`                           | Added to every resource that supports them                                                                               |
+| Name                                                                                  | Default                        | Meaning                                                                                                                                |
+| ------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                                                                | required                       | Name prefix, 2 to 20 characters                                                                                                        |
+| `project_id`                                                                          | required                       | The GCP project                                                                                                                        |
+| `image_version`                                                                       | required                       | Release version of the image (no `v`)                                                                                                  |
+| `region`                                                                              | `us-central1`                  | Must match the provider's region                                                                                                       |
+| `image_repository`                                                                    | `""`                           | A full registry path (your mirror). Empty creates the ghcr.io proxy                                                                    |
+| `public_base_url`                                                                     | `""`                           | `SHELF_PUBLIC_BASE_URL`, for a domain you map yourself; empty means the service's `run.app` URL                                        |
+| `admin_email`                                                                         | `admin@example.com`            | Local admin login email (`SHELF_ADMIN_EMAIL`)                                                                                          |
+| `network`, `subnetwork`                                                               | `""`                           | An existing VPC and subnet (self links). Empty creates them                                                                            |
+| `cpu`, `memory`                                                                       | `2`, `4Gi`                     | Capture renders in the container, so do not go much lower                                                                              |
+| `min_instances`, `max_instances`                                                      | `1`, `1`                       | Identical copies. At least 1 (validated). See [Running several instances](/guides/deployment/#running-several-instances)               |
+| `database_pool_size`                                                                  | `10`                           | Connections per copy. `max_instances` × this must fit the database's limit                                                             |
+| `remote_browser_endpoint_secret_id`, `remote_browser_token_secret_id`                 | `""`                           | Optional [remote browser](/guides/remote-browsers/#from-the-environment-the-product-image) as secret references. The token is optional |
+| `remote_browser_protocol`, `remote_browser_reach`                                     | `""`                           | Declared with the endpoint: `playwright` or `cdp`, `loopback` or `url`                                                                 |
+| `remote_browser_engines`, `remote_browser_sessions`, `remote_browser_max_connections` | `""`, `0`, `0`                 | Engines, parallel pages and most connections per copy (`0`: the image's default)                                                       |
+| `shutdown_grace_seconds`                                                              | `8`                            | Sets `SHELF_SHUTDOWN_GRACE_SECONDS`, 1 to 9 (see [Shutdown](#shutdown))                                                                |
+| `existing_database_url_secret_id`                                                     | `""`                           | A Postgres URL in Secret Manager. No database is created                                                                               |
+| `database_tier`, `database_disk_size_gb`                                              | `db-custom-1-3840`, `10`       | Created database only                                                                                                                  |
+| `deletion_protection`                                                                 | `true`                         | Protects the database and service. `false` also empties the bucket on destroy                                                          |
+| `database_init_image`                                                                 | `postgres:16-alpine` by digest | Image of the `db-init` job. It receives the admin password, so pin a mirror by digest                                                  |
+| `labels`                                                                              | `{}`                           | Added to every resource that supports them                                                                                             |
 
 ### Outputs
 
@@ -140,13 +143,14 @@ If your team won't use the module, you need three things:
 1. **The image.** `ghcr.io/guptasiddhant/storyshelf:<version>` (`amd64` and `arm64`). It listens on port 3000 and bundles Chromium. Use at least 2 vCPU and 4 GB for capture, CPU always allocated and one instance minimum; the `-hosting` variant has no browser, for hosting without capture.
 2. **The environment.** This is what the module passes:
 
-   | Variable                                     | Value                                                                                                                                                   |
-   | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `SHELF_GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`   | The bucket and project. Credentials come from the service account (Application Default Credentials). Setting another storage backend too stops the boot |
-   | `SHELF_PUBLIC_BASE_URL`, `SHELF_TRUST_PROXY` | The public `https://` origin, and `1` behind a proxy                                                                                                    |
-   | `SHELF_SECRET`, `SHELF_ADMIN_TOKEN`          | At least 32 random characters, the same on every copy (secret references)                                                                               |
-   | `DATABASE_URL`, `SHELF_DATABASE_POOL_MAX`    | A Postgres URL (the Cloud SQL private IP), and connections per copy                                                                                     |
-   | `SHELF_SHUTDOWN_GRACE_SECONDS`               | Drain time on SIGTERM, below the platform's 10 second window                                                                                            |
+   | Variable                                     | Value                                                                                                                                                                            |
+   | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `SHELF_GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT`   | The bucket and project. Credentials come from the service account (Application Default Credentials). Setting another storage backend too stops the boot                          |
+   | `SHELF_PUBLIC_BASE_URL`, `SHELF_TRUST_PROXY` | The public `https://` origin, and `1` behind a proxy                                                                                                                             |
+   | `SHELF_SECRET`, `SHELF_ADMIN_TOKEN`          | At least 32 random characters, the same on every copy (secret references)                                                                                                        |
+   | `DATABASE_URL`, `SHELF_DATABASE_POOL_MAX`    | A Postgres URL (the Cloud SQL private IP), and connections per copy                                                                                                              |
+   | `SHELF_REMOTE_BROWSER_*`                     | Optional remote browser: the endpoint and token as secret references, the rest declared (see [Remote browsers](/guides/remote-browsers/#from-the-environment-the-product-image)) |
+   | `SHELF_SHUTDOWN_GRACE_SECONDS`               | Drain time on SIGTERM, below the platform's 10 second window                                                                                                                     |
 
 3. **The permissions** in the section above, attached to the container's own identity. Never put cloud access keys in environment files.
 

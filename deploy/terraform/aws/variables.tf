@@ -228,3 +228,78 @@ variable "gitlab_host" {
   type        = string
   default     = ""
 }
+
+# Remote browsers (ADR 0050): the image reads the SHELF_REMOTE_BROWSER_* variables. The endpoint can
+# carry a key, so both it and the token are Secrets Manager secrets you create outside Terraform:
+# their values never enter configuration or state. protocol and reach are declared, never inferred.
+variable "remote_browser_endpoint_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the remote browser's endpoint (ws(s)://...), passed as SHELF_REMOTE_BROWSER_ENDPOINT. Empty leaves remote browsers off (capture runs in the container). Set with remote_browser_protocol and remote_browser_reach."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.remote_browser_endpoint_secret_arn == "" || (var.remote_browser_protocol != "" && var.remote_browser_reach != "")
+    error_message = "Set remote_browser_protocol and remote_browser_reach with remote_browser_endpoint_secret_arn."
+  }
+}
+
+variable "remote_browser_token_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the remote browser's access token, sent as a Bearer header and passed as SHELF_REMOTE_BROWSER_TOKEN. Optional (an endpoint can carry the key); needs the endpoint."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.remote_browser_token_secret_arn == "" || var.remote_browser_endpoint_secret_arn != ""
+    error_message = "Set remote_browser_endpoint_secret_arn with remote_browser_token_secret_arn."
+  }
+}
+
+variable "remote_browser_protocol" {
+  description = "How the runner talks to the remote browser: playwright or cdp (Chromium only), passed as SHELF_REMOTE_BROWSER_PROTOCOL. Empty with no endpoint."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "playwright", "cdp"], var.remote_browser_protocol)
+    error_message = "remote_browser_protocol must be playwright or cdp."
+  }
+}
+
+variable "remote_browser_reach" {
+  description = "How the remote browser reaches the Storybook: loopback (the service routes back to the host, playwright only) or url (a signed Storybook URL on the public origin), passed as SHELF_REMOTE_BROWSER_REACH. Empty with no endpoint."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = contains(["", "loopback", "url"], var.remote_browser_reach) && !(var.remote_browser_protocol == "cdp" && var.remote_browser_reach == "loopback")
+    error_message = "remote_browser_reach must be loopback or url, and loopback needs the playwright protocol."
+  }
+}
+
+variable "remote_browser_engines" {
+  description = "Comma-separated engines the service offers (chromium, firefox, webkit, chrome), passed as SHELF_REMOTE_BROWSER_ENGINES. Empty means chromium."
+  type        = string
+  default     = ""
+}
+
+variable "remote_browser_sessions" {
+  description = "Parallel pages the service's plan allows per copy, passed as SHELF_REMOTE_BROWSER_SESSIONS. 0 means the image's default (1)."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.remote_browser_sessions >= 0 && floor(var.remote_browser_sessions) == var.remote_browser_sessions
+    error_message = "remote_browser_sessions must be a whole number of at least 0."
+  }
+}
+
+variable "remote_browser_max_connections" {
+  description = "Most connections each copy holds to the service at once, passed as SHELF_REMOTE_BROWSER_MAX_CONNECTIONS. 0 means no cap."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.remote_browser_max_connections >= 0 && floor(var.remote_browser_max_connections) == var.remote_browser_max_connections
+    error_message = "remote_browser_max_connections must be a whole number of at least 0."
+  }
+}

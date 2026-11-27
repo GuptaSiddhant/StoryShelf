@@ -59,7 +59,7 @@ storyshelf create --url <url> --name <name> --token <admin-token>
 npx create-storyshelf --dir <dir>
 ```
 
-`storyshelf upload` — upload a built Storybook as a build. `--url/--slug` optional when `.storybook/storyshelf.json` exists (flags > env > file). `--token/--sha/--branch` fallback to `SHELF_TOKEN`/`GITHUB_SHA`/`GITHUB_REF_NAME`. Running `storyshelf` with no args defaults to `upload` if config exists, else shows help to run `init`.
+`storyshelf upload` — upload a built Storybook as a build. `--url/--slug` optional when `.storybook/storyshelf.json` exists (flags > env > file). The token comes from `SHELF_TOKEN` (`--token` warns: arguments show in the process list). `--sha/--branch` come from the CI provider (the PR head on a pull request), then local git. Running `storyshelf` with no args is the same command, with no flags: it uploads if config exists, else shows help to run `init`.
 
 ```sh
 storyshelf upload --url <url> --slug <slug> --token <token> \

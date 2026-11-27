@@ -38,7 +38,8 @@ import { createCaptureRunner } from "@storyshelf/runner";
  * `SHELF_GITLAB_TOKEN[_FILE]` + `SHELF_GITLAB_TOKEN_EXPIRES`, `SHELF_GIT_CONFIG_FILE`; ADR 0054),
  * `SHELF_SHUTDOWN_GRACE_SECONDS` (bound of the SIGTERM drain, a few seconds below the platform's stop timeout),
  * `PLAYWRIGHT_SERVICE_URL` + `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` (an Azure Playwright Workspace, off
- * unless set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
+ * unless set), `SHELF_REMOTE_BROWSER_ENDPOINT` + `_PROTOCOL` + `_REACH` (one generic remote browser, with
+ * optional `_TOKEN`, `_NAME`, `_ENGINES`, `_SESSIONS` and `_MAX_CONNECTIONS`; off unless one is set), `SHELF_STORYBOOK_HOSTING` (`trusted` by default, or `sandboxed`; ADR 0051) and `SHELF_CAPTURE=off` (hosting only; the `-hosting` image sets it). Sign-in is on:
  * `SHELF_ADMIN_PASSWORD` and `SHELF_SECRET` are required unless `SHELF_AUTH=none` opts out explicitly, and a
  * missing or short secret stops the server. Bundled by rolldown (`rolldown.config.ts`).
  */
@@ -77,6 +78,14 @@ function openAdapters(
     );
   }
   return { database, storage };
+}
+
+/** The runner's browsers; logs the remote targets' names, never an endpoint or a token. */
+function browsersOf(env: Env, logger: Logger): ReturnType<typeof browsersFromEnv> {
+  const browsers = browsersFromEnv(env);
+  const remotes = browsers.filter((browser) => typeof browser !== "string");
+  logger.info({ remoteBrowsers: remotes.map((browser) => browser.name) }, "remote browsers");
+  return browsers;
 }
 
 /** Git connections from the environment (ADR 0054, decision 9): the key and token are never logged. */
@@ -175,7 +184,7 @@ async function imageOptions(env: Env): Promise<ShelfOptions> {
     database,
     storage,
     ...(captureEnabled(env)
-      ? { testing: { runner: createCaptureRunner({ browsers: browsersFromEnv(env) }) } }
+      ? { testing: { runner: createCaptureRunner({ browsers: browsersOf(env, logger) }) } }
       : {}),
     design: integrations.design,
     git: openGit(env, logger),

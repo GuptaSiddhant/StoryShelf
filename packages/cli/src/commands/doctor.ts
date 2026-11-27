@@ -3,6 +3,7 @@ import { access, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClient, RequestError } from "../client.ts";
 import { findStorybookMain, loadStorybookConfig, type StorybookConfig } from "../config.ts";
+import { describeIdentity, resolveUploadIdentity } from "../identity.ts";
 import { createReporter, printLine, type Reporter } from "../output.ts";
 import {
   resolveConnection,
@@ -164,7 +165,7 @@ export async function runDoctor(
   const checks: Check[] = [];
   const connection = await reporter.phase("Checking config", "Checked config", async () => {
     const cfg = await loadStorybookConfig(cwd, options.config);
-    checks.push(await checkSetup(cwd), checkConfigFile(cfg));
+    checks.push(await checkSetup(cwd), checkConfigFile(cfg), ...checkIdentity(cwd));
     return { cfg, connection: await tryResolveConnection(options, checks) };
   });
   if (connection.connection) {
@@ -197,6 +198,15 @@ function historyProblem(cwd: string): Check | null {
           "Shallow clone detected — affected capture renders all stories (use fetch-depth: 0)",
       }
     : null;
+}
+
+/** Every identity value an upload would use, with its source (never the token), and any warning. */
+function checkIdentity(cwd: string): Check[] {
+  const identity = resolveUploadIdentity(cwd, {});
+  return [
+    ...describeIdentity(identity).map((line): Check => ({ status: "pass", message: line })),
+    ...identity.warnings.map((message): Check => ({ status: "warn", message })),
+  ];
 }
 
 /** Warn when affected capture would silently fall back to a full render. */

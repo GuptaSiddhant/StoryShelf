@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 import { emitAttemptLog, type AttemptLogRecorder } from "../models/capture-attempt.ts";
 import type { CaptureLogLevel } from "../schema/capture-attempt.ts";
+import { failureDetail } from "../utils/error-text.ts";
 import { redactSecrets } from "../utils/redact.ts";
 
 /** Longest error text recorded on an attempt-log line. */
@@ -75,12 +76,24 @@ function parseArgs(first: unknown, second: unknown): [Record<string, unknown> | 
   return [fields, typeof second === "string" ? second : ""];
 }
 
-/** JSON-safe copy: an `Error` under `err` becomes its capped message. */
+/**
+ * JSON-safe copy: whatever sits under `err` (an `Error`, or the detail a runner built) becomes the
+ * redacted, capped `{ name, message, step?, causes? }` that a render failure stores; a text is
+ * redacted and capped.
+ */
 function plainFields(fields: object): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...fields };
   const err = copy["err"];
-  if (err instanceof Error) copy["err"] = redactSecrets(err.message).slice(0, ERROR_TEXT_MAX);
+  if (typeof err === "string") copy["err"] = redactSecrets(err).slice(0, ERROR_TEXT_MAX);
+  else if (err instanceof Error || isFailureLike(err)) copy["err"] = failureDetail(err);
   return copy;
+}
+
+/** A failure a runner already built: an object with a text `name` and `message`. */
+function isFailureLike(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const { name, message } = value as Record<string, unknown>;
+  return typeof name === "string" && typeof message === "string";
 }
 
 function noop(): void {}

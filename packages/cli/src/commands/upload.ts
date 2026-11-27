@@ -1,13 +1,5 @@
 /* oxlint-disable max-statements */
-import {
-  computeAffected,
-  gitBranchName,
-  gitHeadSha,
-  LOCAL_BRANCH,
-  localSha,
-  selectAffectedStories,
-  type AffectedResult,
-} from "@storyshelf/affected";
+import { computeAffected, selectAffectedStories, type AffectedResult } from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
@@ -21,15 +13,23 @@ import {
 } from "../client.ts";
 import { loadStorybookConfig, type StorybookConfig } from "../config.ts";
 import {
+  describeIdentity,
+  isShallowClone,
+  resolveUploadIdentity,
+  type UploadIdentity,
+} from "../identity.ts";
+import {
   createReporter,
   describeByteProgress,
   formatBytes,
   type PhaseHandle,
+  printError,
   printLine,
   type Reporter,
   setHumanOutputToStderr,
 } from "../output.ts";
 import { readSetting } from "../settings.ts";
+import { missingConnectionMessage } from "./connection.ts";
 import {
   HashRoutesMissingError,
   isOverInlineLimit,
@@ -41,6 +41,7 @@ import { parseLabels } from "./labels.ts";
 import { collectPackageUsage } from "./package-usage.ts";
 import { assertBuildOutput, ensureBuildDir } from "./storybook-build.ts";
 import { findSupersedes } from "./supersede.ts";
+import { warnTokenFlag } from "./token-flag.ts";
 import { printJsonResult, writeGithubOutputs, type UploadResult } from "./upload-result.ts";
 import { trySkipUnchanged, type SkipContext } from "./upload-skip.ts";
 import {
@@ -82,7 +83,9 @@ async function uploadFlow(options: UploadOptions): Promise<void> {
   const reporter = options.reporter ?? createReporter();
   const collected = await reporter.phase("Checking config", "Checked config", async () => {
     const cfg = await loadStorybookConfig(cwd, options.config);
+    warnTokenFlag(options.token);
     const found = collectUploadOptions(cwd, options, cfg);
+    reportIdentity(cwd, found, options.verbose === true);
     if (found.synthesized) {
       printLine(
         `No git checkout detected — using synthetic identity sha=${found.sha} branch="${found.branch}" (pass --sha/--branch to override)`,
@@ -102,6 +105,21 @@ async function uploadFlow(options: UploadOptions): Promise<void> {
   }
   await buildAndPost(reporter, cwd, collected, options.forceBuild, options.dryRun, options);
 }
+
+/** Print what was resolved (`--verbose`), the identity's warnings and the shallow-clone warning. */
+function reportIdentity(cwd: string, found: CollectedUploadOptions, verbose: boolean): void {
+  if (verbose) {
+    for (const line of describeIdentity(found.identity)) printLine(`  ${line}`);
+  }
+  for (const warning of found.identity.warnings) printError(`Warning: ${warning}`);
+  if ((found.affectedOnly || found.skipUnchanged) && isShallowClone(cwd)) {
+    printError(SHALLOW_WARNING);
+  }
+}
+
+/** Shown when a shallow clone makes affected capture and `--skip-unchanged` fall back; never fails the upload. */
+export const SHALLOW_WARNING =
+  "Warning: this is a shallow clone, so affected capture and --skip-unchanged cannot diff against history and fall back to rendering every story. Check out the full history (fetch-depth: 0 on GitHub Actions, GIT_DEPTH: 0 on GitLab CI).";
 
 /** `--timeout` needs `--wait` and must parse, so a typo fails before any build work. */
 function assertWaitOptions(options: UploadOptions): void {
@@ -143,6 +161,8 @@ export interface UploadOptions {
   authorName?: string;
   /** Build labels as `key=value` strings (repeatable). */
   label?: string[];
+  /** List each resolved identity value with its source. */
+  verbose?: boolean;
   /** Disable affected capture and render every story. */
   full?: boolean;
   /** Record a commit that changed no story as a skipped build instead of uploading. */
@@ -175,40 +195,8 @@ export interface UploadOptions {
   reporter?: Reporter;
 }
 
-/** Git probe for identity auto-detection; injectable for tests. */
-export interface GitIdentityProbe {
-  headSha: (cwd: string) => string | null;
-  branchName: (cwd: string) => string | null;
-}
-
-const defaultProbe: GitIdentityProbe = { headSha: gitHeadSha, branchName: gitBranchName };
-
-/** Resolved sha/branch plus whether either was synthesized locally. */
-export interface ResolvedIdentity {
-  sha: string;
-  branch: string;
-  synthesized: boolean;
-}
-
-/**
- * Resolve sha/branch per field: flags > env > local git > synthesized local
- * identity. Synthesis always succeeds, so checkouts without git can upload
- * with zero identity flags.
- */
-export function resolveIdentity(
-  cwd: string,
-  options: Pick<UploadOptions, "sha" | "branch">,
-  probe: GitIdentityProbe = defaultProbe,
-): ResolvedIdentity {
-  const sha = options.sha ?? envOf("GITHUB_SHA", "VERCEL_GIT_COMMIT_SHA", "CI_COMMIT_SHA");
-  const branch =
-    options.branch ?? envOf("GITHUB_REF_NAME", "VERCEL_GIT_COMMIT_REF", "CI_COMMIT_REF_NAME");
-  return {
-    sha: sha ?? probe.headSha(cwd) ?? localSha(),
-    branch: branch ?? probe.branchName(cwd) ?? LOCAL_BRANCH,
-    synthesized: sha === undefined || branch === undefined,
-  };
-}
+export { resolveIdentity } from "../identity.ts";
+export type { GitIdentityProbe, ResolvedIdentity } from "../identity.ts";
 
 interface CollectedUploadOptions {
   url?: string;
@@ -217,6 +205,7 @@ interface CollectedUploadOptions {
   sha: string;
   branch: string;
   synthesized: boolean;
+  identity: UploadIdentity;
   buildDir: string;
   buildCommand?: string;
   buildScriptName?: string;
@@ -241,38 +230,28 @@ interface ResolvedUploadOptions extends CollectedUploadOptions {
   branch: string;
 }
 
-/** First set value among the given env var names. */
-function envOf(...names: string[]): string | undefined {
-  for (const name of names) {
-    const value = process.env[name];
-    if (value) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
 /** Layer explicit options over env and the client config file. */
 function collectUploadOptions(
   cwd: string,
   options: UploadOptions,
   cfg: StorybookConfig | null,
 ): CollectedUploadOptions {
-  const identity = resolveIdentity(cwd, options);
+  const identity = resolveUploadIdentity(cwd, options);
   return {
     url: resolveServerUrl(options, cfg),
-    slug: options.slug ?? cfg?.slug ?? readSetting(process.env, "SHELF_SLUG"),
+    slug: options.slug ?? readSetting(process.env, "SHELF_SLUG") ?? cfg?.slug,
     token: options.token ?? readSetting(process.env, "SHELF_TOKEN"),
     sha: identity.sha,
     branch: identity.branch,
     synthesized: identity.synthesized,
+    identity,
     buildDir: options.buildDir ?? cfg?.buildDir ?? "storybook-static",
     buildCommand: options.buildCommand ?? cfg?.buildCommand,
     buildScriptName: options.buildScriptName ?? cfg?.buildScriptName,
     skip: options.skip ?? cfg?.skip,
-    message: options.message,
-    authorEmail: options.authorEmail,
-    authorName: options.authorName,
+    message: identity.message,
+    authorEmail: identity.authorEmail,
+    authorName: identity.authorName,
     label: options.label,
     affectedOnly: resolveAffectedOnly(options, cfg),
     skipUnchanged: resolveSkipUnchanged(options, cfg),
@@ -283,9 +262,9 @@ function collectUploadOptions(
   };
 }
 
-/** The server URL from flag, config file or env, without a trailing slash. */
+/** The server URL from flag, env or config file, without a trailing slash. */
 function resolveServerUrl(options: UploadOptions, cfg: StorybookConfig | null): string | undefined {
-  const url = options.url ?? cfg?.url ?? readSetting(process.env, "SHELF_URL");
+  const url = options.url ?? readSetting(process.env, "SHELF_URL") ?? cfg?.url;
   return url === undefined ? undefined : normalizeBaseUrl(url);
 }
 
@@ -324,13 +303,13 @@ function assertUploadOptions(
   collected: CollectedUploadOptions,
 ): asserts collected is ResolvedUploadOptions {
   if (!collected.url) {
-    throw new Error("--url is required (or .storybook/storyshelf.json / SHELF_URL)");
+    throw new Error(missingConnectionMessage("url"));
   }
   if (!collected.slug) {
-    throw new Error("--slug is required (or .storybook/storyshelf.json / SHELF_SLUG)");
+    throw new Error(missingConnectionMessage("slug"));
   }
   if (!collected.token) {
-    throw new Error("--token is required (or SHELF_TOKEN env)");
+    throw new Error(missingConnectionMessage("token"));
   }
 }
 

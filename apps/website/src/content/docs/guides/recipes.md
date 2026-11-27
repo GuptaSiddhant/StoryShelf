@@ -61,6 +61,10 @@ Install the browsers on the host first. See [@storyshelf/runner](/packages/runne
 
 To keep browsers off the app host, or to reach a private network, list a remote browser (a self-hosted Playwright server, Azure Playwright Workspaces or a hosted service). See [Remote browsers](/guides/remote-browsers/).
 
+## Test your app's pages, not only your components
+
+Render real routes as stories against mocked data (MSW), and StoryShelf captures, diffs and reviews them like any other story. See [Test app pages](/guides/app-pages/).
+
 ## Make large Storybooks faster
 
 Three levers, in the order to try them: [affected capture](/concepts/affected-capture/) renders only the stories a change touches (it needs full git history in CI); a bigger host or more instances adds capacity ([Sizing and cost](/guides/sizing/)); and `testing.shardSize` splits a very large build across instances ([Sharding big builds](/concepts/capture/#sharding-big-builds)).

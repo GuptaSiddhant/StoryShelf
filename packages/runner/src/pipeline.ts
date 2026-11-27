@@ -19,10 +19,12 @@ import {
   describeSizing,
   detectCaptureEnvironment,
   errorText,
+  failureDetail,
+  failureText,
   storybookBase,
 } from "@storyshelf/core/utils";
 import type { Browser } from "playwright-core";
-import { finishing, messageOf, outcomeOf, safeCloseBrowser, safeCloseServer } from "./browser.ts";
+import { finishing, outcomeOf, safeCloseBrowser, safeCloseServer, scrubFor } from "./browser.ts";
 import { TransientCaptureError } from "./capture-retry.ts";
 import { isTimeoutError } from "./concurrency/adaptive-concurrency.ts";
 import { createPageLimiter } from "./concurrency/page-limiter.ts";
@@ -32,6 +34,7 @@ import { RemoteBrowserLostError, browserLost } from "./remote-loss.ts";
 import type { RemoteTarget } from "./remote/remote-browser.ts";
 import { logRemoteSizing } from "./remote/remote-sizing.ts";
 import { sessionGateFor, type SessionGate } from "./remote/session-gate.ts";
+import { stepOf } from "./render-step.ts";
 import { createRuntimeParamsState, extractAllParameters } from "./runtime-params.ts";
 import { captureScreenshot } from "./screenshot.ts";
 import { createStaticServer } from "./static-server.ts";
@@ -401,7 +404,13 @@ async function captureOne(
     return false;
   } catch (error) {
     if (lost(input, active, ctx)) throw new RemoteBrowserLostError();
-    pushRenderFailure(out.failures, input, story.id, viewport.name, error);
+    pushRenderFailure(
+      out.failures,
+      input,
+      { storyId: story.id, viewportName: viewport.name },
+      error,
+      ctx,
+    );
     return isTimeoutError(error instanceof TransientCaptureError ? error.cause : error);
   }
 }
@@ -506,15 +515,26 @@ function handleA11y(
   );
 }
 
+/**
+ * Record a story that did not render: the same detail (name, message, step, redacted causes) goes
+ * into `failures[].error` as text and into the log line, with a remote connection scrubbed out.
+ */
 function pushRenderFailure(
   failures: RenderResult["failures"],
   input: PlaywrightRenderInput,
-  storyId: string,
-  viewportName: string,
+  story: { storyId: string; viewportName: string },
   error: unknown,
+  ctx: Pick<CaptureContext, "browser">,
 ): void {
-  failures.push({ storyId, viewportName, error: messageOf(error) });
-  input.logger?.error({ storyId, viewport: viewportName, err: error }, "render failed for story");
+  const detail = failureDetail(error, {
+    step: stepOf(error),
+    scrub: (text) => scrubFor(ctx.browser, text),
+  });
+  failures.push({ ...story, error: failureText(detail) });
+  input.logger?.error(
+    { storyId: story.storyId, viewport: story.viewportName, err: detail },
+    "render failed for story",
+  );
 }
 
 /** The host's sizing of a capture; a remote target runs elsewhere, so nothing is measured here. */

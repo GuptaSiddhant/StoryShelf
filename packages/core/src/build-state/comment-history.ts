@@ -3,6 +3,7 @@ import type { BuildStateExtras } from "../adapters/notifier/build-state.ts";
 import { readCatalog } from "../catalog/catalogue.ts";
 import type { CatalogEntry } from "../catalog/types.ts";
 import { BuildModel } from "../models/build.ts";
+import { SnapshotModel } from "../models/snapshot.ts";
 import type { Build } from "../schema/build.ts";
 import type { Project } from "../schema/project.ts";
 import type { BuildStatus } from "../types.ts";
@@ -38,28 +39,38 @@ function isBefore(row: Pick<Build, "id" | "createdAt">, build: Build): boolean {
   return row.createdAt === build.createdAt ? row.id < build.id : row.createdAt < build.createdAt;
 }
 
+/** The build a frozen comparison says its baseline image came from; null when the record is unusable. */
+function recordedSourceOf(raw: string | null | undefined): string | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const { sourceBuildId } = JSON.parse(raw) as { sourceBuildId?: unknown };
+    return typeof sourceBuildId === "string" && sourceBuildId !== "" ? sourceBuildId : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * The newest approved build before `build` on its own branch, else on the default branch.
- *
- * Limitation: the candidates are the builds that are `approved` now, so an older build approved
- * between two deliveries can change which baseline is picked. The list that follows never names a
- * story the chosen baseline lacked, but it is not stable across deliveries; that needs the baseline
- * the capture recorded.
+ * The build the capture compared against: the newest of the builds that rendered the baseline
+ * images frozen on this build's snapshots (`comparisonMetadata`, written once at capture). It is
+ * read, never re-derived, so an older build approved later cannot change it, and the list names
+ * exactly what was compared. Null while the capture recorded no baseline (a first build, a legacy
+ * row) or its source build is gone.
  */
 async function baselineBuildOf(deps: BuildStateDeps, where: Where): Promise<Build | null> {
   const { build, project } = where;
+  const snapshots = await new SnapshotModel(deps.db).listByBuildSummary(build.id);
+  const sources = new Set(
+    snapshots.flatMap((row) => recordedSourceOf(row.comparisonMetadata) ?? []),
+  );
+  sources.delete(build.id);
   const builds = new BuildModel(deps.db);
-  const before = (rows: readonly Build[]): Build | null =>
-    rows.find((row) => isBefore(row, build)) ?? null;
-  const own = before(
-    await builds.list(project.id, { branch: build.gitBranch, status: "approved" }),
-  );
-  if (own !== null || build.gitBranch === project.gitDefaultBranch) {
-    return own;
-  }
-  return before(
-    await builds.list(project.id, { branch: project.gitDefaultBranch, status: "approved" }),
-  );
+  const found = await Promise.all([...sources].map(async (id) => await builds.get(id)));
+  const rows = found.filter((row): row is Build => row !== null && row.projectId === project.id);
+  const [newest] = rows.toSorted((a, b) => (isBefore(a, b) ? 1 : -1));
+  return newest ?? null;
 }
 
 function storiesOf(entries: readonly CatalogEntry[]): Map<string, string> {

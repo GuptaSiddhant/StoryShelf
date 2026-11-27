@@ -232,3 +232,25 @@ describe("writeStorybookConfig", () => {
     );
   });
 });
+
+function writeConfig(value: unknown): void {
+  mkdirSync(join(dir, ".storybook"), { recursive: true });
+  writeFileSync(join(dir, ".storybook", "storyshelf.json"), JSON.stringify(value));
+}
+
+describe("a token key in the config file", () => {
+  it("is refused with an error that names the key and SHELF_TOKEN, never the value", async () => {
+    writeConfig({ slug: "demo", token: "shelf_leaked_value" });
+    const error = await loadStorybookConfig(dir).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message).toContain('"token" key');
+    expect(message).toContain("SHELF_TOKEN");
+    expect(message).not.toContain("shelf_leaked_value");
+  });
+
+  it("does not turn other invalid keys into an error: they still load as no config", async () => {
+    writeConfig({ slug: 1 });
+    expect(await loadStorybookConfig(dir)).toBeNull();
+  });
+});
