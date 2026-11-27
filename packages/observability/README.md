@@ -55,7 +55,6 @@ only (runtime-agnostic); `./node` holds the Node SDK lifecycle.
 ## What it exports
 
 - `initObservabilityFromEnv`, `resolveObservabilityConfig` (`./node` / config) — env-driven SDK lifecycle.
-- `createHttpMiddleware` — `@hono/otel` server spans plus `storyshelf.req_id` / `enduser.id` (mounted by `createShelfApp`).
 - `createInstrumentedDatabase` / `createInstrumentedStorage` — transparent `db.*` / `storage.*` span + metric wrappers (identity, lifecycle, and tables delegate through). They need core's adapter types, so they live in `@storyshelf/core/telemetry`, not here: this package depends on `@storyshelf/common` and never installs core.
 - `withSpan`, `currentTraceparent`, `injectTraceContext`, `parentContext` — span and W3C propagation helpers.
 - `captureMetrics`, `dbMetrics`, `storageMetrics` — memoized instruments (`capture.job.duration`, `capture.jobs.completed/failed`, operation durations).
