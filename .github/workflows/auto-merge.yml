@@ -40,9 +40,10 @@ permissions:
   pull-requests: write
   checks: read
 
-# One run at a time, so the two workflow_run events for the same commit cannot race to merge.
+# One run at a time per commit (or PR), so the two workflow_run events for the same commit cannot
+# race to merge, while a newer event for another PR never replaces this PR's pending retry.
 concurrency:
-  group: auto-merge
+  group: auto-merge-${{ github.event.workflow_run.head_sha || github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -91,18 +92,29 @@ jobs:
               );
             }
 
+            // Every review thread, page by page: a gate that saw only the first page could pass.
             async function unresolvedThreads(number) {
-              const { repository } = await github.graphql(
-                `query ($owner: String!, $repo: String!, $number: Int!) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      reviewThreads(first: 100) { nodes { isResolved } }
+              let open = 0;
+              let after = null;
+              for (;;) {
+                const { repository } = await github.graphql(
+                  `query ($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                    repository(owner: $owner, name: $repo) {
+                      pullRequest(number: $number) {
+                        reviewThreads(first: 100, after: $after) {
+                          nodes { isResolved }
+                          pageInfo { hasNextPage endCursor }
+                        }
+                      }
                     }
-                  }
-                }`,
-                { owner, repo, number },
-              );
-              return repository.pullRequest.reviewThreads.nodes.filter((t) => !t.isResolved).length;
+                  }`,
+                  { owner, repo, number, after },
+                );
+                const { nodes, pageInfo } = repository.pullRequest.reviewThreads;
+                open += nodes.filter((t) => !t.isResolved).length;
+                if (!pageInfo.hasNextPage) return open;
+                after = pageInfo.endCursor;
+              }
             }
 
             // Required checks green, branch up to date, no open thread: only then is a merge safe
