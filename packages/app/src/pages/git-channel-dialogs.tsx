@@ -128,6 +128,11 @@ export function MoveChannelBody(props: {
     <VStack>
       <ChannelFacts channel={channel} />
       <MoveProblemNotice problem={problem} />
+      {channel.enabled ? null : (
+        <Alert tone="info" title="Disabled channel">
+          This channel is disabled. Once moved, the repository link posts statuses for this project.
+        </Alert>
+      )}
       {choices.length === 0 ? (
         <NoConnection channel={channel} />
       ) : (
