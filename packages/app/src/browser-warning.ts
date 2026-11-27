@@ -27,15 +27,13 @@ export function warnDefaultTargetAfterSetup(
   scoped: Pick<ResolvedShelfOptions, "testing">,
   logger: Logger,
 ): void {
-  const problem = defaultTargetProblem(scoped);
-  if (problem === null) {
-    return;
-  }
   trackBackground(
     cell,
     cell.ready.then(
       (setup) => {
-        if (setup.ok) {
+        // Read after setup: the runner verifies its targets there, and until then each reads as ready.
+        const problem = defaultTargetProblem(scoped);
+        if (setup.ok && problem !== null) {
           logger.warn(
             {},
             `The default capture browser cannot render yet, so builds will fail. ${problem}`,

@@ -60,6 +60,24 @@ describe("warnDefaultTargetAfterSetup", () => {
     expect(String(warn.mock.calls[0]?.[1])).toContain("chromium: declared, not installed");
   });
 
+  it("reads the statuses setup verified, not the ones the runner declared at boot", async () => {
+    const logger = createShelfLogger({ level: "silent" });
+    const warn = vi.spyOn(logger, "warn");
+    const targets = [{ target: "chromium", reach: "loopback", status: "ready" }];
+    const live = options(targets as unknown as Targets);
+    const cell = cellOf(true);
+    warnDefaultTargetAfterSetup(cell, live, logger);
+    // Setup finishes after the call and marks the engine as not installed.
+    targets[0] = {
+      target: "chromium",
+      reach: "loopback",
+      status: { unavailable: "not installed" },
+    } as never;
+    await cell.ready;
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
   it("logs nothing when setup failed", async () => {
     const logger = createShelfLogger({ level: "silent" });
     const warn = vi.spyOn(logger, "warn");
