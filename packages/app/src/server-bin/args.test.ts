@@ -49,3 +49,21 @@ describe("parseServerArgs: entry and watch", () => {
     expect(parseServerArgs(["migrate", "--watch"])).toMatchObject({ kind: "error" });
   });
 });
+
+describe("parseServerArgs: invite", () => {
+  it("takes the email, --name and --role", () => {
+    expect(
+      parseServerArgs(["invite", "ana@example.com", "--name", "Ana", "--role", "admin"]),
+    ).toEqual({
+      kind: "run",
+      command: "invite",
+      flags: { email: "ana@example.com", name: "Ana", role: "admin" },
+    });
+  });
+
+  it("needs exactly one email, and keeps --name and --role to invite", () => {
+    expect(parseServerArgs(["invite"])).toMatchObject({ kind: "error" });
+    expect(parseServerArgs(["invite", "a@b.co", "c@d.co"])).toMatchObject({ kind: "error" });
+    expect(parseServerArgs(["purge", "--name", "x"])).toMatchObject({ kind: "error" });
+  });
+});

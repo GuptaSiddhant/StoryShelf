@@ -372,9 +372,15 @@ function IntegrationsSection(props: {
 /** The header's links: System → Git, AI usage when AI is on, and a recheck. */
 function SystemActions(props: {
   aiEnabled: boolean;
+  authEnabled: boolean;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <HStack>
+      {props.authEnabled ? (
+        <Button variant="secondary" size="sm" href="/admin/invites/new">
+          Invite a user
+        </Button>
+      ) : null}
       <Button variant="secondary" size="sm" href="/admin/git">
         Git
       </Button>
@@ -404,7 +410,9 @@ export function renderAdminSystemPage(data: AdminSystemData): RenderedContent {
             {formatUptime(report.uptimeSecs)}
           </>
         }
-        actions={<SystemActions aiEnabled={data.aiEnabled === true} />}
+        actions={
+          <SystemActions aiEnabled={data.aiEnabled === true} authEnabled={data.authEnabled} />
+        }
       />
       <PausedNotices data={data} />
       {data.gitChannels && data.gitChannels.count > 0 ? (

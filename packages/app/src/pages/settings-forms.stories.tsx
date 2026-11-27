@@ -66,6 +66,18 @@ export const AddMemberError = jsxStory(() => (
   </FormDialog>
 ));
 
+/** Add member, refused for a site admin: nobody has that email, so an invite is offered. */
+export const AddMemberInvite = jsxStory(() => (
+  <FormDialog id={ADD_MEMBER_DIALOG} title="Add member" submitLabel="Add member" open>
+    <AddMemberForm
+      project={project}
+      standalone={false}
+      error="No account has the email ana@example.com. They need to sign in once first."
+      inviteEmail="ana@example.com"
+    />
+  </FormDialog>
+));
+
 /** Add group mapping. */
 export const AddGroupMapping = jsxStory(() => (
   <FormDialog id={ADD_GROUP_DIALOG} title="Add group mapping" submitLabel="Add mapping" open>

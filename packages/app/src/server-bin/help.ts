@@ -13,6 +13,8 @@ Commands:
                   (--sample <n>; exits 1 when something is missing)
   doctor          Check the installed @storyshelf/* packages and their peers, the instance module, its
                   settings and the schema level (no side effects)
+  invite <email>  Invite someone: stage their account and print a one-time link, once (--name, --role
+                  member|viewer|admin; default member). The link is not stored or logged anywhere else.
 
 purge, check-storage and doctor never migrate and start no job consumer, timer or replay.
 

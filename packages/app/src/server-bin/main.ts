@@ -14,6 +14,7 @@ const LOADERS: Record<ServerCommand, (ctx: CommandContext) => Promise<number>> =
   purge: async (ctx) => (await import("./commands/purge.ts")).purge(ctx),
   "check-storage": async (ctx) => (await import("./commands/check-storage.ts")).checkStorage(ctx),
   doctor: async (ctx) => (await import("./commands/doctor.ts")).doctor(ctx),
+  invite: async (ctx) => (await import("./commands/invite.ts")).invite(ctx),
 };
 
 /** The text-only answers (help, version, argument error), or null when a command is to run. */
