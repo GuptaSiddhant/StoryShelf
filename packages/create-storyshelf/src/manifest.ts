@@ -10,6 +10,8 @@ export interface ManifestPeer {
 interface ManifestPackage {
   version: string;
   peers: Record<string, ManifestPeer>;
+  /** Dependencies the package exposes at their pinned version (`storyshelf.exposedDependencies`). */
+  exposed?: Record<string, string>;
 }
 
 const PACKAGES = manifest.packages as Record<string, ManifestPackage>;
@@ -30,4 +32,11 @@ export function peerRange(owner: string, peer: string): string {
   const found = packageOf(owner).peers[peer];
   if (found === undefined) throw new Error(`${owner} has no peer ${peer} in the version manifest`);
   return found.range;
+}
+
+/** The pinned version `owner` exposes for its dependency `name`, so a project can pin the same copy. */
+export function exposedVersion(owner: string, name: string): string {
+  const found = packageOf(owner).exposed?.[name];
+  if (found === undefined) throw new Error(`${owner} exposes no ${name} in the version manifest`);
+  return found;
 }

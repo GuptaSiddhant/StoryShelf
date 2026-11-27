@@ -16,6 +16,13 @@ describe("version manifest", () => {
     assert.equal(readFileSync(MANIFEST_PATH, "utf8"), renderVersionManifest());
   });
 
+  it("lists the dependencies a package exposes, at the version its package.json pins", () => {
+    const runner = buildVersionManifest().packages["@storyshelf/runner"];
+    assert.deepEqual(runner.exposed, {
+      "playwright-core": manifestOf("runner").dependencies["playwright-core"],
+    });
+  });
+
   it("lists every published package once, with the peers of its package.json", () => {
     const manifest = buildVersionManifest();
     const dirs = readdirSync(join(root, "packages")).filter((d) => {
