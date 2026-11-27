@@ -3,13 +3,24 @@
 # required checks (`ci`, `changeset`) pass and every review conversation is resolved, and
 # pr-autoupdate.yml keeps the queue up to date with `main`.
 #
+# GitHub refuses to enable auto-merge in two cases, and this workflow handles both (#1416):
+# - "clean status": the PR is already mergeable (it left draft after its checks went green), so
+#   there is nothing to wait for and it is merged through the REST endpoint;
+# - "unstable status": a check that is not required (our own `storyshelf/testing`, which stays
+#   pending until someone reviews it on the demo) is pending or failing. The workflow retries on
+#   `workflow_run` when CI or Changeset completes, and merges once `ci` and `changeset` are green,
+#   the branch is up to date and every review thread is resolved.
+# A failing or pending required check, or an unresolved thread, is never merged over.
+#
 # Excluded, so they still need a person:
 # - pull requests from forks: anyone can open one, and the ruleset requires no approval;
 # - drafts, until they are marked ready for review;
 # - `release/v*` pull requests: only the owner merges a release (ADR 0043).
 #
 # An epic branch into `main` merges with a merge commit, so each task commit survives; everything
-# else is squashed. No checkout and no pull request code runs here, so pull_request_target is safe.
+# else is squashed. No job checks out or runs pull request code, so pull_request_target and
+# workflow_run (both run with a write token from the default branch) are safe; the workflow_run
+# path reads only the PR's metadata, check runs and review threads through the API.
 #
 # Uses AUTOUPDATE_TOKEN when it is set (see pr-autoupdate.yml), so enabling auto-merge also wakes
 # pr-autoupdate; with GITHUB_TOKEN the queue still moves on the next push to `main`.
@@ -19,17 +30,30 @@ on:
   pull_request_target:
     types: [opened, reopened, ready_for_review]
     branches: [main, "epic/**"]
+  # Retry once the required checks finish: the workflows that produce `ci` and `changeset`.
+  workflow_run:
+    workflows: [CI, Changeset]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+
+# One run at a time, so the two workflow_run events for the same commit cannot race to merge.
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
 
 jobs:
   enable:
+    # A fork's pull_request_target is skipped here; the script rechecks every PR it finds for
+    # workflow_run, which carries no PR payload.
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event_name == 'workflow_run' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
       !github.event.pull_request.draft &&
-      !startsWith(github.event.pull_request.head.ref, 'release/')
+      !startsWith(github.event.pull_request.head.ref, 'release/'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -37,35 +61,133 @@ jobs:
         with:
           github-token: ${{ secrets.AUTOUPDATE_TOKEN || github.token }}
           script: |
-            const pr = context.payload.pull_request;
-            const epicIntoMain = pr.head.ref.startsWith("epic/") && pr.base.ref === "main";
-            const mergeMethod = epicIntoMain ? "MERGE" : "SQUASH";
-            try {
-              // `method` is reserved by @octokit/graphql, so the variable is `mergeMethod`.
-              await github.graphql(
-                `mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
-                  enablePullRequestAutoMerge(
-                    input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }
-                  ) {
-                    clientMutationId
+            const { owner, repo } = context.repo;
+            const REQUIRED = ["ci", "changeset"];
+
+            // Pull requests this event is about. A workflow_run names its commit, not a payload PR.
+            async function candidates() {
+              if (context.eventName === "pull_request_target") {
+                return [context.payload.pull_request.number];
+              }
+              const run = context.payload.workflow_run;
+              if (run.event !== "pull_request" && run.event !== "pull_request_target") return [];
+              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner, repo, commit_sha: run.head_sha,
+              });
+              return data
+                .filter((pr) => pr.state === "open" && pr.head.sha === run.head_sha)
+                .map((pr) => pr.number);
+            }
+
+            // Every exclusion lives here, on fresh data: forks, drafts, release PRs, other bases.
+            function eligible(pr) {
+              const base = pr.base.ref;
+              return (
+                pr.state === "open" &&
+                !pr.draft &&
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                !pr.head.ref.startsWith("release/") &&
+                (base === "main" || base.startsWith("epic/"))
+              );
+            }
+
+            async function unresolvedThreads(number) {
+              const { repository } = await github.graphql(
+                `query ($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) { nodes { isResolved } }
+                    }
                   }
                 }`,
-                { pullRequestId: pr.node_id, mergeMethod },
+                { owner, repo, number },
               );
-              core.info(`Auto-merge (${mergeMethod.toLowerCase()}) enabled on #${pr.number}.`);
-            } catch (error) {
-              // Already mergeable ("clean status") or already enabled: nothing to do. "Unstable
-              // status" (a check still running or failing when the PR leaves draft) is a warning,
-              // not a failure: a red `enable` check would itself keep the PR unstable, so auto-merge
-              // could never be turned on later. Anything else fails the run, so a broken call is not
-              // hidden behind a green check.
-              if (/clean status|already enabled/iu.test(error.message)) {
-                core.notice(`#${pr.number}: ${error.message}`);
-              } else if (/unstable status/iu.test(error.message)) {
-                core.warning(
-                  `#${pr.number}: auto-merge not enabled yet (checks not green); re-run this job or merge once they are.`,
-                );
-              } else {
-                core.setFailed(`#${pr.number}: auto-merge not enabled: ${error.message}`);
+              return repository.pullRequest.reviewThreads.nodes.filter((t) => !t.isResolved).length;
+            }
+
+            // Required checks green, branch up to date, no open thread: only then is a merge safe
+            // while a check that is not required is still pending or failing.
+            async function safeToMerge(pr) {
+              const checks = await github.paginate(github.rest.checks.listForRef, {
+                owner, repo, ref: pr.head.sha, per_page: 100,
+              });
+              const latest = new Map();
+              for (const run of checks) {
+                const seen = latest.get(run.name);
+                if (!seen || run.id > seen.id) latest.set(run.name, run);
               }
+              const red = REQUIRED.filter((name) => {
+                const run = latest.get(name);
+                return !run || run.status !== "completed" || run.conclusion !== "success";
+              });
+              if (red.length > 0) return `required check(s) not green yet: ${red.join(", ")}`;
+              const { data: cmp } = await github.rest.repos.compareCommits({
+                owner, repo, base: pr.base.ref, head: pr.head.sha,
+              });
+              if (cmp.behind_by > 0) return `${cmp.behind_by} commit(s) behind ${pr.base.ref}`;
+              const open = await unresolvedThreads(pr.number);
+              if (open > 0) return `${open} unresolved review thread(s)`;
+              return null;
+            }
+
+            async function mergeNow(pr, mergeMethod) {
+              try {
+                await github.rest.pulls.merge({
+                  owner, repo, pull_number: pr.number, sha: pr.head.sha,
+                  merge_method: mergeMethod.toLowerCase(),
+                });
+                core.info(`#${pr.number} merged (${mergeMethod.toLowerCase()}).`);
+              } catch (error) {
+                // The ruleset is the last word: a refused merge is a warning, never a bypass.
+                core.warning(`#${pr.number}: merge refused: ${error.message}`);
+              }
+            }
+
+            async function settle(number) {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              if (!eligible(pr)) {
+                core.info(`#${number}: excluded (fork, draft, release, closed or other base).`);
+                return;
+              }
+              if (pr.auto_merge) {
+                core.info(`#${number}: auto-merge already enabled.`);
+                return;
+              }
+              const epicIntoMain = pr.head.ref.startsWith("epic/") && pr.base.ref === "main";
+              const mergeMethod = epicIntoMain ? "MERGE" : "SQUASH";
+              try {
+                // `method` is reserved by @octokit/graphql, so the variable is `mergeMethod`.
+                await github.graphql(
+                  `mutation ($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                    enablePullRequestAutoMerge(
+                      input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }
+                    ) {
+                      clientMutationId
+                    }
+                  }`,
+                  { pullRequestId: pr.node_id, mergeMethod },
+                );
+                core.info(`Auto-merge (${mergeMethod.toLowerCase()}) enabled on #${number}.`);
+              } catch (error) {
+                if (/already enabled/iu.test(error.message)) {
+                  core.notice(`#${number}: ${error.message}`);
+                } else if (/clean status|unstable status/iu.test(error.message)) {
+                  // Clean: already mergeable, nothing to wait for. Unstable: only checks that are
+                  // not required (`storyshelf/testing`) can still be pending or failing, so merge
+                  // when the required ones are green. A red `enable` check would itself keep the PR
+                  // unstable, so none of this fails the run.
+                  const why = await safeToMerge(pr);
+                  if (why) {
+                    core.warning(`#${number}: not merged yet: ${why}.`);
+                  } else {
+                    await mergeNow(pr, mergeMethod);
+                  }
+                } else {
+                  core.setFailed(`#${number}: auto-merge not enabled: ${error.message}`);
+                }
+              }
+            }
+
+            for (const number of await candidates()) {
+              await settle(number);
             }

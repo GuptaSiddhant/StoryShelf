@@ -372,7 +372,9 @@ The weekly usage quota is shared, so agents work in short, fresh sessions and ta
 - **The owner talks to the architect** for priorities and decisions, or comments on a PR or issue.
   A comment on a PR wakes the session that owns it.
 - **Merging is native.** `auto-merge.yml` turns on GitHub auto-merge when a PR from a branch of
-  this repository opens or leaves draft (not forks, not `release/v*`). `pr-autoupdate.yml` brings
+  this repository opens or leaves draft (not forks, not `release/v*`); it merges a PR that is already
+  green, and retries when `CI` or `Changeset` completes, merging once `ci` and `changeset` pass even
+  while a non-required check (`storyshelf/testing`) is pending. `pr-autoupdate.yml` brings
   the oldest queued PR up to date with `main`, one at a time, and GitHub merges it when `ci` and
   `changeset` pass and every conversation is resolved. So open a PR as a **draft** until it is
   verified and complete, and answer every review thread: an unresolved thread is what holds a
