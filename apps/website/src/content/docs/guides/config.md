@@ -53,11 +53,11 @@ storyshelf init --config ./config/storyshelf.json --url https://... --slug my-ap
 ## Precedence
 
 ```
-flags (--url/--slug/--build-dir) > env (SHELF_URL/SLUG/TOKEN, GITHUB_SHA/BRANCH) > file (.storybook/storyshelf.json) > defaults (storybook-static, build-storybook)
+flags (--url/--slug/--build-dir) > env (SHELF_URL/SLUG/TOKEN) > file (.storybook/storyshelf.json) > defaults (storybook-static, build-storybook)
 ```
 
-- `token` **never** stored in file — use `SHELF_TOKEN` (project) or `SHELF_ADMIN_TOKEN` (site-admin for `create`/`purge`).
-- `sha`/`branch` resolve per field as flags > env (`GITHUB_SHA`/`GITHUB_REF_NAME`, `VERCEL_GIT_COMMIT_*`, `CI_COMMIT_*`) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Uploading without git](/guides/without-git/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
+- `token` **never** stored in file — a `token` key is refused with an error. Use `SHELF_TOKEN` (project) or `SHELF_ADMIN_TOKEN` (site-admin for `create`/`purge`); `--token` works but warns, because arguments show in the process list.
+- `sha`/`branch` resolve per field as flags > the CI provider (on a pull request the PR head, not the merge commit; see [Where the commit and branch come from](/guides/cli/client/#where-the-commit-and-branch-come-from)) > local git (`rev-parse HEAD`, current branch) > synthesized local identity (`local-<random>` on branch `local`). No git, no flags, no env still uploads — see [Uploading without git](/guides/without-git/). For gitless pipelines, pass explicit values per run (e.g. `--sha <run-id> --branch staging`); each unique sha chains baselines normally.
 
 ## Monorepo
 
@@ -80,7 +80,7 @@ Each upload resolves `packagePath` (`relative(cwd, dirname(.storybook))`) and is
 
 ## Server config vs client config
 
-- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `buildStats`, `untraced` — per-Storybook, committed, non-secret.
+- **Client file** (`.storybook/storyshelf.json`): `slug`, `url`, `buildDir`, `buildCommand`, `buildScriptName`, `skip`, `affectedOnly`, `buildStats`, `skipUnchanged`, `untraced` — per-Storybook, committed, non-secret.
 - **Server `ShelfConfig` / DB `projects`** (`core/src/config.ts:48`, `core/src/schema.ts:5`): `secret` (see [rotating it](/guides/deployment/secret-rotation/)), `previousSecret`, `migrateCredentialsOnBoot`, `scratchDir` (default `<os.tmpdir()>/storyshelf`), `purgeTtlDays`, `branchTtlDays`, `branchGcIntervalMs`, `maxUploadBytes`, `maxInlineUnzipSize`, `maxZipEntries`, `maxUnzippedBytes`, `viewports`, `browser` (per-project capture target: an engine the runner offers, or `<engine>@<name>`), `pixel_threshold`, `storybook_meta` (`framework/addons/storiesGlobs/packagePath` auto-detected at `create`).
 
 Publishing a Storybook zip is bounded by three options (see [Published Storybook](/concepts/publishing/)):

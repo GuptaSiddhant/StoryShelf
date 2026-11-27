@@ -63,15 +63,36 @@ export async function loadStorybookConfig(
 ): Promise<StorybookConfig | null> {
   const full = customPath ? resolve(cwd, customPath) : resolve(cwd, CONFIG_RELATIVE);
   try {
-    const raw = await readFile(full, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    const result = parseStorybookConfig(parsed);
-    if (!result.ok) {
-      return null;
+    return parseConfigFile(JSON.parse(await readFile(full, "utf8")) as unknown, full);
+  } catch (error) {
+    if (error instanceof ConfigTokenError) {
+      throw error;
     }
-    return result.config;
-  } catch {
     return null;
+  }
+}
+
+/** Validate parsed file contents: a `token` key throws, any other invalid content is no config. */
+function parseConfigFile(parsed: unknown, path: string): StorybookConfig | null {
+  assertNoTokenKey(parsed, path);
+  const result = parseStorybookConfig(parsed);
+  return result.ok ? result.config : null;
+}
+
+/** A `token` key in the config file: a secret in a committed file, refused rather than ignored. */
+export class ConfigTokenError extends Error {
+  constructor(path: string) {
+    super(
+      `${path} has a "token" key. Remove it: a token never goes in a committed file. Set the SHELF_TOKEN environment variable (a CI secret) instead.`,
+    );
+    this.name = "ConfigTokenError";
+  }
+}
+
+/** Throw {@link ConfigTokenError} (naming the key, never its value) when the file has a `token` key. */
+function assertNoTokenKey(parsed: unknown, path: string): void {
+  if (typeof parsed === "object" && parsed !== null && Object.hasOwn(parsed, "token")) {
+    throw new ConfigTokenError(path);
   }
 }
 

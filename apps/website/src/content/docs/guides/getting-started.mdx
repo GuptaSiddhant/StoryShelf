@@ -79,15 +79,15 @@ Open `http://localhost:3000` and sign in as `admin@example.com` with your `SHELF
 
 ## 3. Upload a build
 
-From your Storybook project, run the command from the card:
+From your Storybook project, save the URL and slug once. This writes `.storybook/storyshelf.json`, which you commit (it holds no secret):
 
 <PackageManagers
   type="dlx"
   pkg="storyshelf"
-  args="upload --url http://localhost:3000 --slug my-design-system"
+  args="init --url http://localhost:3000 --slug my-design-system"
 />
 
-Set the token first: `SHELF_TOKEN=shelf_… npx storyshelf upload …` (the card prints it that way). `upload` builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
+Then upload with the token in the environment: `SHELF_TOKEN=shelf_… npx storyshelf` (bare `storyshelf` is `storyshelf upload`; the card's command is the same with the settings as flags). It builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
 
 ```text
 ==> Creating build
@@ -107,7 +107,7 @@ View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNPP
 Add `--wait` to follow the build until it is captured; the exit code says how it ended (see [Gating CI with `--wait`](/guides/cli/client/#gating-ci-with---wait)).
 
 <Aside type="tip">
-  To save the URL and slug so later runs need no flags, run `npx storyshelf init --url http://localhost:3000 --slug my-design-system`. It writes `.storybook/storyshelf.json`; keep the token in `SHELF_TOKEN` (a CI secret), never in the file. See [CI setup](/guides/ci/) for a pipeline.
+  Keep the token in `SHELF_TOKEN` (a CI secret), never in `.storybook/storyshelf.json`: a `token` key there is refused. See [CI setup](/guides/ci/) for a pipeline.
 
 On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on, `create` needs the site admin token (`--token`, or `SHELF_ADMIN_TOKEN`) and refuses without it; the UI steps above need no token and are the way to start. With the admin token it creates the project only and points you to its page for the CI token, because a token made on the command line has no user behind it and could not upload.
 

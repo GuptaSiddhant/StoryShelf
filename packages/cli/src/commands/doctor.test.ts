@@ -50,6 +50,8 @@ beforeEach(() => {
 afterEach(() => {
   process.exitCode = savedExitCode;
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -135,6 +137,31 @@ describe("runDoctor", () => {
       cwd: dir,
     });
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it("lists each resolved identity value with its source, and never the token", async () => {
+    setupStorybook();
+    seedValidOutput();
+    vi.stubEnv("GITHUB_ACTIONS", "true");
+    vi.stubEnv("GITHUB_EVENT_NAME", "push");
+    vi.stubEnv("GITHUB_SHA", "tip-sha");
+    vi.stubEnv("GITHUB_REF_NAME", "main");
+    mockFetch(() => ({ name: "Demo", slug: "demo" }));
+    let out = "";
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out += String(chunk);
+      return true;
+    });
+    await runDoctor({
+      url: "https://shelf.example.com",
+      slug: "demo",
+      token: "shelf_secret_value",
+      cwd: dir,
+    });
+    expect(out).toContain("CI provider: GitHub Actions");
+    expect(out).toContain("sha: tip-sha (GitHub push: GITHUB_SHA)");
+    expect(out).toContain("branch: main (GitHub push: GITHUB_REF_NAME)");
+    expect(out).not.toContain("shelf_secret_value");
   });
 
   it("fails when storybook setup is missing", async () => {

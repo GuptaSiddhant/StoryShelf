@@ -19,6 +19,7 @@ describe("CLI settings", () => {
   it("reads the new name and never an old one", () => {
     expect(readSetting({ SHELF_TOKEN: TOKEN_VALUE }, "SHELF_TOKEN")).toBe(TOKEN_VALUE);
     expect(readSetting({ STORYSHELF_TOKEN: TOKEN_VALUE }, "SHELF_TOKEN")).toBeUndefined();
+    expect(readSetting({ SHELF_TOKEN: "" }, "SHELF_TOKEN")).toBeUndefined();
   });
 });
 

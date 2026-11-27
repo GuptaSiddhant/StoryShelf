@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleError } from "./default.ts";
+import { resetTokenFlagWarning } from "./token-flag.ts";
 import { runUpload, resolveIdentity, type GitIdentityProbe } from "./upload.ts";
 
 let dir: string;
@@ -648,5 +649,102 @@ describe("resolveIdentity", () => {
     expect(first.branch).toBe("local");
     expect(first.synthesized).toBe(true);
     expect(first.sha).not.toBe(second.sha);
+  });
+});
+
+/** Capture what the CLI writes to stdout and stderr, and lay a built Storybook into `target`. */
+function captureOutput(target: string): { out: () => string; err: () => string } {
+  mkdirSync(join(target, "storybook-static"), { recursive: true });
+  writeFileSync(join(target, "storybook-static", "index.json"), "{}");
+  let out = "";
+  let err = "";
+  vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    out += String(chunk);
+    return true;
+  });
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    err += String(chunk);
+    return true;
+  });
+  return { out: () => out, err: () => err };
+}
+
+/** Run git quietly in `cwd`. */
+function runGit(args: string[], cwd: string): void {
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+    cwd,
+    stdio: "ignore",
+  });
+}
+
+describe("runUpload resolution", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetTokenFlagWarning();
+  });
+
+  it("uploads a GitHub pull request under its head commit and branch", async () => {
+    const event = join(dir, "event.json");
+    writeFileSync(
+      event,
+      JSON.stringify({ number: 5, pull_request: { head: { sha: "head-sha" } } }),
+    );
+    vi.stubEnv("GITHUB_ACTIONS", "true");
+    vi.stubEnv("GITHUB_EVENT_NAME", "pull_request");
+    vi.stubEnv("GITHUB_EVENT_PATH", event);
+    vi.stubEnv("GITHUB_SHA", "merge-sha");
+    vi.stubEnv("GITHUB_REF_NAME", "5/merge");
+    vi.stubEnv("GITHUB_HEAD_REF", "feature/x");
+    const { out } = captureOutput(dir);
+    await runUpload({
+      url: "https://s.example",
+      slug: "demo",
+      token: "t",
+      cwd: dir,
+      dryRun: true,
+      verbose: true,
+    });
+    expect(out()).toContain(
+      "sha: head-sha (GitHub pull_request: GITHUB_EVENT_PATH pull_request.head.sha)",
+    );
+    expect(out()).toContain("branch: feature/x (GitHub pull_request: GITHUB_HEAD_REF)");
+    expect(out()).toContain("as head-sha on feature/x");
+    expect(out()).not.toContain("merge-sha");
+  });
+
+  it("warns on --token naming the flag, never printing the value, and still uploads", async () => {
+    const { out, err } = captureOutput(dir);
+    await runUpload({ ...baseOptions(), token: "shelf_secret_value", dryRun: true });
+    expect(err()).toContain("--token");
+    expect(err()).toContain("SHELF_TOKEN");
+    expect(err() + out()).not.toContain("shelf_secret_value");
+    expect(out()).toContain("Dry run");
+  });
+
+  it("warns on a shallow clone when affected capture is on, and never fails", async () => {
+    const origin = join(dir, "origin");
+    mkdirSync(origin);
+    runGit(["init", "-q", "-b", "main"], origin);
+    runGit(["commit", "-q", "--allow-empty", "-m", "a"], origin);
+    runGit(["commit", "-q", "--allow-empty", "-m", "b"], origin);
+    const clone = join(dir, "clone");
+    runGit(["clone", "-q", "--depth", "1", `file://${origin}`, clone], dir);
+    const { err } = captureOutput(clone);
+    await runUpload({ ...baseOptions(), cwd: clone, dryRun: true });
+    expect(err()).toContain("shallow clone");
+    expect(err()).toContain("fetch-depth: 0");
+  });
+
+  it("stays quiet about a shallow clone with --full", async () => {
+    const origin = join(dir, "origin");
+    mkdirSync(origin);
+    runGit(["init", "-q", "-b", "main"], origin);
+    runGit(["commit", "-q", "--allow-empty", "-m", "a"], origin);
+    runGit(["commit", "-q", "--allow-empty", "-m", "b"], origin);
+    const clone = join(dir, "clone");
+    runGit(["clone", "-q", "--depth", "1", `file://${origin}`, clone], dir);
+    const { err } = captureOutput(clone);
+    await runUpload({ ...baseOptions(), cwd: clone, dryRun: true, full: true });
+    expect(err()).not.toContain("shallow clone");
   });
 });

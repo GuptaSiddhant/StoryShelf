@@ -90,7 +90,10 @@ function buildUploadCommand(): Command {
       .description("Create a build record for a StoryShelf project")
       .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
       .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
-      .option("--token <token>", "CI token (or SHELF_TOKEN env)")
+      .option(
+        "--token <token>",
+        "CI token (prefer the SHELF_TOKEN env: arguments show in the process list)",
+      )
       .option("--sha <sha>", "revision SHA (flag, CI env, local git HEAD, or synthesized local-*)")
       .option("--branch <branch>", "baseline namespace (flag, CI env, local git branch, or local)")
       .option("--build-dir <dir>", "built Storybook directory (default storybook-static)")
@@ -101,6 +104,7 @@ function buildUploadCommand(): Command {
         "npm script to build Storybook (default build-storybook)",
       )
       .option("--force-build", "force rebuild even if buildDir exists")
+      .option("--verbose", "list each resolved commit, branch and author with where it came from")
       .option("--zip", "upload one zip instead of only the changed files (older servers)")
       .option("--dry-run", "validate and build without sending any requests")
       .option("--skip <glob>", "skip upload for matching branch (glob)")
