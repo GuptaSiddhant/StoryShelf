@@ -51,3 +51,16 @@ describe("curated adapter choices", () => {
     }
   });
 });
+
+const docker = (target: "local" | "docker") =>
+  localInfraPrompts(false, target).find((p) => p.name === "docker");
+
+describe("the Docker question", () => {
+  it("defaults to no after Local (bare node), and to yes for the container target", () => {
+    expect(docker("local")).toMatchObject({ type: "confirm", initial: false });
+    expect(docker("docker")).toMatchObject({ type: "confirm", initial: true });
+    expect(localInfraPrompts(false).find((p) => p.name === "docker")).toMatchObject({
+      initial: false,
+    });
+  });
+});

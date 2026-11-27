@@ -33,6 +33,18 @@ describe("runServerBin", () => {
     expect(io.stdout[0]).toMatch(/^\d+\.\d+\.\d+/u);
   });
 
+  it("stops with one line and exit 1 on a Node below the range, before loading anything", async () => {
+    const io = recordingIo();
+    expect(await runServerBin(["serve", "--dir", "/nonexistent-dir"], io, {}, "22.11.0")).toBe(1);
+    expect(io.stderr).toHaveLength(1);
+    expect(io.stderr[0]).toContain("Node 22.11.0 is too old");
+  });
+
+  it("still answers --help on an old Node", async () => {
+    const io = recordingIo();
+    expect(await runServerBin(["--help"], io, {}, "22.11.0")).toBe(0);
+  });
+
   it("exits 2 on an argument error without loading anything", async () => {
     const io = recordingIo();
     expect(await runServerBin(["bogus"], io)).toBe(2);

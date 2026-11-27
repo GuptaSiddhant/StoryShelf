@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { exposedVersion, peerRange } from "../manifest.ts";
+import { exposedVersion, nodeRange, peerRange } from "../manifest.ts";
 import type { Answers } from "./answers.ts";
 import { generatePackageJson } from "./package-json.ts";
 
@@ -66,7 +66,7 @@ describe("generatePackageJson", () => {
     expect(scripts["typecheck"]).toBe("tsc");
     // Node 26 rejects --experimental-transform-types; Node 24+ strips types unflagged.
     expect(JSON.stringify(scripts)).not.toContain("experimental");
-    expect(engines["node"]).toBe(">=24");
+    expect(engines["node"]).toBe(nodeRange());
   });
 
   it("declares the typing dev dependencies", () => {

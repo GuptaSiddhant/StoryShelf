@@ -199,12 +199,15 @@ const AUTH_SELECT: SelectPrompt = {
   ],
 };
 
-const DOCKER_CONFIRM: ConfirmPrompt = {
-  type: "confirm",
-  name: "docker",
-  message: "Generate Docker files?",
-  initial: true,
-};
+/** The Docker question: yes only for the container target, never after "Local (bare node)". */
+function dockerConfirm(target: "local" | "docker"): ConfirmPrompt {
+  return {
+    type: "confirm",
+    name: "docker",
+    message: "Generate Docker files?",
+    initial: target === "docker",
+  };
+}
 
 const NOTIFICATIONS_CONFIRM: ConfirmPrompt = {
   type: "confirm",
@@ -225,7 +228,10 @@ const OBSERVABILITY_CONFIRM: ConfirmPrompt = {
  * (phase 1), then these (phase 2) with the shortlist or full matrix behind
  * the advanced toggle.
  */
-export function localInfraPrompts(advanced: boolean): Prompt[] {
+export function localInfraPrompts(
+  advanced: boolean,
+  target: "local" | "docker" = "local",
+): Prompt[] {
   return [
     {
       type: "select",
@@ -240,7 +246,7 @@ export function localInfraPrompts(advanced: boolean): Prompt[] {
       choices: storageChoices(advanced),
     },
     AUTH_SELECT,
-    DOCKER_CONFIRM,
+    dockerConfirm(target),
     NOTIFICATIONS_CONFIRM,
     OBSERVABILITY_CONFIRM,
   ];

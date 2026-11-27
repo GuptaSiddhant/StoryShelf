@@ -2,7 +2,7 @@
 // oxlint-disable max-statements curly no-console
 /**
  * The generated version and peer manifest (#1332): one JSON file, `config/version-manifest.json`,
- * with every published workspace package's version and its peer dependencies (range, whether
+ * with every published workspace package's version, its Node range (`engines.node`) and its peer dependencies (range, whether
  * optional, and the subpaths that need it, from `package.json#storyshelf.peerSubpaths`).
  *
  * `create-storyshelf` writes its pins from it, and `storyshelf-server` takes the missing-peer hint
@@ -66,7 +66,12 @@ export function buildVersionManifest(root = ROOT) {
       continue;
     }
     if (pkg.private === true || !pkg.name) continue;
-    packages[pkg.name] = { version: pkg.version, peers: peersOf(pkg), ...exposedOf(pkg) };
+    packages[pkg.name] = {
+      version: pkg.version,
+      ...(pkg.engines?.node ? { engines: { node: pkg.engines.node } } : {}),
+      peers: peersOf(pkg),
+      ...exposedOf(pkg),
+    };
   }
   return {
     packages: Object.fromEntries(

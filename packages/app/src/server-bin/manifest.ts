@@ -11,6 +11,8 @@ export interface ManifestPeer {
 /** A published package in the manifest. */
 export interface ManifestPackage {
   version: string;
+  /** The Node range the package declares (`engines.node`). */
+  engines?: { node: string };
   peers: Record<string, ManifestPeer>;
 }
 
@@ -28,4 +30,9 @@ export function ownersOfPeer(peer: string): PeerOwner[] {
     const declared = pkg.peers[peer];
     return declared === undefined ? [] : [{ owner, peer: declared }];
   });
+}
+
+/** The Node range `@storyshelf/app` declares, from the manifest (never a copy of it). */
+export function nodeRangeOfApp(): string | undefined {
+  return PACKAGES["@storyshelf/app"]?.engines?.node;
 }
