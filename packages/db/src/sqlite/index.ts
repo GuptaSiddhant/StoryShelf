@@ -19,6 +19,7 @@ import { applyConnectionPragmas, type SqliteConnectionOptions } from "./pragmas.
 import { BUSY_WAIT_MS, drizzleOver } from "./proxy-executors.ts";
 import {
   activateRetention,
+  activateRetentionReadOnly,
   attachRetention,
   type RetentionActivation,
 } from "./retention-activation.ts";
@@ -77,7 +78,9 @@ export function createSqliteDatabase(
     // answer arrays, as this adapter always has.
     { isolateStatements: true, rawRows: "arrays" },
   );
-  return attachRetention(adapter, retention);
+  return attachRetention(adapter, retention, async (context) => {
+    await activateRetentionReadOnly(path, retention, context);
+  });
 }
 
 const WEBHOOK_SECRET_DROP = "ALTER TABLE webhooks DROP COLUMN secret";

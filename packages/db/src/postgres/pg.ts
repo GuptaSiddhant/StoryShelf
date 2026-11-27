@@ -16,6 +16,7 @@ import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
 import {
   activateRetention,
+  activateRetentionReadOnly,
   attachRetention,
   type RetentionActivation,
 } from "./retention-activation.ts";
@@ -95,7 +96,15 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
       await pool.query("SELECT 1");
     },
   });
-  return attachRetention(adapter, retention);
+  return attachRetention(
+    adapter,
+    retention,
+    pooled
+      ? async (context) => {
+          await activateRetentionReadOnly(db, retention, context);
+        }
+      : undefined,
+  );
 }
 
 /** An owned pool from URL-or-fields options. */

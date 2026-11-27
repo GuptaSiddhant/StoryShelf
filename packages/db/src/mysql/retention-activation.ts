@@ -12,9 +12,15 @@
 import type {
   BuildReferenceLifecycle,
   DatabaseAdapter,
+  ReadOnlyRetentionContext,
   RetentionPause,
 } from "@storyshelf/core/adapter/database";
-import { BaselineSourceIntegrityError } from "@storyshelf/core/adapter/database";
+import {
+  assertRetentionReady,
+  BaselineSourceIntegrityError,
+  RetentionNotReadyError,
+  sqlSchemaLevelStore,
+} from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { prepareBaselineReferences } from "./baseline-preparation.ts";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
@@ -142,6 +148,40 @@ async function verifiedPool(
   return null;
 }
 
+/**
+ * For a `tool` command: expose the lifecycle when this release already prepared the database and
+ * the server is one the lifecycle was proven on, judged from `SELECT`s alone. Never migrates,
+ * writes `schema_meta` or prepares the pins. Anything unproven throws the one-line refusal.
+ */
+export async function activateRetentionReadOnly(
+  source: RetentionSource,
+  state: RetentionActivation,
+  context: ReadOnlyRetentionContext,
+): Promise<void> {
+  delete state.lifecycle;
+  delete state.pause;
+  if (!("pool" in source)) {
+    throw new RetentionNotReadyError(`Build retention is unavailable here: ${source.refused}.`);
+  }
+  const { pool } = source;
+  await assertProvenServer(pool);
+  const query = async (statement: string): Promise<unknown[]> =>
+    await onConnection(pool, async (connection) => await statementsOn(connection).query(statement));
+  await assertRetentionReady({
+    release: context.release,
+    store: sqlSchemaLevelStore(query, "mysql"),
+    query,
+  });
+  state.lifecycle = createBuildReferenceLifecycle(pool);
+}
+
+async function assertProvenServer(pool: LifecyclePool): Promise<void> {
+  const refusal = refusalOf(await serverFacts(pool));
+  if (refusal !== null) {
+    throw new RetentionNotReadyError(`Build retention is unavailable on this server: ${refusal}.`);
+  }
+}
+
 async function prepareAndExpose(
   pool: LifecyclePool,
   state: RetentionActivation,
@@ -174,7 +214,14 @@ function pauseRetention(
 export function attachRetention(
   adapter: DatabaseAdapter,
   state: RetentionActivation,
+  readOnly?: (context: ReadOnlyRetentionContext) => Promise<void>,
 ): DatabaseAdapter {
+  if (readOnly) {
+    Object.defineProperty(adapter, "activateRetentionReadOnly", {
+      enumerable: true,
+      value: readOnly,
+    });
+  }
   Object.defineProperties(adapter, {
     // Assignable, so a test can swap in a wrapped capability; production code only reads it.
     buildReferenceLifecycle: {

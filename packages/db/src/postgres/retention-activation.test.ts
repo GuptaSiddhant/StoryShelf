@@ -10,7 +10,10 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { createShelfLogger } from "@storyshelf/core/logger";
-import { retentionActivationContractSuite } from "@storyshelf/core/test-helpers";
+import {
+  retentionActivationContractSuite,
+  retentionReadOnlyContractSuite,
+} from "@storyshelf/core/test-helpers";
 import { sql } from "drizzle-orm";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
@@ -277,5 +280,37 @@ describe("PGlite never exposes the capability", () => {
     const { adapter } = await sharedPglite();
     expect(adapter.buildReferenceLifecycle).toBeUndefined();
     expect(adapter.retentionPause).toBeUndefined();
+  });
+});
+
+describe.skipIf(!LIVE)("real Postgres, read-only activation in a scratch database", () => {
+  const server = process.env["DATABASE_URL"] ?? "";
+
+  retentionReadOnlyContractSuite("Postgres (real server)", async (run) => {
+    const name = `shelf_readonly_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    const admin = postgres(server);
+    await admin.unsafe(`CREATE DATABASE ${name}`);
+    const own = new URL(server);
+    own.pathname = `/${name}`;
+    const clients: ReturnType<typeof postgres>[] = [];
+    const open = (): DatabaseAdapter => {
+      const client = postgres(own.toString());
+      clients.push(client);
+      return createPostgresDatabase({ client });
+    };
+    try {
+      await run({
+        open,
+        boot: async (release) => {
+          const db = open();
+          await db.lifecycle?.setup({ config: {}, logger: silent, release });
+          return db;
+        },
+      });
+    } finally {
+      await Promise.all(clients.map(async (client) => await client.end()));
+      await admin.unsafe(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await admin.end();
+    }
   });
 });

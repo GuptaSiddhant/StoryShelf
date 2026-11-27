@@ -6,6 +6,7 @@ import type { LifecyclePool } from "./lifecycle-transaction.ts";
 import { runMigrations } from "./migrate.ts";
 import {
   activateRetention,
+  activateRetentionReadOnly,
   attachRetention,
   type RetentionActivation,
   type RetentionSource,
@@ -134,7 +135,9 @@ export function createMysqlAdapter(
       await pool.query("SELECT 1");
     },
   });
-  return attachRetention(adapter, retention);
+  return attachRetention(adapter, retention, async (context) => {
+    await activateRetentionReadOnly(retentionSource(pool, unverifiedRetention), retention, context);
+  });
 }
 
 /** The rows of one statement on the pool, for the migration runner. */

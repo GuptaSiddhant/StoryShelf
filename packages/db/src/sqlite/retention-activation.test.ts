@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
 import { createShelfLogger } from "@storyshelf/core/logger";
+import { retentionReadOnlyContractSuite } from "@storyshelf/core/test-helpers";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -222,4 +223,28 @@ describe.runIf(process.env["RUN_BENCH"] === "1")("preparation time", () => {
       await db.lifecycle?.teardown();
     });
   }, 120_000);
+});
+
+retentionReadOnlyContractSuite("SQLite", async (run) => {
+  await withFile(async (path) => {
+    const logger = createShelfLogger({ level: "silent" });
+    const opened: DatabaseAdapter[] = [];
+    const open = (): DatabaseAdapter => {
+      const db = createSqliteDatabase(path);
+      opened.push(db);
+      return db;
+    };
+    try {
+      await run({
+        open,
+        boot: async (release) => {
+          const db = open();
+          await db.lifecycle?.setup({ config: {}, logger, release });
+          return db;
+        },
+      });
+    } finally {
+      await Promise.all(opened.map(async (db) => await db.lifecycle?.teardown()));
+    }
+  });
 });
