@@ -19,6 +19,7 @@ import {
   statusTone,
   Badge,
   RelativeTime,
+  Form,
 } from "../ui/components.tsx";
 import { ProjectDesignLinks } from "./design-links.tsx";
 import { GetStarted } from "./get-started.tsx";
@@ -233,7 +234,7 @@ function KeepOfflineButton(props: { slug: string }): Rendered | null {
 
 function BranchPicker(props: { project: Project; build: Build; branches: string[] }): Rendered {
   return (
-    <form method="get" action={`/projects/${props.project.slug}/library`}>
+    <Form method="get" action={`/projects/${props.project.slug}/library`}>
       <HStack>
         <SelectField
           label="Branch"
@@ -246,6 +247,6 @@ function BranchPicker(props: { project: Project; build: Build; branches: string[
           View
         </Button>
       </HStack>
-    </form>
+    </Form>
   );
 }

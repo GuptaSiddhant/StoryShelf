@@ -9,6 +9,7 @@ import {
   Meta,
   SectionTitle,
   SelectField,
+  Form,
 } from "../ui/components.tsx";
 
 /** AI availability and profile choices passed to the settings tab. */
@@ -25,7 +26,7 @@ function ProfileForm(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, ai } = props;
   return (
-    <form
+    <Form
       method="post"
       action={`/projects/${project.slug}/settings/ai`}
       hx-post={`/projects/${project.slug}/settings/ai`}
@@ -56,7 +57,7 @@ function ProfileForm(props: {
       ) : (
         <Meta>You need site admin access to change the AI profile.</Meta>
       )}
-    </form>
+    </Form>
   );
 }
 

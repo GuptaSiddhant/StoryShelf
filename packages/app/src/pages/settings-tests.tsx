@@ -9,6 +9,7 @@ import {
   FormActions,
   Meta,
   SectionTitle,
+  Form,
 } from "../ui/components.tsx";
 
 /** Tests settings tab: play execution, Storybook 10 test runs, accessibility checks, play timeout. */
@@ -41,7 +42,7 @@ export function renderSettingsTests(
           and is reported as passed or failed on the build. A failing test fails the build like a
           failing <code>play</code> function. Storybook 8 and 9 builds have none.
         </Meta>
-        <form
+        <Form
           method="post"
           action={`/projects/${project.slug}/settings/tests`}
           hx-post={`/projects/${project.slug}/settings/tests`}
@@ -109,7 +110,7 @@ export function renderSettingsTests(
           ) : (
             <Meta>You need admin access to edit settings.</Meta>
           )}
-        </form>
+        </Form>
       </Card>
       <Card>
         <SectionTitle level={3}>How to mark stories</SectionTitle>

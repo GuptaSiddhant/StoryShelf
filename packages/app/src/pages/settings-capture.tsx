@@ -15,6 +15,7 @@ import {
   SectionTitle,
   SelectField,
   TextareaField,
+  Form,
 } from "../ui/components.tsx";
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -130,7 +131,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
     <Card>
       <SectionTitle>Superseded builds</SectionTitle>
       <Meta>A newer commit on a branch makes an older build of it unnecessary.</Meta>
-      <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
+      <Form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
         {csrfField()}
         <CheckField
           label="Cancel superseded builds"
@@ -147,7 +148,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
             </Button>
           </FormActions>
         ) : null}
-      </form>
+      </Form>
     </Card>
   );
 }

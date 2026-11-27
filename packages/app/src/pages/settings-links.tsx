@@ -12,6 +12,7 @@ import {
   SectionTitle,
   SelectField,
   Table,
+  Form,
 } from "../ui/components.tsx";
 /** A package linked to the upstream project that publishes it. */
 export interface SettingsLink {
@@ -110,7 +111,7 @@ function AddLinkCard(props: {
   return (
     <Card>
       <SectionTitle level={3}>Link a package</SectionTitle>
-      <form method="post" action={base} hx-post={base} hx-target="body">
+      <Form method="post" action={base} hx-post={base} hx-target="body">
         {csrfField()}
         <div class="grid grid--2">
           <Field label="Package" name="package" required placeholder="@acme/design-system" />
@@ -129,7 +130,7 @@ function AddLinkCard(props: {
             Link package
           </Button>
         </FormActions>
-      </form>
+      </Form>
     </Card>
   );
 }

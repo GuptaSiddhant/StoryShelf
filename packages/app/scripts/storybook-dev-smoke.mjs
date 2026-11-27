@@ -94,7 +94,49 @@ async function inspect(page, id, errors) {
   }
   await page.waitForTimeout(200);
   await checkPhoneWidth(page, errors);
+  await checkCardBottoms(page, errors);
   await checkSummaryRing(page, errors);
+}
+
+/** A card's last visible child ends within one padding step of its bottom edge (no blank band, #1286 L5). */
+const CARD_BOTTOM_LIMIT_PX = 24;
+
+/** The cards of a document (a bordered, rounded, padded surface) whose last child leaves a band. */
+function cardsWithBand(limit) {
+  const doc = globalThis.document;
+  const bands = [];
+  for (const card of doc.querySelectorAll("main div, main section, body > div")) {
+    const style = globalThis.getComputedStyle(card);
+    const isCard =
+      style.paddingBottom === "16px" &&
+      style.borderBottomWidth === "1px" &&
+      style.borderBottomStyle === "solid" &&
+      style.borderTopLeftRadius !== "0px" &&
+      style.display === "grid";
+    const last = [...card.children].reverse().find((child) => {
+      const box = child.getBoundingClientRect();
+      return box.height > 0 && globalThis.getComputedStyle(child).visibility !== "hidden";
+    });
+    if (isCard && last) {
+      const gap = card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+      if (gap > limit) {
+        bands.push(`${Math.round(gap)}px below <${last.tagName.toLowerCase()}>`);
+      }
+    }
+  }
+  return bands;
+}
+
+/** Fail a story whose card ends in a blank band: a margin or an empty line under its last child. */
+async function checkCardBottoms(page, errors) {
+  const frame = page.frames().find((candidate) => candidate !== page.mainFrame());
+  const target = frame ?? page;
+  if (frame) {
+    await frame.waitForLoadState("load");
+  }
+  for (const band of await target.evaluate(cardsWithBand, CARD_BOTTOM_LIMIT_PX)) {
+    errors.push(`card: a blank band at the bottom of a card (${band})`);
+  }
 }
 
 /** What the story's document measures: the canvas, or the frame inside it for a page story (#1133). */
