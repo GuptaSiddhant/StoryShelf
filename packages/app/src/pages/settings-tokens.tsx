@@ -39,7 +39,7 @@ function tokenItems(
           hx-confirm="Delete this token? CI jobs using it will stop working."
         >
           {csrfField()}
-          <Button variant="ghost" size="sm" type="submit">
+          <Button variant="danger-secondary" size="sm" type="submit">
             Revoke
           </Button>
         </form>

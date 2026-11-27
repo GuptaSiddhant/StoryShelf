@@ -14,6 +14,7 @@ import {
   Meta,
   PageHeader,
   SectionTitle,
+  Absent,
   RelativeTime,
   Table,
   VStack,
@@ -221,7 +222,7 @@ const PasskeysSection: FC<{ security: SecurityState }> = ({ security }) => {
       <PasskeyTable passkeys={security.passkeys} />
       <HStack>
         <Field label="Key name" name="keyName" type="text" placeholder="e.g. Security key" />
-        <Button variant="primary" size="sm" type="button" data-passkey-register="true">
+        <Button variant="primary" type="button" data-passkey-register="true">
           Register a passkey
         </Button>
       </HStack>
@@ -330,8 +331,9 @@ export function renderProfilePage(state: ProfilePageState): RenderedContent {
             </VStack>
           </HStack>
           <div class={profileMeta}>
-            Member since {dbUser?.createdAt ? <Time value={dbUser.createdAt} format="date" /> : "—"}{" "}
-            · Last login {dbUser?.lastLoginAt ? <Time value={dbUser.lastLoginAt} /> : "—"}
+            Member since{" "}
+            {dbUser?.createdAt ? <Time value={dbUser.createdAt} format="date" /> : <Absent />} ·
+            Last login {dbUser?.lastLoginAt ? <Time value={dbUser.lastLoginAt} /> : <Absent />}
           </div>
         </VStack>
       </Card>

@@ -15,7 +15,6 @@ import {
   RelativeTime,
   SectionTitle,
   VStack,
-  Time,
 } from "../ui/components.tsx";
 import { Style } from "../ui/css.ts";
 import {
@@ -99,7 +98,7 @@ export function CommentCard(
       <div class={reviewCommentHead}>
         <strong>{who}</strong>
         <span>
-          · <Time value={comment.createdAt} />
+          · <RelativeTime value={comment.createdAt} />
         </span>
         {anchor ?? null}
         <KindBadge comment={comment} />

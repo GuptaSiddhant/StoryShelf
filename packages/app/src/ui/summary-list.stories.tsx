@@ -11,7 +11,7 @@ const actions = (
     <Button variant="secondary" size="sm" href="#edit">
       Edit
     </Button>
-    <Button variant="danger" size="sm" href="#remove">
+    <Button variant="danger-secondary" size="sm" href="#remove">
       Remove
     </Button>
   </>

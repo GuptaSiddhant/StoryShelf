@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { initials } from "./avatar.tsx";
 import {
+  Absent,
   Alert,
   Avatar,
   AvatarGroup,
@@ -23,6 +24,7 @@ import {
   Table,
   Thumbnail,
   statusTone,
+  valueWithUnit,
 } from "./components.tsx";
 import { Style } from "./css.ts";
 import { iconSpriteHref } from "./icons/sprite.ts";
@@ -473,5 +475,20 @@ describe("statusTone", () => {
 
   it("shows a skipped build neutral: routine, neither good news nor a problem", () => {
     expect(statusTone("skipped")).toBe("neutral");
+  });
+});
+
+describe("absent values", () => {
+  it("renders a dash for sight and none for a screen reader", async () => {
+    const html = await render(<Absent />);
+    expect(html).toContain('<span aria-hidden="true">—</span>');
+    expect(html).toContain('<span class="visually-hidden">none</span>');
+  });
+
+  it("attaches a unit to a number and says not set otherwise", () => {
+    expect(valueWithUnit(30, "days")).toBe("30 days");
+    expect(valueWithUnit(0, "days")).toBe("0 days");
+    expect(valueWithUnit(null, "days")).toBe("not set");
+    expect(valueWithUnit(undefined, "bytes")).toBe("not set");
   });
 });

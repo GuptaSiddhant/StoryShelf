@@ -142,7 +142,7 @@ describe("component page without testing", () => {
     expect(html).toContain("changed");
     expect(html).toContain("2 added");
     expect(html).toContain("1 renamed");
-    expect(html).toContain("new here");
+    expect(html).toContain("New here");
   });
 
   it("says where a moved file went and where a deleted one was last seen", async () => {

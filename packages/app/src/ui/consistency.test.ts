@@ -368,6 +368,11 @@ describe("type and colour tokens", () => {
     expect(await offendersOf(raw)).toEqual([]);
   });
 
+  it("draws no small solid danger button (a row action is danger-secondary)", async () => {
+    const solid = /<Button\b(?=[^>]*variant="danger")(?=[^>]*size="sm")[^>]*>/gu;
+    expect(await offendersOf(solid, /^ui\//u)).toEqual([]);
+  });
+
   it("formats no date by slicing an ISO string in pages or the shell", async () => {
     const slicing = /\.slice\(0, (?:10|16)\)|\btoISOString\(\)/gu;
     expect(await offendersOf(slicing, /^ui\/|^shell\/service-worker-sync\.ts$/u)).toEqual([]);

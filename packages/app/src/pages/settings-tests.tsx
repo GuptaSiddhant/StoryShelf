@@ -102,7 +102,7 @@ export function renderSettingsTests(
           />
           {isAdmin ? (
             <FormActions>
-              <Button variant="primary" type="submit" icon="check">
+              <Button variant="primary" type="submit">
                 Save changes
               </Button>
             </FormActions>

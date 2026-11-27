@@ -47,7 +47,12 @@ const linkRow = (
         >
           {csrfField()}
           <input type="hidden" name="package" value={link.packageName} />
-          <Button variant="ghost" type="submit" aria-label={`Remove ${link.packageName}`}>
+          <Button
+            variant="danger-secondary"
+            size="sm"
+            type="submit"
+            aria-label={`Remove ${link.packageName}`}
+          >
             Remove
           </Button>
         </form>
@@ -120,7 +125,7 @@ function AddLinkCard(props: {
           />
         </div>
         <FormActions>
-          <Button variant="primary" type="submit" icon="plus">
+          <Button variant="primary" type="submit">
             Link package
           </Button>
         </FormActions>

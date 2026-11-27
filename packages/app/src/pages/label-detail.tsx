@@ -13,7 +13,7 @@ import {
   Table,
   statusLabel,
   statusTone,
-  Time,
+  RelativeTime,
 } from "../ui/components.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -61,7 +61,7 @@ function LabelBuildRow(props: {
       </td>
       <td>
         <Meta as="span">
-          <Time value={build.createdAt} />
+          <RelativeTime value={build.createdAt} />
         </Meta>
       </td>
       <td class="nowrap">

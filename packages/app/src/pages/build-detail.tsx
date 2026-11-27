@@ -153,7 +153,7 @@ function BuildTags(props: { build: Build; details: BuildDetailsData }): Rendered
     <HStack>
       {details.testing ? (
         <Badge tone={selective ? "info" : "neutral"}>
-          {selective ? "affected capture" : "full capture"}
+          {selective ? "Affected capture" : "Full capture"}
         </Badge>
       ) : null}
       {details.labels.map((label): Rendered => (

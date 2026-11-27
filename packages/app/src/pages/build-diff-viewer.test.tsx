@@ -71,7 +71,7 @@ describe("review stage: size change", () => {
       { reference: known({ width: 100, height: 100 }), currentSize: { width: 120, height: 100 } },
     );
     expect(html).toContain("100×100 → 120×100");
-    expect(html).toContain("sizes differ");
+    expect(html).toContain("Sizes differ");
     expect(html).not.toContain(">0 px<");
     expect(html).not.toContain(">100.0%<");
     expect(html).not.toContain("No diff yet");
@@ -86,7 +86,7 @@ describe("review stage: size change", () => {
       currentSize: { width: 800, height: 600 },
     });
     expect(html).toContain("12 px");
-    expect(html).not.toContain("sizes differ");
+    expect(html).not.toContain("Sizes differ");
   });
 
   it("names the baseline in one quiet line, not an alert", async () => {
