@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -109,5 +109,38 @@ describe("findInstalled", () => {
     mkdirSync(join(root, "a/b"), { recursive: true });
     expect(findInstalled("@storyshelf/core", join(root, "a/b"))?.manifest.version).toBe("0.14.0");
     expect(findInstalled("not-installed-anywhere-xyz", join(root, "a/b"))).toBeUndefined();
+  });
+});
+
+/** A project pinning `pin` (or none) whose runner resolves its own nested `used`. */
+function withRunner(pin: string | undefined, used: string): string {
+  const root = project();
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+    dependencies: Json;
+  };
+  manifest.dependencies["@storyshelf/runner"] = "0.14.0";
+  if (pin !== undefined) {
+    manifest.dependencies["playwright-core"] = pin;
+    install(root, "playwright-core", { version: pin });
+  }
+  writeFileSync(join(root, "package.json"), JSON.stringify(manifest));
+  const runner = install(root, "@storyshelf/runner", { version: "0.14.0" });
+  install(runner, "playwright-core", { version: used });
+  return root;
+}
+
+describe("playwright-core pin", () => {
+  it("says nothing when the versions match", () => {
+    expect(text(peerChecks(withRunner("1.63.0", "1.63.0")))).not.toContain("playwright-core");
+  });
+
+  it("warns with both versions and the fix when the pin drifts", () => {
+    const message = text(peerChecks(withRunner("1.60.0", "1.63.0")));
+    expect(message).toContain("warn: playwright-core 1.60.0 in the project differs from 1.63.0");
+    expect(message).toContain("Set playwright-core to 1.63.0");
+  });
+
+  it("says nothing when the project does not pin playwright-core", () => {
+    expect(text(peerChecks(withRunner(undefined, "1.63.0")))).not.toContain("playwright-core");
   });
 });
