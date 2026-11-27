@@ -65,7 +65,7 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
             {open ? "2" : "1"}. Open your project: its Library shows a token and the upload command.
           </Meta>
           <Meta>{open ? "3" : "2"}. Upload your built Storybook.</Meta>
-          <CodeBlock code="npx storyshelf upload" />
+          <CodeBlock code="npx storyshelf" />
         </VStack>
       </details>
     </Card>
