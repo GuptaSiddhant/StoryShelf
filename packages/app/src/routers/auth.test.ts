@@ -165,6 +165,74 @@ describe("engine auth routes", () => {
     expect(await response.text()).toContain("Invalid credentials");
   });
 
+  it("names the configured origin when the page was opened at another address (#1431)", async () => {
+    const { db, shelf } = await testEngine();
+    const lines: string[] = [];
+    const logger = pino({ level: "warn" }, { write: (line: string) => lines.push(line) });
+    const app = createShelfApp({
+      database: db,
+      storage: makeStorage().storage,
+      auth: shelf.adapter,
+      logger,
+      config: { secret: SECRET, publicBaseUrl: BASE_URL },
+    });
+    await signup(shelf, "ada@example.com");
+
+    // The right password, the wrong password and an unknown account get the same answer: the engine
+    // refuses the origin before it reads the credentials, so nothing about the account leaks.
+    const pages = await Promise.all(
+      [
+        ["ada@example.com", "hunter2hunter2"],
+        ["ada@example.com", "wrongpassword12"],
+        ["nobody@example.com", "wrongpassword12"],
+      ].map(async ([email = "", password = ""]) => {
+        const form = new FormData();
+        form.set("email", email);
+        form.set("password", password);
+        const response = await app.request("/auth/engine/login", {
+          method: "POST",
+          headers: { origin: "http://127.0.0.1:3000", "sec-fetch-site": "same-origin" },
+          body: form,
+        });
+        expect(response.status).toBe(403);
+        expect(response.headers.get("set-cookie") ?? "").not.toContain("storyshelf_session=");
+        return await response.text();
+      }),
+    );
+    for (const html of pages) {
+      expect(html).toContain("This server is configured for <code>http://localhost:3000</code>");
+      expect(html).toContain("SHELF_PUBLIC_BASE_URL");
+      expect(html).not.toContain("Invalid credentials");
+    }
+
+    const refusals = lines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((line) => String(line["msg"]).startsWith("sign-in refused"));
+    expect(refusals).toHaveLength(3);
+    expect(refusals[0]).toMatchObject({
+      requestOrigin: "http://127.0.0.1:3000",
+      configuredOrigin: "http://localhost:3000",
+    });
+    expect(lines.join("\n")).not.toMatch(/hunter2|wrongpassword|cookie|token/iu);
+  });
+
+  it("keeps a wrong password at the configured address generic", async () => {
+    const { db, shelf } = await testEngine();
+    const app = testApp(db, shelf);
+    const form = new FormData();
+    form.set("email", "nobody@example.com");
+    form.set("password", "wrongpassword12");
+    const response = await app.request("/auth/engine/login", {
+      method: "POST",
+      headers: { origin: BASE_URL },
+      body: form,
+    });
+    expect(response.status).toBe(401);
+    const html = await response.text();
+    expect(html).toContain("Invalid credentials");
+    expect(html).not.toContain("SHELF_PUBLIC_BASE_URL");
+  });
+
   it("reports an unusable email address instead of invalid credentials", async () => {
     const { db, shelf } = await testEngine();
     const app = testApp(db, shelf);
