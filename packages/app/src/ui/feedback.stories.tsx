@@ -109,6 +109,7 @@ export const Stats = jsxStory(() => (
     <Stat label="Components" value={42} />
     <Stat label="Approved" value={36} tone="success" />
     <Stat label="Needing attention" value={6} tone="warning" />
+    <Stat label="Needs attention · Unavailable" value={null} />
     <Stat label="Coverage" value="86%" />
   </HStack>
 ));

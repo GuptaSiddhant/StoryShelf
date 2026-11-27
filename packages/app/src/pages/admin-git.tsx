@@ -21,6 +21,7 @@ import {
   SummaryList,
   type SummaryItem,
   Form,
+  formatAbsolute,
 } from "../ui/components.tsx";
 
 /** Where a connection's health probe stands. */
@@ -94,7 +95,9 @@ function connectionState(connection: GitConnectionView): SummaryItem["state"] {
 /** The token's expiry, unless the health line already names it (a warning within 30 days). */
 function expiryNote(connection: GitConnectionView): string {
   const { expiresOn, health } = connection;
-  return expiresOn && !health.detail.includes(expiresOn) ? `Token expires ${expiresOn}` : "";
+  return expiresOn && !health.detail.includes(expiresOn)
+    ? `Token expires ${formatAbsolute(expiresOn, "date")}`
+    : "";
 }
 
 /** One line of facts: provider, account, coverage, health, expiry, what it posts and who manages it. */

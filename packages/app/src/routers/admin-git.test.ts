@@ -177,7 +177,7 @@ describe("System → Git", () => {
     stubHost({ "/personal_access_tokens/self": { active: true } });
     const html = await (await browser.get("/admin/git")).text();
     expect(html).toContain("acme/web on gitlab.example.com");
-    expect(html).toContain("Token expires 2099-01-31");
+    expect(html).toContain("Token expires Jan 31, 2099");
     expect(html).not.toContain(GITLAB_TOKEN);
   });
 

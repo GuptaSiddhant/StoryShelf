@@ -394,15 +394,15 @@ export const StatGroup: FC<{ children?: unknown }> = ({ children }) => (
   <div class={statGroup}>{children}</div>
 );
 
-/** Centered statistic value with a label and an optional value tone. */
-export const Stat: FC<{ label: string; value: string | number; tone?: StatTone }> = ({
+/** Centered statistic value with a label and an optional value tone; `null` is an absent value. */
+export const Stat: FC<{ label: string; value: string | number | null; tone?: StatTone }> = ({
   label,
   value,
   tone = "neutral",
 }) => {
   return (
     <div class={statWrap}>
-      <div class={statValueTones[tone]}>{String(value)}</div>
+      <div class={statValueTones[tone]}>{value === null ? <Absent /> : String(value)}</div>
       <div class={statLabel}>{label}</div>
     </div>
   );

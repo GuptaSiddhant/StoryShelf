@@ -89,6 +89,14 @@ closeDialog` (plus a refresh) or `HX-Redirect`; 400/409/422 re-render inside the
 - **Capitalisation.** Sentence case for buttons, tabs, titles, badges and filters; product names
   keep their capital ("View in Library", "Open in Figma", "View Storybook"). Never print a raw enum
   (status, verdict, role, kind, provider, log level): pass it through `statusLabel()`.
+- **Absent values, dates and line breaks.** A value that is not there is `<Absent />` (a dash for
+  sight, "none" for a screen reader; `Stat` takes `value={null}`), never a typed "-", "–" or "—"; a
+  number with no value is `valueWithUnit(value, unit)` ("not set"), never a placeholder with its
+  unit. Every timestamp is the `Time` or `RelativeTime` facade (relative in lists, strips and comment
+  heads; absolute only where the date is the content, as an expiry), never `.slice()` or
+  `toISOString()` on an ISO string. `RelativeTime` is one tab stop so the exact time reaches a keyboard.
+  JSX drops a line break in text: put `{" "}` where a line ends before `<code>`, `<a>`, `<strong>` or
+  `<em>` (`consistency.test.ts` enforces all three).
 
 - **Icons are sprite-backed.** Add the SVG body to `ui/icons/paths.ts`
   (24×24, stroke-based, inherits `currentColor`); `IconName` and the sprite

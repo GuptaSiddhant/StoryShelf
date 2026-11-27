@@ -13,6 +13,7 @@ import {
   Table,
   statusLabel,
   statusTone,
+  Absent,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { type SkipSource, noStoryChangedText, skipSourceSha } from "./skipped-source.ts";
@@ -200,7 +201,7 @@ function BuildRow({
       <td class={hideNarrow}>
         <div class={authorCell}>
           {build.authorName ? <Avatar name={build.authorName} size="sm" /> : null}
-          <span>{build.authorName ?? "—"}</span>
+          <span>{build.authorName ?? <Absent />}</span>
         </div>
       </td>
       <td class={hideNarrow}>

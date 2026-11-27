@@ -28,8 +28,8 @@ function tokenItems(
     return {
       id: token.id,
       name: token.name,
-      details: `Created ${formatAbsolute(token.createdAt, "date")} · Last used ${
-        token.lastUsedAt ? formatAbsolute(token.lastUsedAt, "date") : "never"
+      details: `Created ${formatAbsolute(token.createdAt, "date")} · ${
+        token.lastUsedAt ? `Last used ${formatAbsolute(token.lastUsedAt, "date")}` : "Never used"
       }`,
       actions: isAdmin ? (
         <form

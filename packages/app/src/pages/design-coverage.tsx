@@ -171,7 +171,7 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
         <a href="#drift" class={statLink}>
           <Stat
             label={unavailable ? "Needs attention · Unavailable" : "Needs attention"}
-            value={unavailable ? "–" : data.drifted.length}
+            value={unavailable ? null : data.drifted.length}
             tone={unavailable ? "neutral" : data.drifted.length > 0 ? "warning" : "success"}
           />
         </a>
