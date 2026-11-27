@@ -313,35 +313,38 @@ const ChannelsSection: FC<{
   const add = canAdd ? <AddChannelLink project={project} /> : undefined;
   return (
     <VStack>
-      <SectionTitle>Channels</SectionTitle>
-      <Meta>
-        Project admins route build events to Slack, Teams or email, and show each build's state on
-        GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
-        only in memory at delivery time. Git channels follow the build state, not a topic list, and
-        their delivery is best-effort: a failure shows here, and the next build state retries it.
-      </Meta>
-      {isAdmin && channels.some((channel) => channel.delivery === "state") ? (
+      <Card>
+        <SectionTitle>Channels</SectionTitle>
         <Meta>
-          Retry re-sends the current state of this project's open builds to one git channel. It
-          never replays chat, email or webhooks.
+          Project admins route build events to Slack, Teams or email, and show each build's state on
+          GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
+          only in memory at delivery time. Git channels follow the build state, not a topic list,
+          and their delivery is best-effort: a failure shows here, and the next build state retries
+          it.
         </Meta>
-      ) : null}
-      <SummaryList
-        label="Channels"
-        items={channels.map((channel) => ({
-          id: channel.id,
-          anchor: `channel-${channel.id}`,
-          name: targetOf(channel),
-          state: healthOf(channel),
-          details: detailsOf(channel),
-          actions: isAdmin ? (
-            <ChannelActions project={project} channel={channel} paused={paused} />
-          ) : undefined,
-        }))}
-        emptyTitle="No channels configured"
-        add={add}
-      />
-      {channels.length > 0 ? add : null}
+        {isAdmin && channels.some((channel) => channel.delivery === "state") ? (
+          <Meta>
+            Retry re-sends the current state of this project's open builds to one git channel. It
+            never replays chat, email or webhooks.
+          </Meta>
+        ) : null}
+        <SummaryList
+          label="Channels"
+          items={channels.map((channel) => ({
+            id: channel.id,
+            anchor: `channel-${channel.id}`,
+            name: targetOf(channel),
+            state: healthOf(channel),
+            details: detailsOf(channel),
+            actions: isAdmin ? (
+              <ChannelActions project={project} channel={channel} paused={paused} />
+            ) : undefined,
+          }))}
+          emptyTitle="No channels configured"
+          add={add}
+        />
+        {channels.length > 0 ? add : null}
+      </Card>
       {canAdd ? <ChannelDialogs /> : null}
     </VStack>
   );

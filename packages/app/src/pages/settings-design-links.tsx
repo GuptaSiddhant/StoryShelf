@@ -2,6 +2,7 @@ import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
   Button,
+  Card,
   DialogLink,
   Meta,
   SectionTitle,
@@ -78,26 +79,28 @@ export const FilesCard: FC<{
   ) : undefined;
   return (
     <VStack>
-      <SectionTitle>Design files</SectionTitle>
-      <Meta>
-        Design files for this project. They appear in the library header; individual stories link to
-        a design through their component (see below) or their story parameters.
-      </Meta>
-      <SummaryList
-        label="Design files"
-        items={linkItems(
-          files.map((file) => ({
-            id: file.id,
-            name: file.label,
-            url: file.url,
-            ...(isAdmin ? { removeAction: `${base}/files/${file.id}/delete` } : {}),
-            confirm: "Remove this design file?",
-          })),
-        )}
-        emptyTitle="No design files linked"
-        add={add}
-      />
-      {files.length > 0 ? add : null}
+      <Card>
+        <SectionTitle>Design files</SectionTitle>
+        <Meta>
+          Design files for this project. They appear in the library header; individual stories link
+          to a design through their component (see below) or their story parameters.
+        </Meta>
+        <SummaryList
+          label="Design files"
+          items={linkItems(
+            files.map((file) => ({
+              id: file.id,
+              name: file.label,
+              url: file.url,
+              ...(isAdmin ? { removeAction: `${base}/files/${file.id}/delete` } : {}),
+              confirm: "Remove this design file?",
+            })),
+          )}
+          emptyTitle="No design files linked"
+          add={add}
+        />
+        {files.length > 0 ? add : null}
+      </Card>
       {isAdmin ? (
         <FormDialog
           id={ADD_DESIGN_FILE_DIALOG}
@@ -128,28 +131,30 @@ export const ComponentsCard: FC<{
   );
   return (
     <VStack>
-      <SectionTitle>Component mapping</SectionTitle>
-      <Meta>
-        Map a story file (its import path) to a design. A manual mapping overrides the story&apos;s
-        own <code>storyshelf.figma</code> and <code>design</code> parameters, and survives new
-        builds. Mappings are keyed by the story file path, so update one after a file is renamed or
-        moved.
-      </Meta>
-      <SummaryList
-        label="Component design mappings"
-        items={linkItems(
-          components.map((component) => ({
-            id: component.id,
-            name: component.importPath,
-            url: component.url,
-            removeAction: `${base}/components/${component.id}/delete`,
-            confirm: "Remove this mapping?",
-          })),
-        )}
-        emptyTitle="No component mappings"
-        add={add}
-      />
-      {components.length > 0 ? add : null}
+      <Card>
+        <SectionTitle>Component mapping</SectionTitle>
+        <Meta>
+          Map a story file (its import path) to a design. A manual mapping overrides the
+          story&apos;s own <code>storyshelf.figma</code> and <code>design</code> parameters, and
+          survives new builds. Mappings are keyed by the story file path, so update one after a file
+          is renamed or moved.
+        </Meta>
+        <SummaryList
+          label="Component design mappings"
+          items={linkItems(
+            components.map((component) => ({
+              id: component.id,
+              name: component.importPath,
+              url: component.url,
+              removeAction: `${base}/components/${component.id}/delete`,
+              confirm: "Remove this mapping?",
+            })),
+          )}
+          emptyTitle="No component mappings"
+          add={add}
+        />
+        {components.length > 0 ? add : null}
+      </Card>
       <FormDialog id={MAP_COMPONENT_DIALOG} title="Map component" submitLabel="Map component" />
     </VStack>
   );
