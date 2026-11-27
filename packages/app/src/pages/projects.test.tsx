@@ -115,3 +115,40 @@ describe("first-run copy", () => {
     expect(html).not.toContain("free and unlimited");
   });
 });
+
+/** The projects page for a signed-in user with the given site role and no projects. */
+async function projectsPageAs(role: "member" | "viewer" | "admin"): Promise<string> {
+  const { db } = makeDatabase();
+  const { storage } = makeStorage();
+  const user = { id: "ada", email: "ada@example.com", name: "Ada", role };
+  const app = createShelfApp({
+    database: db,
+    storage,
+    auth: stubAuth(user),
+    logger: createShelfLogger({ level: "silent" }),
+  });
+  return await (await app.request("/projects")).text();
+}
+
+describe("projects overview for a signed-in non-admin with no projects", () => {
+  it("says the user has not been added and asks an admin, with no setup steps", async () => {
+    const pages = await Promise.all(
+      (["member", "viewer"] as const).map(async (role) => await projectsPageAs(role)),
+    );
+    for (const html of pages) {
+      expect(html).toContain("You have not been added to a project yet. Ask an admin.");
+      expect(html).not.toContain("Create your first project");
+      expect(html).not.toContain("Set up your first upload");
+      expect(html).not.toContain("storyshelf create");
+      expect(html).not.toContain("SHELF_ADMIN_TOKEN");
+      expect(html).not.toContain("data-copy=");
+    }
+  });
+
+  it("keeps the admin's own empty state and setup steps", async () => {
+    const html = await projectsPageAs("admin");
+    expect(html).toContain("Create your first project to start visual testing.");
+    expect(html).toContain("Set up your first upload");
+    expect(html).not.toContain("You have not been added to a project yet.");
+  });
+});

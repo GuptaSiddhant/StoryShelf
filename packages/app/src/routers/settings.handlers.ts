@@ -9,6 +9,7 @@ import {
 } from "@storyshelf/core/models";
 import { PackageUsageModel } from "@storyshelf/core/models";
 import { MemberModel } from "@storyshelf/core/models";
+import { UserModel } from "@storyshelf/core/models";
 import { NotificationChannelModel } from "@storyshelf/core/models";
 import { NotificationSubscriptionModel } from "@storyshelf/core/models";
 import { ProjectGroupMappingModel } from "@storyshelf/core/models";
@@ -36,7 +37,7 @@ import type { DesignCredentialState } from "../pages/settings-design-credential.
 import type { SettingsDesignData, SettingsDesignProvider } from "../pages/settings-design.tsx";
 import type { SettingsGitData } from "../pages/settings-git.tsx";
 import type { SettingsLink, SettingsLinkCandidate } from "../pages/settings-links.tsx";
-import type { SettingsMember } from "../pages/settings-members.tsx";
+import { memberIdentityOf, type SettingsMember } from "../pages/settings-members.tsx";
 import type {
   SettingsMySubscription,
   SettingsNotificationChannel,
@@ -115,7 +116,13 @@ async function loadProjectRoster(
   projectId: string,
 ): Promise<{ labelTypes: LabelType[]; members: SettingsMember[] }> {
   const labelTypes = await new LabelModel(db).listTypes(projectId);
-  const members = await new MemberModel(db).list(projectId);
+  const users = new UserModel(db);
+  const rows = await new MemberModel(db).list(projectId);
+  const members = await Promise.all(
+    rows.map(async (member) =>
+      Object.assign(member, memberIdentityOf(await users.get(member.userId))),
+    ),
+  );
   return { labelTypes, members };
 }
 

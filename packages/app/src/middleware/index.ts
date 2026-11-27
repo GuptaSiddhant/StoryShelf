@@ -13,4 +13,5 @@ export { hostDispatch } from "./host-dispatch.ts";
 export { requireTesting } from "./require-testing.ts";
 export { requireReview } from "./require-review.ts";
 export { notFoundPage } from "./not-found-page.ts";
+export { forbiddenPage } from "./forbidden-page.ts";
 export { requireProjectVisible } from "./require-visible.ts";
