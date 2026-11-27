@@ -13,7 +13,19 @@ export const Initials = jsxStory(() => (
         <Avatar name="Ada Lovelace" size={size} />
         <Avatar name="grace.hopper@example.com" size={size} />
         <Avatar name="Linus" size={size} />
+      </HStack>
+    ))}
+  </VStack>
+));
+
+/** No name: a "?" hidden from assistive tech (no `role="img"` with an empty label), with or without an image. */
+export const NoName = jsxStory(() => (
+  <VStack>
+    {(["sm", "md", "lg", "xl"] as const).map((size) => (
+      <HStack key={size}>
         <Avatar name="" size={size} />
+        <Avatar name="  " size={size} />
+        <Avatar name="" src="/avatar.png" size={size} />
       </HStack>
     ))}
   </VStack>

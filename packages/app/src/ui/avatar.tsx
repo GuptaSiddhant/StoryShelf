@@ -80,14 +80,26 @@ export function initials(name: string): string {
   return letters.toUpperCase();
 }
 
-/** Round user image, falling back to tinted initials (the brand accent shows subtly). */
+/**
+ * Round user image, falling back to tinted initials (the brand accent shows subtly). With a name it
+ * is an image named for the person; with none it is decoration (a "?"), hidden from assistive tech,
+ * because every call site prints the person's name beside it.
+ */
 export const Avatar: FC<{ name: string; src?: string | null; size?: AvatarSize }> = ({
   name,
   src,
   size = "md",
 }) => {
+  const named = name.trim().length > 0;
   if (src) {
-    return <img class={avatarSizes[size]} src={src} alt={name} loading="lazy" />;
+    return <img class={avatarSizes[size]} src={src} alt={named ? name : ""} loading="lazy" />;
+  }
+  if (!named) {
+    return (
+      <span class={avatarSizes[size]} aria-hidden="true">
+        ?
+      </span>
+    );
   }
   return (
     <span class={avatarSizes[size]} role="img" aria-label={name}>
