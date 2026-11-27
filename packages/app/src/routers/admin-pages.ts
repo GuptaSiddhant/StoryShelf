@@ -3,6 +3,7 @@ import type { AdapterSetupResult, AdapterSetupSources } from "@storyshelf/core/a
 import type { Auth } from "@storyshelf/core/auth";
 import {
   type CredentialProbe,
+  GIT_CHANNELS_STOP_RELEASE,
   NotificationChannelModel,
   ProjectModel,
 } from "@storyshelf/core/models";
@@ -10,6 +11,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import { describeCaptureHost } from "@storyshelf/core/utils";
 import type { ShelfRouter } from "../app-types.ts";
 import { loadCredentialProbe, reencryptWithCurrent } from "../credentials.ts";
+import { gitChannelCount } from "../git-channels-admin.ts";
 import { countHiddenSnapshots } from "../hidden-data.ts";
 import { insightDepsFromStore } from "../insights/deps.ts";
 import { buildUsageReport } from "../insights/usage-report.ts";
@@ -72,6 +74,7 @@ export function registerAdminPages(app: ShelfRouter, deps: AdminPageDeps, auth?:
         ...(await captureView()),
         // Only a host that runs capture jobs (one with `testing`) is sized here.
         capture: capturesHere === true ? describeCaptureHost(captureConcurrency) : null,
+        gitChannels: { count: await gitChannelCount(), release: GIT_CHANNELS_STOP_RELEASE },
       }),
     );
   });

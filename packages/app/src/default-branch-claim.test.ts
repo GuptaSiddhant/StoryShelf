@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "./index.tsx";
+import { seedGitChannel } from "./test-git-channel.ts";
 
 const SHA = "b".repeat(40);
 const BASE = "https://shelf.example.com";
@@ -96,12 +97,12 @@ async function uploadMain(onBranch?: boolean) {
     slug: string;
   };
   if (onBranch !== undefined) {
-    const channel = await json(app, "POST", `/projects/${project.slug}/notification-channels`, {
+    await seedGitChannel(db, {
+      project: project.slug,
       provider: "github",
       config: { owner: "acme", repo: "web" },
       secret: "ghp_token",
     });
-    expect(channel.status).toBe(201);
   }
   const created = (await (
     await json(app, "POST", `/projects/${project.slug}/builds`, { gitSha: SHA, gitBranch: "main" })

@@ -9,6 +9,7 @@ import { decryptCredential, encrypt, type SecretInput } from "../utils/encrypt.t
 import { checkOutboundUrl, outboundReasonText } from "../utils/outbound.ts";
 import { ulid } from "../utils/ulid.ts";
 import { col } from "./columns.ts";
+import { GIT_CHANNELS_CLOSED } from "./git-channel.ts";
 
 /** Tables required by {@link NotificationChannelModel}. */
 export interface NotificationChannelTables {
@@ -185,8 +186,8 @@ export class NotificationChannelModel {
   }
 
   /**
-   * Validate channel input against the matching notifier's schema. With `scope`, also
-   * enforce what `state` providers (git hosts) need: a project and a token. Then the outbound
+   * Validate channel input against the matching notifier's schema. With `scope` (a new channel),
+   * a `state` provider (a git host) is refused: projects link repositories instead. Then the outbound
    * guard checks the destination URLs (chat webhook URL in `secret`, GitLab `host`); it runs
    * again at send time, which stays the real check because DNS can change.
    */
@@ -277,16 +278,14 @@ async function destinationProblem(
 }
 
 /** Git channels belong to one project and carry their own token. */
-function stateScopeProblem(scope: {
-  projectId: string | null;
-  hasSecret: boolean;
-}): ChannelValidation {
-  if (scope.projectId === null) {
-    return { ok: false, field: "provider", message: "Git channels belong to a project" };
-  }
-  return scope.hasSecret
-    ? { ok: true }
-    : { ok: false, field: "secret", message: "A git channel needs a token or private key" };
+function stateScopeProblem(scope: { projectId: string | null }): ChannelValidation {
+  // Release N+1 of ADR 0054 (decision 8): a project links a repository through the server's
+  // connection; no new per-project credential is accepted. Existing channels keep delivering.
+  return {
+    ok: false,
+    field: "provider",
+    message: scope.projectId === null ? "Git channels belong to a project" : GIT_CHANNELS_CLOSED,
+  };
 }
 
 /** Decode a JSON event list column (empty = all events). */

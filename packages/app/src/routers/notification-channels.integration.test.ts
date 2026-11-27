@@ -1,3 +1,4 @@
+import { GIT_CHANNELS_CLOSED } from "@storyshelf/core/models";
 import { makeDatabase, makeFakeStateNotifier, makeStorage } from "@storyshelf/core/test-helpers";
 import type { AuthUser } from "@storyshelf/core/types";
 import { pino } from "pino";
@@ -183,7 +184,7 @@ describe("notification channels", () => {
     expect((await listed.json()) as unknown[]).toHaveLength(1);
   });
 
-  it("keeps git channels project-scoped and requires their token", async () => {
+  it("refuses every new git channel, project or site-wide, pointing to the server's connection", async () => {
     const { db, storage } = await seed();
     const app = appWith(db, storage);
     const config = { owner: "acme", repo: "widgets" };
@@ -195,11 +196,11 @@ describe("notification channels", () => {
       });
     const project = "/api/v1/projects/notify-project/notification-channels";
 
-    const noToken = await post(project, { provider: "github", config });
-    expect(noToken.status).toBe(400);
-    expect(((await noToken.json()) as { error: { message: string } }).error.message).toBe(
-      "A git channel needs a token or private key",
-    );
+    const refused = await post(project, { provider: "github", config, secret: "ghp_token" });
+    expect(refused.status).toBe(400);
+    const text = await refused.text();
+    expect(JSON.parse(text)).toMatchObject({ error: { message: GIT_CHANNELS_CLOSED } });
+    expect(text).not.toContain("ghp_token");
 
     const siteWide = await post("/api/v1/admin/notification-channels", {
       provider: "github",
@@ -207,14 +208,6 @@ describe("notification channels", () => {
       secret: "ghp_token",
     });
     expect(siteWide.status).toBe(400);
-
-    const created = await post(project, { provider: "github", config, secret: "ghp_token" });
-    expect(created.status).toBe(201);
-    expect(await created.json()).toMatchObject({
-      provider: "github",
-      hasSecret: true,
-      lastError: null,
-      lastErrorAt: null,
-    });
+    expect(await db.list(db.tables.notificationChannels)).toHaveLength(0);
   });
 });

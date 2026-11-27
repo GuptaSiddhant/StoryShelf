@@ -1,102 +1,16 @@
-/** Create a git (`state`) channel from the settings form: repository, status prefix and token. */
-import { NotificationChannelModel } from "@storyshelf/core/models";
-import type { Project } from "@storyshelf/core/schema";
+/**
+ * A git channel posted from Project → Settings → Notifications (a page from before release N+1 of
+ * ADR 0054, decision 8): refused, with where git hosts went. Nothing is stored and the typed token
+ * or key is never echoed back.
+ */
+import { GIT_CHANNELS_CLOSED } from "@storyshelf/core/models";
 import type { Context } from "hono";
-import { unofferedKindMessage } from "../integrations.ts";
-import { getStore } from "../store.ts";
-import { flash } from "./flash.ts";
-import { notificationChannelModel } from "./scoped-models.ts";
-import { asString, renderSettingsPage } from "./settings.handlers.ts";
+import { renderSettingsPage } from "./settings.handlers.ts";
 
-const CONFIG_FIELDS = ["owner", "repo", "host", "prefix"] as const;
-/** Only the GitHub provider reads these: how it shows a build, the App that posts check runs and the GHES API base. */
-const GITHUB_FIELDS = ["mode", "appId", "installationId", "apiUrl"] as const;
-
-/** The provider config from the form; blank optional fields are left out. */
-function gitConfig(provider: string, form: FormData): Record<string, string> {
-  const config: Record<string, string> = {};
-  const fields = provider === "github" ? [...CONFIG_FIELDS, ...GITHUB_FIELDS] : CONFIG_FIELDS;
-  for (const field of fields) {
-    const value = asString(form.get(field));
-    if (value) {
-      config[field] = value;
-    }
-  }
-  return config;
-}
-
-/** Render the tab again with field errors (HTTP 400). */
-async function formError(c: Context, errors: Record<string, string>): Promise<Response> {
-  return c.html((await renderSettingsPage(c, "notifications", { errors })) ?? "", 400);
-}
-
-/** Map a failed validation to the form fields it concerns. */
-function fieldErrors(
-  secretField: "token" | "privateKey",
-  checked: Extract<
-    Awaited<ReturnType<typeof NotificationChannelModel.validateInput>>,
-    { ok: false }
-  >,
-): Record<string, string> {
-  if (checked.field === "secret") {
-    return { [secretField]: checked.message };
-  }
-  if (checked.field === "provider") {
-    return { gitProvider: checked.message };
-  }
-  const errors: Record<string, string> = {};
-  for (const issue of checked.issues ?? []) {
-    errors[issue.path] ??= issue.message;
-  }
-  return Object.keys(errors).length > 0 ? errors : { gitProvider: checked.message };
-}
-
-/** Validate and store a git channel; the token lands in the encrypted secret column. */
-export async function createGitChannel(
-  c: Context,
-  project: Project,
-  provider: string,
-  form: FormData,
-): Promise<Response> {
-  const config = gitConfig(provider, form);
-  // A GitHub App channel keeps its private key where other channels keep a token.
-  const checks = config["mode"] === "checks";
-  const token = asString(form.get(checks ? "privateKey" : "token"));
-  const problem = await gitChannelProblem(project, provider, config, {
-    token,
-    secretField: checks ? "privateKey" : "token",
-  });
-  if (problem) {
-    return await formError(c, problem);
-  }
-  await notificationChannelModel().create({
-    projectId: project.id,
-    provider,
-    config,
-    secret: token,
-  });
-  flash(c, "Git channel added");
-  return c.html((await renderSettingsPage(c, "notifications")) ?? "", 201);
-}
-
-/** The form errors for a git channel input, or null when it is valid. */
-async function gitChannelProblem(
-  project: Project,
-  provider: string,
-  config: Record<string, string>,
-  secret: { token: string | undefined; secretField: "token" | "privateKey" },
-): Promise<Record<string, string> | null> {
-  const unoffered = unofferedKindMessage(provider);
-  if (unoffered !== undefined) {
-    return { gitProvider: unoffered };
-  }
-  const { notifiers } = getStore();
-  if (!NotificationChannelModel.isStateKind(notifiers, provider)) {
-    return { gitProvider: `Unknown git provider: ${provider}` };
-  }
-  const checked = await NotificationChannelModel.validateInput(notifiers, provider, config, {
-    projectId: project.id,
-    hasSecret: Boolean(secret.token),
-  });
-  return checked.ok ? null : fieldErrors(secret.secretField, checked);
+/** Render the tab again with the refusal (HTTP 400). */
+export async function refuseGitChannel(c: Context): Promise<Response> {
+  return c.html(
+    (await renderSettingsPage(c, "notifications", { globalError: GIT_CHANNELS_CLOSED })) ?? "",
+    400,
+  );
 }

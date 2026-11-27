@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "./index.tsx";
+import { seedGitChannel } from "./test-git-channel.ts";
 
 const STORY_ID = "components-button--primary";
 const SHA = "a".repeat(40);
@@ -52,22 +53,22 @@ async function finalStates(
   return latest();
 }
 
-/** Add a git channel for the project through the notification-channel API. */
+/** Add a git channel for the project, as one made before repository links would be. */
 async function addGitChannel(
-  app: ReturnType<typeof createShelfApp>,
+  db: ReturnType<typeof makeDatabase>["db"],
   slug: string,
   channel: { provider: string; secret: string; prefix?: string },
 ): Promise<void> {
-  const created = await app.request(`/api/v1/projects/${slug}/notification-channels`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      provider: channel.provider,
-      config: { owner: "acme", repo: "widgets", prefix: channel.prefix },
-      secret: channel.secret,
-    }),
+  await seedGitChannel(db, {
+    project: slug,
+    provider: channel.provider,
+    config: {
+      owner: "acme",
+      repo: "widgets",
+      ...(channel.prefix ? { prefix: channel.prefix } : {}),
+    },
+    secret: channel.secret,
   });
-  expect(created.status).toBe(201);
 }
 
 function fakeRunner(overrides: Partial<CaptureRunner> = {}): {
@@ -217,7 +218,7 @@ async function hostingOnly() {
       body: JSON.stringify({ name: "Hosting only" }),
     })
   ).json()) as { id: string; slug: string };
-  await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
+  await addGitChannel(db, project.slug, { provider: "github-a", secret: "token-a" });
   return { app, git, project };
 }
 
@@ -245,8 +246,8 @@ describe("git channel status fan-out", () => {
     expect(projectResponse.status).toBe(201);
     const project = (await projectResponse.json()) as { id: string; slug: string };
 
-    await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
-    await addGitChannel(app, project.slug, {
+    await addGitChannel(db, project.slug, { provider: "github-a", secret: "token-a" });
+    await addGitChannel(db, project.slug, {
       provider: "github-b",
       secret: "token-b",
       prefix: "storyshelf-docs",
@@ -304,7 +305,7 @@ describe("git channel status fan-out", () => {
       body: JSON.stringify({ name: "Fanout failure" }),
     });
     const project = (await projectResponse.json()) as { id: string; slug: string };
-    await addGitChannel(app, project.slug, { provider: "github-a", secret: "token-a" });
+    await addGitChannel(db, project.slug, { provider: "github-a", secret: "token-a" });
 
     const createdBuild = await uploadBuild(app, project.slug);
 
@@ -370,7 +371,7 @@ describe("git channel status fan-out", () => {
           body: JSON.stringify({ name: "Fanout health" }),
         })
       ).json()) as { id: string; slug: string };
-      await addGitChannel(app, project.slug, { provider: "github-a", secret: "bad-token" });
+      await addGitChannel(db, project.slug, { provider: "github-a", secret: "bad-token" });
 
       const build = await uploadBuild(app, project.slug);
 

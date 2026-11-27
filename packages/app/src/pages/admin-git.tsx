@@ -24,6 +24,7 @@ import {
   Form,
   formatAbsolute,
 } from "../ui/components.tsx";
+import { GitChannelsCard, type GitChannelView } from "./admin-git-channels.tsx";
 
 /** Where a connection's health probe stands. */
 export type GitHealthState = "ok" | "warning" | "failed" | "unknown";
@@ -72,6 +73,10 @@ export interface AdminGitData {
   anyRepository: boolean;
   /** The confirmed public origin; without one, Connect GitHub cannot start. */
   origin: string | null;
+  /** The per-project git channels that remain, to move (ADR 0054, decision 8). */
+  channels: readonly GitChannelView[];
+  /** The release in which unmoved channels stop posting. */
+  stopRelease: string;
 }
 
 /** The dialog the request actions open into. */
@@ -326,6 +331,8 @@ export function renderAdminGitPage(data: AdminGitData): RenderedContent {
       <ConnectionsCard data={data} />
 
       <RequestsCard requests={data.requests} />
+
+      <GitChannelsCard channels={data.channels} release={data.stopRelease} />
 
       <SwitchCard on={data.anyRepository} />
     </DocumentLayout>

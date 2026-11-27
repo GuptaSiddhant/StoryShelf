@@ -182,7 +182,22 @@ export {
   type GitRepositoryLinkInput,
   type GitRepositoryLinkTables,
 } from "./git-repository-link.ts";
-export { connectionHost, linkKeyOf, type LinkKey } from "./git-link-key.ts";
+export { channelKeyOf, connectionHost, linkKeyOf, type LinkKey } from "./git-link-key.ts";
+export {
+  connectionFits,
+  connectionProviderFor,
+  GIT_CHANNELS_CLOSED,
+  GIT_CHANNELS_STOP_RELEASE,
+  listPerProjectGitChannels,
+  perProjectGitChannelOf,
+  type GitChannelKind,
+  type PerProjectGitChannel,
+} from "./git-channel.ts";
+export {
+  GitChannelChangedError,
+  replaceChannelWithLink,
+  type ChannelReplacement,
+} from "./git-channel-move.ts";
 export { GitLinkStateError } from "./git-link-state-error.ts";
 export {
   CONNECTION_REMOVED_REASON,

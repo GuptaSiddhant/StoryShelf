@@ -2,6 +2,13 @@
  * Build state on git channels (ADR 0014, decisions 5 to 7): the delivery that reads a build and
  * shows it, the publisher every transition calls, and the durable `notify` job kind behind it.
  */
+export {
+  moveGitChannel,
+  type ChannelMove,
+  type ChannelMoveDeps,
+  type ChannelMoveRequest,
+  type ChannelMoveTarget,
+} from "./channel-move.ts";
 export { channelTargets, deliverBuildState, loadBuild, stateTargets, writeTo } from "./deliver.ts";
 export {
   approveRepositoryLink,

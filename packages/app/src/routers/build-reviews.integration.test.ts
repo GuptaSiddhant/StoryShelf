@@ -16,6 +16,7 @@ import { pino } from "pino";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createShelfApp } from "../index.tsx";
 import { stubAuth } from "../stub-auth.ts";
+import { seedGitChannel } from "../test-git-channel.ts";
 import { stubRunner } from "../test-runner.ts";
 
 /**
@@ -133,11 +134,13 @@ async function boot(
           "content-type": "application/json",
         },
       });
-  const channel = await as("admin")("/notification-channels", {
-    method: "POST",
-    body: JSON.stringify({ provider: "fake-host", config: { owner: "a", repo: "w" }, secret: "t" }),
+  await seedGitChannel(db, {
+    project: "gate",
+    provider: "fake-host",
+    config: { owner: "a", repo: "w" },
+    secret: "t",
+    serverSecret: "s",
   });
-  expect(channel.status).toBe(201);
   const statuses = (context: string): string[] =>
     git.calls.flatMap((call) =>
       call.target.kind === "status" && call.target.context === context ? [call.state] : [],

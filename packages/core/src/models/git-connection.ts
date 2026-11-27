@@ -71,8 +71,20 @@ export class GitConnectionModel {
 
   /** Store a connection a site admin set up; its secret is encrypted before it is written. */
   async create(input: GitConnectionInput): Promise<GitConnection> {
+    const row = (await this.#db.insert(
+      this.#tables.gitConnections,
+      this.prepare(input),
+    )) as unknown as GitConnectionRow;
+    return viewOfRow(row, false);
+  }
+
+  /**
+   * The row {@link create} would write, its secret already encrypted, for a caller that inserts it
+   * inside its own transaction (moving a channel, ADR 0054 decision 8).
+   */
+  prepare(input: GitConnectionInput): GitConnectionRow {
     const now = new Date().toISOString();
-    const row = (await this.#db.insert(this.#tables.gitConnections, {
+    return {
       id: ulid(),
       provider: input.provider,
       name: input.name,
@@ -83,7 +95,11 @@ export class GitConnectionModel {
       state: "active",
       createdAt: now,
       updatedAt: now,
-    })) as unknown as GitConnectionRow;
+    };
+  }
+
+  /** The view of a row {@link prepare} built, once it is stored. */
+  static viewOf(row: GitConnectionRow): GitConnection {
     return viewOfRow(row, false);
   }
 

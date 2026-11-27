@@ -78,6 +78,8 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "POST /admin/git/links/:id/approve": "hosting",
   "GET /admin/git/links/:id/refuse": "hosting",
   "POST /admin/git/links/:id/refuse": "hosting",
+  "GET /admin/git/channels/:id/move": "hosting",
+  "POST /admin/git/channels/:id/move": "hosting",
   "GET /_": "hosting",
   "GET /_/": "hosting",
   "GET /_/:id": "hosting",
