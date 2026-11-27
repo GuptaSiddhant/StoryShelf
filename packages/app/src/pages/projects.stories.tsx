@@ -43,7 +43,7 @@ export const HealthBadge = pageStory(async () => {
   );
 });
 
-/** A default install with no project yet: sign-in on, no admin token, so the guide starts at Create project and shows no `storyshelf create`. */
+/** A default install with no project yet: sign-in on, no admin token, so the guide starts at New project and shows no `storyshelf create`. */
 export const NoProjectsSignInOn = pageStory(() => renderProjectsPage(), {
   dataset: "blank",
   store: { authEnabled: true },

@@ -39,15 +39,40 @@ export function settingChecks(env: NodeJS.ProcessEnv, adminToken: string | undef
   ];
 }
 
+/**
+ * No `schema_meta` row: a database nothing has migrated yet. That is expected on a fresh scaffold,
+ * because the first `serve` migrates it, so it passes. Only an unreachable database warns. The
+ * probe's own error is not printed: a driver error can carry the connection string.
+ */
+async function unmigratedCheck(built: BuiltInstance): Promise<Check> {
+  const lifecycle = built.options.database.lifecycle;
+  if (!lifecycle) {
+    return {
+      status: "warn",
+      message:
+        "Schema level: unknown (no schema_meta row), and this driver has no health probe to tell an unmigrated database from an unreachable one",
+    };
+  }
+  try {
+    if (!(await lifecycle.health()).ok) throw new Error("health reported not ok");
+  } catch {
+    return {
+      status: "warn",
+      message: "Schema level: unknown, because the database is unreachable",
+    };
+  }
+  return {
+    status: "pass",
+    message:
+      "Schema level: no schema_meta row yet. The database will be migrated on the first `serve`, or by `storyshelf-server migrate`.",
+  };
+}
+
 /** The schema level: what migrated the database, against this release. Read-only. */
 export async function schemaCheck(built: BuiltInstance, own = packageVersion()): Promise<Check> {
   const recorded = await readSchemaRelease(built.options.database);
   if (recorded === null) {
-    return {
-      status: "warn",
-      message:
-        "Schema level: unknown (no schema_meta row): not migrated yet, or the database is unreachable. Run `storyshelf-server migrate`.",
-    };
+    return await unmigratedCheck(built);
   }
   if (decideMigration(own, recorded) === "refuse") {
     return {

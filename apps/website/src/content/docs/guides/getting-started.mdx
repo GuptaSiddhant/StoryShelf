@@ -15,7 +15,7 @@ StoryShelf is a self-hosted visual testing platform for Storybook. You run one s
   caption="What you will end up with: a project per Storybook, and what still needs review."
 />
 
-You need a Storybook with a `.storybook/main.*` file, and a machine to run the server on. Pick one way to start the server below (both end in the same place), then follow steps 2 to 4.
+You need a Storybook with a `.storybook/main.*` file, and a machine to run the server on. Pick a way to start the server below, then follow steps 2 to 4.
 
 <Aside type="caution" title="Three values you must set">
   The server starts with sign-in on and refuses to start without these.
@@ -42,7 +42,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
       ghcr.io/guptasiddhant/storyshelf
     ```
 
-    The server listens on `http://localhost:3000`. Keep `SHELF_SECRET`: the same `storyshelf` volume needs it on every start.
+    Keep `SHELF_SECRET`: the volume needs it on every start.
 
   </TabItem>
   <TabItem label="npm">
@@ -50,7 +50,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
 
     <PackageManagers type="create" pkg="storyshelf" />
 
-    Accept the defaults (SQLite, local filesystem, **Local accounts**). It writes the server, a `.env.example`, a README and Docker files, then prints the next steps:
+    Accept the defaults (SQLite, local filesystem, **Local accounts**); it writes the server, `.env.example`, a README and Docker files, then prints next steps:
 
     ```sh
     cd my-storyshelf
@@ -64,7 +64,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     npm start
     ```
 
-    The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
+    Or copy `.env.example` to `.env`, which the server reads. A missing value stops it with a one-line error.
 
     `create-storyshelf` asks its questions in a terminal. Pass `--yes` (`-y`) to accept every default (CI, agents). `--dir <path>` picks the output directory and `--install` installs the dependencies with the package manager that ran it.
 
@@ -88,35 +88,44 @@ From your Storybook project, save the URL and slug once. This writes `.storybook
   args="init --url http://localhost:3000 --slug my-design-system"
 />
 
-Then upload with the token in the environment: `SHELF_TOKEN=shelf_… npx storyshelf` (bare `storyshelf` is `storyshelf upload`; the card's command is the same with the settings as flags). It builds your Storybook first when there is no `storybook-static` directory. StoryShelf renders every story on the server and diffs it against the branch baseline. The command prints each phase, then a summary and the link to the build:
+Then upload with the token in the environment: `SHELF_TOKEN=shelf_… npx storyshelf` (bare `storyshelf` is `storyshelf upload`; the card's command is the same with the settings as flags). It builds your Storybook first when there is no `storybook-static` directory. The server renders every story and diffs it against the branch baseline. Each phase ends with its time (`<time>` here), then a summary and the build link:
 
 ```text
+==> Checking config
+--> Checked config (<time>)
+==> Building Storybook
+--> Built Storybook (<time>)
 ==> Creating build
---> Created build (0.1s)
+--> Created build (<time>)
+==> Selecting affected stories
+Full capture (no baseline build yet): rendering all stories
+--> Selected affected stories (<time>)
+==> Recording package usage
+--> Recorded package usage (<time>)
 ==> Uploading Storybook
 Uploading 26 of 32 files (the server has the rest)
---> Uploaded Storybook (0.1s)
+--> Uploaded Storybook (<time>)
 Summary
   Files:    32
   Size:     4.8 MiB
   Stories:  full capture (24 stories)
   Build:    01M7YHNPPVYK1EGAKNAC3APM01
-  Time:     5.3s
+  Time:     <time>
 View the build: http://localhost:3000/projects/my-design-system/builds/01M7YHNPPVYK1EGAKNAC3APM01/diff
 ```
 
-Add `--wait` to follow the build until it is captured; the exit code says how it ended (see [Gating CI with `--wait`](/guides/cli/client/#gating-ci-with---wait)).
+Add `--wait` to follow the build to its result ([Gating CI with `--wait`](/guides/cli/client/#gating-ci-with---wait)).
 
 <Aside type="tip">
   Keep the token in `SHELF_TOKEN` (a CI secret), never in `.storybook/storyshelf.json`: a `token` key there is refused. See [CI setup](/guides/ci/) for a pipeline.
 
-On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on, `create` needs the site admin token (`--token`, or `SHELF_ADMIN_TOKEN`) and refuses without it; the UI steps above need no token and are the way to start. With the admin token it creates the project only and points you to its page for the CI token, because a token made on the command line has no user behind it and could not upload.
+On a server with sign-in off, `npx storyshelf create --url http://localhost:3000 --name "My Design System"` creates the project and a CI token and writes the config. With sign-in on, `create` needs the site admin token (`--token`, or `SHELF_ADMIN_TOKEN`) and refuses without it. With the admin token it creates the project only and points you to its page for the CI token, because a token made on the command line has no user behind it and could not upload.
 
 </Aside>
 
 ## 4. Review
 
-The first build has nothing to compare against, so it waits for review: open the build and approve it to make it the baseline. Upload again and the new build is compared with that baseline; an unchanged Storybook passes with nothing to review. A build that needs attention shows **N to review** on its project card; open it, and choose **Review diffs** for the review workspace: a filmstrip of changed stories, baseline, current and diff side by side (or swiped, blended or flipped), and **Approve** / **Reject** with the keyboard.
+The first build has nothing to compare against, so it waits for review: open the build and approve it to make it the baseline. Upload again and the new build is compared with that baseline; an unchanged Storybook passes with nothing to review. A build that needs attention shows **N to review** on its project card; open it, and choose **Review diffs** for the review workspace: a filmstrip of changed stories, baseline, current and diff side by side, and **Approve** / **Reject** with the keyboard.
 
 <Screenshot
   name="diff-review"

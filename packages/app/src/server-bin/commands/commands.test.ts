@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { ShelfApp } from "../../app-types.ts";
 import { instanceDir, recordingIo, recordRelease, tablesOf } from "../__fixtures__/instance-dir.ts";
 import { adminCall, adminTokenOf } from "../admin-call.ts";
+import type { BuiltInstance } from "../instance.ts";
 import { runServerBin } from "../main.ts";
 import { printStorageReport, problemsIn } from "./check-storage.ts";
-import { settingChecks } from "./doctor.ts";
+import { schemaCheck, settingChecks } from "./doctor.ts";
 import { portOf } from "./serve.ts";
 
 async function migrated(): Promise<ReturnType<typeof instanceDir>> {
@@ -91,14 +92,59 @@ describe("storage report", () => {
   });
 });
 
+/** A built instance whose database has no `schema_meta` row (`all` throws, as a missing table does). */
+function unmigratedBuilt(health: (() => Promise<{ ok: boolean }>) | null): BuiltInstance {
+  const database = {
+    all: async (): Promise<never> => {
+      throw new Error("no such table: schema_meta");
+    },
+    ...(health && { lifecycle: { health } }),
+  };
+  return { options: { database } } as unknown as BuiltInstance;
+}
+
+describe("doctor schema level", () => {
+  it("passes a database nothing has migrated yet: the first serve migrates it", async () => {
+    const check = await schemaCheck(unmigratedBuilt(async () => ({ ok: true })));
+    expect(check).toEqual({
+      status: "pass",
+      message:
+        "Schema level: no schema_meta row yet. The database will be migrated on the first `serve`, or by `storyshelf-server migrate`.",
+    });
+  });
+
+  it("warns, without the driver's error, when the database is unreachable", async () => {
+    const check = await schemaCheck(
+      unmigratedBuilt(async () => {
+        throw new Error("connect ECONNREFUSED postgres://user:secret@db.internal");
+      }),
+    );
+    expect(check).toEqual({
+      status: "warn",
+      message: "Schema level: unknown, because the database is unreachable",
+    });
+    expect(check.message).not.toContain("secret");
+  });
+
+  it("warns when the health probe reports the database closed", async () => {
+    const check = await schemaCheck(unmigratedBuilt(async () => ({ ok: false })));
+    expect(check.status).toBe("warn");
+  });
+
+  it("warns when the driver has no health probe, since it cannot tell the two apart", async () => {
+    const check = await schemaCheck(unmigratedBuilt(null));
+    expect(check.status).toBe("warn");
+  });
+});
+
 describe("doctor", () => {
-  it("does not migrate, and says the schema level is unknown", async () => {
+  it("does not migrate, and says the database will be migrated by the first serve", async () => {
     const { dir, dataDir } = instanceDir({ afterSetup: true });
     const io = recordingIo();
     expect(await runServerBin(["doctor", "--dir", dir], io, {})).toBe(0);
     const text = io.stdout.join("\n");
     expect(text).toContain("The instance factory built its options and the app");
-    expect(text).toContain("! Schema level: unknown");
+    expect(text).toContain("✓ Schema level: no schema_meta row yet");
     // A real SQLite instance: nothing was created. A job consumer would have needed `capture_jobs`.
     expect(tablesOf(dataDir)).toEqual([]);
   });

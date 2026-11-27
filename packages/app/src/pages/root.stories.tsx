@@ -12,5 +12,5 @@ export const Welcome = pageStory(() => renderRootPage());
 /** The same page on a 375px phone: the three steps stack and nothing scrolls sideways. */
 export const OnAPhone = onAPhone(pageStory(() => renderRootPage()));
 
-/** Sign-in on and no admin token (a default install): the page leads with Create project and does not mention `storyshelf create`. */
+/** Sign-in on and no admin token (a default install): the page leads with New project and does not mention `storyshelf create`. */
 export const SignInOn = pageStory(() => renderRootPage(), { store: { authEnabled: true } });
