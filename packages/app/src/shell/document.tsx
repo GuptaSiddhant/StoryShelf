@@ -141,6 +141,16 @@ const AppChrome: FC<{
   </>
 );
 
+function pageOf(title: string, project: string): string {
+  if (title === project) {
+    return "";
+  }
+  if (title.endsWith(` · ${project}`)) {
+    return title.slice(0, -` · ${project}`.length);
+  }
+  return title.startsWith(`${project} · `) ? title.slice(`${project} · `.length) : title;
+}
+
 /**
  * The tab title in one order, `<Page> · <Project> · <App>`: a page that names the project itself
  * is reordered, and a bare "Settings" takes the tab's name from the breadcrumb trail.
@@ -150,9 +160,8 @@ export function tabTitle(title: string, nav: NavConfig | undefined): string {
   if (!project) {
     return title;
   }
-  const parts = title.split(" · ").filter((part) => part !== project);
   const last = nav?.trail?.at(-1)?.label;
-  const page = parts.join(" · ");
+  const page = pageOf(title, project);
   return [page === "Settings" && last ? last : page, project].filter(Boolean).join(" · ");
 }
 

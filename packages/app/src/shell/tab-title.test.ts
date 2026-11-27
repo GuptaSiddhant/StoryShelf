@@ -20,4 +20,13 @@ describe("tabTitle", () => {
   it("names a settings tab by its breadcrumb", () => {
     expect(tabTitle("Demo Design System · Settings", nav)).toBe("Access · Demo Design System");
   });
+
+  it("strips only the project's own prefix or suffix", () => {
+    const settings = { projectName: "Settings", trail: [{ label: "Access" }] };
+    expect(tabTitle("Settings · Settings", settings)).toBe("Access · Settings");
+    expect(tabTitle("Settings", settings)).toBe("Settings");
+    const dotted = { projectName: "Demo · UI", trail: [{ label: "Access" }] };
+    expect(tabTitle("Demo · UI · Settings", dotted)).toBe("Access · Demo · UI");
+    expect(tabTitle("Builds · Demo · UI", dotted)).toBe("Builds · Demo · UI");
+  });
 });
