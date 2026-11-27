@@ -141,6 +141,30 @@ const AppChrome: FC<{
   </>
 );
 
+function pageOf(title: string, project: string): string {
+  if (title === project) {
+    return "";
+  }
+  if (title.endsWith(` · ${project}`)) {
+    return title.slice(0, -` · ${project}`.length);
+  }
+  return title.startsWith(`${project} · `) ? title.slice(`${project} · `.length) : title;
+}
+
+/**
+ * The tab title in one order, `<Page> · <Project> · <App>`: a page that names the project itself
+ * is reordered, and a bare "Settings" takes the tab's name from the breadcrumb trail.
+ */
+export function tabTitle(title: string, nav: NavConfig | undefined): string {
+  const project = nav?.projectName;
+  if (!project) {
+    return title;
+  }
+  const last = nav?.trail?.at(-1)?.label;
+  const page = pageOf(title, project);
+  return [page === "Settings" && last ? last : page, project].filter(Boolean).join(" · ");
+}
+
 // Hono's JSX.Element is typed as `HtmlEscapedString | Promise<...>`, so JSX-returning
 // Functions can legitimately return a promise; the rule is a false positive here.
 /** Full HTML document shell with sidebar, top bar, theme, toasts, and HTMX. */
@@ -162,7 +186,7 @@ export const DocumentLayout: FC<{
       {raw("<!DOCTYPE html>")}
       <html lang="en" data-theme="system">
         <DocumentHead
-          title={title}
+          title={tabTitle(title, nav)}
           name={name}
           csrfToken={getCsrfToken(config.secret, sessionId)}
           styles={baseStyle(light, dark)}

@@ -13,6 +13,8 @@ import {
   VStack,
   statusLabel,
   statusTone,
+  Absent,
+  RelativeTime,
   Time,
 } from "../ui/components.tsx";
 
@@ -46,7 +48,9 @@ function QueueRow(props: { slug: string; job: QueueView }): Rendered {
         </Meta>
       </td>
       <td>
-        <Meta as="span">{job.startedAt ? <Time value={job.startedAt} format="time" /> : "—"}</Meta>
+        <Meta as="span">
+          {job.startedAt ? <Time value={job.startedAt} format="time" /> : <Absent />}
+        </Meta>
       </td>
     </tr>
   );
@@ -130,7 +134,7 @@ function BuildRow(props: {
       </td>
       <td>
         <Meta as="span">
-          <Time value={build.createdAt} />
+          <RelativeTime value={build.createdAt} />
         </Meta>
       </td>
       <td class="nowrap">

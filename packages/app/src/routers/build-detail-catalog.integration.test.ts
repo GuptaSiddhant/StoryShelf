@@ -89,7 +89,7 @@ describe("build page without testing", () => {
       "No snapshots yet",
       "Capture attempts",
       "Changed / new",
-      "full capture",
+      "Full capture",
     ]) {
       expect(html).not.toContain(gone);
     }

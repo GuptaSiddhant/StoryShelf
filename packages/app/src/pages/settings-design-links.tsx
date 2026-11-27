@@ -39,7 +39,7 @@ export const RemoveForm: FC<{ action: string; confirm: string; label: string }> 
     hx-confirm={props.confirm}
   >
     {csrfField()}
-    <Button variant="ghost" size="sm" type="submit" aria-label={props.label}>
+    <Button variant="danger-secondary" size="sm" type="submit" aria-label={props.label}>
       Remove
     </Button>
   </form>

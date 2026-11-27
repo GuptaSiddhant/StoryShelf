@@ -49,7 +49,7 @@ function ProfileForm(props: {
       />
       {ai.isSiteAdmin ? (
         <FormActions>
-          <Button variant="primary" type="submit" icon="check">
+          <Button variant="primary" type="submit">
             Save changes
           </Button>
         </FormActions>

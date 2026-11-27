@@ -142,7 +142,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
         />
         {isAdmin ? (
           <FormActions>
-            <Button variant="primary" type="submit" icon="check">
+            <Button variant="primary" type="submit">
               Save superseded-build setting
             </Button>
           </FormActions>
@@ -156,7 +156,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
 function SaveChanges(props: { isAdmin: boolean }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return props.isAdmin ? (
     <FormActions>
-      <Button variant="primary" type="submit" icon="check">
+      <Button variant="primary" type="submit">
         Save changes
       </Button>
     </FormActions>

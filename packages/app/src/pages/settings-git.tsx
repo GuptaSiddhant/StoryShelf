@@ -126,7 +126,7 @@ function linkActions(project: Project, link: SettingsGitLink, isAdmin: boolean):
         hx-confirm="Remove this link? Builds stop posting to the repository."
       >
         {csrfField()}
-        <Button variant="danger" size="sm" type="submit">
+        <Button variant="danger-secondary" size="sm" type="submit">
           Remove
         </Button>
       </form>
