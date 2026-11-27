@@ -243,6 +243,46 @@ async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
   return await readJson(url, await fetch(url, options));
 }
 
+/** Most times a call waits out a 429 and tries again before it fails. */
+export const RATE_LIMIT_RETRIES = 3;
+/** The longest one wait may be, whatever `Retry-After` says; one second when the server sent none. */
+const MAX_RETRY_WAIT_MS = 30_000;
+const DEFAULT_RETRY_WAIT_MS = 1000;
+
+/** The error after the retries ran out: names the limit and the server setting that usually fixes it. */
+function rateLimitError(error: RequestError): RequestError {
+  return new RequestError(
+    429,
+    `Too many requests: the server's rate limit still applied after ${RATE_LIMIT_RETRIES} retries. Clients that share one address (CI, a NAT, or every client behind a reverse proxy) share one limit; set \`trustProxy\` on the server so each client is counted by its own address, or retry later`,
+    error.retryAfterMs,
+  );
+}
+
+/**
+ * `fetchJson` for a call that can be repeated (a JSON or multipart body, never a stream): a 429
+ * waits the server's `Retry-After` (capped) and tries again, up to `RATE_LIMIT_RETRIES` times.
+ */
+async function fetchJsonRetrying(url: string, options: RequestInit, attempt = 0): Promise<unknown> {
+  try {
+    return await fetchJson(url, options);
+  } catch (error) {
+    if (!(error instanceof RequestError) || error.status !== 429) {
+      throw error;
+    }
+    if (attempt >= RATE_LIMIT_RETRIES) {
+      throw rateLimitError(error);
+    }
+    await sleep(Math.min(error.retryAfterMs ?? DEFAULT_RETRY_WAIT_MS, MAX_RETRY_WAIT_MS));
+    return await fetchJsonRetrying(url, options, attempt + 1);
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 /**
  * The JSON body of a response. A failed status throws a `RequestError` that keeps the status; an
  * HTML page there (a proxy or login page) or in place of the JSON is described by `notJsonMessage`
@@ -315,7 +355,7 @@ function createFileUploadApi(
 ): Pick<Client["projects"]["builds"], "dedup" | "uploadContent" | "postManifest"> {
   return {
     dedup: async (slug: string, buildId: string, hashes: string[]) => {
-      const answer = (await fetchJson(
+      const answer = (await fetchJsonRetrying(
         `${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/dedup`,
         {
           method: "POST",
@@ -335,14 +375,17 @@ function createFileUploadApi(
         form.set(file.hash, new File([new Uint8Array(file.data)], file.hash));
       }
       // No content-type header: fetch adds the multipart boundary itself.
-      return await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/content`, {
-        method: "POST",
-        headers: requestHeaders(),
-        body: form,
-      });
+      return await fetchJsonRetrying(
+        `${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/content`,
+        {
+          method: "POST",
+          headers: requestHeaders(),
+          body: form,
+        },
+      );
     },
     postManifest: async (slug: string, buildId: string, files: ManifestFile[]) =>
-      await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/manifest`, {
+      await fetchJsonRetrying(`${baseUrl}/api/v1/projects/${slug}/builds/${buildId}/manifest`, {
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify({ files }),
@@ -383,7 +426,7 @@ function createInFlightApi(
   return {
     inFlight: async (slug: string, branch: string) =>
       toInFlight(
-        await fetchJson(
+        await fetchJsonRetrying(
           `${baseUrl}/api/v1/projects/${slug}/builds/in-flight?branch=${encodeURIComponent(branch)}`,
           { headers: requestHeaders() },
         ),
@@ -412,7 +455,7 @@ function createBuildsApi(
     ...createFileUploadApi(baseUrl, requestHeaders),
     ...createSkipApi(baseUrl, requestHeaders),
     createJson: async (slug: string, json: BuildCreateInput) =>
-      (await fetchJson(`${baseUrl}/api/v1/projects/${slug}/builds`, {
+      (await fetchJsonRetrying(`${baseUrl}/api/v1/projects/${slug}/builds`, {
         method: "POST",
         headers: requestHeaders("application/json"),
         body: JSON.stringify(json),

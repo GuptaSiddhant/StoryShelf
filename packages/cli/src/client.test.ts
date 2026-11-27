@@ -308,3 +308,54 @@ describe("builds.get", () => {
     },
   );
 });
+
+const throttled = (): Response =>
+  new Response("{}", { status: 429, headers: { "retry-after": "2" } });
+
+describe("429 retries on create and upload calls", () => {
+  const created = { build: { id: "b1" }, uploadUrl: "/u" };
+  const input = { gitSha: "abc", gitBranch: "main" };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits Retry-After and repeats a create call", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(throttled())
+      .mockResolvedValueOnce(Response.json(created));
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = createClient("https://shelf.test").projects.builds.createJson("demo", input);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toEqual(created);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after the retries and names the limit and trustProxy", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockImplementation(async () => throttled());
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = createClient("https://shelf.test")
+      .projects.builds.inFlight("demo", "main")
+      .catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const error = (await pending) as RequestError;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(error).toBeInstanceOf(RequestError);
+    expect(error.status).toBe(429);
+    expect(error.message).toMatch(/rate limit.*trustProxy/u);
+  });
+
+  it("does not retry other failures", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("no", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      createClient("https://shelf.test").projects.builds.createJson("demo", input),
+    ).rejects.toThrow("500");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
