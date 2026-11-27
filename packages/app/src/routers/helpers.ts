@@ -259,16 +259,19 @@ async function tokenReviewer(secret: string | null): Promise<string> {
   return token.userId;
 }
 
+/** Whether the caller is a site-level admin (always true when auth is disabled). */
+export function isSiteAdmin(c: Context): boolean {
+  if (!getStore().authEnabled) {
+    return true;
+  }
+  return getStore().user?.role === "admin" || requestHasAdminToken(c);
+}
+
 /** Require a site-level admin (or permit when auth is disabled). */
 export function requireSiteAdmin(c: Context): void {
-  if (!getStore().authEnabled) {
-    return;
+  if (!isSiteAdmin(c)) {
+    forbidden();
   }
-  const { user } = getStore();
-  if (user?.role === "admin" || requestHasAdminToken(c)) {
-    return;
-  }
-  forbidden();
 }
 
 /** Require the current session user to hold one of the given project roles. */

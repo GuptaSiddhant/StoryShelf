@@ -1,6 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
-import { Alert, Field, SelectField, statusLabel } from "../ui/components.tsx";
+import { Alert, Button, Field, SelectField, statusLabel } from "../ui/components.tsx";
 import { DialogForm } from "./dialog-form.tsx";
 
 const ROLES = ["viewer", "developer", "approver", "admin"] as const;
@@ -16,8 +16,13 @@ interface FormProps {
   error?: string | undefined;
 }
 
+interface AddMemberProps extends FormProps {
+  /** Offer an invite for this address: no account has it and the viewer is a site admin. */
+  inviteEmail?: string | undefined;
+}
+
 /** The add-member form: in the dialog, or on its own page. */
-export const AddMemberForm: FC<FormProps> = ({ project, standalone, error }) => {
+export const AddMemberForm: FC<AddMemberProps> = ({ project, standalone, error, inviteEmail }) => {
   return (
     <DialogForm
       dialog={ADD_MEMBER_DIALOG}
@@ -27,6 +32,15 @@ export const AddMemberForm: FC<FormProps> = ({ project, standalone, error }) => 
       backHref={`/projects/${project.slug}/settings/access#members`}
     >
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {inviteEmail ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          href={`/admin/invites/new?email=${encodeURIComponent(inviteEmail)}`}
+        >
+          Invite {inviteEmail}
+        </Button>
+      ) : null}
       <Field label="Email" name="email" type="email" required placeholder="name@example.com" />
       <SelectField label="Project role" name="role" options={roleOptions} />
     </DialogForm>

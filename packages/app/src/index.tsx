@@ -61,6 +61,7 @@ import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
 import { registerAdminGit } from "./routers/admin-git.ts";
+import { registerAdminInvites } from "./routers/admin-invites.tsx";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerPublicOriginRoutes } from "./routers/admin-public-origin.tsx";
 import { registerAdmin } from "./routers/admin.ts";
@@ -514,6 +515,7 @@ function registerSystemPages(
   health: HealthDeps,
 ): void {
   registerAdminPages(app, health, options.auth);
+  registerAdminInvites(app, options.auth);
   registerPublicOriginRoutes(app);
   registerAdminGit(app);
 }
