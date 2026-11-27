@@ -16,6 +16,7 @@ import {
   Meta,
   PageHeader,
   VStack,
+  Disclosure,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { ProjectCard, type ProjectSummary } from "./projects-card.tsx";
@@ -24,14 +25,6 @@ const projectGrid = css`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: var(--space-4);
-`;
-
-const setupSummary = css`
-  /* setup-summary */
-  cursor: pointer;
-  font-weight: var(--weight-semibold);
-  font-size: var(--text-lg);
-  letter-spacing: -0.01em;
 `;
 
 /** Latest build, a few previews, and the review backlog for one project. */
@@ -52,8 +45,7 @@ async function summarize(project: Project): Promise<ProjectSummary> {
 function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
   return (
     <Card>
-      <details open={open}>
-        <summary class={setupSummary}>Set up your first upload</summary>
+      <Disclosure variant="inline" title="Set up your first upload" open={open}>
         <VStack>
           {open ? (
             <>
@@ -67,7 +59,7 @@ function SetupGuide({ open }: { open: boolean }): ReturnType<typeof Card> {
           <Meta>{open ? "3" : "2"}. Upload your built Storybook.</Meta>
           <CodeBlock code="npx storyshelf" />
         </VStack>
-      </details>
+      </Disclosure>
     </Card>
   );
 }

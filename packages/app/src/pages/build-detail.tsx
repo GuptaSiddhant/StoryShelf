@@ -91,15 +91,21 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
     <Card>
       <SectionTitle>Capture attempts</SectionTitle>
       {attempts.map(({ attempt, logs }, index): Rendered => (
-        <details key={attempt.id} open={index === attempts.length - 1}>
-          <summary>
-            Attempt {attempt.attemptNo}{" "}
-            <Badge tone={statusTone(attempt.status)}>{statusLabel(attempt.status)}</Badge>{" "}
-            <Meta as="span">
-              {attempt.storyCount} stories
-              {attempt.reqId ? ` · ${attempt.reqId}` : ""}
-            </Meta>
-          </summary>
+        <Disclosure
+          key={attempt.id}
+          variant="inline"
+          open={index === attempts.length - 1}
+          title={
+            <>
+              Attempt {attempt.attemptNo}
+              <Badge tone={statusTone(attempt.status)}>{statusLabel(attempt.status)}</Badge>
+              <Meta as="span">
+                {attempt.storyCount} stories
+                {attempt.reqId ? ` · ${attempt.reqId}` : ""}
+              </Meta>
+            </>
+          }
+        >
           {attempt.error ? <Meta as="pre">{attempt.error}</Meta> : null}
 
           <VStack>
@@ -111,7 +117,7 @@ function AttemptsCard(props: { attempts: BuildDetailsData["attempts"] }): Render
               </HStack>
             ))}
           </VStack>
-        </details>
+        </Disclosure>
       ))}
     </Card>
   );

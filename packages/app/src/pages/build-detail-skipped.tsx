@@ -15,6 +15,7 @@ import {
   statusTone,
   statusLabel,
   RelativeTime,
+  Disclosure,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import {
@@ -24,7 +25,7 @@ import {
   skipSourceSha,
 } from "./skipped-source.ts";
 
-/** Changed files shown before the rest fold into a `<details>`. */
+/** Changed files shown before the rest fold into a disclosure. */
 const VISIBLE_FILES = 10;
 
 const termList = css`
@@ -169,14 +170,13 @@ function ChangedFilesCard({ files }: { files: string[] }): ReturnType<typeof Car
           ))}
         </ul>
         {files.length > VISIBLE_FILES ? (
-          <details>
-            <summary>Show all {files.length}</summary>
+          <Disclosure variant="inline" title={`Show all ${files.length}`}>
             <ul class={fileList}>
               {files.slice(VISIBLE_FILES).map((path) => (
                 <FileItem key={path} path={path} />
               ))}
             </ul>
-          </details>
+          </Disclosure>
         ) : null}
       </VStack>
     </Card>
