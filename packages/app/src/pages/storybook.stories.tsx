@@ -2,6 +2,7 @@
 import type { Meta } from "@storybook/html-vite";
 import type { Build } from "@storyshelf/core/schema";
 import { onAPhone, pageStory } from "../../.storybook/page.tsx";
+import { resolveHtml } from "../../.storybook/render.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { BUILD_MAIN, builds, project } from "../stories-fixtures/dataset.ts";
 import { renderStorybookPage, renderStorybookPreparingPage } from "./storybook.tsx";
@@ -23,7 +24,7 @@ export const Preparing = pageStory(() =>
  * frame inside the page shows a fixed placeholder in its place.
  */
 const withoutLiveFrame = async (page: RenderedContent): Promise<string> =>
-  (await page).replace(
+  (await resolveHtml(page)).replace(
     /<iframe class="(?<classes>[^"]*)" src="[^"]*"/u,
     '<iframe class="$<classes>" srcdoc="<p style=&quot;font-family:system-ui;padding:1rem&quot;>The published Storybook loads here.</p>"',
   );
@@ -57,7 +58,7 @@ export const PublishedOnAPhone = onAPhone(
 
 /** Preparing after the automatic checks stopped: the status says so and only "Check again" is left. */
 export const PreparingChecksStopped = pageStory(async () => {
-  const page = await renderStorybookPreparingPage(project, build, project.slug);
+  const page = await resolveHtml(renderStorybookPreparingPage(project, build, project.slug));
   return page.replace(
     /(?<open><p [^>]*id="prep-status"[^>]*>)[^<]*(?<close><\/p>)/u,
     "$<open>Still preparing. Automatic checks stopped; use Check again.$<close>",

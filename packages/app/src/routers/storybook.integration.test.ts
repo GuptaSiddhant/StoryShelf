@@ -200,6 +200,8 @@ describe("storybook routes", () => {
     expect(body).not.toContain("http-equiv");
     expect(body).toContain('aria-live="polite"');
     expect(body).toContain("Pause automatic check");
+    // Without JavaScript the pause control stays hidden; the script shows it.
+    expect(body).toMatch(/<button[^>]*id="prep-toggle"[^>]*hidden/u);
     expect(body).toContain(">Check again</a>");
     // The waiting state is the app's empty state with the shared tokens, not a faded block, and the old header rules are gone (#1285).
     expect(body).toContain("--surface-card");
