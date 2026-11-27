@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GitChannelView } from "./admin-git-channels.tsx";
 import { MoveChannelBody } from "./git-channel-dialogs.tsx";
 
-vi.mock("../shell/csrf-field.tsx", () => ({ csrfField: () => null }));
+vi.mock("../shell/csrf-field.tsx", () => ({ csrfField: (): null => null }));
 
 const channel: GitChannelView = {
   id: "01JCHANNELTOKEN00000000000",
