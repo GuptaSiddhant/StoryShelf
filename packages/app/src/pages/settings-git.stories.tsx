@@ -120,10 +120,44 @@ export const NoConnectionSiteAdmin = pageStory(() =>
 /** A project admin on a server with no connection: no Git section at all. */
 export const NoConnectionProjectAdmin = pageStory(() => gitPage(null));
 
-/** The link form in its dialog: repository and prefix only. */
+/** The link form in its dialog, operator switch off: a typed URL and a prefix, no picker. */
 export const LinkForm = jsxStory(() => (
   <Card>
     <GitLinkForm project={project} data={data()} inDialog />
+  </Card>
+));
+
+const repositories = ["acme/design-system", "acme/docs", "acme/web"].map((name) => ({
+  url: `https://github.com/${name}`,
+  label: name,
+}));
+
+/** Operator switch on: choose a covered repository, or type a URL. */
+export const LinkFormPicker = jsxStory(() => (
+  <Card>
+    <GitLinkForm
+      project={project}
+      data={{ ...data(), picker: { listed: true, repositories, truncated: false } }}
+      inDialog
+    />
+  </Card>
+));
+
+/** Switch on, the list hit the page cap: the form says it is cut short and points to the URL. */
+export const LinkFormPickerTruncated = jsxStory(() => (
+  <Card>
+    <GitLinkForm
+      project={project}
+      data={{ ...data(), picker: { listed: true, repositories, truncated: true } }}
+      inDialog
+    />
+  </Card>
+));
+
+/** Switch on, listing failed: the typed URL, with a note and nothing about why. */
+export const LinkFormPickerFailed = jsxStory(() => (
+  <Card>
+    <GitLinkForm project={project} data={{ ...data(), picker: { listed: false } }} inDialog />
   </Card>
 ));
 
