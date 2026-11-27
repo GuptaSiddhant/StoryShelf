@@ -49,7 +49,7 @@ export {
 export { Progress } from "./progress.tsx";
 export { PreviewEmbed, PREVIEW_SANDBOX } from "./preview-embed.tsx";
 export { DesignPreview, DesignReference } from "./design-reference.tsx";
-export { CodeBlock } from "./code-block.tsx";
+export { CodeBlock, Command } from "./code-block.tsx";
 export { FilterInput } from "./filter-input.tsx";
 export { RelativeTime, Time, formatAbsolute, formatRelative } from "./time.tsx";
 export { SubNavLayout, type SubNavItem } from "./subnav.tsx";
