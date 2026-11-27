@@ -157,7 +157,7 @@ function CoverageBody(props: { data: DesignCoverageData }): Rendered {
       {data.storyLinksRead ? null : (
         <Alert tone="info" title="Only mapped design links are counted">
           Links declared in stories are read from captured builds, so they are not counted without
-          testing. Components linked under Settings → Design are.
+          testing. Components linked under Settings › Design are.
         </Alert>
       )}
       <StatGroup>
@@ -346,7 +346,7 @@ function DriftAlert(props: { data: DesignCoverageData }): Rendered {
   return (
     <Alert tone="info" title="Drift can't be checked">
       {withoutToken.join(", ")} has no access token for this project, so StoryShelf cannot see which
-      designs changed. Add one in Settings → Capture & tests.
+      designs changed. Add one in Settings › Capture & tests.
       <div>
         <Button
           variant="secondary"

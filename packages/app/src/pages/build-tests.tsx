@@ -1,6 +1,15 @@
 import { summarizeTests, type TestResult } from "@storyshelf/core/models";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { Badge, Card, HStack, Meta, SectionTitle, VStack, statusLabel } from "../ui/components.tsx";
+import {
+  Badge,
+  Card,
+  Disclosure,
+  HStack,
+  Meta,
+  SectionTitle,
+  VStack,
+  statusLabel,
+} from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** The line under the card title: counts, and what a failure means for the build. */
@@ -42,14 +51,13 @@ export function TestsCard(props: { results: readonly TestResult[] }): Rendered |
         ))}
       </VStack>
       {passed.length > 0 ? (
-        <details>
-          <summary>Passed tests ({passed.length})</summary>
+        <Disclosure variant="inline" title={`Passed tests (${passed.length})`}>
           <VStack>
             {passed.map((result) => (
               <TestRow key={result.id} result={result} />
             ))}
           </VStack>
-        </details>
+        </Disclosure>
       ) : null}
     </Card>
   );

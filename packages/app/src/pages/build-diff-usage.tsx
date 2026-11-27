@@ -61,7 +61,7 @@ export function LinkedUsage(props: {
                 target="_blank"
                 rel="noreferrer"
               >
-                Story →
+                Story
               </Button>
             ) : null}
             <Button

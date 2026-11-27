@@ -68,8 +68,8 @@ export const reviewComment = css`
 export const reviewCommentHead = css`
   /* review-comment-head */
   display: flex;
-  gap: var(--space-2);
-  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
   font-size: var(--text-sm);
   color: var(--text-secondary);
   flex-wrap: wrap;

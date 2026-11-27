@@ -249,6 +249,8 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
   const { project, build, snapshots, selectedId, canReview, drifted } = data;
   const selected = selectedSnapshot(snapshots, selectedId);
   const pendingGroups = reviewProgress(snapshots).pending;
+  // The status message (a build with nothing to compare) sits above the details, never below them.
+  const noSnapshots = snapshots.length === 0;
   return (
     <DocumentLayout
       title={`Build ${build.gitBranch}`}
@@ -272,9 +274,10 @@ export function renderBuildDiffPage(data: BuildDiffData): RenderedContent {
         canReview={canReview}
       />
       <InsightSlot project={project} build={build} data={data.insight} />
+      {noSnapshots ? <Stage data={data} selected={selected} /> : null}
       <DetailsPanel data={data} />
       {data.details ? <ReviewOnlySection details={data.details} /> : null}
-      <Stage data={data} selected={selected} />
+      {noSnapshots ? null : <Stage data={data} selected={selected} />}
       <ShortcutsDialog />
     </DocumentLayout>
   );

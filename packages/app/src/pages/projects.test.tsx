@@ -43,7 +43,7 @@ describe("projects overview", () => {
   it("shows the setup guide expanded with copyable commands when there are no projects", async () => {
     const html = await get("/projects");
     expect(html).toContain("No projects yet");
-    expect(html).toContain("<details open");
+    expect(html).toMatch(/<details[^>]* open/u);
     expect(html).toContain("data-copy=");
     expect(html).not.toContain('data-filter-input="true"');
   });
@@ -56,7 +56,7 @@ describe("projects overview", () => {
     expect(html).toContain("/snapshots/");
     expect(html).toContain('data-filter-input="true"');
     expect(html).toContain('data-filter-text="Docs docs acme/docs"');
-    expect(html).not.toContain("<details open");
+    expect(html).not.toMatch(/<details[^>]* open/u);
   });
 });
 

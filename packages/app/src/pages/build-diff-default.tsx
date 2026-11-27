@@ -1,7 +1,7 @@
 import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { DefaultComparison } from "../routers/baseline-reference.ts";
-import { HStack } from "../ui/components.tsx";
+import { Disclosure, HStack } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { snapshotImageUrl } from "./build-diff-model.ts";
 
@@ -23,8 +23,10 @@ export function DefaultComparisonView(props: {
   });
   const baseline = `${snapshotImageUrl(project, build, snapshot, "baseline")}?${params}`;
   return (
-    <details>
-      <summary>Compare with current default branch ({comparison.branch})</summary>
+    <Disclosure
+      variant="inline"
+      title={`Compare with current default branch (${comparison.branch})`}
+    >
       <p>
         This is a secondary comparison. Approval still uses the primary comparison above. Default
         baseline updated {comparison.version}.
@@ -51,7 +53,7 @@ export function DefaultComparisonView(props: {
       ) : (
         <p>The current default-branch baseline image is unavailable.</p>
       )}
-    </details>
+    </Disclosure>
   );
 }
 

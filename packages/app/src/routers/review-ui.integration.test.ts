@@ -602,16 +602,16 @@ describe("the build page without testing", () => {
 });
 
 describe("the build page with testing", () => {
-  it("keeps the changeset and the verdict in the details, above the stage", async () => {
+  it("keeps the changeset and the verdict in the details, below a status with nothing to compare", async () => {
     const booted = await boot({ testing: true });
     const id = await publish(booted, "feature/z");
     const html = await (await booted.page("alice", `/builds/${id}/diff`)).text();
     const changes = html.indexOf("Changes in this build");
     const empty = html.indexOf("Waiting for a capture worker");
     const verdict = html.indexOf("Approve build");
-    expect(changes).toBeGreaterThan(-1);
+    expect(empty).toBeGreaterThan(-1);
+    expect(changes).toBeGreaterThan(empty);
     expect(verdict).toBeGreaterThan(changes);
-    expect(empty).toBeGreaterThan(verdict);
     expect(html).toContain("a verdict is a sign-off");
   });
 
