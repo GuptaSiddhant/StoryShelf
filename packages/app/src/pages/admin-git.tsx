@@ -116,7 +116,7 @@ function ConnectionActions(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { connection } = props;
   return (
-    <HStack gap="sm">
+    <HStack gap="sm" wrap={false}>
       {connection.installUrl ? (
         <Button variant="secondary" size="sm" href={connection.installUrl} rel="noreferrer">
           Install on GitHub

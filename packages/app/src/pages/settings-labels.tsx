@@ -22,7 +22,7 @@ function LabelTypeActions(props: { project: Project; labelType: LabelType }): Re
   const editable = labelType.key !== "persistent";
   const deletable = editable && labelType.key !== "branch";
   return (
-    <HStack gap="sm">
+    <HStack gap="sm" wrap={false}>
       {editable ? (
         <Button
           variant="secondary"
