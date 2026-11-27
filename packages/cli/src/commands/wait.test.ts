@@ -114,7 +114,7 @@ describe("waitForBuild exit codes", () => {
       "Build failed: the Storybook could not be published",
     );
     expect((await run([{ status: "failed" }])).lines[0]).toBe(
-      "Build failed: capture did not complete",
+      "Build failed: capture did not complete (the build page gives the reason)",
     );
   });
 

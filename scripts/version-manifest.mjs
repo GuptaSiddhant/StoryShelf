@@ -41,6 +41,18 @@ function peersOf(pkg) {
   return peers;
 }
 
+/**
+ * The dependencies a package lists in `package.json#storyshelf.exposedDependencies`, at their pinned
+ * version: a project that installs the package pins them too, so their binaries resolve from the project.
+ */
+function exposedOf(pkg) {
+  const exposed = {};
+  for (const name of pkg.storyshelf?.exposedDependencies ?? []) {
+    exposed[name] = pkg.dependencies?.[name];
+  }
+  return Object.keys(exposed).length > 0 ? { exposed } : {};
+}
+
 /** The manifest of the published packages under `root`, keyed by package name. */
 export function buildVersionManifest(root = ROOT) {
   const packages = {};
@@ -54,7 +66,7 @@ export function buildVersionManifest(root = ROOT) {
       continue;
     }
     if (pkg.private === true || !pkg.name) continue;
-    packages[pkg.name] = { version: pkg.version, peers: peersOf(pkg) };
+    packages[pkg.name] = { version: pkg.version, peers: peersOf(pkg), ...exposedOf(pkg) };
   }
   return {
     packages: Object.fromEntries(

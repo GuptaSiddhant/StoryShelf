@@ -275,7 +275,7 @@ function failureReason(state: BuildState): string {
   const tests = failingTests(state.testResults);
   if (tests > 0) return `${tests} Storybook ${tests === 1 ? "test" : "tests"} failed`;
   if (state.publishing === "failure") return "the Storybook could not be published";
-  return "capture did not complete";
+  return "capture did not complete (the build page gives the reason)";
 }
 
 function failingTests(json: string | null | undefined): number {

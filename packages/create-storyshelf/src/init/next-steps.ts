@@ -1,6 +1,11 @@
 import { resolve } from "node:path";
 import { printLine } from "../output.ts";
-import { installCommand, startCommand, type PackageRunner } from "../runner.ts";
+import {
+  browserInstallCommand,
+  installCommand,
+  startCommand,
+  type PackageRunner,
+} from "../runner.ts";
 import { needsCompose, resolveDeployTarget, type Answers } from "./answers.ts";
 import { requiredEnv } from "./codegen.ts";
 
@@ -23,6 +28,7 @@ function stepsFor(answers: Answers, runner: PackageRunner, installed: boolean): 
   return [
     ...envSteps(answers),
     ...(installed ? [] : [`  ${installCommand(runner)}`]),
+    `  ${browserInstallCommand(runner)}   # once; add --with-deps on Linux`,
     `  ${startCommand(runner)}`,
     ...(answers.auth === "password" ? [`  # then sign in as admin@example.com`] : []),
   ];

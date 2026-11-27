@@ -42,8 +42,13 @@ describe("verifyLocalTargets", () => {
         unavailable: expect.stringContaining(`declared, not installed`),
       });
     }
+    for (const engine of ["chromium", "firefox", "webkit"]) {
+      const text = JSON.stringify(status[engine]);
+      expect(text).toContain(`npx playwright-core install ${engine}`);
+      expect(text).not.toMatch(/(?<!-core )(?<!playwright-core )playwright install/u);
+    }
     expect(status["firefox"]).toEqual({
-      unavailable: expect.stringContaining("playwright install firefox"),
+      unavailable: expect.stringContaining("playwright-core install firefox"),
     });
   });
 
@@ -90,7 +95,9 @@ describe("verifyLocalTargets", () => {
     expect(chrome).toBe("ready");
     const missing = verifyLocalTargets(flattenBrowsers(["chrome"]).locals, types(), () => false)[0]
       ?.status;
-    expect(missing).toEqual({ unavailable: expect.stringContaining("playwright install chrome") });
+    expect(missing).toEqual({
+      unavailable: expect.stringContaining("playwright-core install chrome"),
+    });
   });
 
   it("falls back to the executable alone when it sits outside a revision directory", async () => {
