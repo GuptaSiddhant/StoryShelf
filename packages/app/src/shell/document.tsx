@@ -73,7 +73,8 @@ const shellContentForm = css`
 const shellContentFormPage = css`
   /* shell-content-form-page */
   ${shellContent}
-  max-width: 640px;
+  /* A 640 px card: the page's own side padding is added to the measure. */
+  max-width: calc(640px + 2 * var(--space-6));
 `;
 
 const CONTENT_CLASS = {
