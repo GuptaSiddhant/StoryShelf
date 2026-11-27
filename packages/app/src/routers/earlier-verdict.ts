@@ -21,6 +21,9 @@ export interface EarlierVerdict {
 /** How many earlier builds of the branch are looked through for the story. */
 const LOOKBACK = 25;
 
+/** The newest builds of the branch read at all; the query is bounded, not the whole history. */
+const BRANCH_WINDOW = 100;
+
 const NO_VERDICT_STATUSES: ReadonlySet<string> = new Set(["failed", "cancelled"]);
 
 /** The same story, mode (viewport) and target (engine) as `selected`. */
@@ -70,7 +73,9 @@ export async function loadEarlierVerdict(
   build: Build,
   selected: Snapshot,
 ): Promise<EarlierVerdict | null> {
-  const earlier = (await new BuildModel(db).list(project.id, { branch: build.gitBranch }))
+  const earlier = (
+    await new BuildModel(db).list(project.id, { branch: build.gitBranch, limit: BRANCH_WINDOW })
+  )
     .filter(
       (item) =>
         item.id !== build.id &&

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { EarlierVerdict } from "../routers/earlier-verdict.ts";
 import { builds } from "../stories-fixtures/dataset.ts";
 import { reviewComment, reviewData } from "../stories-fixtures/review.ts";
-import { DiffComments, earlierVerdictText } from "./build-diff-comments.tsx";
+import { DiffComments, earlierVerdictText, renderCommentSwap } from "./build-diff-comments.tsx";
 import { changeSummary } from "./project-builds-table.tsx";
 
 vi.mock("../shell/csrf-field.tsx", () => ({ csrfField: (): string => "" }));
@@ -61,6 +61,26 @@ describe("earlier verdict note", () => {
     expect(earlierVerdictText(earlier({ verdict: null }))).toBe(
       "1 change request still open in a1b2c3d.",
     );
+  });
+});
+
+describe("comment swap", () => {
+  it("keeps the earlier-verdict note after a comment is posted", async () => {
+    const data = reviewData();
+    const app = new Hono();
+    app.get("/", (c) =>
+      c.html(
+        renderCommentSwap({
+          project: data.project,
+          build: data.build,
+          selectedId: data.selectedId ?? "",
+          comments: [],
+          canTriage: true,
+          earlier: earlier(),
+        }) as never,
+      ),
+    );
+    expect(await (await app.request("/")).text()).toContain("Rejected in a1b2c3d");
   });
 });
 
