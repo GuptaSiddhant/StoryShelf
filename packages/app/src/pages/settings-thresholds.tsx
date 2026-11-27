@@ -1,7 +1,16 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { csrfField } from "../shell/csrf-field.tsx";
-import { Alert, Button, Card, Field, FormActions, Meta, SectionTitle } from "../ui/components.tsx";
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  FormActions,
+  Meta,
+  SectionTitle,
+  Form,
+} from "../ui/components.tsx";
 import type { SettingsFormState } from "./settings-general.tsx";
 
 /** The two threshold inputs: any precision from 0 to 1, both required. */
@@ -49,7 +58,7 @@ export function renderSettingsThresholds(
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Diff thresholds</SectionTitle>
-        <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
+        <Form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
           <ThresholdFields project={project} />
           {isAdmin ? (
@@ -61,7 +70,7 @@ export function renderSettingsThresholds(
           ) : (
             <Meta>You need admin access to edit settings.</Meta>
           )}
-        </form>
+        </Form>
       </Card>
     </div>
   );

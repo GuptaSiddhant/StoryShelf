@@ -21,6 +21,7 @@ import {
   VStack,
   statusLabel,
   Time,
+  Form,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { NotificationsPausedNotice } from "./notifications-paused.tsx";
@@ -81,6 +82,7 @@ const profileName = css`
 
 const profileMeta = css`
   /* profile-meta */
+  margin: 0;
   color: var(--text-secondary);
   font-size: var(--text-sm);
 `;
@@ -238,12 +240,12 @@ const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
   <Card>
     <SectionTitle>Display name</SectionTitle>
     <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
-    <form method="post" action="/profile" class="max-w-prose" novalidate>
+    <Form method="post" action="/profile" novalidate>
       <Field label="Display name" name="displayName" type="text" required value={displayName} />
       <Button variant="primary" type="submit">
         Save name
       </Button>
-    </form>
+    </Form>
   </Card>
 );
 
@@ -252,7 +254,7 @@ const PasswordCard: FC = () => (
   <Card>
     <SectionTitle>Change password</SectionTitle>
     <Meta>For local accounts only</Meta>
-    <form method="post" action="/profile/password" novalidate>
+    <Form method="post" action="/profile/password" novalidate>
       <Field
         label="Current password"
         name="currentPassword"
@@ -277,7 +279,7 @@ const PasswordCard: FC = () => (
       <Button variant="primary" type="submit">
         Change password
       </Button>
-    </form>
+    </Form>
   </Card>
 );
 

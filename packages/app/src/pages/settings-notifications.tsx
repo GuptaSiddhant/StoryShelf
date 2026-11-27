@@ -17,6 +17,7 @@ import {
   formatAbsolute,
   statusLabel,
   type SummaryItem,
+  Form,
 } from "../ui/components.tsx";
 import { ADD_CHANNEL_DIALOG, EDIT_CHANNEL_DIALOG, type ChannelKind } from "./channel-forms.tsx";
 import { FormDialog } from "./dialog-form.tsx";
@@ -115,7 +116,7 @@ const MyNotificationsCard: FC<{
         Approvers and admins get review requests by email by default; turn off Send me review
         requests to stop them. The options below add other email alerts for this project.
       </Meta>
-      <form
+      <Form
         method="post"
         action={`/projects/${project.slug}/settings/notifications/me`}
         hx-post={`/projects/${project.slug}/settings/notifications/me`}
@@ -151,7 +152,7 @@ const MyNotificationsCard: FC<{
             Save my preferences
           </Button>
         </FormActions>
-      </form>
+      </Form>
     </Card>
   );
 };

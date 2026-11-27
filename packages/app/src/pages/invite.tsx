@@ -1,6 +1,6 @@
 import { csrfField } from "../shell/csrf-field.tsx";
 import { DocumentLayout, type RenderedContent } from "../shell/document.tsx";
-import { Alert, Button, Card, Field, PageHeader, VStack } from "../ui/components.tsx";
+import { Alert, Button, Card, Field, PageHeader, VStack, Form } from "../ui/components.tsx";
 
 export interface InvitePageState {
   inviteId: string;
@@ -25,7 +25,7 @@ export function renderInvitePage(state: InvitePageState): RenderedContent {
               {state.error}
             </Alert>
           ) : null}
-          <form method="post" action={`/auth/invites/${state.inviteId}`} novalidate>
+          <Form method="post" action={`/auth/invites/${state.inviteId}`} novalidate>
             <VStack>
               <input type="hidden" name="token" value={state.token} />
               {csrfField()}
@@ -48,7 +48,7 @@ export function renderInvitePage(state: InvitePageState): RenderedContent {
                 Set password and sign in
               </Button>
             </VStack>
-          </form>
+          </Form>
         </VStack>
       </Card>
     </DocumentLayout>

@@ -20,6 +20,7 @@ import {
   SectionTitle,
   SummaryList,
   type SummaryItem,
+  Form,
 } from "../ui/components.tsx";
 
 /** Where a connection's health probe stands. */
@@ -247,7 +248,7 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
   return (
     <Card>
       <SectionTitle>Who may link repositories</SectionTitle>
-      <form
+      <Form
         method="post"
         action="/admin/git/settings"
         hx-post="/admin/git/settings"
@@ -264,7 +265,7 @@ function SwitchCard(props: { on: boolean }): HtmlEscapedString | Promise<HtmlEsc
         <Button type="submit" variant="primary">
           Save
         </Button>
-      </form>
+      </Form>
     </Card>
   );
 }

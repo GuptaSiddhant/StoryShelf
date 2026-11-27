@@ -17,6 +17,7 @@ import {
   OptionFields,
   TextareaField,
   VStack,
+  Form,
 } from "../ui/components.tsx";
 
 /** The options of the form, in order. */
@@ -260,7 +261,7 @@ function GitLabFields(props: FieldProps): HtmlEscapedString | Promise<HtmlEscape
 function ConnectionForm(props: FieldProps): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { data } = props;
   return (
-    <form
+    <Form
       method="post"
       action="/admin/git/connections"
       hx-post="/admin/git/connections"
@@ -298,7 +299,7 @@ function ConnectionForm(props: FieldProps): HtmlEscapedString | Promise<HtmlEsca
           Cancel
         </Button>
       </FormActions>
-    </form>
+    </Form>
   );
 }
 

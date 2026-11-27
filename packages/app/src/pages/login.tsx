@@ -9,6 +9,7 @@ import {
   Meta,
   PageHeader,
   VStack,
+  Form,
 } from "../ui/components.tsx";
 import { passkeyLoginScript } from "./passkey-ceremony.ts";
 
@@ -66,7 +67,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
           ) : null}
 
           {state.engineMethods?.some((method) => method.kind === "password") ? (
-            <form method="post" action="/auth/engine/login" novalidate>
+            <Form method="post" action="/auth/engine/login" novalidate>
               {state.returnTo && state.returnTo !== "/" ? (
                 <input type="hidden" name="return_to" value={state.returnTo} />
               ) : null}
@@ -91,7 +92,7 @@ export function renderLoginPage(state: LoginPageState = {}): RenderedContent {
                   {submitLabel}
                 </Button>
               </VStack>
-            </form>
+            </Form>
           ) : null}
 
           {state.engineMethods

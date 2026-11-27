@@ -1,7 +1,26 @@
-import type { FC } from "hono/jsx";
+import type { FC, JSX } from "hono/jsx";
 import { css } from "./css.ts";
 import { Icon } from "./icons/icon.tsx";
 type FieldLayout = "stack" | "inline";
+
+const formStack = css`
+  /* form */
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+`;
+
+/**
+ * A form whose fields and buttons sit one step apart: the stack owns the space between them, so
+ * a `Field` or `FormActions` carries no margin of its own. Takes the usual form attributes.
+ */
+export const Form: FC<Omit<JSX.IntrinsicElements["form"], "class">> = ({ children, ...attrs }) => {
+  return (
+    <form class={formStack} {...attrs}>
+      {children}
+    </form>
+  );
+};
 
 const fieldWrap = css`
   /* field */
@@ -9,7 +28,6 @@ const fieldWrap = css`
   gap: var(--space-1);
   /* Don't stretch rows when a neighbouring field is taller (hint text). */
   align-content: start;
-  margin-bottom: var(--space-4);
 `;
 
 const fieldWrapInline = css`
@@ -18,7 +36,6 @@ const fieldWrapInline = css`
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: 0;
 `;
 
 const fieldLabel = css`
@@ -129,7 +146,6 @@ const formActions = css`
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
-  margin-top: var(--space-4);
 `;
 
 const formActionsEnd = css`
