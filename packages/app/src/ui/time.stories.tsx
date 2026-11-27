@@ -15,6 +15,7 @@ export const Ranges = jsxStory(() => (
       <RelativeTime key={seconds} value={ago(seconds)} />
     ))}
     <RelativeTime value="not a date" />
+    <RelativeTime value="2025-11-02T09:00:00.000Z" />
   </VStack>
 ));
 

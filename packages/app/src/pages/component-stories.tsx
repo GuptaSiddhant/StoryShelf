@@ -233,7 +233,7 @@ function ChangeCell(props: { row: CatalogHistoryRow }): Rendered {
   const parts = changeParts(row);
   return (
     <HStack>
-      <Badge tone="warning">changed</Badge>
+      <Badge tone="warning">Changed</Badge>
       {parts ? <Meta as="span">{parts}</Meta> : null}
     </HStack>
   );

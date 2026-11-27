@@ -21,6 +21,12 @@ describe("tabTitle", () => {
     expect(tabTitle("Demo Design System · Settings", nav)).toBe("Access · Demo Design System");
   });
 
+  it("names the General tab by its own label, not by Settings", () => {
+    expect(tabTitle("Demo Design System · General", { projectName: "Demo Design System" })).toBe(
+      "General · Demo Design System",
+    );
+  });
+
   it("strips only the project's own prefix or suffix", () => {
     const settings = { projectName: "Settings", trail: [{ label: "Access" }] };
     expect(tabTitle("Settings · Settings", settings)).toBe("Access · Settings");

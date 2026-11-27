@@ -139,7 +139,7 @@ describe("component page without testing", () => {
     expect(html).toContain("Published builds");
     expect(html).toContain(`/projects/web/builds/${b2.id}`);
     expect(html).toContain(`/projects/web/builds/${b1.id}`);
-    expect(html).toContain("changed");
+    expect(html).toContain("Changed");
     expect(html).toContain("2 added");
     expect(html).toContain("1 renamed");
     expect(html).toContain("New here");

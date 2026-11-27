@@ -45,7 +45,7 @@ export function renderSettingsReview(
   isAdmin: boolean,
 ): unknown {
   return (
-    <VStack>
+    <VStack gap="lg">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>Review</SectionTitle>

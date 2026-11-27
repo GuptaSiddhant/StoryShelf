@@ -176,7 +176,7 @@ export function ProjectCard(props: {
         {summary.health ? (
           <a href={urls.library}>
             <Badge tone={healthTone(summary.health.verdict)} icon>
-              health: {summary.health.verdict}
+              Health: {statusLabel(summary.health.verdict)}
               {summary.health.score === null ? "" : ` · ${Math.round(summary.health.score)}`}
             </Badge>
           </a>

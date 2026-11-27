@@ -180,7 +180,7 @@ function LibraryHeader(props: {
   return (
     <PageHeader
       title="Library"
-      description={
+      meta={
         <>
           {props.components} {props.components === 1 ? "component" : "components"} · {props.stories}{" "}
           {props.stories === 1 ? "story" : "stories"} · Latest build{" "}

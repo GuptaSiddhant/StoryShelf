@@ -59,9 +59,7 @@ function DangerZoneCard(props: { project: Project }): Rendered {
   const { project } = props;
   return (
     <Card tone="danger">
-      <SectionTitle level={3} tone="danger">
-        Danger zone
-      </SectionTitle>
+      <SectionTitle tone="danger">Danger zone</SectionTitle>
       <Meta>
         Deleting a project removes all builds, snapshots, baselines and tokens. This cannot be
         undone.
@@ -90,7 +88,7 @@ export function renderSettingsGeneral(
   canDeleteProject = false,
 ): unknown {
   return (
-    <VStack>
+    <VStack gap="lg">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle>General</SectionTitle>

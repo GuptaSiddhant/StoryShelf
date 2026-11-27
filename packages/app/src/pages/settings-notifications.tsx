@@ -315,7 +315,7 @@ const ChannelsSection: FC<{
   const add = (primary: boolean): unknown =>
     canAdd ? <AddChannelLink project={project} primary={primary} /> : undefined;
   return (
-    <VStack>
+    <VStack gap="lg">
       <Card>
         <SectionTitle actions={channels.length > 0 ? add(false) : null}>Channels</SectionTitle>
         <Meta>
@@ -382,7 +382,7 @@ export function renderSettingsNotifications(
   // The personal card's switches are about email: it shows only while email is offered.
   const personal = providers.some((provider) => provider.kind === "email");
   return (
-    <VStack>
+    <VStack gap="lg">
       <UnofferedNotice area="Some integrations are" integrations={unoffered} />
       <NotificationsPausedNotice paused={paused} />
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}

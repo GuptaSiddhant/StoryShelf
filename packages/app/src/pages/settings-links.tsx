@@ -110,7 +110,7 @@ function AddLinkCard(props: {
   const { base, candidates } = props;
   return (
     <Card>
-      <SectionTitle level={3}>Link a package</SectionTitle>
+      <SectionTitle>Link a package</SectionTitle>
       <Form method="post" action={base} hx-post={base} hx-target="body">
         {csrfField()}
         <div class="grid grid--2">

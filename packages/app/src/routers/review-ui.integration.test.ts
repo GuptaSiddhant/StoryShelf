@@ -481,7 +481,7 @@ describe("the build page without testing", () => {
     expect(html).toContain("Table");
     expect(html).toContain("1 added");
     expect(html).toContain("Spacing looks off here");
-    expect(html).toContain("story button--primary");
+    expect(html).toContain("Story button--primary");
     expect(html).toContain("Add build comment");
     expect(html).toContain(`/projects/gate/storybook/build/${id}/?path=/story/table--basic`);
   });

@@ -20,8 +20,8 @@ describe("formatRelative", () => {
     expect(formatRelative(ago(seconds), now)).toBe(expected);
   });
 
-  it("uses an ISO date after a week", () => {
-    expect(formatRelative(ago(30 * 86_400), now)).toBe("2026-09-05");
+  it("uses the written date after a week, never ISO text", () => {
+    expect(formatRelative(ago(30 * 86_400), now)).toBe("Sep 5, 2026");
   });
 
   it("treats timestamps from the future as just now", () => {
@@ -75,9 +75,10 @@ describe("Time", () => {
     expect(auckland).toContain("UTC");
   });
 
-  it("flags invalid input without a datetime attribute", async () => {
+  it("shows the absent value for invalid input, with no time element", async () => {
     const html = await render(<Time value="nope" />);
-    expect(html).toContain("unknown");
+    expect(html).toContain("none");
+    expect(html).not.toContain("<time");
     expect(html).not.toContain("datetime=");
   });
 });

@@ -225,7 +225,7 @@ function sectionBody(
 /** The sections of the active tab, each under its own anchor; a refused form shows only on its section. */
 function renderActiveTab(data: ProjectSettingsData, formState?: SettingsFormState): unknown {
   return (
-    <VStack>
+    <VStack gap="lg">
       {sectionsOf(data.activeTab)
         .filter((section) => sectionShown(section, data))
         .map((section) => (
@@ -247,7 +247,7 @@ export function renderProjectSettingsPage(
   return (
     <DocumentLayout
       layout="form"
-      title={`${project.name} · Settings`}
+      title={`${project.name} · ${TAB_LABELS[activeTab]}`}
       nav={{
         active: "settings",
         projectSlug: project.slug,

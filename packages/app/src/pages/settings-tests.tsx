@@ -113,7 +113,7 @@ export function renderSettingsTests(
         </Form>
       </Card>
       <Card>
-        <SectionTitle level={3}>How to mark stories</SectionTitle>
+        <SectionTitle>How to mark stories</SectionTitle>
         <Meta as="pre">
           {`// Disable snapshot entirely (skip capture + play)
 export const Hidden: Story = {

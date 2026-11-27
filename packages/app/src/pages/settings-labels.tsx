@@ -138,7 +138,7 @@ function EditLabelTypeCard(props: { project: Project; editing: LabelType }): Ren
   const { project, editing } = props;
   return (
     <Card>
-      <SectionTitle level={3}>Edit label type: {editing.key}</SectionTitle>
+      <SectionTitle>Edit label type: {editing.key}</SectionTitle>
       <Form
         method="post"
         action={`/projects/${project.slug}/settings/labels/${editing.key}`}
@@ -171,7 +171,7 @@ function CreateLabelTypeCard(props: { project: Project }): Rendered {
   const { project } = props;
   return (
     <Card>
-      <SectionTitle level={3}>Create label type</SectionTitle>
+      <SectionTitle>Create label type</SectionTitle>
       <Form
         method="post"
         action={`/projects/${project.slug}/settings/labels`}

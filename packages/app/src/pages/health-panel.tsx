@@ -97,11 +97,11 @@ export function HealthPanel(
     <div id="health-panel" {...poll}>
       <Card>
         <HStack>
-          <SectionTitle level={3}>Project health (AI, last {HEALTH_UI_WINDOW})</SectionTitle>
+          <SectionTitle>Project health (AI, last {HEALTH_UI_WINDOW})</SectionTitle>
           {latest?.status === "done" ? (
             <Badge tone={healthTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}
-          {inFlight ? <Badge tone="info">generating…</Badge> : null}
+          {inFlight ? <Badge tone="info">Generating…</Badge> : null}
         </HStack>
         <VStack>
           <HealthBody latest={latest} />
