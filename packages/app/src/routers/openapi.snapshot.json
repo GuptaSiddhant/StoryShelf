@@ -3,7 +3,7 @@
   "info": {
     "title": "StoryShelf API",
     "description": "REST API for the StoryShelf visual testing platform. JSON endpoints live under /api/v1; HTML pages are served at /.",
-    "version": "1.0.0"
+    "version": "0.0.0"
   },
   "tags": [
     {

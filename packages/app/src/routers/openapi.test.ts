@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 import { createShelfApp } from "../index.tsx";
+import { packageVersion } from "../package-version.ts";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -61,6 +62,8 @@ describe("OpenAPI spec", () => {
     const doc = (await response.json()) as OpenApiDocument;
     expect(doc.openapi).toBe("3.0.0");
     expect(doc.info.title).toBe("StoryShelf API");
+    // The release version (`packageVersion()`), "0.0.0" from source: never a hand-typed number.
+    expect(doc.info.version).toBe(packageVersion());
     expect(doc.paths["/api/v1/projects"]).toBeDefined();
     expect(doc.paths["/api/v1/projects/{slug}/builds"]).toBeDefined();
     expect(doc.paths["/api/v1/admin/purge"]).toBeDefined();
