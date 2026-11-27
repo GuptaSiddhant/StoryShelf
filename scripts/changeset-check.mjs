@@ -20,6 +20,7 @@ import { join } from "node:path";
 import {
   checkChangeset,
   checkSchemaBreak,
+  checkSchemaLine,
   malformedChangesets,
   manifestPublished,
   releaseBranchVersion,
@@ -145,6 +146,17 @@ const schemaBreak = checkSchemaBreak({
 if (!schemaBreak.ok) {
   console.error(
     `::error title=Schema break undeclared::This pull request ${schemaBreak.reason}. Add or edit a changeset: \`Breaking: <summary>\`, a blank line, then a \`Schema: <the contract step>\` line (ADR 0053 amendment, 2026-11-21).`,
+  );
+  process.exit(1);
+}
+const schemaLine = checkSchemaLine({
+  changed,
+  added,
+  read: (path) => readFileSync(join(root, path), "utf8"),
+});
+if (!schemaLine.ok) {
+  console.error(
+    `::error title=Schema line missing::This pull request ${schemaLine.reason}. Add a changeset with a \`Schema: <the expand or contract step>\` line (ADR 0053, decision 10; docs/CONTRIBUTING.md).`,
   );
   process.exit(1);
 }
