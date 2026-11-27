@@ -87,10 +87,14 @@ export function renderAdminAiPage(report: UsageReport): RenderedContent {
         />
       ) : (
         <>
-          <SectionTitle level={3}>By day</SectionTitle>
-          <DaysTable days={report.days} />
-          <SectionTitle level={3}>By profile</SectionTitle>
-          <ProfilesTable profiles={report.profiles} />
+          <Card>
+            <SectionTitle>By day</SectionTitle>
+            <DaysTable days={report.days} />
+          </Card>
+          <Card>
+            <SectionTitle>By profile</SectionTitle>
+            <ProfilesTable profiles={report.profiles} />
+          </Card>
           <Meta>
             Rows older than 90 days are purged. Failed calls the provider billed still count.
           </Meta>

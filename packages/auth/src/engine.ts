@@ -15,6 +15,7 @@ import { betterAuth } from "better-auth";
 import { baseAuthDateFields, baseAuthTables } from "./auth-tables.ts";
 import { createShelfDbBridge } from "./db-bridge.ts";
 import { buildAdapter, mirrorUser } from "./engine/adapter-bridge.ts";
+import { assertBaseUrl } from "./engine/base-url.ts";
 import {
   assertNoReservedEndpointCollision,
   buildPlugins,
@@ -53,6 +54,8 @@ export type {
  */
 export function createShelfAuth(options: ShelfAuthOptions): ShelfAuth {
   const { db } = options;
+  // A scheme-less base URL would only fail on the first request, as an unhandled rejection (#1431).
+  assertBaseUrl(options.baseURL);
   // Never hand the library a missing or weak secret: it would fall back to its built-in default.
   assertAuthSecret(options.secret);
   assertNoLibrarySecretOverride();
@@ -155,6 +158,11 @@ interface AdvancedOptions {
    * The app overwrites it on every request it hands over, from its own resolver.
    */
   ipAddress: { ipAddressHeaders: ["x-forwarded-for"] };
+  /**
+   * Always false: the library skips its origin check whenever `NODE_ENV=test` unless this is stated,
+   * so a deployment started with that value would accept a sign-in from any origin (#1431).
+   */
+  disableOriginCheck: false;
 }
 
 const ENGINE_IP_OPTIONS: AdvancedOptions["ipAddress"] = { ipAddressHeaders: ["x-forwarded-for"] };
@@ -173,12 +181,14 @@ function advancedOptions(options: ShelfAuthOptions): AdvancedOptions {
       useSecureCookies: false,
       defaultCookieAttributes: { secure: true },
       ipAddress: ENGINE_IP_OPTIONS,
+      disableOriginCheck: false,
     };
   }
   return {
     database: { generateId: (): string => ulid() },
     cookies: { session_token: { name: SESSION_COOKIE, attributes } },
     ipAddress: ENGINE_IP_OPTIONS,
+    disableOriginCheck: false,
   };
 }
 

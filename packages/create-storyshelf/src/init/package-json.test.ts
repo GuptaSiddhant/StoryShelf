@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { peerRange } from "../manifest.ts";
+import { exposedVersion, peerRange } from "../manifest.ts";
 import type { Answers } from "./answers.ts";
 import { generatePackageJson } from "./package-json.ts";
 
@@ -39,6 +39,7 @@ describe("generatePackageJson", () => {
       "@storyshelf/core",
       "@storyshelf/db",
       "@storyshelf/runner",
+      "playwright-core",
     ]);
   });
 
@@ -97,9 +98,9 @@ describe("generatePackageJson", () => {
     ][]) {
       const names = Object.keys(pkg({ database }).dependencies);
       expect(names).toContain(adapter);
-      expect(names.filter((name) => !name.startsWith("@storyshelf/"))).toEqual(
-        peer === undefined ? [] : [peer],
-      );
+      expect(
+        names.filter((name) => !name.startsWith("@storyshelf/") && name !== "playwright-core"),
+      ).toEqual(peer === undefined ? [] : [peer]);
     }
   });
 
@@ -146,6 +147,12 @@ describe("generatePackageJson", () => {
     expect(dependencies["@storyshelf/observability"]).toBeDefined();
     expect(dependencies["@storyshelf/core"]).toBeDefined();
     expect(pkg().dependencies["@storyshelf/observability"]).toBeUndefined();
+  });
+
+  it("pins the runner's playwright-core, from the manifest, so exec resolves it under pnpm", () => {
+    expect(pkg().dependencies["playwright-core"]).toBe(
+      exposedVersion("@storyshelf/runner", "playwright-core"),
+    );
   });
 
   it("installs no integration package: git, chat, email and Figma are built in", () => {

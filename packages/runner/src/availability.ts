@@ -41,7 +41,7 @@ function statusOf(entry: LocalTarget, types: BrowserTypes, exists: Exists): Runn
   return installed.some((path) => exists(path))
     ? "ready"
     : {
-        unavailable: `declared, not installed (run \`playwright install ${engine}\`, pinned to this playwright-core)`,
+        unavailable: `declared, not installed (run \`npx playwright-core install ${engine}\` in the server project: it installs the revision this playwright-core needs)`,
       };
 }
 
@@ -79,7 +79,7 @@ function channelStatus(channel: string, exists: Exists): RunnerTarget["status"] 
     return "ready";
   }
   return {
-    unavailable: `channel "${channel}" is not installed (run \`playwright install ${channel}\`)`,
+    unavailable: `channel "${channel}" is not installed (run \`npx playwright-core install ${channel}\`)`,
   };
 }
 

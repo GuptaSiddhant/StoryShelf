@@ -121,6 +121,12 @@ export interface Auth {
    * account with no user row. Absent or empty: no account is read-only.
    */
   readOnlyAccounts?: () => readonly string[];
+  /**
+   * The one origin the engine accepts a sign-in from (its base URL's origin). The sign-in page names
+   * it when the engine refused a sign-in because the page was opened at another address (#1431).
+   * Display only: never a trusted origin, never a link. Absent: the page names no origin.
+   */
+  configuredOrigin?: () => string;
 }
 
 /** The one refusal a read-only account gets for any write (403), from the app and the engine alike. */

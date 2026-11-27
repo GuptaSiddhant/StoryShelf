@@ -33,7 +33,7 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 **A build stays `pending`.** Three common reasons. Review is on and the build is waiting for a verdict: that is expected for a feature-branch build on an instance without capture, and it is accepted or rejected by a reviewer (see [Review](/guides/review/#review-without-screenshots)). The instance has no capture consumer running: open the **Compute jobs** page to see the queue. Or the instance is hosting only.
 
-**A browser shows as unavailable.** Open **System → Capture browsers**: each target is `ready` or `unavailable` with a reason. The Playwright runner never downloads browsers, so install one on the host, matching the pinned `playwright-core` version, for example `npx -y playwright@<version> install --with-deps chromium`. See [@storyshelf/runner](/packages/runner/#browsers). A build that cannot launch its browser fails at once instead of retrying.
+**A browser shows as unavailable.** Open **System → Capture browsers**: each target is `ready` or `unavailable` with a reason. The Playwright runner never downloads browsers, so install one on the host, matching the pinned `playwright-core` version, for example `npx playwright-core install --with-deps chromium` from the server project (a bare `npx playwright install` fetches the wrong revision). See [@storyshelf/runner](/packages/runner/#browsers). An unavailable browser is retried like any failed capture (three attempts).
 
 **Captures time out, or the host runs out of memory.** Each open page costs roughly 100 to 300 MB, and more pages than CPU cores make every page slower. The runner logs a `capture sizing` line with what it detected and chose; if it looks wrong for your host, set the concurrency and timeout explicitly. See [Sizing and cost](/guides/sizing/).
 
@@ -62,6 +62,12 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 **Links in notifications point at the wrong host.** The public origin is set to a platform address while a custom domain fronts the app. Set `SHELF_PUBLIC_BASE_URL` to the address people use.
 
 ## Sign-in and access
+
+**"This is not the address the server is configured for" at sign-in.** The page was opened at another address than `SHELF_PUBLIC_BASE_URL`, for example `http://127.0.0.1:3000` or the VM's IP while the value is `http://localhost:3000`. Sign-in only accepts the configured origin, so your password was not checked: open the address the message names, or set `SHELF_PUBLIC_BASE_URL` to the address people use and restart the server. Behind a proxy, that is the address the browser shows.
+
+**The server stops with "requires SHELF_PUBLIC_BASE_URL … starting with http:// or https://".** The value has no scheme, such as `localhost:3000/`. Write the full URL: `SHELF_PUBLIC_BASE_URL=http://localhost:3000`.
+
+**The server stops with "SHELF_ADMIN_PASSWORD must be at least 12 characters".** The local admin's password is too short. Set a longer `SHELF_ADMIN_PASSWORD` and start it again.
 
 **Nobody is an admin yet.** With authentication on and an empty database, set `SHELF_ADMIN_TOKEN` on the server: its bearer token grants site-admin API access without a session. See [Roles & tokens](/concepts/roles/#first-admin-bootstrap).
 

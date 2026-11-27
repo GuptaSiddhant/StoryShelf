@@ -274,6 +274,30 @@ describe("createShelfAuth", () => {
     await shelf.adapter.destroySession("");
   });
 
+  it("refuses a base URL without a scheme at creation, naming SHELF_PUBLIC_BASE_URL (#1431)", async () => {
+    const { db } = await testEngine();
+    const secret = "spike-secret-that-is-long-enough-123456";
+    for (const baseURL of ["localhost:3000/", "127.0.0.1:3000"]) {
+      expect(() => createShelfAuth({ db, secret, baseURL })).toThrow(
+        /^Shelf auth requires SHELF_PUBLIC_BASE_URL .*http:\/\/localhost:3000$/u,
+      );
+    }
+  });
+
+  it("answers a sign-in from another origin with the engine's INVALID_ORIGIN code, before the password", async () => {
+    const { shelf } = await testEngine();
+    const response = await shelf.auth.handler(
+      new Request("http://localhost:3000/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://127.0.0.1:3000" },
+        body: JSON.stringify({ email: "nobody@example.com", password: "whatever-password" }),
+      }),
+    );
+    // The app tells the wrong address apart by this code (#1431): pin it against library upgrades.
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "INVALID_ORIGIN" });
+  });
+
   it("refuses a short secret at creation, before the library sees it", async () => {
     const { db } = await testEngine();
     expect(() =>

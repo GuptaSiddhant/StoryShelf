@@ -67,7 +67,7 @@ describe("ensurePasswordAdmin", () => {
     ).resolves.toBe(true);
   });
 
-  it("refreshes the credential on repeat boots and rejects short passwords", async () => {
+  it("refreshes the credential on repeat boots", async () => {
     const db = await testDb();
     await ensurePasswordAdmin(db, { email: "admin@example.com", password: "dev-password-12" });
     await ensurePasswordAdmin(db, { email: "admin@example.com", password: "rotated-pass-34" });
@@ -82,9 +82,15 @@ describe("ensurePasswordAdmin", () => {
     await expect(
       verifyPassword({ hash: String(credential?.["password"]), password: "rotated-pass-34" }),
     ).resolves.toBe(true);
-    await expect(
-      ensurePasswordAdmin(db, { email: "admin@example.com", password: "short" }),
-    ).rejects.toThrow(/at least 12/u);
+  });
+
+  it("names SHELF_ADMIN_PASSWORD when the password is too short, without echoing it", async () => {
+    const db = await testDb();
+    const attempt = ensurePasswordAdmin(db, { email: "admin@example.com", password: "short" });
+    await expect(attempt).rejects.toThrow("SHELF_ADMIN_PASSWORD must be at least 12 characters");
+    await expect(attempt).rejects.toThrow(
+      expect.objectContaining({ message: expect.not.stringContaining("short") }),
+    );
   });
 
   it("rejects emails the engine cannot sign in (dotless domain)", async () => {

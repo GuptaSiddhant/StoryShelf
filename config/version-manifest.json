@@ -127,6 +127,9 @@
           "range": ">=0.34.0",
           "optional": true
         }
+      },
+      "exposed": {
+        "playwright-core": "1.63.0"
       }
     },
     "@storyshelf/storage": {

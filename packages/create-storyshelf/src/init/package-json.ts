@@ -1,4 +1,4 @@
-import { ownVersion, peerRange } from "../manifest.ts";
+import { exposedVersion, ownVersion, peerRange } from "../manifest.ts";
 import { SCAFFOLD_DEV_DEPENDENCIES, SERVER_ENTRY } from "../scaffold.ts";
 import {
   needsCompose,
@@ -85,11 +85,17 @@ function sdkPins(answers: Answers): Record<string, string> {
   return Object.fromEntries(pins);
 }
 
+/** The runner's own `playwright-core`, pinned in the project so `<runner> exec playwright-core` resolves it. */
+function browserPins(): Record<string, string> {
+  return { "playwright-core": exposedVersion("@storyshelf/runner", "playwright-core") };
+}
+
 function buildDeps(answers: Answers): Record<string, string> {
   return {
     ...ownPackages(coreNames(answers)),
     ...ownPackages(featureNames(answers)),
     ...sdkPins(answers),
+    ...browserPins(),
   };
 }
 

@@ -60,6 +60,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     printf 'Admin password: '; stty -echo; read -r SHELF_ADMIN_PASSWORD; stty echo; echo
     export SHELF_ADMIN_PASSWORD
     npm install   # or pass --install to create-storyshelf
+    npx playwright-core install chromium
     npm start
     ```
 
