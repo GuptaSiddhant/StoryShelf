@@ -14,6 +14,7 @@ import {
   SectionTitle,
   Table,
   Form,
+  Absent,
 } from "../ui/components.tsx";
 
 type Rendered = ReturnType<typeof Card>;
@@ -71,7 +72,7 @@ function LabelTypeRow(props: {
         <Badge tone="neutral">{labelType.key}</Badge>
       </td>
       <td>{labelType.name}</td>
-      <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
+      <td class="truncate max-w-cell">{labelType.linkTemplate ?? <Absent />}</td>
       <td>
         {isAdmin ? (
           <LabelTypeActions project={project} labelType={labelType} />

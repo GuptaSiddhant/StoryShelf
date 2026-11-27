@@ -431,6 +431,18 @@ describe("type and colour tokens", () => {
     expect(await offendersOf(slicing, /^ui\/|^shell\/service-worker-sync\.ts$/u)).toEqual([]);
   });
 
+  it("writes an absent value with Absent or valueWithUnit, never a dash literal", async () => {
+    // "—", "-" and "–" all meant "nothing here" (#1287 T4): `Absent` is the one spelling.
+    const dash = /\?\?\s*["'][-–—]["']|\bvalue=\{[^\n]*["'][-–]["']/gu;
+    expect(await offendersOf(dash, /^ui\//u)).toEqual([]);
+  });
+
+  it("keeps a space where JSX breaks a line before <code>, <a>, <strong> or <em>", async () => {
+    // A line break in JSX text is dropped, so "marked\n<code>" read "marked<code>" (#1287 T1).
+    const runTogether = /[A-Za-z,;:)]\n\s*<(?:code|a|strong|em)\b/gu;
+    expect(await offendersOf(runTogether, /^ui\//u)).toEqual([]);
+  });
+
   it("writes no hex colour in styles outside the theme and token modules", async () => {
     expect(
       await offendersOf(

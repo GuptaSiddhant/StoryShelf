@@ -154,7 +154,7 @@ function AdapterRow(props: {
         <Meta as="span">{formatLatency(adapter.latencyMs)}</Meta>
       </td>
       <td>
-        <Meta as="span">{adapter.detail ?? "—"}</Meta>
+        <Meta as="span">{adapter.detail ?? <Absent />}</Meta>
       </td>
     </tr>
   );

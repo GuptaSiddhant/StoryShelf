@@ -1,4 +1,5 @@
 import type { FC } from "hono/jsx";
+import { css } from "./css.ts";
 const MINUTE = 60;
 const HOUR = 3600;
 const DAY = 86_400;
@@ -27,12 +28,47 @@ export function formatRelative(value: string | Date, now: Date = new Date()): st
   return `${Math.max(1, Math.round(seconds / step[1]))} ${step[2]} ago`;
 }
 
-/** `<time>` showing a relative label, with the exact timestamp on hover. */
+const relativeTime = css`
+  /* relative-time */
+  position: relative;
+  border-radius: var(--radius);
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* The title is a mouse tooltip only: a focused label shows the exact time too. */
+  &:focus-visible::after {
+    content: attr(title);
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    z-index: 2;
+    margin-top: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-card);
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+`;
+
+/**
+ * `<time>` showing a relative label, with the exact timestamp on hover and on keyboard focus (a
+ * valid time takes one tab stop, since a `title` alone never reaches a keyboard user).
+ */
 export const RelativeTime: FC<{ value: string | Date }> = ({ value }) => {
   const date = new Date(value);
   const valid = !Number.isNaN(date.getTime());
   return (
-    <time datetime={valid ? date.toISOString() : undefined} title={valid ? date.toUTCString() : ""}>
+    <time
+      class={relativeTime}
+      datetime={valid ? date.toISOString() : undefined}
+      title={valid ? date.toUTCString() : ""}
+      tabindex={valid ? 0 : undefined}
+    >
       {formatRelative(value)}
     </time>
   );

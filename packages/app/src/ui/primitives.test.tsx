@@ -409,6 +409,13 @@ describe("RelativeTime", () => {
     const html = await render(<RelativeTime value="not a date" />);
     expect(html).toContain("unknown");
   });
+
+  it("takes one tab stop when it is a real time, so the exact time reaches a keyboard", async () => {
+    expect(await render(<RelativeTime value="2020-01-02T03:04:05.000Z" />)).toContain(
+      'tabindex="0"',
+    );
+    expect(await render(<RelativeTime value="not a date" />)).not.toContain("tabindex");
+  });
 });
 
 describe("CodeBlock and FilterInput", () => {

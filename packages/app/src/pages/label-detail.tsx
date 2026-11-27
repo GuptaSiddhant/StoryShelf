@@ -14,6 +14,7 @@ import {
   statusLabel,
   statusTone,
   RelativeTime,
+  Absent,
 } from "../ui/components.tsx";
 /** Resolve a label type's `link_template` against a build, or return null. */
 export function resolveLabelLink(
@@ -56,7 +57,7 @@ function LabelBuildRow(props: {
         <Badge tone={statusTone(build.status)}>{statusLabel(build.status)}</Badge>
       </td>
       <td>
-        <div>{build.authorName ?? "—"}</div>
+        <div>{build.authorName ?? <Absent />}</div>
         <Meta as="div">{build.authorEmail ?? ""}</Meta>
       </td>
       <td>
@@ -212,7 +213,7 @@ function LabelTypesTable(props: { labelTypes: LabelType[] }): ReturnType<typeof 
                 <Badge tone="neutral">{labelType.key}</Badge>
               </td>
               <td>{labelType.name}</td>
-              <td class="truncate max-w-cell">{labelType.linkTemplate ?? "—"}</td>
+              <td class="truncate max-w-cell">{labelType.linkTemplate ?? <Absent />}</td>
             </tr>
           ))}
         </tbody>

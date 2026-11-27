@@ -145,7 +145,7 @@ const SessionRow: FC<{ session: SessionInfo; readOnly: boolean }> = ({ session, 
       <td>
         <div class="truncate">{session.userAgent ?? "Unknown device"}</div>
         <div class={profileMeta}>
-          <span class="mono">{session.ipAddress ?? "—"}</span>
+          <span class="mono">{session.ipAddress ?? <Absent />}</span>
         </div>
       </td>
       <td class="nowrap">
