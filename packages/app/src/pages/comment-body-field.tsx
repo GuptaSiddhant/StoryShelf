@@ -7,6 +7,7 @@
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { MentionSuggestion } from "../mentions.ts";
 import { Meta, Option, OptionList, TextareaField, VStack } from "../ui/components.tsx";
+import { css } from "../ui/css.ts";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** What a comment box is for: the whole build, one story, or one snapshot. */
@@ -38,6 +39,20 @@ function mentionUrls(slug: string, buildId: string): { suggest: string; complete
   return { suggest: `${base}/mention-suggest`, complete: `${base}/mention-complete` };
 }
 
+const fieldWithMentions = css`
+  /* comment-body-field */
+  display: grid;
+  gap: var(--space-2);
+`;
+
+/** The place the suggestions appear takes no room (and no gap) until there are some. */
+const mentions = css`
+  /* comment-body-mentions */
+  &:empty {
+    display: none;
+  }
+`;
+
 /** The comment text box, and the place its member suggestions appear. */
 export function CommentBodyField(props: {
   slug: string;
@@ -50,6 +65,7 @@ export function CommentBodyField(props: {
   const field = FIELDS[kind];
   return (
     <div
+      class={fieldWithMentions}
       id={`${field.id}-field`}
       hx-post={mentionUrls(slug, buildId).suggest}
       hx-trigger="input from:find textarea delay:250ms"
@@ -67,7 +83,7 @@ export function CommentBodyField(props: {
         placeholder={field.placeholder}
         {...(value === undefined ? {} : { value, autofocus: true })}
       />
-      <div id={`${field.id}-mentions`} aria-live="polite" />
+      <div class={mentions} id={`${field.id}-mentions`} aria-live="polite" />
     </div>
   );
 }

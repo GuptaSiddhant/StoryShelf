@@ -12,6 +12,7 @@ import {
   SectionTitle,
   Table,
   TextareaField,
+  Form,
 } from "../ui/components.tsx";
 
 /** What the owners card shows beyond the saved rules: a refused submission, kept as typed. */
@@ -81,7 +82,7 @@ const OwnersForm: FC<{
 }> = (props) => {
   const action = `/projects/${props.project.slug}/settings/members/owners`;
   return (
-    <form method="post" action={action} hx-post={action} hx-target="body">
+    <Form method="post" action={action} hx-post={action} hx-target="body">
       {csrfField()}
       {props.problems.length > 0 ? <ProblemsAlert problems={props.problems} /> : null}
       <TextareaField
@@ -97,7 +98,7 @@ const OwnersForm: FC<{
           Save owners
         </Button>
       </FormActions>
-    </form>
+    </Form>
   );
 };
 

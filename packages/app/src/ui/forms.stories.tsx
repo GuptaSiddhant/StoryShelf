@@ -6,6 +6,7 @@ import {
   Card,
   CheckField,
   Field,
+  Form,
   FormActions,
   SelectField,
   TextareaField,
@@ -149,6 +150,26 @@ export const FormActionAlignment = jsxStory(() => (
       </Card>
     ))}
   </VStack>
+));
+
+/** A form in a card: the fields and the buttons sit one step apart and the card ends under the buttons. */
+export const FormInCard = jsxStory(() => (
+  <Card>
+    <Form method="post" action="/">
+      <Field label="Project name" name="name" placeholder="Design system" required />
+      <Field
+        label="Default branch"
+        name="branch"
+        value="main"
+        hint="Baselines are kept per branch."
+      />
+      <CheckField label="Run accessibility checks" name="a11y" checked />
+      <FormActions>
+        <Button>Save</Button>
+        <Button variant="ghost">Cancel</Button>
+      </FormActions>
+    </Form>
+  </Card>
 ));
 
 /** Native controls take the app theme's `color-scheme`; switch the theme toolbar to Dark to check. */

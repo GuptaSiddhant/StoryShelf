@@ -17,6 +17,7 @@ import {
   FormActions,
   SectionTitle,
   SelectField,
+  Form,
 } from "../ui/components.tsx";
 import type { GitLinkFormState, SettingsGitData } from "./settings-git.tsx";
 import type { SettingsGitLink } from "./settings-git.tsx";
@@ -115,7 +116,7 @@ export function GitLinkForm(props: FormProps & { inDialog?: boolean }): Rendered
   const base = createUrlBuilder("/").settingsTab(project.slug, "git");
   const action = link ? `${base}/${link.id}` : base;
   return (
-    <form
+    <Form
       id="git-link-form"
       method="post"
       action={action}
@@ -128,7 +129,7 @@ export function GitLinkForm(props: FormProps & { inDialog?: boolean }): Rendered
       <FormActions>
         <Button type="submit">{link ? "Save" : "Request link"}</Button>
       </FormActions>
-    </form>
+    </Form>
   );
 }
 

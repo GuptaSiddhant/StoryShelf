@@ -110,7 +110,9 @@ function isSettingsPage(file: string): boolean {
 
 /** `<form>` elements with more than one input, on a page. A page with a form page of its own renders it outside these files. */
 function inlineForms(source: string): number {
-  const forms = [...source.matchAll(/<form\b[\s\S]*?<\/form>/gu)].map(([form]) => form);
+  const forms = [...source.matchAll(/<(?:form|Form)\b[\s\S]*?<\/(?:form|Form)>/gu)].map(
+    ([form]) => form,
+  );
   return forms.filter(
     (form) =>
       countMatches(
@@ -498,6 +500,29 @@ describe("type and colour tokens", () => {
     ];
     expect(blocks.length).toBeGreaterThan(0);
     expect(blocks.filter(([block]) => /margin:(?!\s*0;)/u.test(block))).toEqual([]);
+  });
+
+  it("gives Field, CheckField and FormActions no outer margin: the Form stack spaces them", async () => {
+    // A bottom margin on `Field` doubled the gap inside any `VStack` and left a blank band at
+    // the end of a card (#1286 L5). `Form` (a grid, one step of gap) owns the space instead.
+    const forms = (await styledSources()).find(({ file }) => file === "ui/forms.tsx");
+    const blocks = [
+      ...(forms?.source ?? "").matchAll(/\/\* (field[\w-]*|form-actions[\w-]*) \*\/[^`]*/gu),
+    ];
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.filter(([block]) => /margin(?:-[a-z]+)?:(?!\s*0;)/u.test(block))).toEqual([]);
+  });
+
+  it("renders a form with fields as Form, not a raw <form>", async () => {
+    const raw: string[] = [];
+    for (const { file, source } of await pageSources()) {
+      for (const [form] of source.matchAll(/<form\b[\s\S]*?<\/form>/gu)) {
+        if (/<(?:Field|TextareaField|SelectField|CheckField|OptionFields)\b/u.test(form)) {
+          raw.push(file);
+        }
+      }
+    }
+    expect(raw).toEqual([]);
   });
 
   it("positions every scroller (a .visually-hidden child is absolute)", async () => {

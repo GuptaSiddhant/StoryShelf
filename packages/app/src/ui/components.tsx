@@ -23,7 +23,7 @@ export {
   statusTone,
   valueWithUnit,
 } from "./feedback.tsx";
-export { CheckField, Field, FormActions, SelectField, TextareaField } from "./forms.tsx";
+export { CheckField, Field, Form, FormActions, SelectField, TextareaField } from "./forms.tsx";
 export { Card, CardSection, PageHeader, SectionTitle } from "./layout.tsx";
 export { HStack, VStack } from "./stacks.tsx";
 export { Avatar, AvatarGroup } from "./avatar.tsx";

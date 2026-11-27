@@ -11,6 +11,7 @@ import {
   SectionTitle,
   SelectField,
   TextareaField,
+  Form,
 } from "../ui/components.tsx";
 import type { NotificationsFormState, SettingsNotifyProvider } from "./settings-notifications.tsx";
 /** GitHub only: show builds as check runs posted by a GitHub App, not as commit statuses. */
@@ -106,7 +107,7 @@ export const CreateGitChannelCard: FC<{
         again.
       </Alert>
     ) : null}
-    <form
+    <Form
       method="post"
       action={`/projects/${project.slug}/settings/notifications`}
       hx-post={`/projects/${project.slug}/settings/notifications`}
@@ -125,6 +126,6 @@ export const CreateGitChannelCard: FC<{
           Add git channel
         </Button>
       </FormActions>
-    </form>
+    </Form>
   </Card>
 );

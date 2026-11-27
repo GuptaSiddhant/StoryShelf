@@ -16,6 +16,7 @@ import {
   PageHeader,
   TextareaField,
   VStack,
+  Form,
 } from "../ui/components.tsx";
 import type { GitLinkRequestView } from "./admin-git.tsx";
 
@@ -130,7 +131,7 @@ export function RefuseLinkBody(props: {
   return (
     <VStack>
       <LinkFacts link={link} />
-      <form
+      <Form
         id={formId(link, "refuse")}
         method="post"
         action={path}
@@ -153,7 +154,7 @@ export function RefuseLinkBody(props: {
             Refuse
           </Button>
         </FormActions>
-      </form>
+      </Form>
     </VStack>
   );
 }

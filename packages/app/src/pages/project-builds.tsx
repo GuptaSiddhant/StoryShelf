@@ -17,6 +17,7 @@ import {
   SelectField,
   VStack,
   statusLabel,
+  Form,
 } from "../ui/components.tsx";
 import { css } from "../ui/css.ts";
 import { GetStarted } from "./get-started.tsx";
@@ -97,7 +98,7 @@ function BranchFilter(props: {
 }): ReturnType<typeof SelectField> {
   const { base, filters, branches, skippedTotal, statuses } = props;
   return (
-    <form
+    <Form
       method="get"
       action={base}
       hx-get={base}
@@ -132,7 +133,7 @@ function BranchFilter(props: {
           ...branches.map((branch) => ({ value: branch, label: branch })),
         ]}
       />
-    </form>
+    </Form>
   );
 }
 

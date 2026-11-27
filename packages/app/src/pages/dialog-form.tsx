@@ -4,7 +4,7 @@ import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import { FormPage } from "../shell/form-page.tsx";
 import { getStore } from "../store.ts";
-import { Button, Dialog, FormActions } from "../ui/components.tsx";
+import { Button, Dialog, FormActions, Form } from "../ui/components.tsx";
 import { TAB_LABELS, type SettingsTab } from "./settings-tabs.ts";
 
 /** What a form of a dialog needs: its dialog id, where it posts and the label of its save button. */
@@ -34,7 +34,7 @@ export const DialogForm: FC<DialogFormSpec> = ({
   children,
 }) => {
   return (
-    <form
+    <Form
       id={`${dialog}-form`}
       method="post"
       action={action}
@@ -55,7 +55,7 @@ export const DialogForm: FC<DialogFormSpec> = ({
           ) : null}
         </FormActions>
       ) : null}
-    </form>
+    </Form>
   );
 };
 

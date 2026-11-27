@@ -15,6 +15,8 @@ import {
   SectionTitle,
   SelectField,
   TextareaField,
+  Form,
+  VStack,
 } from "../ui/components.tsx";
 import { targetChoices, type TargetChoices } from "./target-choices.ts";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -29,18 +31,20 @@ export function BrowserExtras(props: {
   const { primary, extras, disabled, choices } = props;
   return (
     <div id="browser-extras">
-      {choices
-        .filter((engine) => engine.value !== primary)
-        .map((engine) => (
-          <CheckField
-            key={engine.value}
-            label={`Also capture on ${engine.label}`}
-            name={`extra_${engine.value}`}
-            value={engine.value}
-            checked={extras.includes(engine.value) ? true : undefined}
-            disabled={disabled}
-          />
-        ))}
+      <VStack gap="lg">
+        {choices
+          .filter((engine) => engine.value !== primary)
+          .map((engine) => (
+            <CheckField
+              key={engine.value}
+              label={`Also capture on ${engine.label}`}
+              name={`extra_${engine.value}`}
+              value={engine.value}
+              checked={extras.includes(engine.value) ? true : undefined}
+              disabled={disabled}
+            />
+          ))}
+      </VStack>
     </div>
   );
 }
@@ -130,7 +134,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
     <Card>
       <SectionTitle>Superseded builds</SectionTitle>
       <Meta>A newer commit on a branch makes an older build of it unnecessary.</Meta>
-      <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
+      <Form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
         {csrfField()}
         <CheckField
           label="Cancel superseded builds"
@@ -147,7 +151,7 @@ function SupersededCard(props: { project: Project; isAdmin: boolean }): Rendered
             </Button>
           </FormActions>
         ) : null}
-      </form>
+      </Form>
     </Card>
   );
 }
@@ -192,7 +196,7 @@ export function renderSettingsCapture(
           <em>Only this browser</em> in the review for an engine-specific decision. Up to{" "}
           {MAX_BROWSERS} targets. A newly added target starts from its first build.
         </Meta>
-        <form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
+        <Form method="post" action={action} hx-post={action} hx-target="body" hx-swap="outerHTML">
           {csrfField()}
           <BrowserFields
             slug={project.slug}
@@ -204,7 +208,7 @@ export function renderSettingsCapture(
           <AllowlistField allowlist={allowlist} />
           <UrlLifetimeField project={project} disabled={!isAdmin} />
           <SaveChanges isAdmin={isAdmin} />
-        </form>
+        </Form>
       </Card>
       <SupersededCard project={project} isAdmin={isAdmin} />
     </div>

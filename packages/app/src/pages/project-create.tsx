@@ -1,7 +1,7 @@
 import { csrfField } from "../shell/csrf-field.tsx";
 import type { RenderedContent } from "../shell/document.tsx";
 import { FormPage } from "../shell/form-page.tsx";
-import { Alert, Button, Field, HStack } from "../ui/components.tsx";
+import { Alert, Button, Field, HStack, Form } from "../ui/components.tsx";
 
 /** Form state for the project creation page (values and validation errors). */
 export interface ProjectCreateFormState {
@@ -31,7 +31,7 @@ function ProjectCreateForm(props: {
 }): ReturnType<typeof HStack> {
   const { values, errors } = props;
   return (
-    <form
+    <Form
       method="post"
       action="/projects/new"
       hx-post="/projects/new"
@@ -70,7 +70,7 @@ function ProjectCreateForm(props: {
       />
 
       <ProjectCreateActions />
-    </form>
+    </Form>
   );
 }
 

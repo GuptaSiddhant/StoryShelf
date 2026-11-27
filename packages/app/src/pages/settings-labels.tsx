@@ -13,6 +13,7 @@ import {
   Meta,
   SectionTitle,
   Table,
+  Form,
 } from "../ui/components.tsx";
 
 type Rendered = ReturnType<typeof Card>;
@@ -135,7 +136,7 @@ function EditLabelTypeCard(props: { project: Project; editing: LabelType }): Ren
   return (
     <Card>
       <SectionTitle level={3}>Edit label type: {editing.key}</SectionTitle>
-      <form
+      <Form
         method="post"
         action={`/projects/${project.slug}/settings/labels/${editing.key}`}
         hx-post={`/projects/${project.slug}/settings/labels/${editing.key}`}
@@ -158,7 +159,7 @@ function EditLabelTypeCard(props: { project: Project; editing: LabelType }): Ren
             Cancel
           </Button>
         </FormActions>
-      </form>
+      </Form>
     </Card>
   );
 }
@@ -168,7 +169,7 @@ function CreateLabelTypeCard(props: { project: Project }): Rendered {
   return (
     <Card>
       <SectionTitle level={3}>Create label type</SectionTitle>
-      <form
+      <Form
         method="post"
         action={`/projects/${project.slug}/settings/labels`}
         hx-post={`/projects/${project.slug}/settings/labels`}
@@ -197,7 +198,7 @@ function CreateLabelTypeCard(props: { project: Project }): Rendered {
             Add label type
           </Button>
         </FormActions>
-      </form>
+      </Form>
     </Card>
   );
 }

@@ -94,7 +94,50 @@ async function inspect(page, id, errors) {
   }
   await page.waitForTimeout(200);
   await checkPhoneWidth(page, errors);
+  await checkCardBottoms(page, errors);
   await checkSummaryRing(page, errors);
+}
+
+/** A card's last visible child ends within one padding step of its bottom edge (no blank band, #1286 L5). */
+const CARD_BOTTOM_LIMIT_PX = 24;
+
+/** The cards of a document (a bordered, rounded, padded surface) whose last child leaves a band. */
+function cardsWithBand(limit) {
+  // Runs in the page, so it cannot call anything defined outside it.
+  const doc = globalThis.document;
+  const cards = [...doc.querySelectorAll("main div, main section, body > div")].filter((card) => {
+    const style = globalThis.getComputedStyle(card);
+    return (
+      style.paddingBottom === "16px" &&
+      style.borderBottomWidth === "1px" &&
+      style.borderBottomStyle === "solid" &&
+      style.borderTopLeftRadius !== "0px" &&
+      style.display === "grid"
+    );
+  });
+  return cards.flatMap((card) => {
+    const last = [...card.children]
+      .toReversed()
+      .find((child) => child.getBoundingClientRect().height > 0);
+    const gap = last
+      ? card.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom
+      : 0;
+    return last && gap > limit
+      ? [`${Math.round(gap)}px below <${last.tagName.toLowerCase()}>`]
+      : [];
+  });
+}
+
+/** Fail a story whose card ends in a blank band: a margin or an empty line under its last child. */
+async function checkCardBottoms(page, errors) {
+  const frame = page.frames().find((candidate) => candidate !== page.mainFrame());
+  const target = frame ?? page;
+  if (frame) {
+    await frame.waitForLoadState("load");
+  }
+  for (const band of await target.evaluate(cardsWithBand, CARD_BOTTOM_LIMIT_PX)) {
+    errors.push(`card: a blank band at the bottom of a card (${band})`);
+  }
 }
 
 /** What the story's document measures: the canvas, or the frame inside it for a page story (#1133). */

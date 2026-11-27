@@ -17,6 +17,7 @@ import {
   VStack,
   statusTone,
   statusLabel,
+  Form,
 } from "../ui/components.tsx";
 import { openChangeRequests, openRequestsLabel } from "./review-change-requests.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -36,22 +37,24 @@ export function VerdictCard(props: { data: ReviewSectionData }): Rendered {
       </HStack>
       <Meta>{nothingToReview(data) ?? summary(data)}</Meta>
       {takesNoVerdict(data.build.status) ? null : <AssignedReviewers data={data} />}
-      <VStack>
-        {data.state.latest.map((review): Rendered => (
-          <HStack key={review.id} align="baseline" wrap={false}>
-            <Badge tone={review.verdict === "approved" ? "success" : "danger"}>
-              {statusLabel(review.verdict)}
-            </Badge>
-            <strong>
-              {review.userId ? (data.names.get(review.userId) ?? review.userId) : "anonymous"}
-            </strong>
-            <Meta as="span">
-              <RelativeTime value={review.createdAt} />
-            </Meta>
-            {review.body ? <span>{review.body}</span> : null}
-          </HStack>
-        ))}
-      </VStack>
+      {data.state.latest.length > 0 ? (
+        <VStack>
+          {data.state.latest.map((review): Rendered => (
+            <HStack key={review.id} align="baseline" wrap={false}>
+              <Badge tone={review.verdict === "approved" ? "success" : "danger"}>
+                {statusLabel(review.verdict)}
+              </Badge>
+              <strong>
+                {review.userId ? (data.names.get(review.userId) ?? review.userId) : "anonymous"}
+              </strong>
+              <Meta as="span">
+                <RelativeTime value={review.createdAt} />
+              </Meta>
+              {review.body ? <span>{review.body}</span> : null}
+            </HStack>
+          ))}
+        </VStack>
+      ) : null}
       <VerdictControls data={data} />
     </Card>
   );
@@ -180,7 +183,7 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
   const url = `/projects/${project.slug}/builds/${build.id}/reviews`;
   const open = openChangeRequests(props.data).length;
   return (
-    <form method="post" action={url} hx-post={url} hx-target="body" class="max-w-prose">
+    <Form method="post" action={url} hx-post={url} hx-target="body">
       {csrfField()}
       <VStack>
         <TextareaField
@@ -211,7 +214,7 @@ function VerdictForm(props: { data: ReviewSectionData; disabled?: boolean }): Re
           </Button>
         </HStack>
       </VStack>
-    </form>
+    </Form>
   );
 }
 
