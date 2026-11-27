@@ -95,7 +95,7 @@ export function InsightPanel(
           {latest?.status === "done" ? (
             <Badge tone={verdictTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}
-          {inFlight ? <Badge tone="info">generating…</Badge> : null}
+          {inFlight ? <Badge tone="info">Generating…</Badge> : null}
         </HStack>
         <VStack>
           <InsightBody latest={latest} />

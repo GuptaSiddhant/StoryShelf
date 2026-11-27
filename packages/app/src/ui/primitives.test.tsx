@@ -407,7 +407,8 @@ describe("RelativeTime", () => {
 
   it("does not throw on invalid input", async () => {
     const html = await render(<RelativeTime value="not a date" />);
-    expect(html).toContain("unknown");
+    expect(html).toContain("none");
+    expect(html).not.toContain("<time");
   });
 
   it("takes one tab stop when it is a real time, so the exact time reaches a keyboard", async () => {

@@ -521,6 +521,12 @@ describe("type and colour tokens", () => {
     expect(await offendersOf(stack, /^ui\//u)).toEqual([]);
   });
 
+  it("starts a badge's text with a capital (sentence case), never a lower-case word", async () => {
+    // "ready", "default", "unreachable" and "health: watch" sat among capitalised badges (#1287 T3).
+    const lower = /<Badge\b[^>]*>\s*[a-z][^<{]*<\/Badge>/gu;
+    expect(await offendersOf(lower, /^ui\//u)).toEqual([]);
+  });
+
   it("writes no hex colour or font-family literal in a page outside a css template", async () => {
     // A plain `<style>` string in a page escaped the css-template checks and hard-coded #ddd and
     // system-ui (#1285 V5). Colours and fonts come from the token stylesheet.

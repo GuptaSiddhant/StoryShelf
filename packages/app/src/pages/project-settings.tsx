@@ -247,7 +247,7 @@ export function renderProjectSettingsPage(
   return (
     <DocumentLayout
       layout="form"
-      title={`${project.name} · Settings`}
+      title={`${project.name} · ${TAB_LABELS[activeTab]}`}
       nav={{
         active: "settings",
         projectSlug: project.slug,

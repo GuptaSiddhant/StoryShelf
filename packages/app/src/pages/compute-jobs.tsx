@@ -15,7 +15,6 @@ import {
   statusTone,
   Absent,
   RelativeTime,
-  Time,
 } from "../ui/components.tsx";
 
 /** Build statuses the retry button of the jobs table offers. */
@@ -44,13 +43,11 @@ function QueueRow(props: { slug: string; job: QueueView }): Rendered {
       </td>
       <td>
         <Meta as="span">
-          <Time value={job.queuedAt} format="time" />
+          <RelativeTime value={job.queuedAt} />
         </Meta>
       </td>
       <td>
-        <Meta as="span">
-          {job.startedAt ? <Time value={job.startedAt} format="time" /> : <Absent />}
-        </Meta>
+        <Meta as="span">{job.startedAt ? <RelativeTime value={job.startedAt} /> : <Absent />}</Meta>
       </td>
     </tr>
   );

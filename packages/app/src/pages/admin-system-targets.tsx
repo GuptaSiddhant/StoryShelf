@@ -28,7 +28,7 @@ function UnreachableNote(props: {
   return (
     <>
       <Badge tone="danger" icon>
-        unreachable
+        Unreachable
       </Badge>
       <Meta as="div">
         {REASONS[down.reason]} Since <Time value={down.since} />.
@@ -55,7 +55,7 @@ function TargetRow(props: {
         <Meta as="span" mono>
           {entry.target}
         </Meta>
-        {props.isDefault ? <Badge>default</Badge> : null}
+        {props.isDefault ? <Badge>Default</Badge> : null}
       </td>
       <td>
         <Meta as="span">
@@ -64,7 +64,7 @@ function TargetRow(props: {
       </td>
       <td>
         <Badge tone={reason === null ? "success" : "danger"} icon>
-          {reason === null ? "ready" : "unavailable"}
+          {reason === null ? "Ready" : "Unavailable"}
         </Badge>
         {reason === null ? null : <Meta as="div">{reason}</Meta>}
         <UnreachableNote down={props.down} />

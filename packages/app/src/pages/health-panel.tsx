@@ -101,7 +101,7 @@ export function HealthPanel(
           {latest?.status === "done" ? (
             <Badge tone={healthTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}
-          {inFlight ? <Badge tone="info">generating…</Badge> : null}
+          {inFlight ? <Badge tone="info">Generating…</Badge> : null}
         </HStack>
         <VStack>
           <HealthBody latest={latest} />
