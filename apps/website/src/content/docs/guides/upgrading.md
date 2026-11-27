@@ -60,6 +60,12 @@ With Puppeteer gone there is one runner, so it has the plain name. Nothing else 
 
 There is no alias and no re-export: `@storyshelf/runner-playwright` is not published again, and the owner deprecates the npm package with a message naming the new one.
 
+### Move the `playwright-core` pin with the runner
+
+**Who is affected:** a server project scaffolded by `create-storyshelf`, which pins `playwright-core` to the version `@storyshelf/runner` uses.
+
+When you upgrade `@storyshelf/runner`, set `playwright-core` in `package.json` to the version the new runner uses, install, then run `npx playwright-core install chromium`. A stale pin installs the old browser revision, and the default target stays declared but not installed. `storyshelf-server doctor` warns when the two differ. Docker image installs do not pin it and need nothing.
+
 ### Switching from Puppeteer to Playwright
 
 Playwright is the one capture runner. Do this on 0.14.x, before you upgrade to 0.15.0.
