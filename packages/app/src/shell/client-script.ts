@@ -232,7 +232,13 @@ function toastPart(): string {
       var form=e.detail && e.detail.elt && e.detail.elt.closest ? e.detail.elt.closest('[data-toast]') : null;
       if(form){ queueToast({message:form.getAttribute('data-toast'),tone:form.getAttribute('data-toast-tone')||'success'}); }
     });
-    function failed(){ clearToast(); toast({message:'Something went wrong. Please try again.',tone:'danger'}); }
+    function failed(e){
+      var status=e && e.detail && e.detail.xhr ? e.detail.xhr.status : 0;
+      var message=status===403 ? 'Your role cannot do this.'
+        : status===429 ? 'Too many requests. Wait a moment and try again.'
+        : 'Something went wrong. Please try again.';
+      clearToast(); toast({message:message,tone:'danger'});
+    }
     document.addEventListener('htmx:responseError',failed);
     document.addEventListener('htmx:sendError',failed);`;
 }

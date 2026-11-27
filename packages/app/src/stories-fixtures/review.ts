@@ -31,6 +31,7 @@ export function reviewData(overrides: Partial<BuildDiffData> = {}): BuildDiffDat
     comments: comments.filter((comment) => comment.buildId === BUILD_REVIEW),
     selectedId: reviewSnapshots.find((snapshot) => snapshot.storyId === "kit-button--primary")?.id,
     canReview: true,
+    canComment: true,
     canTriage: true,
     names: new Map<string, string>(),
     hasBaseline,
