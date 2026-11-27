@@ -29,7 +29,7 @@ import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { notFound, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect, isHxRequest } from "./htmx.ts";
-import { loadGitSection, usableConnections } from "./settings-git-data.ts";
+import { loadGitSection, loadRepositoryPicker, usableConnections } from "./settings-git-data.ts";
 import { asString } from "./settings.handlers.ts";
 
 /** Register the Git section's form pages and writes. */
@@ -60,15 +60,17 @@ async function ownLink(project: Project, id: string): Promise<GitRepositoryLinkR
   return link;
 }
 
-function formResponse(
+async function formResponse(
   c: Context,
   ctx: { project: Project; data: SettingsGitData },
   linkId: string | undefined,
   state: GitLinkFormState | undefined,
   status: 200 | 400,
-): Response | Promise<Response> {
+): Promise<Response> {
   const link = ctx.data.links.find((candidate) => candidate.id === linkId);
-  const props = { ...ctx, link, state };
+  // The picker asks the host only with the operator switch on; off, the form is URL-only.
+  const data = { ...ctx.data, picker: await loadRepositoryPicker() };
+  const props = { project: ctx.project, data, link, state };
   const body = isHxRequest(c) ? renderGitLinkFragment(props) : renderGitLinkPage(props);
   return c.html(body, status);
 }
@@ -120,7 +122,8 @@ function readForm(
   connections: readonly GitConnection[],
   current?: GitConnection,
 ): LinkRead {
-  const typed = asString(form.get("repository")) ?? "";
+  // A picked repository is a URL like a typed one and resolves the same way (decision 2).
+  const typed = asString(form.get(form.get("source") === "pick" ? "picked" : "repository")) ?? "";
   const prefix = asString(form.get("prefix")) ?? "";
   const found = findRepository(typed, connections, current);
   const problem = prefix.length === 0 ? null : prefixProblem(prefix);
@@ -180,13 +183,13 @@ async function requestLink(
 }
 
 /** A taken repository and prefix is a form error; anything else is a real failure. */
-function takenOrThrow(
+async function takenOrThrow(
   c: Context,
   ctx: { project: Project; data: SettingsGitData },
   linkId: string | undefined,
   error: unknown,
   read: { typed: string; prefix: string },
-): Response | Promise<Response> {
+): Promise<Response> {
   if (!(error instanceof GitRepositoryTakenError)) {
     throw error;
   }
@@ -194,7 +197,7 @@ function takenOrThrow(
     prefix: "That repository is already linked with this prefix. Choose another prefix.",
   };
   const values = { repository: read.typed, prefix: read.prefix };
-  return formResponse(c, ctx, linkId, { errors, values }, 400);
+  return await formResponse(c, ctx, linkId, { errors, values }, 400);
 }
 
 /** The outputs the form chose, capped by what the connection may post. */

@@ -15,11 +15,12 @@ import {
   CheckField,
   Field,
   FormActions,
+  OptionFields,
   SectionTitle,
   SelectField,
   Form,
 } from "../ui/components.tsx";
-import type { GitLinkFormState, SettingsGitData } from "./settings-git.tsx";
+import type { GitLinkFormState, RepositoryPicker, SettingsGitData } from "./settings-git.tsx";
 import type { SettingsGitLink } from "./settings-git.tsx";
 
 const COMMENT_MODES = [
@@ -73,21 +74,70 @@ type FormProps = {
 
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
+/** The typed-URL field: the only way to name a repository while the operator switch is off. */
+function RepositoryField(props: FormProps): Rendered {
+  const { link, state } = props;
+  return (
+    <Field
+      label="Repository"
+      name="repository"
+      required
+      placeholder="https://github.com/acme/widgets"
+      value={state?.values?.repository ?? (link ? link.url : "")}
+      error={state?.errors?.["repository"]}
+      hint="The repository's URL or owner/name."
+    />
+  );
+}
+
+/** Pick from the covered repositories, or type a URL. A cut-short list says so. */
+function PickerFields(
+  props: FormProps & { picker: Extract<RepositoryPicker, { listed: true }> },
+): Rendered {
+  const { picker, link, state } = props;
+  const choosing =
+    picker.repositories.length > 0 && !link && state?.values?.repository === undefined;
+  return (
+    <OptionFields
+      name="source"
+      label="Repository"
+      selected={choosing ? "pick" : "type"}
+      options={[
+        {
+          value: "pick",
+          label: "Choose from the list",
+          children: (
+            <SelectField
+              label="Covered repository"
+              name="picked"
+              options={picker.repositories.map(({ url, label }) => ({ value: url, label }))}
+              hint={
+                picker.truncated
+                  ? "This list was cut short. Type the URL for a repository that is not here."
+                  : undefined
+              }
+            />
+          ),
+        },
+        { value: "type", label: "Type a URL", children: <RepositoryField {...props} /> },
+      ]}
+    />
+  );
+}
+
 /** Repository and prefix, then (for an existing link) its outputs and the approval notice. */
 function LinkFields(props: FormProps): Rendered {
   const { data, link, state } = props;
   const errors = state?.errors ?? {};
+  const picker = data.picker?.listed === true ? data.picker : undefined;
   return (
     <>
-      <Field
-        label="Repository"
-        name="repository"
-        required
-        placeholder="https://github.com/acme/widgets"
-        value={state?.values?.repository ?? (link ? link.url : "")}
-        error={errors["repository"]}
-        hint="The repository's URL or owner/name."
-      />
+      {data.picker?.listed === false ? (
+        <Alert tone="info" role="none">
+          The repositories this server covers could not be listed. Type the repository's URL.
+        </Alert>
+      ) : null}
+      {picker ? <PickerFields {...props} picker={picker} /> : <RepositoryField {...props} />}
       <Field
         label="Status prefix"
         name="prefix"

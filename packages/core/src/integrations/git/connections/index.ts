@@ -9,6 +9,16 @@ export {
   gitConfigFile,
   gitFromEnv,
 } from "./env.ts";
+export {
+  listCoveredRepositories,
+  MAX_INSTALLATIONS,
+  MAX_REPOSITORY_PAGES,
+  REPOSITORIES_PER_PAGE,
+  RepositoryListError,
+  type CoveredRepositories,
+  type CoveredRepository,
+  type ListRepositoriesOptions,
+} from "./covered-repositories.ts";
 export { exchangeManifestCode, type ExchangedApp } from "./exchange.ts";
 export {
   GITLAB_EXPIRY_WARNING_DAYS,
