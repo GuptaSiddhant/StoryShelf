@@ -23,3 +23,15 @@ export const Open = jsxStory(() => (
     <DefinitionList items={items} />
   </Disclosure>
 ));
+
+export const InlineCollapsed = jsxStory(() => (
+  <Disclosure variant="inline" title="Show all 12" hint="more files">
+    <DefinitionList items={items} />
+  </Disclosure>
+));
+
+export const InlineOpen = jsxStory(() => (
+  <Disclosure variant="inline" title="Resolved (1)" open>
+    <DefinitionList items={items} />
+  </Disclosure>
+));

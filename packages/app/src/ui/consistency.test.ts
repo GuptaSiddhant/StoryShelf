@@ -131,6 +131,17 @@ const INLINE_FORM_ALLOWANCE: Record<string, number> = {
   "settings-tests.tsx": 1,
 };
 
+/** Files that still render a list with `<ul>`/`<ol>` (a real list of prose items), with their counts. Shrink it. */
+const LIST_ALLOWANCE: Record<string, number> = {
+  "a11y-violations.tsx": 1,
+  "build-detail-skipped.tsx": 2,
+  "review-change-requests.tsx": 1,
+  "settings-component-owners.tsx": 1,
+};
+
+/** A ✓, ✗ or → in JSX text (between tags) or as a one-glyph string child, not in a comment or template. */
+const JSX_GLYPH = /(?<![=-])>[^<>{}*;]*[✓✗→][^<>{}*;]*<|\?\s*"[✓✗→] ?"/u;
+
 describe("ui-building-blocks contract", () => {
   it("has no raw component or retired utility classes in pages/", async () => {
     const forbidden =
@@ -288,6 +299,42 @@ describe("ui-building-blocks contract", () => {
       .filter(({ source }) => hasNestedCard(source))
       .map(({ file }) => file);
     expect(nested).toEqual([]);
+  });
+
+  it("has no <details> or <summary> in pages/ (Disclosure and Dropdown own them)", async () => {
+    const found = (await pageSources())
+      .filter(
+        ({ file, source }) =>
+          !file.endsWith(".test.tsx") && /<details[\s>]|<summary[\s>]/u.test(source),
+      )
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it("has no bare <ul> or <ol> in pages/ beyond the allow-list", async () => {
+    const found: Record<string, number> = {};
+    for (const { file, source } of await pageSources()) {
+      const count = countMatches(source, /<(?:ul|ol)[\s>]/gu);
+      if (count > 0) {
+        found[file] = count;
+      }
+    }
+    expect(found).toEqual(LIST_ALLOWANCE);
+  });
+
+  it("prints no ✓, ✗ or → character in JSX text in pages/ (use Icon)", async () => {
+    const found = (await pageSources())
+      .filter(({ file, source }) => !file.endsWith(".test.tsx") && JSX_GLYPH.test(source))
+      .map(({ file }) => file);
+    expect(found).toEqual([]);
+  });
+
+  it("recognises a glyph in JSX text and ignores one in a string or comment", () => {
+    expect(JSX_GLYPH.test("<span>✓ done</span>")).toBe(true);
+    expect(JSX_GLYPH.test('{decided ? "✓ " : ""}')).toBe(true);
+    expect(JSX_GLYPH.test("<span>Story →</span>")).toBe(true);
+    expect(JSX_GLYPH.test("// System → Git page")).toBe(false);
+    expect(JSX_GLYPH.test("const label = `${a} → ${b}`;")).toBe(false);
   });
 
   it("recognises a card nested in a card", () => {

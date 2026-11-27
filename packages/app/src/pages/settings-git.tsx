@@ -181,7 +181,7 @@ export function renderGitNotConnected(): unknown {
   return (
     <Alert tone="info">
       Repository links are not offered to projects on this server: no git connection is set up. Add
-      one under <a href="/admin#git">System → Git</a>.
+      one under <a href="/admin#git">System › Git</a>.
     </Alert>
   );
 }

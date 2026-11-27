@@ -186,7 +186,7 @@ describe("component page", () => {
       await get(app, "/projects/app/components/src/Button.stories.tsx?tab=linked")
     ).text();
     expect(linked).toContain("Uses @acme/ds");
-    expect(linked).toContain("Story →");
+    expect(linked).toContain("Story");
     expect(linked).toContain("/projects/ds/components/src/Tag.stories.tsx");
   });
 

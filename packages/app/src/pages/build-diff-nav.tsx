@@ -101,7 +101,7 @@ function FilmItem(props: {
       </span>
       <span class={filmStatus}>
         {a11yCount > 0 ? `a11y ${a11yCount}${a11yOrigin(carrier, multiBrowser)} ` : ""}
-        {decided ? "✓ " : ""}
+        {decided ? <Icon name="check" size="sm" /> : null}
         <span class={statusDots[statusTone(snap.status)]} aria-hidden="true" />
         <span class="visually-hidden">{snap.status}</span>
         {percent ?? ""}

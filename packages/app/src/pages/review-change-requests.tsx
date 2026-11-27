@@ -5,7 +5,7 @@ import { createUrlBuilder } from "@storyshelf/core/urls";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { ReviewSectionData } from "../routers/review-section.handlers.ts";
 import { getStore } from "../store.ts";
-import { Card, Meta, SectionTitle, VStack } from "../ui/components.tsx";
+import { Card, Disclosure, Meta, SectionTitle, VStack } from "../ui/components.tsx";
 type Rendered = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 /** Characters of the comment shown beside its anchor. */
@@ -38,10 +38,9 @@ export function ChangeRequestsCard(props: { data: ReviewSectionData }): Rendered
         <Entries data={data} requests={open} />
       )}
       {resolved.length === 0 ? null : (
-        <details>
-          <summary>Resolved ({resolved.length})</summary>
+        <Disclosure variant="inline" title={`Resolved (${resolved.length})`}>
           <Entries data={data} requests={resolved} />
-        </details>
+        </Disclosure>
       )}
     </Card>
   );

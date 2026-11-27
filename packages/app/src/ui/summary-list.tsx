@@ -23,6 +23,11 @@ const row = css`
   background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  /* On a phone the actions always sit under the text, on every row, so a list is never ragged. */
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 `;
 
 const main = css`
