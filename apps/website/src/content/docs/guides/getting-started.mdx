@@ -64,7 +64,7 @@ You need a Storybook with a `.storybook/main.*` file, and a machine to run the s
     npm start
     ```
 
-    `npm install` does not download a browser, and the server renders stories in one. Install it with the project's own `playwright-core` as above: `npx playwright install` would fetch the latest Playwright's revision, which this server cannot use. Without a browser the server still starts and logs a warning, but the first build fails.
+    `npm install` downloads no browser, so install one with the project's own `playwright-core` as above (a bare `npx playwright install` fetches a different revision). Without it the server starts and warns, but the first build fails.
 
     The server listens on `http://localhost:3000`. Instead of exporting the variables, copy `.env.example` to `.env`; the server reads it. A missing value stops the server with one line naming it.
 
