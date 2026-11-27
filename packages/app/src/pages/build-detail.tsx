@@ -216,7 +216,7 @@ export function BuildDetails(props: BuildDetailsProps): Rendered {
 export function ReviewOnlySection(props: { details: BuildDetailsData }): Rendered | null {
   const { review, testing } = props.details;
   return review && !testing ? (
-    <VStack>
+    <VStack gap="lg">
       <VerdictCard data={review} />
       <CommentsCard data={review} />
     </VStack>

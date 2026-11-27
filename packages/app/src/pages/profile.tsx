@@ -241,7 +241,7 @@ const DisplayNameCard: FC<{ displayName: string }> = ({ displayName }) => (
   <Card>
     <SectionTitle>Display name</SectionTitle>
     <Meta>Shown in comments and the header. Survives SSO refresh.</Meta>
-    <Form method="post" action="/profile" novalidate>
+    <Form narrow method="post" action="/profile" novalidate>
       <Field label="Display name" name="displayName" type="text" required value={displayName} />
       <FormActions>
         <Button variant="primary" type="submit">
@@ -257,7 +257,7 @@ const PasswordCard: FC = () => (
   <Card>
     <SectionTitle>Change password</SectionTitle>
     <Meta>For local accounts only</Meta>
-    <Form method="post" action="/profile/password" novalidate>
+    <Form narrow method="post" action="/profile/password" novalidate>
       <Field
         label="Current password"
         name="currentPassword"

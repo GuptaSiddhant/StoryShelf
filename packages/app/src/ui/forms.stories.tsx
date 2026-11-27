@@ -16,6 +16,19 @@ import {
 const meta: Meta = { title: "UI/Forms" };
 export default meta;
 
+export const NarrowForm = jsxStory(() => (
+  <Card>
+    <Form narrow>
+      <Field label="Display name" name="displayName" value="Siddhant" />
+      <FormActions>
+        <Button variant="primary" type="submit">
+          Save name
+        </Button>
+      </FormActions>
+    </Form>
+  </Card>
+));
+
 export const FieldStates = jsxStory(() => (
   <VStack>
     <Field label="Project name" name="name" placeholder="Design system" />

@@ -1,5 +1,6 @@
 import type { FC } from "hono/jsx";
 import { css } from "./css.ts";
+import { Absent } from "./feedback.tsx";
 const MINUTE = 60;
 const HOUR = 3600;
 const DAY = 86_400;
@@ -11,7 +12,7 @@ const STEPS: [number, number, string][] = [
   [7 * DAY, DAY, "d"],
 ];
 
-/** Compact relative time ("3 min ago"); falls back to an ISO date after a week. */
+/** Compact relative time ("3 min ago"); falls back to the date ("Nov 15, 2026") after a week. */
 export function formatRelative(value: string | Date, now: Date = new Date()): string {
   const then = new Date(value);
   if (Number.isNaN(then.getTime())) {
@@ -23,7 +24,7 @@ export function formatRelative(value: string | Date, now: Date = new Date()): st
   }
   const step = STEPS.find(([limit]) => seconds < limit);
   if (!step) {
-    return then.toISOString().slice(0, 10);
+    return formatAbsolute(then, "date");
   }
   return `${Math.max(1, Math.round(seconds / step[1]))} ${step[2]} ago`;
 }
@@ -31,6 +32,7 @@ export function formatRelative(value: string | Date, now: Date = new Date()): st
 const relativeTime = css`
   /* relative-time */
   position: relative;
+  white-space: nowrap;
   border-radius: var(--radius);
   &:focus-visible {
     outline: 2px solid var(--ring);
@@ -62,6 +64,9 @@ const relativeTime = css`
 export const RelativeTime: FC<{ value: string | Date }> = ({ value }) => {
   const date = new Date(value);
   const valid = !Number.isNaN(date.getTime());
+  if (!valid) {
+    return <Absent />;
+  }
   return (
     <time
       class={relativeTime}
@@ -99,14 +104,22 @@ export function formatAbsolute(value: string | Date, format: TimeFormat = "datet
   return format === "date" ? text : `${text} ${TIME_ZONE}`;
 }
 
+const absoluteTime = css`
+  /* absolute-time */
+  white-space: nowrap;
+`;
+
 /** `<time datetime>` with an explicit locale and zone (UTC, `en`), never the server's. */
 export const Time: FC<{ value: string | Date; format?: TimeFormat }> = ({
   value,
   format = "datetime",
 }) => {
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return <Absent />;
+  }
   return (
-    <time datetime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}>
+    <time class={absoluteTime} datetime={date.toISOString()}>
       {formatAbsolute(value, format)}
     </time>
   );

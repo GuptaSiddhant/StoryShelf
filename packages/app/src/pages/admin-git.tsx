@@ -101,12 +101,17 @@ function expiryNote(connection: GitConnectionView): string {
     : "";
 }
 
+/** The health line names the expiry as an ISO date; show it the way every other date reads. */
+function isoDatesAsText(text: string): string {
+  return text.replaceAll(/\d{4}-\d{2}-\d{2}/gu, (day) => formatAbsolute(day, "date"));
+}
+
 /** One line of facts: provider, account, coverage, health, expiry, what it posts and who manages it. */
 function connectionDetails(connection: GitConnectionView): string {
   const parts = [
     `${connection.providerLabel} · ${connection.account}`,
     `${connection.linked} linked ${connection.linked === 1 ? "repository" : "repositories"}`,
-    connection.health.detail,
+    isoDatesAsText(connection.health.detail),
     expiryNote(connection),
     `Posts ${connection.posts.join(", ")}`,
     connection.managed ? "Managed by configuration" : "",

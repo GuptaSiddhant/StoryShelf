@@ -10,13 +10,24 @@ const formStack = css`
   align-content: start;
 `;
 
+const formNarrow = css`
+  /* form-narrow */
+  ${formStack}
+  /* The width of a form page: a lone field is not stretched across a wide card. */
+  max-width: 640px;
+`;
+
 /**
  * A form whose fields and buttons sit one step apart: the stack owns the space between them, so
  * a `Field` or `FormActions` carries no margin of its own. Takes the usual form attributes.
  */
-export const Form: FC<Omit<JSX.IntrinsicElements["form"], "class">> = ({ children, ...attrs }) => {
+export const Form: FC<Omit<JSX.IntrinsicElements["form"], "class"> & { narrow?: boolean }> = ({
+  children,
+  narrow,
+  ...attrs
+}) => {
   return (
-    <form class={formStack} {...attrs}>
+    <form class={narrow ? formNarrow : formStack} {...attrs}>
       {children}
     </form>
   );
