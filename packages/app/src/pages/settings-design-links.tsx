@@ -67,20 +67,22 @@ export const FilesCard: FC<{
   formState?: DesignFormState;
   urlHint: string;
 }> = ({ base, files, isAdmin }) => {
-  const add = isAdmin ? (
-    <DialogLink
-      dialogId={ADD_DESIGN_FILE_DIALOG}
-      href={`${base}/files/new`}
-      variant="primary"
-      icon="plus"
-    >
-      Add design file
-    </DialogLink>
-  ) : undefined;
+  const add = (primary: boolean): unknown =>
+    isAdmin ? (
+      <DialogLink
+        dialogId={ADD_DESIGN_FILE_DIALOG}
+        href={`${base}/files/new`}
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        icon="plus"
+      >
+        Add design file
+      </DialogLink>
+    ) : undefined;
   return (
     <VStack>
       <Card>
-        <SectionTitle>Design files</SectionTitle>
+        <SectionTitle actions={files.length > 0 ? add(false) : null}>Design files</SectionTitle>
         <Meta>
           Design files for this project. They appear in the library header; individual stories link
           to a design through their component (see below) or their story parameters.
@@ -97,9 +99,8 @@ export const FilesCard: FC<{
             })),
           )}
           emptyTitle="No design files linked"
-          add={add}
+          add={add(true)}
         />
-        {files.length > 0 ? add : null}
       </Card>
       {isAdmin ? (
         <FormDialog
@@ -119,11 +120,12 @@ export const ComponentsCard: FC<{
   formState?: DesignFormState;
   urlHint: string;
 }> = ({ base, components }) => {
-  const add = (
+  const add = (primary: boolean): unknown => (
     <DialogLink
       dialogId={MAP_COMPONENT_DIALOG}
       href={`${base}/components/new`}
-      variant="primary"
+      variant={primary ? "primary" : "secondary"}
+      size={primary ? "md" : "sm"}
       icon="plus"
     >
       Map component
@@ -132,7 +134,9 @@ export const ComponentsCard: FC<{
   return (
     <VStack>
       <Card>
-        <SectionTitle>Component mapping</SectionTitle>
+        <SectionTitle actions={components.length > 0 ? add(false) : null}>
+          Component mapping
+        </SectionTitle>
         <Meta>
           Map a story file (its import path) to a design. A manual mapping overrides the
           story&apos;s own <code>storyshelf.figma</code> and <code>design</code> parameters, and
@@ -151,9 +155,8 @@ export const ComponentsCard: FC<{
             })),
           )}
           emptyTitle="No component mappings"
-          add={add}
+          add={add(true)}
         />
-        {components.length > 0 ? add : null}
       </Card>
       <FormDialog id={MAP_COMPONENT_DIALOG} title="Map component" submitLabel="Map component" />
     </VStack>

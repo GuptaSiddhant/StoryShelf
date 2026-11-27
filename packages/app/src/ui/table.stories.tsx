@@ -2,7 +2,7 @@
 import type { Meta } from "@storybook/html-vite";
 import { onAPhone } from "../../.storybook/page.tsx";
 import { jsxStory } from "../../.storybook/render.tsx";
-import { Badge, Table, VStack } from "./components.tsx";
+import { Badge, Button, HStack, Table, VStack } from "./components.tsx";
 
 const meta: Meta = { title: "UI/Table" };
 export default meta;
@@ -96,3 +96,34 @@ export const Overflowing = jsxStory(() => <Table label="Recent captures">{wide}<
 
 /** The same wide table in the preview's 375px phone viewport: it scrolls in its own region. */
 export const OnAPhone = onAPhone(jsxStory(() => <Table label="Recent captures">{wide}</Table>));
+
+/** A row action is a small `<Button>`: secondary for the neutral one, danger-secondary for the destructive one, side by side. */
+export const RowActions = jsxStory(() => (
+  <Table label="Components">
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.name}>
+            <td>{row.name}</td>
+            <td class="nowrap">
+              <HStack>
+                <Button variant="secondary" size="sm" href="#edit">
+                  Edit
+                </Button>
+                <Button variant="danger-secondary" size="sm" type="button">
+                  Remove
+                </Button>
+              </HStack>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </Table>
+));

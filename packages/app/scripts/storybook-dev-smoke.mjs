@@ -95,7 +95,28 @@ async function inspect(page, id, errors) {
   await page.waitForTimeout(200);
   await checkPhoneWidth(page, errors);
   await checkCardBottoms(page, errors);
+  await checkButtonFonts(page, errors);
   await checkSummaryRing(page, errors);
+}
+
+/** The buttons of a document whose font family differs from the body's: a form control does not inherit it (#1284 B1). */
+function buttonsInAnotherFont() {
+  const doc = globalThis.document;
+  const body = globalThis.getComputedStyle(doc.body).fontFamily;
+  return [...doc.querySelectorAll("button")]
+    .filter((button) => button.getBoundingClientRect().height > 0)
+    .filter((button) => globalThis.getComputedStyle(button).fontFamily !== body)
+    .map((button) => (button.textContent ?? "").trim().slice(0, 30));
+}
+
+/** Fail a story with a visible `<button>` that is not drawn in the body's typeface. */
+async function checkButtonFonts(page, errors) {
+  const frames = [page, ...page.frames().filter((candidate) => candidate !== page.mainFrame())];
+  for (const target of frames) {
+    for (const label of await target.evaluate(buttonsInAnotherFont)) {
+      errors.push(`font: the button "${label}" is not in the body's font family`);
+    }
+  }
 }
 
 /** A card's last visible child ends within one padding step of its bottom edge (no blank band, #1286 L5). */

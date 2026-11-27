@@ -421,6 +421,24 @@ describe("type and colour tokens", () => {
     expect(await offendersOf(solid, /^ui\//u)).toEqual([]);
   });
 
+  it("draws a row action as a Button, never a bare link in a list row or an action cell", async () => {
+    // A bare `<a>` row action was 21 px tall beside 32 px buttons (#1284 B2).
+    const bareLink =
+      /\bactions[:=]\s*\{?\s*\(?\s*<a\b|<td[^>]*class="[^"]*\bnowrap\b[^"]*"[^>]*>\s*<a\b/gu;
+    expect(await offendersOf(bareLink, /^ui\//u)).toEqual([]);
+  });
+
+  it("keeps one primary button on a list: the title-row Add is secondary, the empty state's is primary", async () => {
+    // `SectionTitle actions` holds the Add of a list (#1284 B3); it must be the compact secondary.
+    const primaryInTitle = /<SectionTitle[^>]*actions=\{[^}]*\}[^>]*>/gu;
+    const offenders = (await pageSources()).flatMap(({ file, source }) =>
+      [...source.matchAll(primaryInTitle)]
+        .filter(([title]) => /primary/u.test(title))
+        .map(() => file),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it("spaces page blocks with the page column and stacks, not margin wrappers", async () => {
     // `.mt-1` / `.mb-1` inside the page column or a card doubled the gap (32 px, #1286 L4).
     expect(await offendersOf(/class="(?:[\w-]+ )*m[tb]-1(?: [\w-]+)*"/gu, /^ui\//u)).toEqual([]);

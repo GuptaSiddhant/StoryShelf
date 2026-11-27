@@ -89,6 +89,13 @@ closeDialog` (plus a refresh) or `HX-Redirect`; 400/409/422 re-render inside the
 - **Capitalisation.** Sentence case for buttons, tabs, titles, badges and filters; product names
   keep their capital ("View in Library", "Open in Figma", "View Storybook"). Never print a raw enum
   (status, verdict, role, kind, provider, log level): pass it through `statusLabel()`.
+- **Row actions and Add.** A row action is `Button size="sm"`, `secondary` for the neutral action and
+  `danger-secondary` for the destructive one, side by side in an `HStack`, never a bare link and
+  never stacked; solid `danger` stays for the confirm step and "Delete project". The Add of a list
+  is a `secondary` sm in the section's title row (`SectionTitle actions`) once the list has rows; the
+  `primary` Add lives in its `EmptyState`, so a page has at most one primary. A submit is primary md
+  without an icon; a plus icon only on a button that opens a form. Every `<button>` draws in the body
+  font (the reset sets `font-family: inherit` on form controls; the Storybook smoke script fails otherwise).
 - **Absent values, dates and line breaks.** A value that is not there is `<Absent />` (a dash for
   sight, "none" for a screen reader; `Stat` takes `value={null}`), never a typed "-", "–" or "—"; a
   number with no value is `valueWithUnit(value, unit)` ("not set"), never a placeholder with its

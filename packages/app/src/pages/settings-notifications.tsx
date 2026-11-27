@@ -284,11 +284,12 @@ const ChannelActions: FC<{
   </HStack>
 );
 
-const AddChannelLink: FC<{ project: Project }> = ({ project }) => (
+const AddChannelLink: FC<{ project: Project; primary: boolean }> = ({ project, primary }) => (
   <DialogLink
     dialogId={ADD_CHANNEL_DIALOG}
     href={`/projects/${project.slug}/settings/notifications/new`}
-    variant="primary"
+    variant={primary ? "primary" : "secondary"}
+    size={primary ? "md" : "sm"}
     icon="plus"
   >
     Add channel
@@ -311,11 +312,12 @@ const ChannelsSection: FC<{
   paused: boolean;
 }> = ({ project, channels, messageKinds, isAdmin, paused }) => {
   const canAdd = isAdmin && messageKinds.length > 0;
-  const add = canAdd ? <AddChannelLink project={project} /> : undefined;
+  const add = (primary: boolean): unknown =>
+    canAdd ? <AddChannelLink project={project} primary={primary} /> : undefined;
   return (
     <VStack>
       <Card>
-        <SectionTitle>Channels</SectionTitle>
+        <SectionTitle actions={channels.length > 0 ? add(false) : null}>Channels</SectionTitle>
         <Meta>
           Project admins route build events to Slack, Teams or email, and show each build's state on
           GitHub or GitLab as a commit status. Secrets and tokens are stored encrypted and decrypted
@@ -342,9 +344,8 @@ const ChannelsSection: FC<{
             ) : undefined,
           }))}
           emptyTitle="No channels configured"
-          add={add}
+          add={add(true)}
         />
-        {channels.length > 0 ? add : null}
       </Card>
       {canAdd ? <ChannelDialogs /> : null}
     </VStack>

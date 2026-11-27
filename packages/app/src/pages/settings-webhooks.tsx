@@ -57,16 +57,18 @@ export function renderSettingsWebhooks(
   isAdmin: boolean,
   formState?: { errors?: Record<string, string>; globalError?: string; secret?: string },
 ): unknown {
-  const add = isAdmin ? (
-    <DialogLink
-      dialogId={ADD_WEBHOOK_DIALOG}
-      href={`/projects/${project.slug}/settings/webhooks/new`}
-      variant="primary"
-      icon="plus"
-    >
-      Add webhook
-    </DialogLink>
-  ) : undefined;
+  const add = (primary: boolean): unknown =>
+    isAdmin ? (
+      <DialogLink
+        dialogId={ADD_WEBHOOK_DIALOG}
+        href={`/projects/${project.slug}/settings/webhooks/new`}
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        icon="plus"
+      >
+        Add webhook
+      </DialogLink>
+    ) : undefined;
   return (
     <VStack>
       {formState?.secret ? (
@@ -76,7 +78,7 @@ export function renderSettingsWebhooks(
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <SectionTitle>Webhooks</SectionTitle>
+        <SectionTitle actions={webhooks.length > 0 ? add(false) : null}>Webhooks</SectionTitle>
         <Meta>
           Notify external services when builds are created, updated, approved or rejected. Payloads
           are POSTed as JSON and signed with the webhook secret.
@@ -85,9 +87,8 @@ export function renderSettingsWebhooks(
           label="Webhooks"
           items={webhookItems(project, webhooks, isAdmin)}
           emptyTitle="No webhooks configured"
-          add={add}
+          add={add(true)}
         />
-        {webhooks.length > 0 ? add : null}
       </Card>
       {isAdmin ? (
         <FormDialog id={ADD_WEBHOOK_DIALOG} title="Add webhook" submitLabel="Add webhook" />

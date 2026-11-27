@@ -80,43 +80,48 @@ export function renderSettingsMembers(
   isAdmin: boolean,
   formState?: { globalError?: string },
 ): unknown {
-  const addMember = isAdmin ? (
-    <DialogLink
-      dialogId={ADD_MEMBER_DIALOG}
-      variant="primary"
-      icon="plus"
-      href={`/projects/${project.slug}/settings/members/new`}
-    >
-      Add member
-    </DialogLink>
-  ) : undefined;
-  const addMapping = isAdmin ? (
-    <DialogLink
-      dialogId={ADD_GROUP_DIALOG}
-      variant="primary"
-      icon="plus"
-      href={`/projects/${project.slug}/settings/members/groups/new`}
-    >
-      Add group mapping
-    </DialogLink>
-  ) : undefined;
+  const addMember = (primary: boolean): unknown =>
+    isAdmin ? (
+      <DialogLink
+        dialogId={ADD_MEMBER_DIALOG}
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        icon="plus"
+        href={`/projects/${project.slug}/settings/members/new`}
+      >
+        Add member
+      </DialogLink>
+    ) : undefined;
+  const addMapping = (primary: boolean): unknown =>
+    isAdmin ? (
+      <DialogLink
+        dialogId={ADD_GROUP_DIALOG}
+        variant={primary ? "primary" : "secondary"}
+        size={primary ? "md" : "sm"}
+        icon="plus"
+        href={`/projects/${project.slug}/settings/members/groups/new`}
+      >
+        Add group mapping
+      </DialogLink>
+    ) : undefined;
   return (
     <VStack>
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
-        <SectionTitle>Members</SectionTitle>
+        <SectionTitle actions={members.length > 0 ? addMember(false) : null}>Members</SectionTitle>
         <Meta>Project members and their roles. Site admins have implicit admin access.</Meta>
         <SummaryList
           label="Members"
           items={memberItems(project, members, isAdmin)}
           emptyTitle="No members yet"
           emptyDescription="Add the people who work on this project."
-          add={addMember}
+          add={addMember(true)}
         />
-        {members.length > 0 ? addMember : null}
       </Card>
       <Card>
-        <SectionTitle>Identity-provider group mappings</SectionTitle>
+        <SectionTitle actions={groupMappings.length > 0 ? addMapping(false) : null}>
+          Identity-provider group mappings
+        </SectionTitle>
         <Meta>
           Map an IdP group (name or provider ID, exact match) to a project role. Members sync at
           next login; removing a mapping revokes synced grants but never manual ones. Wildcards are
@@ -126,9 +131,8 @@ export function renderSettingsMembers(
           label="Identity-provider group mappings"
           items={mappingItems(project, groupMappings, isAdmin)}
           emptyTitle="No group mappings yet"
-          add={addMapping}
+          add={addMapping(true)}
         />
-        {groupMappings.length > 0 ? addMapping : null}
       </Card>
       {isAdmin ? (
         <>
