@@ -15,6 +15,7 @@ import { loadBaselineView } from "./baseline-guard.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 import { isBuildAuthor } from "./comment-triage.ts";
 import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
+import { loadEarlierVerdict } from "./earlier-verdict.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
 import { readPngSize } from "./png-size.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
@@ -57,6 +58,7 @@ export async function loadBuildDiffData(
     canComment: capabilities.canComment,
     canTriage: canManage || isBuildAuthor(build),
     canManage,
+    earlier: selected ? await loadEarlierVerdict(db, project, build, selected) : null,
     names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
     hasBaseline,
     drifted,

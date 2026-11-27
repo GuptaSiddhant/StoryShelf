@@ -6,6 +6,7 @@ import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
+import type { EarlierVerdict } from "../routers/earlier-verdict.ts";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
 import { Alert, EmptyState, type ImageSize } from "../ui/components.tsx";
 import { canvasColumn, comparisonCard, workspace } from "../ui/styles/review-layout.ts";
@@ -39,6 +40,8 @@ export interface BuildDiffData {
   canManage?: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  /** What the latest earlier build on the branch decided for the selected story; read-only. */
+  earlier?: EarlierVerdict | null;
   /** Display names of the users behind comments, by user id. */
   names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
@@ -70,6 +73,7 @@ export interface DiffReviewGridProps {
   canComment: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  earlier?: EarlierVerdict | null;
   /** Display names of the users behind comments, by user id. */
   names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
@@ -106,6 +110,7 @@ function SnapshotComments(props: {
       comments={grid.comments}
       canTriage={grid.canTriage}
       canComment={grid.canComment}
+      earlier={grid.earlier}
       names={grid.names}
     />
   );
