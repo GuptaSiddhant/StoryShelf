@@ -39,6 +39,9 @@ export function createProgram(): Command {
   for (const command of commands) {
     program.addCommand(command);
   }
+  // Bare `storyshelf [options]` is `storyshelf upload [options]`: a hidden default command built
+  // from the same option table, so a flag added to `upload` is accepted here with no second copy.
+  program.addCommand(buildDefaultCommand(program), { isDefault: true, hidden: true });
   return program;
 }
 
@@ -85,9 +88,34 @@ function buildCreateCommand(): Command {
 }
 
 function buildUploadCommand(): Command {
+  return addUploadOptions(
+    new Command("upload").description("Create a build record for a StoryShelf project"),
+  ).action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload));
+}
+
+/**
+ * The hidden command that runs when no subcommand is named. It takes every `upload` option, checks
+ * for a client config first (pointing at `init` when there is none), then uploads.
+ */
+function buildDefaultCommand(program: Command): Command {
+  return addUploadOptions(new Command("default")).action(
+    run<UploadOptions>(async () => await loadDefaultCommand(program)),
+  );
+}
+
+async function loadDefaultCommand(
+  program: Command,
+): Promise<(options: UploadOptions) => Promise<void>> {
+  const { runDefaultCommand } = await import("./commands/default.ts");
+  return async (options) => {
+    await runDefaultCommand(program, options);
+  };
+}
+
+/** The one table of `upload` options, shared by `upload` and the bare command. */
+function addUploadOptions(command: Command): Command {
   return addWaitOptions(
-    new Command("upload")
-      .description("Create a build record for a StoryShelf project")
+    command
       .option("--url <url>", "server base URL (or .storybook/storyshelf.json)")
       .option("--slug <slug>", "project slug (or .storybook/storyshelf.json)")
       .option(
@@ -131,8 +159,7 @@ function buildUploadCommand(): Command {
         "build label (repeatable: --label pr=123)",
         (value: string, previous: string[]) => [...previous, value],
         [] as string[],
-      )
-      .action(run<UploadOptions>(async () => (await import("./commands/upload.ts")).runUpload)),
+      ),
   );
 }
 
@@ -232,15 +259,9 @@ function buildProtectCommand(): Command {
     .action(run<ProtectOptions>(async () => (await import("./commands/protect.ts")).runProtect));
 }
 
-/** Run the CLI: `storyshelf` with no args uploads if config exists, else helps to init. */
+/** Run the CLI: bare `storyshelf [upload options]` uploads if config exists, else points at init. */
 async function main(): Promise<void> {
-  const program = createProgram();
-  if (process.argv.length <= 2) {
-    const { runDefaultCommand } = await import("./commands/default.ts");
-    await runDefaultCommand(program);
-  } else {
-    program.parse(process.argv);
-  }
+  await createProgram().parseAsync(process.argv);
 }
 
 if (isMainModule(import.meta.url, process.argv[1])) {
