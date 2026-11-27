@@ -133,7 +133,7 @@ export function renderStorybookPreparingPage(
                 Preparing preview. This page checks again every {CHECK_EVERY_MS / 1000} seconds.
               </p>
               <HStack justify="center">
-                <Button variant="secondary" size="sm" id="prep-toggle" hidden="">
+                <Button variant="secondary" size="sm" id="prep-toggle" hidden>
                   Pause automatic check
                 </Button>
                 <a href="">Check again</a>
