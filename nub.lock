@@ -928,9 +928,6 @@ importers:
       '@storyshelf/common':
         specifier: workspace:*
         version: link:../common
-      hono:
-        specifier: 'catalog:'
-        version: 4.13.21
     devDependencies:
       '@opentelemetry/context-async-hooks':
         specifier: 'catalog:'

@@ -67,8 +67,7 @@
     "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
-    "@storyshelf/common": "workspace:*",
-    "hono": "catalog:"
+    "@storyshelf/common": "workspace:*"
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "catalog:",
