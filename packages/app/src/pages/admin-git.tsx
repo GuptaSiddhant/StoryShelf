@@ -195,7 +195,7 @@ function RequestActions(props: {
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { request } = props;
   return (
-    <HStack gap="sm">
+    <HStack gap="sm" wrap={false}>
       <DialogLink
         dialogId={LINK_DIALOG_ID}
         href={`/admin/git/links/${request.id}/approve`}
