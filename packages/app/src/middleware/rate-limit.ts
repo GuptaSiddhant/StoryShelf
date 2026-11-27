@@ -1,5 +1,7 @@
+import type { Auth } from "@storyshelf/core/auth";
 import type { Context, MiddlewareHandler } from "hono";
 import { jsonRefusal } from "./api-errors.ts";
+import { resolveRequestUser } from "./auth-gate.ts";
 import { createClientIpResolver, type ClientIpResolver } from "./client-ip.ts";
 
 interface RateLimitEntry {
@@ -11,6 +13,44 @@ export interface RateLimitOptions {
   windowMs: number;
   max: number;
   keyGenerator?: (c: Context) => string;
+  /** True to leave a request out of this limiter (it is counted by another bucket, or not at all). */
+  skip?: (c: Context) => boolean | Promise<boolean>;
+}
+
+/** `GET /api/v1/health`: the open liveness probe, never counted in the shared bucket. */
+export function isHealthRead(c: Pick<Context, "req">): boolean {
+  return c.req.path === "/api/v1/health";
+}
+
+/** The path every snapshot-image read has (`…/snapshots/:snapshotId/image`). */
+const SNAPSHOT_IMAGE_PATH = /^\/api\/v1\/projects\/[^/]+\/builds\/[^/]+\/snapshots\/[^/]+\/image$/u;
+
+/** Whether the request reads a snapshot image (the review page loads one per snapshot). */
+export function isSnapshotImageRead(c: Pick<Context, "req">): boolean {
+  return c.req.method === "GET" && SNAPSHOT_IMAGE_PATH.test(c.req.path);
+}
+
+const signedInReads = new WeakMap<Request, Promise<boolean>>();
+
+/**
+ * Whether this is a snapshot-image read by a signed-in user (a verified session; never a guess
+ * from a cookie's presence). An anonymous or token caller stays in the shared bucket, so the
+ * floor for unauthenticated callers is unchanged. The answer is kept per request, so the two
+ * limiters that ask do one `auth.check`.
+ */
+export function signedInImageRead(auth?: Auth): (c: Context) => Promise<boolean> {
+  return async (c) => {
+    if (!auth || !isSnapshotImageRead(c)) {
+      return false;
+    }
+    const known = signedInReads.get(c.req.raw);
+    if (known) {
+      return await known;
+    }
+    const asked = resolveRequestUser(c, auth).then((user) => user !== null);
+    signedInReads.set(c.req.raw, asked);
+    return await asked;
+  };
 }
 
 /** The resolver for an app without `trustProxy`: the socket peer, else the unverified fallback. */
@@ -119,11 +159,13 @@ export function createRateLimiter(
   const defaultKey = rateLimitKey("api", clientIp);
 
   return (options) => {
-    const { windowMs, max, keyGenerator } = options;
+    const { windowMs, max, keyGenerator, skip } = options;
+    const keyOf = keyGenerator ?? defaultKey;
     return async (c, next) => {
-      const key = keyGenerator ? keyGenerator(c) : defaultKey(c);
-      const now = Date.now();
-      const limited = applyLimit(c, bucketFor(key, now, windowMs), max, now);
+      const skipped = skip !== undefined && (await skip(c));
+      const limited = skipped
+        ? undefined
+        : applyLimit(c, bucketFor(keyOf(c), Date.now(), windowMs), max, Date.now());
       if (!limited) {
         await next();
       }

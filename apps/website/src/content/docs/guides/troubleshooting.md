@@ -19,6 +19,8 @@ It checks that a Storybook setup is found, that the client config loads, that a 
 
 **`401 Unauthorized` or `403 Forbidden`.** `401` means the token is missing or not recognised: check you copied the whole token and that it belongs to this server. `403` means it is valid but its owner cannot upload to this project. A token has the role of the user who created it, so that user needs at least the `developer` role on the project. Run `storyshelf whoami` to confirm which server and project the CLI is using. See [Roles & tokens](/concepts/roles/).
 
+**`429`, "Too many requests", or "the server's rate limit still applied".** The server limits requests per client address, and clients that share an address share a count. The CLI waits for `Retry-After` and retries three times before it gives up. If it keeps failing, or reviewers see broken snapshot images while CI runs, the server probably sees every client as one address because it runs behind a reverse proxy or load balancer: set `SHELF_TRUST_PROXY` (see [Rate limits](/guides/deployment/#behind-a-reverse-proxy-and-rate-limits)). Signed-in snapshot images and `GET /api/v1/health` have their own allowances and no longer eat the shared one.
+
 **The upload goes to the wrong project, or the project is not found.** The slug does not match. Each Storybook is one project with one slug, so a monorepo needs one config file per Storybook. See [Monorepo](/guides/config/#monorepo).
 
 **`413` for a large Storybook.** The server refused a zip over its inline size limit and cannot publish it in the background (a serverless host runs no job consumer). The CLI retries by itself file by file, so this usually resolves without action. If it still fails, see the limits in [Published Storybook](/concepts/publishing/#limits).

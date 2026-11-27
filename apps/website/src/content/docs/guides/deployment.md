@@ -64,6 +64,29 @@ Playwright's separate `staticCompression: true` option covers only its temporary
 - **Social / enterprise SSO** — GitHub, Google, Entra, Keycloak, Okta, Auth0, SAML (see [Auth](/guides/auth/)).
 - **None** — for VPN-protected deployments.
 
+## Behind a reverse proxy and rate limits
+
+The server counts requests per client address. Behind a load balancer or reverse proxy, every request arrives from the proxy's address unless you tell the server which proxy to trust, so all clients share one count and one busy reviewer or CI run can lock out the rest with `429`. Set `SHELF_TRUST_PROXY` (or `trustProxy` in the server config) to what sits in front of the server:
+
+- a number: trust that many proxy hops, counted from the server (`1` for one load balancer);
+- a comma-separated list of IPs or CIDRs: trust forwarded headers only from those peers;
+- `fly`: read `Fly-Client-IP` on Fly.io;
+- unset, empty or `0`: use the socket's address and ignore forwarded headers (the default).
+
+A forwarded header from a peer that is not trusted is never read, so set this only for proxies you run. The per-minute limits, per client address:
+
+| Route | Limit | Counted in |
+| --- | --- | --- |
+| `/api/v1/*` | 100 | the shared API bucket |
+| `/api/v1/tokens/*` | 10 | the shared API bucket |
+| `/api/v1/webhooks/*` | 20 | the shared API bucket |
+| Snapshot images (`…/snapshots/:id/image`) read by a signed-in user | 3000 | their own bucket |
+| Signed Storybook URLs (`/_s/`, `/_r/`) | 6000 (`storybookUrlRateLimit`) | their own bucket |
+| `/auth/*`, `/api/auth/*` | 100, 300 | their own buckets |
+| `GET /api/v1/health` | none | not counted |
+
+An anonymous or token caller reading a snapshot image stays in the shared bucket. A limited request answers `429` with `Retry-After`; the CLI waits that long and retries a few times before it fails.
+
 ## Deployment targets — bring your own assembly
 
 StoryShelf is **cross-runtime**: the core router (`createShelfApp`) uses only Web-standard APIs (`Request`, `Response`, `fetch`, `ReadableStream`, `crypto`, `URL`). There is no Node coupling in the core. This means you can assemble and deploy on any platform that runs JavaScript.

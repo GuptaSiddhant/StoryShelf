@@ -23,6 +23,7 @@ import {
   STORYBOOK_READ_PREFIX,
   STORYBOOK_TOKEN_PREFIX,
 } from "@storyshelf/core/utils";
+import type { Context } from "hono";
 import { requestId } from "hono/request-id";
 import { noteAppConstructed } from "./app-count.ts";
 import type {
@@ -55,6 +56,7 @@ import {
   sameSiteWrites,
   storeScope,
 } from "./middleware/index.ts";
+import { isHealthRead, signedInImageRead } from "./middleware/rate-limit.ts";
 import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
@@ -289,9 +291,15 @@ function mountProjectGates(app: ShelfRouter): void {
 
 const MINUTE = 60_000;
 
+interface RateLimitRow {
+  paths: string[];
+  max: number;
+  bucket?: string;
+  skip?: (c: Context) => boolean | Promise<boolean>;
+}
+
 /** Per-path limits; `bucket` gives a route family its own counter (default: shared `api:`). */
-const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] = [
-  { paths: ["/api/v1/*"], max: 100 },
+const RATE_LIMITS: readonly RateLimitRow[] = [
   { paths: ["/api/v1/tokens/*"], max: 10 },
   { paths: ["/api/v1/webhooks/*"], max: 20 },
   // Auth endpoints ride their own buckets (the store keys by IP, so a prefix
@@ -321,8 +329,35 @@ const RATE_LIMITS: readonly { paths: string[]; max: number; bucket?: string }[] 
   },
 ];
 
+/**
+ * Requests per minute per client IP for signed-in snapshot-image reads: a review page loads one
+ * image per snapshot (hundreds), and reviewers behind one address share the count.
+ */
+const SNAPSHOT_IMAGE_RATE_LIMIT = 3000;
+
 /** Requests per minute per client IP on the signed Storybook URL route (`storybookUrlRateLimit`, alias `testing.storybookUrlRateLimit`). */
 const DEFAULT_STORYBOOK_URL_RATE_LIMIT = 6000;
+
+/**
+ * The shared `/api/v1/*` floor, and the bucket of signed-in snapshot-image reads. Health and a
+ * signed-in image read are left out of the shared count; an anonymous or token image read stays in it.
+ */
+function apiLimits(options: Pick<ResolvedShelfOptions, "auth">): RateLimitRow[] {
+  const signedInImage = signedInImageRead(options.auth);
+  return [
+    {
+      paths: ["/api/v1/*"],
+      max: 100,
+      skip: async (c) => isHealthRead(c) || (await signedInImage(c)),
+    },
+    {
+      paths: ["/api/v1/projects/:slug/builds/:buildId/snapshots/:snapshotId/image"],
+      max: SNAPSHOT_IMAGE_RATE_LIMIT,
+      bucket: "snapshot-images",
+      skip: async (c) => !(await signedInImage(c)),
+    },
+  ];
+}
 
 /** Mount rate limits and CSRF guards (abuse floors, not strict protection). */
 function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ResolvedShelfOptions): void {
@@ -331,7 +366,7 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ResolvedShe
   const rateLimit = createRateLimiter(clientIp);
   // A render fetches thousands of assets from one farm IP, so this floor is generous; it counts
   // before the token is looked at and answers 429 alike for any token.
-  const signedUrls = {
+  const signedUrls: RateLimitRow = {
     paths: [
       `${STORYBOOK_TOKEN_PREFIX}*`,
       `${STORYBOOK_READ_PREFIX}*`,
@@ -343,10 +378,10 @@ function mountGuards(app: ShelfRouter, config: ShelfConfig, options: ResolvedShe
       DEFAULT_STORYBOOK_URL_RATE_LIMIT,
     bucket: "signed-storybook",
   };
-  for (const { paths, max, bucket } of [...RATE_LIMITS, signedUrls]) {
+  for (const { paths, max, bucket, skip } of [...apiLimits(options), ...RATE_LIMITS, signedUrls]) {
     const keyGenerator = bucket ? rateLimitKey(bucket, clientIp) : undefined;
     for (const path of paths) {
-      app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator }));
+      app.use(path, rateLimit({ windowMs: MINUTE, max, keyGenerator, skip }));
     }
   }
   // CSRF tokens on page writes; the same-origin rule (`sameSiteWrites`) covers every write (#786).
