@@ -7,6 +7,7 @@ import {
   DEPLOY_TARGET_PROMPT,
   PROJECT_PROMPTS,
   localInfraPrompts,
+  type Prompt,
 } from "../prompts.ts";
 import { resolveDeployTarget, type Answers } from "./answers.ts";
 
@@ -40,6 +41,32 @@ export async function collectAnswers(dir?: string): Promise<Answers | null> {
   const answers = { ...phase1 } as unknown as Answers;
   await askLocalAdapters(answers, cwdPkg);
   return answers;
+}
+
+/** What a question answers when nobody chooses: its `initial`, the first choice, or the previous answer's. */
+function defaultOf(prompt: Prompt, previous: string): unknown {
+  if (prompt.type === "confirm") return prompt.initial;
+  if (prompt.type === "select") return prompt.choices[prompt.initial ?? 0]?.value;
+  return typeof prompt.initial === "function" ? prompt.initial(previous) : prompt.initial;
+}
+
+/**
+ * Every default, with no questions (`--yes`): the project is named after `dir` (or `my-storyshelf`),
+ * deployed as bare node with the curated shortlist's first database and storage.
+ */
+export function defaultAnswers(dir?: string): Answers {
+  const name = dir === undefined ? "my-storyshelf" : basename(resolve(dir));
+  const target = defaultOf(DEPLOY_TARGET_PROMPT, name) as "local" | "docker";
+  const answers: Record<string, unknown> = {
+    name,
+    dir: dir ?? `./${name}`,
+    deployTarget: target,
+    advancedAdapters: false,
+  };
+  for (const prompt of localInfraPrompts(false, target)) {
+    answers[prompt.name] = defaultOf(prompt, name);
+  }
+  return answers as unknown as Answers;
 }
 
 /** The project questions when `--dir` is given: no directory question, and the name defaults to the directory's. */
@@ -80,7 +107,7 @@ async function askLocalAdapters(answers: Answers, detected: DetectedAdapters): P
   const advanced =
     answers.advancedAdapters ?? (advPhase["advancedAdapters"] as boolean | undefined) ?? false;
   answers.advancedAdapters = advanced;
-  const localPrompts = localInfraPrompts(advanced).map((prompt) =>
+  const localPrompts = localInfraPrompts(advanced, target).map((prompt) =>
     withInitial(prompt, answers, detected),
   );
   Object.assign(answers, await ask(localPrompts));

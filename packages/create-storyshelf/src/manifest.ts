@@ -9,6 +9,7 @@ export interface ManifestPeer {
 
 interface ManifestPackage {
   version: string;
+  engines?: { node: string };
   peers: Record<string, ManifestPeer>;
   /** Dependencies the package exposes at their pinned version (`storyshelf.exposedDependencies`). */
   exposed?: Record<string, string>;
@@ -39,4 +40,12 @@ export function exposedVersion(owner: string, name: string): string {
   const found = packageOf(owner).exposed?.[name];
   if (found === undefined) throw new Error(`${owner} exposes no ${name} in the version manifest`);
   return found;
+}
+
+/** The Node range the scaffolded server needs: the one `@storyshelf/app` declares, so it is never copied by hand. */
+export function nodeRange(): string {
+  const range = packageOf("@storyshelf/app").engines?.node;
+  if (range === undefined)
+    throw new Error("@storyshelf/app has no Node range in the version manifest");
+  return range;
 }

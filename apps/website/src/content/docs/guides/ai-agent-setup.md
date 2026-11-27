@@ -67,6 +67,16 @@ Add this to the `AGENTS.md` (or `CLAUDE.md`) of the repository that is tested wi
   check fails, explain which stories changed and leave the verdict to the reviewer.
 ```
 
+## Scaffolding a server without a terminal
+
+An agent has no interactive terminal, so `create-storyshelf` stops with a message unless it is given `--yes` (`-y`). That takes every default (SQLite, local filesystem, local accounts, no Docker files) and asks nothing:
+
+```sh
+npm create storyshelf my-storyshelf -- --yes
+```
+
+The first argument is the directory; without one the project is `my-storyshelf`. The scaffolded server needs Node 24 or newer and stops with one line, exit 1, on an older Node.
+
 ## The MCP server
 
 To let an agent read builds and comment on reviews, set up the [MCP server](/ai/mcp/). It has no approve or reject tool, which matches the snippet above.
