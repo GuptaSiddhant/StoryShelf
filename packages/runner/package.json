@@ -69,11 +69,6 @@
     "prepublishOnly": "nub run build",
     "test:flake": "vitest run --repeats=20 --maxWorkers=1 --no-file-parallelism src/capture-runner.test.ts src/settle.test.ts src/screenshot.test.ts src/concurrency/adaptive-concurrency.test.ts src/concurrency/page-limiter.test.ts src/remote/session-gate.test.ts src/images/pool.test.ts"
   },
-  "storyshelf": {
-    "exposedDependencies": [
-      "playwright-core"
-    ]
-  },
   "dependencies": {
     "axe-core": "4.13.0",
     "pixelmatch": "^7.1.0",
@@ -111,5 +106,10 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "storyshelf": {
+    "exposedDependencies": [
+      "playwright-core"
+    ]
   }
 }
