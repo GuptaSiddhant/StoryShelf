@@ -99,9 +99,11 @@ function LabelTypesCard(props: {
         template.
       </Meta>
 
-      <Button variant="secondary" size="sm" href={browseUrl}>
-        Browse labels
-      </Button>
+      <HStack>
+        <Button variant="secondary" size="sm" href={browseUrl}>
+          Browse labels
+        </Button>
+      </HStack>
 
       <Table label="Label types">
         <table>
