@@ -119,7 +119,7 @@ export const ComponentOwnersCard: FC<{
   const text = formState?.ownerText ?? ownerRulesText(rules);
   return (
     <Card>
-      <SectionTitle level={3}>Component owners</SectionTitle>
+      <SectionTitle>Component owners</SectionTitle>
       <Meta>
         Reviews of changed components go to their owners. Others who can approve may still approve.
       </Meta>

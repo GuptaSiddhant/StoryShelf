@@ -63,20 +63,20 @@ const Hero: FC = () => (
 const Steps: FC = () => (
   <div class="grid grid--3">
     <Card>
-      <SectionTitle level={3}>Capture</SectionTitle>
+      <SectionTitle>Capture</SectionTitle>
       <Meta>
         Upload your Storybook build. Server renders stories with Playwright — deterministic, no repo
         cloning.
       </Meta>
     </Card>
     <Card>
-      <SectionTitle level={3}>Diff</SectionTitle>
+      <SectionTitle>Diff</SectionTitle>
       <Meta>
         Pixel-perfect diff with pixelmatch. Configurable thresholds, overlay images stored on disk.
       </Meta>
     </Card>
     <Card>
-      <SectionTitle level={3}>Review</SectionTitle>
+      <SectionTitle>Review</SectionTitle>
       <Meta>Per-branch baselines with fallback to default. Approve changes per-story or bulk.</Meta>
     </Card>
   </div>

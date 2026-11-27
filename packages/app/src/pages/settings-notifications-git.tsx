@@ -99,7 +99,7 @@ export const CreateGitChannelCard: FC<{
   formState?: NotificationsFormState;
 }> = ({ project, providers, formState }) => (
   <Card>
-    <SectionTitle level={3}>Add a git channel</SectionTitle>
+    <SectionTitle>Add a git channel</SectionTitle>
     {isServerlessHost() ? (
       <Alert tone="info" title="Statuses are delivered inline">
         This host has no job consumer, so a build's state is written in the request that changes it,

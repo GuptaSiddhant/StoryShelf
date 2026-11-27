@@ -105,7 +105,7 @@ export function renderSettingsMembers(
       </DialogLink>
     ) : undefined;
   return (
-    <VStack>
+    <VStack gap="lg">
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       <Card>
         <SectionTitle actions={members.length > 0 ? addMember(false) : null}>Members</SectionTitle>

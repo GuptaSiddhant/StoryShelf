@@ -91,7 +91,7 @@ export function InsightPanel(
     <div id="insight-panel" {...poll}>
       <Card>
         <HStack>
-          <SectionTitle level={3}>AI triage (advisory)</SectionTitle>
+          <SectionTitle>AI triage (advisory)</SectionTitle>
           {latest?.status === "done" ? (
             <Badge tone={verdictTone(latest.verdict)}>{statusLabel(latest.verdict ?? "")}</Badge>
           ) : null}

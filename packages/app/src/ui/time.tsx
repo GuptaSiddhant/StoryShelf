@@ -31,6 +31,7 @@ export function formatRelative(value: string | Date, now: Date = new Date()): st
 const relativeTime = css`
   /* relative-time */
   position: relative;
+  white-space: nowrap;
   border-radius: var(--radius);
   &:focus-visible {
     outline: 2px solid var(--ring);
@@ -99,6 +100,11 @@ export function formatAbsolute(value: string | Date, format: TimeFormat = "datet
   return format === "date" ? text : `${text} ${TIME_ZONE}`;
 }
 
+const absoluteTime = css`
+  /* absolute-time */
+  white-space: nowrap;
+`;
+
 /** `<time datetime>` with an explicit locale and zone (UTC, `en`), never the server's. */
 export const Time: FC<{ value: string | Date; format?: TimeFormat }> = ({
   value,
@@ -106,7 +112,10 @@ export const Time: FC<{ value: string | Date; format?: TimeFormat }> = ({
 }) => {
   const date = new Date(value);
   return (
-    <time datetime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}>
+    <time
+      class={absoluteTime}
+      datetime={Number.isNaN(date.getTime()) ? undefined : date.toISOString()}
+    >
       {formatAbsolute(value, format)}
     </time>
   );
