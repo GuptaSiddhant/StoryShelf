@@ -36,9 +36,11 @@ describe("createPgDatabase", () => {
     });
     const failed = db.lifecycle?.setup({ config: {}, logger: undefined as never });
     await expect(failed).rejects.toThrow(/^cannot start the database at 127\.0\.0\.1:1\/shelf: /u);
-    await failed?.catch((error: Error) => {
-      expect(error.message).not.toMatch(/hunter2|me:/u);
-    });
+    const message = await failed?.then(
+      () => "",
+      (error: unknown) => (error as Error).message,
+    );
+    expect(message).not.toMatch(/hunter2|me:/u);
     await db.lifecycle?.teardown();
   });
 

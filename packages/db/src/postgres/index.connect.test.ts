@@ -30,6 +30,7 @@ describe("createPostgresDatabase from a connection string", () => {
     });
     expect(postgresMock).toHaveBeenCalledTimes(1);
     expect(postgresMock).toHaveBeenCalledWith("postgres://u:p@db.example.com:5432/shelf", {
+      onnotice: expect.any(Function),
       ssl: { ca: "CA" },
       prepare: false,
       max: 7,

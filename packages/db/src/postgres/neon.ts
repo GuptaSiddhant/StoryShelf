@@ -8,8 +8,15 @@
  */
 import { Pool, type PoolClient } from "@neondatabase/serverless";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import { assertPostgresUrl, createNoticeSink, nameFailure } from "./connection.ts";
+import {
+  assertPostgresUrl,
+  createNoticeSink,
+  nameFailure,
+  routeNotices,
+  type NoticeSink,
+} from "./connection.ts";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
@@ -45,28 +52,7 @@ export interface NeonDatabaseOptions {
  * @returns A DatabaseAdapter backed by the Neon database.
  */
 export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapter {
-  const connectionString = options.connectionString ?? options.url;
-  if (!options.client && !connectionString) {
-    throw new Error(
-      "createNeonDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
-    );
-  }
-
-  if (connectionString) {
-    assertPostgresUrl(connectionString);
-  }
-
-  const owned = !options.client;
-  const sink = createNoticeSink();
-  const pool = options.client ?? new Pool({ connectionString });
-  if (owned) {
-    // Every connection emits `notice`: it goes to the adapter's logger at debug.
-    pool.on("connect", (client) => {
-      client.on("notice", (notice) => {
-        sink.notice(notice);
-      });
-    });
-  }
+  const { connectionString, owned, sink, pool } = openPool(options);
   const db = drizzle({ client: pool });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
@@ -87,10 +73,7 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
         sink.attach(logger);
       }
       await nameFailure(owned ? connectionString : undefined, async () => {
-        await runMigrationsLocked(sessionFor(pool), logger, release);
-        if (pooled) {
-          await activateRetention(db, retention);
-        }
+        await migrateAndActivate(pool, db, retention, pooled, logger, release);
       });
     },
     close: async () => {
@@ -125,4 +108,52 @@ async function endClient(pool: Pool | PoolClient): Promise<void> {
 /** A pool gives the migration a dedicated connection; an injected client is already one session. */
 function sessionFor(pool: Pool | PoolClient): MigrationSession {
   return pool instanceof Pool ? pooledSession(pool) : singleSession(pool);
+}
+
+/** The migration on its own session, then retention where each transaction has a session of its own. */
+async function migrateAndActivate(
+  pool: Pool | PoolClient,
+  db: Parameters<typeof activateRetention>[0],
+  retention: RetentionActivation,
+  pooled: boolean,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await runMigrationsLocked(sessionFor(pool), logger, release);
+  if (pooled) {
+    await activateRetention(db, retention);
+  }
+}
+
+/** The caller's client, or an owned pool for the (checked) connection string, with its notices routed to the sink. */
+function openPool(options: NeonDatabaseOptions): {
+  connectionString: string | undefined;
+  owned: boolean;
+  sink: NoticeSink;
+  pool: Pool | PoolClient;
+} {
+  const connectionString = options.connectionString ?? options.url;
+  assertConnectable(options, connectionString);
+  const owned = !options.client;
+  const sink = createNoticeSink();
+  const pool = options.client ?? new Pool({ connectionString });
+  if (owned) {
+    routeNotices(pool, sink);
+  }
+  return { connectionString, owned, sink, pool };
+}
+
+/** Refuse options that name no connection, or a connection string that is not a Postgres URL. */
+function assertConnectable(
+  options: NeonDatabaseOptions,
+  connectionString: string | undefined,
+): void {
+  if (!options.client && !connectionString) {
+    throw new Error(
+      "createNeonDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
+    );
+  }
+  if (connectionString) {
+    assertPostgresUrl(connectionString);
+  }
 }

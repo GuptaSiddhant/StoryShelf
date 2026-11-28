@@ -27,7 +27,11 @@ const OPTIONAL_ENV: readonly (readonly [string, string, string])[] = [
 ];
 
 /** The databases that keep their file in `SHELF_DATA_DIR`. */
-const FILE_DATABASES: readonly Answers["database"][] = ["sqlite", "better-sqlite3", "bun-sqlite"];
+const FILE_DATABASES: ReadonlySet<Answers["database"]> = new Set([
+  "sqlite",
+  "better-sqlite3",
+  "bun-sqlite",
+]);
 
 /** A `DATABASE_URL` that shows the shape: MySQL-family servers use `mysql://`, the rest `postgres://`. */
 export function databaseUrlExample(database: Answers["database"]): string {
@@ -39,7 +43,7 @@ export function databaseUrlExample(database: Answers["database"]): string {
 /** The optional variables; `SHELF_DATA_DIR` holds the database file only for a file database. */
 function optionalEnv(answers: Answers): readonly (readonly [string, string, string])[] {
   return OPTIONAL_ENV.map(([name, value, note]) =>
-    name === "SHELF_DATA_DIR" && FILE_DATABASES.includes(answers.database)
+    name === "SHELF_DATA_DIR" && FILE_DATABASES.has(answers.database)
       ? [name, value, "where the SQLite file and local uploads live"]
       : [name, value, note],
   );

@@ -96,3 +96,21 @@ export function createNoticeSink(): NoticeSink {
     },
   };
 }
+
+/** A pool that announces each new connection (`pg` and Neon pools both do); typed here, as `pg`'s ambient types stop short of events. */
+interface NoticePool {
+  on(event: "connect", listener: (client: NoticeClient) => void): unknown;
+}
+
+interface NoticeClient {
+  on(event: "notice", listener: (notice: PostgresNotice) => void): unknown;
+}
+
+/** Send the `notice` events of every connection a pool opens to `sink`. */
+export function routeNotices(pool: unknown, sink: NoticeSink): void {
+  (pool as NoticePool).on("connect", (client) => {
+    client.on("notice", (notice) => {
+      sink.notice(notice);
+    });
+  });
+}
