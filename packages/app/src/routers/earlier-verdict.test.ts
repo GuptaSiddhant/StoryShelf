@@ -96,4 +96,46 @@ describe("loadEarlierVerdict", () => {
     const { db, project, build, selected } = await setup("reviewing", "rejected", "other");
     expect(await loadEarlierVerdict(db, project, build, selected)).toBeNull();
   });
+
+  it("finds a match beyond the first page, and newer builds do not crowd it out", async () => {
+    const { db, project, build, selected } = await setup("reviewing", "rejected");
+    const filler = {
+      projectId: "p1",
+      gitSha: "x",
+      gitBranch: "feature/y",
+      isDefault: false,
+      authorEmail: null,
+      authorName: null,
+      message: null,
+      public: false,
+      status: "reviewing",
+      snapshotCount: 0,
+      changedCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      inheritedCount: 0,
+      affectedOnly: true,
+      baselineSha: null,
+      changedFiles: null,
+      affectedImportPaths: null,
+    };
+    // 30 builds between the match (day 1) and the build under review (day 2), and 30 newer ones.
+    for (let n = 0; n < 60; n += 1) {
+      const stamp =
+        n < 30
+          ? `2026-01-01T12:00:${String(n).padStart(2, "0")}.000Z`
+          : `2026-01-03T00:00:${String(n - 30).padStart(2, "0")}.000Z`;
+      // oxlint-disable-next-line no-await-in-loop -- fixture rows
+      await db.insert(db.tables.builds, {
+        ...filler,
+        id: `f${String(n)}`,
+        createdAt: stamp,
+        updatedAt: stamp,
+      } as Build);
+    }
+    await db.update(db.tables.builds, "new", { createdAt: "2026-01-02T00:00:00.000Z" });
+    const moved = { ...build, createdAt: "2026-01-02T00:00:00.000Z" } as Build;
+    const found = await loadEarlierVerdict(db, project, moved, selected);
+    expect(found?.build.id).toBe("old");
+  });
 });

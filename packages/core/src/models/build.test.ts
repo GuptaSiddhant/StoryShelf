@@ -227,6 +227,23 @@ async function branchWith(statuses: [string, Build["status"]][]) {
   return { model, project };
 }
 
+describe("BuildModel list createdBefore", () => {
+  it("filters to older builds before the limit, so newer ones cannot crowd them out", async () => {
+    const { model, project } = await branchWith([
+      ["a", "approved"],
+      ["b", "approved"],
+      ["c", "approved"],
+      ["d", "approved"],
+    ]);
+    const older = await model.list(project.id, {
+      branch: "feature/x",
+      createdBefore: "2026-01-03T00:00:00.000Z",
+      limit: 1,
+    });
+    expect(older.map((build) => build.gitSha)).toEqual(["b"]);
+  });
+});
+
 describe("BuildModel newestComparableBuild", () => {
   it("returns the newest approved build, passing over every other status", async () => {
     const { model, project } = await branchWith([
