@@ -10,7 +10,11 @@ import { getStore } from "../store.ts";
 import { VIEW_ROLES, DEVELOPER_ROLES, buildForProject } from "./builds.handlers.ts";
 import { resolveTriager } from "./comment-triage.ts";
 import { flashHx } from "./flash.ts";
-import { resolveAuthorizedProject, notFound as throwNotFound } from "./helpers.ts";
+import {
+  resolveAuthorizedProject,
+  resolveCommenter,
+  notFound as throwNotFound,
+} from "./helpers.ts";
 import { hxRefresh } from "./htmx.ts";
 import { commentSchema, commentCreateSchema, notFound, unauthorized } from "./schemas.ts";
 const listCommentsRoute = createRoute({
@@ -96,7 +100,8 @@ export function registerComments(app: ShelfRouter): void {
     const { slug, buildId } = c.req.valid("param");
     const project = await resolveAuthorizedProject(c, slug, ...DEVELOPER_ROLES);
     const build = await buildForProject(project.id, buildId);
-    const comment = await createComment(project, build.id, c.req.valid("json"));
+    const author = await resolveCommenter(c);
+    const comment = await createComment(project, build.id, c.req.valid("json"), author);
     hxRefresh(c);
     flashHx(c, "Comment added");
     return c.json(commentJson(comment), 201);
@@ -228,9 +233,9 @@ export async function createComment(
   project: Project,
   buildId: string,
   body: CommentCreateInput,
+  userId: string | null = getStore().user?.id ?? null,
 ): Promise<Comment> {
   assertOneAnchor(body);
-  const userId = getStore().user?.id ?? null;
   // Resolved here, never taken from the request: a client cannot name who gets notified.
   const mentions = await mentionsIn(project, body.body);
   const comment = await new CommentModel(getStore().db).create(project.id, buildId, userId, {
