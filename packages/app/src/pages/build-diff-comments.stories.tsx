@@ -40,3 +40,34 @@ export const AfterPosting = jsxStory(() => {
 export const ReadOnly = jsxStory(() => (
   <DiffComments {...thread()} canComment={false} canTriage={false} />
 ));
+
+/** A re-upload: the earlier build rejected this story and left a change request open. */
+export const EarlierRejectedWithOpenRequest = jsxStory(() => {
+  const props = thread();
+  const earlier = {
+    build: { id: "EARLIER", gitSha: "a1b2c3d4e5f6", gitBranch: props.build.gitBranch },
+    snapshotId: "EARLIER-SNAP",
+    verdict: "rejected" as const,
+    openChangeRequests: [
+      reviewComment("OPEN", {
+        kind: "change_request",
+        snapshotId: "EARLIER-SNAP",
+        body: "The focus ring is clipped.",
+      }),
+    ],
+  };
+  return <DiffComments {...props} earlier={earlier} />;
+});
+
+/** The earlier build approved this story: the note says so, without open requests. */
+export const EarlierApproved = jsxStory(() => (
+  <DiffComments
+    {...thread()}
+    earlier={{
+      build: { id: "EARLIER", gitSha: "a1b2c3d4e5f6", gitBranch: "feature/x" },
+      snapshotId: "EARLIER-SNAP",
+      verdict: "approved",
+      openChangeRequests: [],
+    }}
+  />
+));
