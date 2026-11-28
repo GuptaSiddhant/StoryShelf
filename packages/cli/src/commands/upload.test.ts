@@ -636,7 +636,7 @@ describe("resolveIdentity", () => {
     expect(resolveIdentity(dir, {}, probe)).toEqual({
       sha: "env-sha",
       branch: "git-branch",
-      synthesized: true,
+      synthesized: false,
     });
   });
 
