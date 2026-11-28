@@ -44,6 +44,16 @@ export {
   type BaselineSourceProblem,
 } from "./baseline-source-integrity-error.ts";
 
+import type { ReadOnlyRetentionContext } from "./retention-readiness.ts";
+
+export {
+  assertRetentionReady,
+  RetentionNotReadyError,
+  schemaServesRelease,
+  type ReadOnlyRetentionContext,
+  type RetentionRowQuery,
+} from "./retention-readiness.ts";
+
 /** Type-safe table map enforced on every DatabaseAdapter. */
 export interface Tables {
   projects: Table;
@@ -399,6 +409,13 @@ export interface DatabaseAdapter extends Adapter<DatabaseAdapterMetadata> {
    * integrity problem. Absent otherwise (including adapters that never implement it).
    */
   readonly retentionPause?: RetentionPause | undefined;
+  /**
+   * For a `tool` command that does not set the adapter up: expose `buildReferenceLifecycle` from
+   * reads alone when the database was already prepared by this release (never migrates, never
+   * writes `schema_meta`, never prepares baseline pins), else throw {@link RetentionNotReadyError}
+   * with one line that names the fix. Optional: an adapter without it keeps failing closed.
+   */
+  readonly activateRetentionReadOnly?: (context: ReadOnlyRetentionContext) => Promise<void>;
   /** Table handles for this adapter's dialect, enforced with type safety. */
   readonly tables: Tables;
   /** Insert a row and return the inserted record. */

@@ -5,6 +5,7 @@ import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked } from "./migrate.ts";
 import {
   activateRetention,
+  activateRetentionReadOnly,
   attachRetention,
   type RetentionActivation,
 } from "./retention-activation.ts";
@@ -111,5 +112,7 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
       await client.unsafe("SELECT 1");
     },
   });
-  return attachRetention(adapter, retention);
+  return attachRetention(adapter, retention, async (context) => {
+    await activateRetentionReadOnly(db, retention, context);
+  });
 }

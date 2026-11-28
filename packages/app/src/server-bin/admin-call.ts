@@ -34,7 +34,20 @@ export async function adminCall<T>(
   );
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`${path} answered ${response.status}: ${text.slice(0, 300)}`);
+    throw new Error(
+      errorMessageOf(text) ?? `${path} answered ${response.status}: ${text.slice(0, 300)}`,
+    );
   }
   return JSON.parse(text) as T;
+}
+
+/** The `error.message` of the API's error envelope, or undefined when the body is something else. */
+function errorMessageOf(text: string): string | undefined {
+  try {
+    const body = JSON.parse(text) as { error?: { message?: unknown } } | null;
+    const message = body?.error?.message;
+    return typeof message === "string" && message !== "" ? message : undefined;
+  } catch {
+    return undefined;
+  }
 }

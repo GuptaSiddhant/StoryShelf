@@ -1,4 +1,6 @@
+import type { ShelfOptions } from "@storyshelf/core/config";
 import type { ShelfAppMode } from "../../app-types.ts";
+import { packageVersion } from "../../package-version.ts";
 import type { ServerFlags } from "../args.ts";
 import { buildInstance, loadInstance, type BuiltInstance } from "../instance.ts";
 import type { Io } from "../io.ts";
@@ -27,4 +29,15 @@ export async function withInstance<T>(
   } finally {
     await built.app.lifecycle.teardown();
   }
+}
+
+/**
+ * Let a `tool` command use the database's fenced retention (ADR 0039) when this release already
+ * prepared it: the adapter decides from reads alone and throws one line naming the fix otherwise
+ * (`serve` or `migrate` once). Only a `testing` deployment needs it (without testing, retention is
+ * not fenced), and an adapter without the hook keeps failing closed as before.
+ */
+export async function activateToolRetention(options: ShelfOptions): Promise<void> {
+  if (!options.testing) return;
+  await options.database.activateRetentionReadOnly?.({ release: packageVersion() });
 }

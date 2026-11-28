@@ -52,6 +52,11 @@ export {
   type RetentionSkippedRunner,
 } from "./retention-skipped-contract.ts";
 export {
+  retentionReadOnlyContractSuite,
+  type RetentionReadOnlyHarness,
+  type RetentionReadOnlyHarnessRunner,
+} from "./retention-readonly-contract.ts";
+export {
   retentionActivationContractSuite,
   type RetentionActivationHarness,
   type RetentionActivationHarnessRunner,

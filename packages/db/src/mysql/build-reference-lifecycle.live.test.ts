@@ -15,6 +15,7 @@ import { createShelfLogger } from "@storyshelf/core/logger";
 import {
   buildReferenceContractSuite,
   retentionActivationContractSuite,
+  retentionReadOnlyContractSuite,
   retentionSkippedContractSuite,
 } from "@storyshelf/core/test-helpers";
 import mysql from "mysql2/promise";
@@ -363,6 +364,32 @@ describe.skipIf(!LIVE)("real MySQL, one pool per party", () => {
     } finally {
       await adapter.lifecycle?.teardown();
       await onServer(`DROP DATABASE ${name}`);
+    }
+  });
+});
+
+describe.skipIf(!LIVE)("real MySQL, read-only activation in a scratch database", () => {
+  retentionReadOnlyContractSuite("MySQL (real server)", async (run) => {
+    const readonly = scratchUrl("shelf_readonly");
+    await onServer(`CREATE DATABASE ${readonly.name}`);
+    const opened: DatabaseAdapter[] = [];
+    const open = (): DatabaseAdapter => {
+      const db = createMysqlDatabase({ url: readonly.url });
+      opened.push(db);
+      return db;
+    };
+    try {
+      await run({
+        open,
+        boot: async (release) => {
+          const db = open();
+          await db.lifecycle?.setup({ config: {}, logger: silent, release });
+          return db;
+        },
+      });
+    } finally {
+      await Promise.all(opened.map(async (db) => await db.lifecycle?.teardown()));
+      await onServer(`DROP DATABASE IF EXISTS ${readonly.name}`);
     }
   });
 });

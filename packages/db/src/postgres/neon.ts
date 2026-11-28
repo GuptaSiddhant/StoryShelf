@@ -14,6 +14,7 @@ import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
 import {
   activateRetention,
+  activateRetentionReadOnly,
   attachRetention,
   type RetentionActivation,
 } from "./retention-activation.ts";
@@ -82,7 +83,15 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
       await pool.query("SELECT 1");
     },
   });
-  return attachRetention(adapter, retention);
+  return attachRetention(
+    adapter,
+    retention,
+    pooled
+      ? async (context) => {
+          await activateRetentionReadOnly(db, retention, context);
+        }
+      : undefined,
+  );
 }
 
 /** Close an owned client: pools end, checked-out clients release. */

@@ -7,10 +7,17 @@
 import type {
   BuildReferenceLifecycle,
   DatabaseAdapter,
+  ReadOnlyRetentionContext,
   RetentionPause,
 } from "@storyshelf/core/adapter/database";
-import { BaselineSourceIntegrityError } from "@storyshelf/core/adapter/database";
+import {
+  assertRetentionReady,
+  BaselineSourceIntegrityError,
+  RetentionNotReadyError,
+  sqlSchemaLevelStore,
+} from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
+import { DatabaseSync } from "node:sqlite";
 import {
   createBuildReferenceLifecycle,
   prepareBaselineReferences,
@@ -50,6 +57,37 @@ async function prepareAndExpose(path: string, state: RetentionActivation): Promi
   );
 }
 
+/**
+ * For a `tool` command: expose the lifecycle when this release already prepared the file, judged
+ * from a read-only connection. Never migrates, writes `schema_meta` or prepares the pins; the
+ * lifecycle it exposes opens its own connections and takes the same write lock as the server's,
+ * so a second process beside a running server serializes with it exactly as two requests do.
+ */
+export async function activateRetentionReadOnly(
+  path: string,
+  state: RetentionActivation,
+  context: ReadOnlyRetentionContext,
+): Promise<void> {
+  delete state.lifecycle;
+  delete state.pause;
+  if (path === ":memory:") {
+    throw new RetentionNotReadyError("Build retention needs a database file, not memory.");
+  }
+  const sqlite = new DatabaseSync(path, { readOnly: true, returnArrays: true });
+  try {
+    const query = async (sql: string): Promise<unknown[]> =>
+      await Promise.resolve(sqlite.prepare(sql).all());
+    await assertRetentionReady({
+      release: context.release,
+      store: sqlSchemaLevelStore(query, "sqlite"),
+      query,
+    });
+  } finally {
+    sqlite.close();
+  }
+  state.lifecycle = createBuildReferenceLifecycle(path);
+}
+
 /** Keep the capability off and say why, once, so the System page and the log agree. */
 function pauseRetention(state: RetentionActivation, error: BaselineSourceIntegrityError): void {
   const { baselineId, buildId, problem } = error;
@@ -64,7 +102,14 @@ function pauseRetention(state: RetentionActivation, error: BaselineSourceIntegri
 export function attachRetention(
   adapter: DatabaseAdapter,
   state: RetentionActivation,
+  readOnly?: (context: ReadOnlyRetentionContext) => Promise<void>,
 ): DatabaseAdapter {
+  if (readOnly) {
+    Object.defineProperty(adapter, "activateRetentionReadOnly", {
+      enumerable: true,
+      value: readOnly,
+    });
+  }
   Object.defineProperties(adapter, {
     // Assignable, so a test can swap in a wrapped capability; production code only reads it.
     buildReferenceLifecycle: {

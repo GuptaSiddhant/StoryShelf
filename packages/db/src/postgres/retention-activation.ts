@@ -10,12 +10,19 @@
 import type {
   BuildReferenceLifecycle,
   DatabaseAdapter,
+  ReadOnlyRetentionContext,
   RetentionPause,
 } from "@storyshelf/core/adapter/database";
-import { BaselineSourceIntegrityError } from "@storyshelf/core/adapter/database";
+import {
+  assertRetentionReady,
+  BaselineSourceIntegrityError,
+  sqlSchemaLevelStore,
+} from "@storyshelf/core/adapter/database";
 import type { Logger } from "@storyshelf/core/logger";
+import { sql } from "drizzle-orm";
 import { prepareBaselineReferences } from "./baseline-preparation.ts";
 import { createBuildReferenceLifecycle } from "./build-reference-lifecycle.ts";
+import { inTransaction, type LifecycleDatabase } from "./lifecycle-transaction.ts";
 
 /** What boot decided; read through getters, so the adapter reflects a later activation. */
 export interface RetentionActivation {
@@ -52,6 +59,30 @@ async function prepareAndExpose(database: unknown, state: RetentionActivation): 
   );
 }
 
+/**
+ * For a `tool` command: expose the lifecycle when this release already prepared the database,
+ * judged from `SELECT`s alone. Never migrates, writes `schema_meta` or prepares the pins; the
+ * lifecycle's own transactions take the row locks the server's do.
+ */
+export async function activateRetentionReadOnly(
+  database: unknown,
+  state: RetentionActivation,
+  context: ReadOnlyRetentionContext,
+): Promise<void> {
+  delete state.lifecycle;
+  delete state.pause;
+  const query = async (statement: string): Promise<unknown[]> =>
+    await inTransaction(database as LifecycleDatabase, async (tx) => {
+      return await tx.query(sql.raw(statement));
+    });
+  await assertRetentionReady({
+    release: context.release,
+    store: sqlSchemaLevelStore(query, "postgres"),
+    query,
+  });
+  state.lifecycle = createBuildReferenceLifecycle(database);
+}
+
 /** Keep the capability off and say why, once, so the System page and the log agree. */
 function pauseRetention(state: RetentionActivation, error: BaselineSourceIntegrityError): void {
   const { baselineId, buildId, problem } = error;
@@ -66,7 +97,14 @@ function pauseRetention(state: RetentionActivation, error: BaselineSourceIntegri
 export function attachRetention(
   adapter: DatabaseAdapter,
   state: RetentionActivation,
+  readOnly?: (context: ReadOnlyRetentionContext) => Promise<void>,
 ): DatabaseAdapter {
+  if (readOnly) {
+    Object.defineProperty(adapter, "activateRetentionReadOnly", {
+      enumerable: true,
+      value: readOnly,
+    });
+  }
   Object.defineProperties(adapter, {
     // Assignable, so a test can swap in a wrapped capability; production code only reads it.
     buildReferenceLifecycle: {
