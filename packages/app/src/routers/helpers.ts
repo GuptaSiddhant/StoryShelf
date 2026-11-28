@@ -247,6 +247,35 @@ export async function resolveReviewer(c: Context): Promise<string | null> {
   return await tokenReviewer(requestHasAdminToken(c) ? null : header.slice("Bearer ".length));
 }
 
+/**
+ * Who a comment is attributed to: the session user, else the owner of the bearer token (the same
+ * attribution as {@link resolveReviewer}). Unlike a verdict, a comment never needs a user: the
+ * admin token, a token without an owner (or whose owner is gone) and an instance without auth keep
+ * `null`.
+ */
+export async function resolveCommenter(c: Context): Promise<string | null> {
+  const { authEnabled, user } = getStore();
+  if (!authEnabled) {
+    return null;
+  }
+  if (user) {
+    return user.id;
+  }
+  const header = c.req.header("authorization");
+  if (!header?.startsWith("Bearer ") || requestHasAdminToken(c)) {
+    return null;
+  }
+  return await tokenOwnerId(header.slice("Bearer ".length));
+}
+
+/** The id of the existing user owning bearer `secret`; null for an unknown or ownerless token. */
+async function tokenOwnerId(secret: string): Promise<string | null> {
+  const { db } = getStore();
+  const token = await new TokenModel(db).findByHash(sha256(secret));
+  const owner = token?.userId ? await new UserModel(db).get(token.userId) : null;
+  return owner?.id ?? null;
+}
+
 /** The user owning bearer `secret` (null for the admin token); 403 when no user can be traced. */
 async function tokenReviewer(secret: string | null): Promise<string> {
   const { db } = getStore();
