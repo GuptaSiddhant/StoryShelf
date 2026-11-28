@@ -56,6 +56,52 @@ const tableDense = css`
   }
 `;
 
+/**
+ * At a phone width (480px and below) every row becomes a stacked card: the header is hidden, each
+ * cell takes the full width, and a cell's `data-label` shows above its value. Cells that a page
+ * hides at a wider breakpoint keep that rule, because this variant never sets their `display`.
+ */
+const tableStacked = css`
+  /* table-stacked */
+  ${tableWrap}
+  @media (max-width: 480px) {
+    & table,
+    & tbody {
+      display: block;
+      width: 100%;
+    }
+    & thead {
+      display: none;
+    }
+    & tr {
+      display: grid;
+      gap: var(--space-2);
+      grid-template-columns: minmax(0, 1fr);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    & td {
+      padding: 0;
+      border-bottom: 0;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    & td.nowrap {
+      white-space: normal;
+    }
+    & td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: var(--space-1);
+      color: var(--text-secondary);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+  }
+`;
+
 const tableEmptyCell = css`
   /* table-empty */
   padding: var(--space-6) var(--space-4);
@@ -70,16 +116,22 @@ const tableEmptyCell = css`
  * overflows and a screen reader says which table it is. `label` is required;
  * give each table on a page its own name (two regions with the same name fail
  * axe's `landmark-unique`).
+ *
+ * `stackOnPhone` turns each row into a card at a phone width, so nothing
+ * scrolls sideways and the row's actions stay on screen. Label the cells that
+ * have a column heading with `data-label`. It does not combine with `dense`.
  */
 export const Table: FC<{
   dense?: boolean;
+  stackOnPhone?: boolean;
   label: string;
   /** "Nothing here" message: one full-width row, no header, and `children` are not rendered. */
   empty?: unknown;
   children?: unknown;
-}> = ({ dense = false, label, empty, children }) => {
+}> = ({ dense = false, stackOnPhone = false, label, empty, children }) => {
+  const surface = stackOnPhone ? tableStacked : dense ? tableDense : tableWrap;
   return (
-    <div class={dense ? tableDense : tableWrap} role="region" aria-label={label} tabindex={0}>
+    <div class={surface} role="region" aria-label={label} tabindex={0}>
       {empty === undefined ? (
         children
       ) : (
