@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { computeAffected } from "./index.ts";
+import { BASELINE_NOT_IN_CHECKOUT, computeAffected } from "./index.ts";
 
 let dir: string;
 
@@ -80,6 +80,73 @@ describe("computeAffected", () => {
     });
     expect(result.affectedImportPaths).toBeNull();
     expect(result.fullReason).toBe("story-index-unreadable");
+  });
+
+  it("names a baseline the checkout does not hold as BASELINE_NOT_IN_CHECKOUT", async () => {
+    const missing = "deadbeef".repeat(5);
+    const head = git(["rev-parse", "HEAD"]);
+    const result = await computeAffected({
+      cwd: dir,
+      buildDir: "static",
+      baseSha: missing,
+      headSha: head,
+    });
+    expect(result.affectedImportPaths).toBeNull();
+    expect(result.fullReason).toBe(BASELINE_NOT_IN_CHECKOUT);
+    expect(result.baselineSha).toBe(missing);
+  });
+
+  it("keeps git's own line when the head is unresolved but the baseline is present", async () => {
+    const base = git(["rev-parse", "HEAD"]);
+    const result = await computeAffected({
+      cwd: dir,
+      buildDir: "static",
+      baseSha: base,
+      headSha: "deadbeef".repeat(5),
+    });
+    expect(result.fullReason).not.toBe(BASELINE_NOT_IN_CHECKOUT);
+    expect(result.fullReason).toMatch(/^fatal: /u);
+  });
+
+  describe("in a shallow clone", () => {
+    let shallow: string;
+    let parent: string;
+    let head: string;
+
+    beforeEach(() => {
+      parent = git(["rev-parse", "HEAD"]);
+      writeFileSync(join(dir, "second.txt"), "second");
+      git(["add", "second.txt"]);
+      git(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "second"]);
+      shallow = mkdtempSync(join(tmpdir(), "storyshelf-affected-index-shallow-"));
+      execFileSync("git", ["clone", "--quiet", "--depth", "1", `file://${dir}`, shallow]);
+      head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: shallow, encoding: "utf8" }).trim();
+    });
+
+    afterEach(() => {
+      rmSync(shallow, { recursive: true, force: true });
+    });
+
+    it("names a baseline the clone never fetched as BASELINE_NOT_IN_CHECKOUT", async () => {
+      const result = await computeAffected({
+        cwd: shallow,
+        buildDir: "static",
+        baseSha: parent,
+        headSha: head,
+      });
+      expect(result.affectedImportPaths).toBeNull();
+      expect(result.fullReason).toBe(BASELINE_NOT_IN_CHECKOUT);
+    });
+
+    it("keeps shallow-clone when the baseline is present", async () => {
+      const result = await computeAffected({
+        cwd: shallow,
+        buildDir: "static",
+        baseSha: head,
+        headSha: head,
+      });
+      expect(result.fullReason).toBe("shallow-clone");
+    });
   });
 
   it("never throws outside a repository", async () => {

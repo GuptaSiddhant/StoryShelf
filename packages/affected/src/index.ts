@@ -1,4 +1,11 @@
-import { changedFiles, gitRepoRoot, gitRepoStatus, MAX_CHANGED_FILES } from "./git.ts";
+import {
+  changedFiles,
+  GitCommandError,
+  gitRepoRoot,
+  hasCommit,
+  gitRepoStatus,
+  MAX_CHANGED_FILES,
+} from "./git.ts";
 import {
   keyOfChangedFile,
   keyOfStoryFile,
@@ -9,6 +16,12 @@ import {
 import { loadDepGraph, loadStoryImportPaths, statsPathFor } from "./stats.ts";
 import { matchesAnyGlob, traceAffected } from "./trace.ts";
 import type { AffectedInput, AffectedResult, DepGraph } from "./types.ts";
+
+/**
+ * `fullReason` when the baseline commit is not in the checkout (a shallow clone, or a commit never
+ * fetched). The CLI names the commit itself from `baselineSha`.
+ */
+export const BASELINE_NOT_IN_CHECKOUT = "baseline-not-in-checkout";
 
 /**
  * Compute the affected story set for an upload. Never throws: every failure
@@ -35,11 +48,20 @@ function selectiveResult(changed: string[], baselineSha: string, paths: string[]
   return { affectedImportPaths: paths, changedFiles: changed, baselineSha, fullReason: null };
 }
 
-/** The roots to resolve paths against, throwing a full-render reason when the checkout can't be diffed. */
+/**
+ * The roots to resolve paths against, throwing a full-render reason when the checkout can't be diffed.
+ * A shallow clone that lacks the baseline reports the missing baseline; one that holds it keeps
+ * `shallow-clone`.
+ */
 function guardedBase(input: AffectedInput): PathBase {
   const repo = gitRepoStatus(input.cwd);
+  if (repo === "shallow") {
+    throw new Error(
+      hasCommit(input.cwd, input.baseSha) ? "shallow-clone" : BASELINE_NOT_IN_CHECKOUT,
+    );
+  }
   if (repo !== "ok") {
-    throw new Error(repo === "shallow" ? "shallow-clone" : "not-a-git-repo");
+    throw new Error("not-a-git-repo");
   }
   const base = pathBase(gitRepoRoot(input.cwd), input.cwd);
   if (!base) {
@@ -113,9 +135,21 @@ async function computeSelective(input: AffectedInput): Promise<AffectedResult> {
     changed = guardedChanged(input);
     return await traceSelective(input, changed, base);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "affected-computation-failed";
-    return fullResult(changed, input.baseSha, reason);
+    return fullResult(changed, input.baseSha, reasonOf(error, input));
   }
+}
+
+/**
+ * The `fullReason` for a failure: a missing baseline, git's first line for any other git failure,
+ * or the reason string a guard threw. An unknown revision counts as a missing baseline only when
+ * the baseline itself is absent; an unresolved head keeps git's own line.
+ */
+function reasonOf(error: unknown, input: AffectedInput): string {
+  if (error instanceof GitCommandError) {
+    const baselineMissing = error.unknownRevision && !hasCommit(input.cwd, input.baseSha);
+    return baselineMissing ? BASELINE_NOT_IN_CHECKOUT : error.message;
+  }
+  return error instanceof Error ? error.message : "affected-computation-failed";
 }
 
 export type { AffectedInput, AffectedResult, DepGraph, StoryLike, TraceOptions } from "./types.ts";

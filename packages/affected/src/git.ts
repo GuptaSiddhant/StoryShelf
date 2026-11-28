@@ -10,14 +10,59 @@ export const LOCAL_SHA_PREFIX = "local-";
 /** Default branch for synthesized identities (isolates local experiments). */
 export const LOCAL_BRANCH = "local";
 
-/** Run a git subcommand, returning trimmed stdout. Throws on failure. */
+/**
+ * A git subcommand that failed. `message` is git's first stderr line, never the multi-line dump
+ * `execFileSync` builds. `unknownRevision` marks a revision the checkout does not hold (an unknown
+ * name, or a commit a shallow clone never fetched).
+ */
+export class GitCommandError extends Error {
+  readonly unknownRevision: boolean;
+
+  constructor(message: string, unknownRevision: boolean) {
+    super(message);
+    this.name = "GitCommandError";
+    this.unknownRevision = unknownRevision;
+  }
+}
+
+/** git's wording for a revision it cannot resolve: "unknown revision" or, in a shallow clone, "Invalid revision range". */
+const UNKNOWN_REVISION = /unknown revision|Invalid revision range/u;
+
+/** The first non-empty line of a text, or `""`. */
+function firstLine(text: string): string {
+  return (
+    text
+      .split("\n")
+      .find((line) => line.trim().length > 0)
+      ?.trim() ?? ""
+  );
+}
+
+/** Map an `execFileSync` failure to a `GitCommandError` carrying git's own first line. */
+function gitFailure(error: unknown): GitCommandError {
+  const failure = error as { stderr?: unknown; message?: unknown };
+  const stderr = typeof failure.stderr === "string" ? failure.stderr : "";
+  const message = typeof failure.message === "string" ? failure.message : "git failed";
+  const line = firstLine(stderr) || firstLine(message);
+  return new GitCommandError(line, UNKNOWN_REVISION.test(stderr));
+}
+
+/**
+ * Run a git subcommand, returning trimmed stdout. Throws a `GitCommandError` on failure.
+ * `LC_ALL=C` keeps git's messages in English, so `UNKNOWN_REVISION` matches on any machine.
+ */
 function git(cwd: string, args: string[]): string {
   // stderr is piped, never inherited: outside a checkout git's `fatal:` lines must not reach the terminal.
-  return execFileSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
+  try {
+    return execFileSync("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, LC_ALL: "C" },
+    }).trim();
+  } catch (error) {
+    throw gitFailure(error);
+  }
 }
 
 /** Repository git status relevant to affected capture. */
@@ -104,6 +149,22 @@ function tryGit(cwd: string, args: string[]): string | null {
  */
 export function gitRepoRoot(cwd: string): string | null {
   return tryGit(cwd, ["rev-parse", "--show-toplevel"]);
+}
+
+/**
+ * Whether the checkout holds this commit. A shallow clone lacks the commits it never fetched, and
+ * a name starting with `-` is never a commit.
+ */
+export function hasCommit(cwd: string, sha: string): boolean {
+  if (sha.startsWith("-")) {
+    return false;
+  }
+  try {
+    git(cwd, ["cat-file", "-e", `${sha}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
