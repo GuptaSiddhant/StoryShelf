@@ -230,32 +230,32 @@ describe("SnapshotModel.listByImportPath", () => {
   });
 });
 
+const stamp = (n: number): string => `2026-01-0${n}T00:00:00.000Z`;
+
+async function seed() {
+  const { db } = makeDatabase();
+  const build = (id: string, branch: string, status: string, day: number) =>
+    db.insert(db.tables.builds, {
+      id,
+      projectId: "p1",
+      gitSha: "sha",
+      gitBranch: branch,
+      status,
+      createdAt: stamp(day),
+      updatedAt: stamp(day),
+    } as unknown as Build);
+  const model = new SnapshotModel(db);
+  const snap = async (buildId: string, storyId = "s", browser = "chromium") => {
+    const row = await model.create("p1", buildId, {
+      ...timedRow(storyId, "desktop", null),
+      browser,
+    });
+    return row.id;
+  };
+  return { db, build, snap, model };
+}
+
 describe("SnapshotModel.latestEarlierOnBranch", () => {
-  const stamp = (n: number): string => `2026-01-0${n}T00:00:00.000Z`;
-
-  async function seed() {
-    const { db } = makeDatabase();
-    const build = (id: string, branch: string, status: string, day: number) =>
-      db.insert(db.tables.builds, {
-        id,
-        projectId: "p1",
-        gitSha: "sha",
-        gitBranch: branch,
-        status,
-        createdAt: stamp(day),
-        updatedAt: stamp(day),
-      } as unknown as Build);
-    const model = new SnapshotModel(db);
-    const snap = async (buildId: string, storyId = "s", browser = "chromium") => {
-      const row = await model.create("p1", buildId, {
-        ...timedRow(storyId, "desktop", null),
-        browser,
-      });
-      return row.id;
-    };
-    return { db, build, snap, model };
-  }
-
   const selected = { projectId: "p1", storyId: "s", viewportName: "desktop", browser: "chromium" };
 
   it("returns the newest earlier snapshot of the branch, skipping failed and cancelled builds", async () => {

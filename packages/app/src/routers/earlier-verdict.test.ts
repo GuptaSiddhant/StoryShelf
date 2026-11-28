@@ -1,4 +1,4 @@
-import type { Build, Project } from "@storyshelf/core/schema";
+import type { Build, Project, Snapshot } from "@storyshelf/core/schema";
 import { makeDatabase } from "@storyshelf/core/test-helpers";
 import { describe, expect, it } from "vitest";
 import { loadEarlierVerdict } from "./earlier-verdict.ts";
@@ -154,7 +154,7 @@ describe("loadEarlierVerdict", () => {
         };
       },
     });
-    const brandNew = { ...selected, storyId: "brand-new" };
+    const brandNew = { ...(selected as Snapshot), storyId: "brand-new" };
     expect(await loadEarlierVerdict(counted, project, build, brandNew)).toBeNull();
     expect(reads).toEqual(["list"]);
   });

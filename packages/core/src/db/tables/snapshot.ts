@@ -66,6 +66,12 @@ export const snapshots = defineTable(
       ]),
       index("snapshots_build_id_idx", ["buildId"]),
       index("snapshots_project_import_path_idx", ["projectId", "storyImportPath"]),
+      index("snapshots_project_story_mode_idx", [
+        "projectId",
+        "storyId",
+        "viewportName",
+        "browser",
+      ]),
     ],
   },
 );

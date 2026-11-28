@@ -17,6 +17,7 @@ describe("runMigrations: pre-browser volume upgrade", () => {
     await runMigrations(run);
     await client.exec(`
       DROP INDEX snapshots_build_story_mode_browser_idx;
+      DROP INDEX snapshots_project_story_mode_idx;
       DROP INDEX baselines_project_story_mode_browser_branch_idx;
       ALTER TABLE snapshots DROP COLUMN browser;
       ALTER TABLE snapshots DROP COLUMN mode;
