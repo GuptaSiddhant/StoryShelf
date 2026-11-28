@@ -9,23 +9,34 @@ export interface StorageReport {
   builds: { buildId: string; missing: number }[];
   unreadableManifests: string[];
   missingBaselineImages: number;
+  snapshotsChecked: number;
+  missingSnapshotImages: number;
+  buildsMissingImages: string[];
   unreferencedBlobs: number;
   sampled: boolean;
 }
 
-/** How many problems the report holds: missing blobs, unreadable manifests, missing baseline images. */
+/** How many problems the report holds: missing blobs, unreadable manifests, missing baseline or snapshot images. */
 export function problemsIn(report: StorageReport): number {
-  return report.builds.length + report.unreadableManifests.length + report.missingBaselineImages;
+  return (
+    report.builds.length +
+    report.unreadableManifests.length +
+    report.missingBaselineImages +
+    report.missingSnapshotImages
+  );
 }
 
 /** Print the report, one line per finding. */
 export function printStorageReport(report: StorageReport, io: Io): void {
   io.out(`Checked ${report.buildsChecked} build(s) and ${report.baselinesChecked} baseline(s)`);
+  io.out(`Checked ${report.snapshotsChecked} snapshot(s) of available builds`);
   for (const build of report.builds) {
     io.out(`Build ${build.buildId}: ${build.missing} blob(s) missing from storage`);
   }
   for (const id of report.unreadableManifests) io.out(`Build ${id}: manifest unreadable`);
   io.out(`Baseline images missing: ${report.missingBaselineImages}`);
+  for (const id of report.buildsMissingImages) io.out(`Build ${id}: snapshot image(s) missing`);
+  io.out(`Snapshot images missing (current, baseline copy, diff): ${report.missingSnapshotImages}`);
   io.out(
     report.sampled
       ? "Unreferenced blobs: not counted (sampled run)"
@@ -34,7 +45,7 @@ export function printStorageReport(report: StorageReport, io: Io): void {
   if (problemsIn(report) === 0) io.out("Storage is consistent with the database.");
 }
 
-/** `check-storage`: read-only, a `tool`; exits 1 when a blob or baseline image is missing or a manifest unreadable. */
+/** `check-storage`: read-only, a `tool`; exits 1 when a blob, baseline image or snapshot image (current, baseline copy, diff) is missing, or a manifest is unreadable. */
 export async function checkStorage(ctx: CommandContext): Promise<number> {
   return await withInstance(ctx, "tool", async ({ app, options }) => {
     const { sample } = ctx.flags;

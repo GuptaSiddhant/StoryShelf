@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ShelfApp } from "../../app-types.ts";
+import { fixtureOptions } from "../__fixtures__/instance-app.ts";
 import { instanceDir, recordingIo, recordRelease, tablesOf } from "../__fixtures__/instance-dir.ts";
 import { adminCall, adminTokenOf } from "../admin-call.ts";
 import type { BuiltInstance } from "../instance.ts";
@@ -29,6 +30,48 @@ describe("tool commands", () => {
     const io = recordingIo();
     expect(await runServerBin(["check-storage", "--dir", dir, "--sample", "5"], io, {})).toBe(0);
     expect(io.stdout.at(-1)).toBe("Storage is consistent with the database.");
+  });
+
+  it("check-storage exits 1 when a snapshot's diff image is gone from storage", async () => {
+    const { dir, dataDir } = await migrated();
+    const { database, storage } = fixtureOptions(dataDir);
+    const now = "2026-11-28T00:00:00.000Z";
+    const t = database.tables;
+    await database.insert(t.projects, {
+      id: "p1",
+      name: "P",
+      slug: "p",
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+    await database.insert(t.builds, {
+      id: "b1",
+      projectId: "p1",
+      gitSha: "s",
+      gitBranch: "main",
+      status: "failed",
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+    await database.insert(t.snapshots, {
+      id: "s1",
+      projectId: "p1",
+      buildId: "b1",
+      storyId: "a--b",
+      storyName: "b",
+      storyTitle: "a",
+      screenshotPath: "p1/builds/b1/s1.png",
+      diffPath: "p1/builds/b1/s1.diff.png",
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+    await storage.write("p1/builds/b1/s1.png", Buffer.from("png"));
+    const io = recordingIo();
+    expect(await runServerBin(["check-storage", "--dir", dir], io, {})).toBe(1);
+    expect(io.stdout).toContain("Build b1: snapshot image(s) missing");
+    expect(io.stdout).not.toContain("Storage is consistent with the database.");
+    await storage.write("p1/builds/b1/s1.diff.png", Buffer.from("png"));
+    expect(await runServerBin(["check-storage", "--dir", dir], recordingIo(), {})).toBe(0);
   });
 
   it("never migrate: purge and check-storage leave an unmigrated database untouched", async () => {
@@ -65,6 +108,9 @@ describe("storage report", () => {
     builds: [],
     unreadableManifests: [],
     missingBaselineImages: 0,
+    snapshotsChecked: 3,
+    missingSnapshotImages: 0,
+    buildsMissingImages: [],
     unreferencedBlobs: 4,
     sampled: false,
   };

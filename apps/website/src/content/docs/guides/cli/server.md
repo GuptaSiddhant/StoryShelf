@@ -66,7 +66,7 @@ The instance commands are the `storyshelf-server` bin of `@storyshelf/app`. Run 
 storyshelf-server serve [--port 3000] [--watch]   # start the instance; SIGTERM drains it
 storyshelf-server migrate                         # run the database migrations, then exit
 storyshelf-server purge [--ttl-days 30]           # purge expired builds
-storyshelf-server check-storage [--sample 50]     # read-only consistency check
+storyshelf-server check-storage [--sample 50]     # read-only: blobs, baseline and snapshot images
 storyshelf-server doctor                          # installed packages and peers, module, settings, schema level
 ```
 
