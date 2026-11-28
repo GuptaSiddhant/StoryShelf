@@ -11,6 +11,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type Client, type PoolClient } from "pg";
+import { assertPostgresUrl, createNoticeSink, nameFailure, type NoticeSink } from "./connection.ts";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
@@ -64,8 +65,13 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
     );
   }
 
+  if (connectionString) {
+    assertPostgresUrl(connectionString);
+  }
+
   const owned = !options.client;
-  const pool = options.client ?? newPool(options, connectionString);
+  const sink = createNoticeSink();
+  const pool = options.client ?? newPool(options, connectionString, sink);
   const db = drizzle({ client: pool });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
@@ -82,10 +88,15 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
     },
     tables: schema,
     migrate: async ({ logger, release }) => {
-      await runMigrationsLocked(sessionFor(pool), logger, release);
-      if (pooled) {
-        await activateRetention(db, retention);
+      if (logger) {
+        sink.attach(logger);
       }
+      await nameFailure(owned ? (connectionString ?? hostTarget(options)) : undefined, async () => {
+        await runMigrationsLocked(sessionFor(pool), logger, release);
+        if (pooled) {
+          await activateRetention(db, retention);
+        }
+      });
     },
     close: async () => {
       if (owned) {
@@ -108,8 +119,12 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
 }
 
 /** An owned pool from URL-or-fields options. */
-function newPool(options: PgDatabaseOptions, connectionString: string | undefined): Pool {
-  return new Pool({
+function newPool(
+  options: PgDatabaseOptions,
+  connectionString: string | undefined,
+  sink: NoticeSink,
+): Pool {
+  const pool = new Pool({
     connectionString,
     host: options.host,
     port: options.port,
@@ -121,6 +136,20 @@ function newPool(options: PgDatabaseOptions, connectionString: string | undefine
     idleTimeoutMillis: options.idleTimeoutMillis,
     connectionTimeoutMillis: options.connectionTimeoutMillis,
   });
+  // `pg` has no notice option: every connection emits `notice`, which goes to the adapter's logger at debug.
+  pool.on("connect", (client) => {
+    client.on("notice", (notice) => {
+      sink.notice(notice);
+    });
+  });
+  return pool;
+}
+
+/** A credential-free URL for the discrete host fields, so the failure line names them too. */
+function hostTarget(options: PgDatabaseOptions): string | undefined {
+  return options.host
+    ? `postgres://${options.host}:${options.port ?? 5432}/${options.database ?? ""}`
+    : undefined;
 }
 
 /** Close an owned client: pools end, bare clients disconnect. */

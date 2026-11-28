@@ -1,6 +1,7 @@
 import { packageVersion } from "../package-version.ts";
 import { parseServerArgs, type ParsedArgs, type ServerCommand } from "./args.ts";
 import type { CommandContext } from "./commands/context.ts";
+import { failureLines } from "./failure-lines.ts";
 import { SERVER_HELP } from "./help.ts";
 import type { Io } from "./io.ts";
 import { nodeVersionProblem } from "./node-version.ts";
@@ -67,6 +68,7 @@ export async function runServerBin(
     return await LOADERS[parsed.command]({ flags: parsed.flags, io, env });
   } catch (error) {
     io.err(`storyshelf-server ${parsed.command}: ${(error as Error).message}`);
+    for (const line of failureLines(error)) io.err(line);
     return 1;
   }
 }

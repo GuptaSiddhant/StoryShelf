@@ -48,6 +48,24 @@ describe("createPostgresDatabase from a connection string", () => {
     expect(postgresMock.mock.calls[0]?.[0]).toBe("postgres://a/one");
   });
 
+  it("refuses a URL without a scheme, naming DATABASE_URL, before opening anything", () => {
+    expect(() => createPostgresDatabase({ url: "localhost:5433/shelf" })).toThrow("DATABASE_URL");
+    expect(postgresMock).not.toHaveBeenCalled();
+  });
+
+  it("routes onnotice to the adapter's logger at debug once setup hands it over", async () => {
+    const db = createPostgresDatabase({ url: "postgres://u:p@h:5432/shelf" });
+    const onnotice = postgresMock.mock.calls[0]?.[1]["onnotice"] as (n: unknown) => void;
+    expect(() => onnotice({ message: "before setup" })).not.toThrow();
+    const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await db.lifecycle?.setup({ config: {}, logger: logger as never }).catch(() => {});
+    onnotice({ severity: "NOTICE", message: "x already exists, skipping" });
+    expect(logger.debug).toHaveBeenCalledWith(
+      { severity: "NOTICE", code: undefined, notice: "x already exists, skipping" },
+      "postgres notice",
+    );
+  });
+
   it("opens nothing when the caller supplies the client", () => {
     const client = { unsafe: vi.fn(), end: vi.fn() } as never;
     createPostgresDatabase({ client, url: "postgres://ignored/db" });

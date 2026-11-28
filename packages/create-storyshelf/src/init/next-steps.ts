@@ -8,6 +8,7 @@ import {
 } from "../runner.ts";
 import { needsCompose, resolveDeployTarget, type Answers } from "./answers.ts";
 import { requiredEnv } from "./codegen.ts";
+import { databaseUrlExample } from "./env-files.ts";
 
 /** `installed`: the dependencies were just installed (`--install`), so the install step is left out. */
 export function printNextSteps(answers: Answers, runner: PackageRunner, installed = false): void {
@@ -42,7 +43,10 @@ function envSteps(answers: Answers): string[] {
   }
   return [
     `  # Required: ${names.join(", ")}. Set them in the shell, or in .env (copy .env.example):`,
-    ...names.map((name) => `  export ${name}=${EXPORT_HINT[name] ?? "..."}`),
+    ...names.map(
+      (name) =>
+        `  export ${name}=${name === "DATABASE_URL" ? databaseUrlExample(answers.database) : (EXPORT_HINT[name] ?? "...")}`,
+    ),
   ];
 }
 

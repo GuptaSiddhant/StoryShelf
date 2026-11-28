@@ -24,10 +24,24 @@ describe("generateEnvExample", () => {
   });
 
   it("adds DATABASE_URL for a server database and drops the required block without sign-in", () => {
-    expect(generateEnvExample(answers({ database: "postgres" }))).toContain("\nDATABASE_URL=\n");
+    expect(generateEnvExample(answers({ database: "postgres" }))).toContain(
+      "\nDATABASE_URL=postgres://user:password@host:5432/dbname\n",
+    );
+    expect(generateEnvExample(answers({ database: "mysql" }))).toContain(
+      "\nDATABASE_URL=mysql://user:password@host:3306/dbname\n",
+    );
     const open = generateEnvExample(answers({ auth: "none" }));
     expect(open).not.toContain("# Required");
     expect(open).toContain("# PORT=3000");
+  });
+});
+
+describe("SHELF_DATA_DIR in .env.example", () => {
+  it("says the SQLite file lives there only for a file database", () => {
+    expect(generateEnvExample(answers())).toContain("where the SQLite file and local uploads live");
+    const server = generateEnvExample(answers({ database: "postgres" }));
+    expect(server).not.toContain("SQLite");
+    expect(server).toContain("# where local uploads live\n# SHELF_DATA_DIR=./data");
   });
 });
 

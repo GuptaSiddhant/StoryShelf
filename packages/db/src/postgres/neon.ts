@@ -9,6 +9,7 @@
 import { Pool, type PoolClient } from "@neondatabase/serverless";
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/neon-serverless";
+import { assertPostgresUrl, createNoticeSink, nameFailure } from "./connection.ts";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
@@ -51,8 +52,21 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
     );
   }
 
+  if (connectionString) {
+    assertPostgresUrl(connectionString);
+  }
+
   const owned = !options.client;
+  const sink = createNoticeSink();
   const pool = options.client ?? new Pool({ connectionString });
+  if (owned) {
+    // Every connection emits `notice`: it goes to the adapter's logger at debug.
+    pool.on("connect", (client) => {
+      client.on("notice", (notice) => {
+        sink.notice(notice);
+      });
+    });
+  }
   const db = drizzle({ client: pool });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
@@ -69,10 +83,15 @@ export function createNeonDatabase(options: NeonDatabaseOptions): DatabaseAdapte
     },
     tables: schema,
     migrate: async ({ logger, release }) => {
-      await runMigrationsLocked(sessionFor(pool), logger, release);
-      if (pooled) {
-        await activateRetention(db, retention);
+      if (logger) {
+        sink.attach(logger);
       }
+      await nameFailure(owned ? connectionString : undefined, async () => {
+        await runMigrationsLocked(sessionFor(pool), logger, release);
+        if (pooled) {
+          await activateRetention(db, retention);
+        }
+      });
     },
     close: async () => {
       if (owned) {

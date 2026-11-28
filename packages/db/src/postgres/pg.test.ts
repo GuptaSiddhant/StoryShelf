@@ -25,6 +25,23 @@ describe("createPgDatabase", () => {
     expect(() => createPgDatabase({})).toThrow("provide `url`");
   });
 
+  it("refuses a URL without a scheme, naming DATABASE_URL", () => {
+    expect(() => createPgDatabase({ url: "localhost:5433/shelf" })).toThrow("DATABASE_URL");
+  });
+
+  it("ends a failed start with one line naming host, port and database, never the password", async () => {
+    const db = createPgDatabase({
+      url: "postgres://me:hunter2@127.0.0.1:1/shelf",
+      connectionTimeoutMillis: 1000,
+    });
+    const failed = db.lifecycle?.setup({ config: {}, logger: undefined as never });
+    await expect(failed).rejects.toThrow(/^cannot start the database at 127\.0\.0\.1:1\/shelf: /u);
+    await failed?.catch((error: Error) => {
+      expect(error.message).not.toMatch(/hunter2|me:/u);
+    });
+    await db.lifecycle?.teardown();
+  });
+
   it("runs the shared DDL on setup", async () => {
     const pool = createRecordingPool();
     const db = createPgDatabase({ client: pool as unknown as Pool });

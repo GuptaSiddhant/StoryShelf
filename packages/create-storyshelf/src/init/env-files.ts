@@ -18,7 +18,7 @@ const ENV_HELP: Record<string, { example: string; note: string }> = {
 /** Optional variables every scaffold reads, commented out in `.env.example`. */
 const OPTIONAL_ENV: readonly (readonly [string, string, string])[] = [
   ["PORT", "3000", "the port to listen on"],
-  ["SHELF_DATA_DIR", "./data", "where the SQLite file and local uploads live"],
+  ["SHELF_DATA_DIR", "./data", "where local uploads live"],
   [
     "SHELF_ADMIN_TOKEN",
     "",
@@ -26,13 +26,35 @@ const OPTIONAL_ENV: readonly (readonly [string, string, string])[] = [
   ],
 ];
 
+/** The databases that keep their file in `SHELF_DATA_DIR`. */
+const FILE_DATABASES: readonly Answers["database"][] = ["sqlite", "better-sqlite3", "bun-sqlite"];
+
+/** A `DATABASE_URL` that shows the shape: MySQL-family servers use `mysql://`, the rest `postgres://`. */
+export function databaseUrlExample(database: Answers["database"]): string {
+  return ["mysql", "planetscale", "tidb"].includes(database)
+    ? "mysql://user:password@host:3306/dbname"
+    : "postgres://user:password@host:5432/dbname";
+}
+
+/** The optional variables; `SHELF_DATA_DIR` holds the database file only for a file database. */
+function optionalEnv(answers: Answers): readonly (readonly [string, string, string])[] {
+  return OPTIONAL_ENV.map(([name, value, note]) =>
+    name === "SHELF_DATA_DIR" && FILE_DATABASES.includes(answers.database)
+      ? [name, value, "where the SQLite file and local uploads live"]
+      : [name, value, note],
+  );
+}
+
 /** The `.env.example` of a scaffold: required variables first, optional ones commented out. */
 export function generateEnvExample(answers: Answers): string {
+  const optional = optionalEnv(answers).map(
+    ([name, value, note]) => `# ${note}\n# ${name}=${value}`,
+  );
   const required = requiredEnv(answers).map((name) => {
     const help = ENV_HELP[name];
-    return `# ${help?.note ?? name}\n${name}=${help?.example ?? ""}`;
+    const example = name === "DATABASE_URL" ? databaseUrlExample(answers.database) : help?.example;
+    return `# ${help?.note ?? name}\n${name}=${example ?? ""}`;
   });
-  const optional = OPTIONAL_ENV.map(([name, value, note]) => `# ${note}\n# ${name}=${value}`);
   return [
     "# Copy to .env and fill in; the server reads it at start. Never commit .env.",
     ...(required.length > 0 ? ["", "# Required", ...required] : []),

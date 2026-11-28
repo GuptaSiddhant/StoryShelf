@@ -70,6 +70,14 @@ describe("printNextSteps", () => {
     );
   });
 
+  it("shows the shape of DATABASE_URL for a server database", () => {
+    printNextSteps(answers({ database: "postgres" }), "npm");
+    expect(printed).toContain("export DATABASE_URL=postgres://user:password@host:5432/dbname");
+    printed = "";
+    printNextSteps(answers({ database: "mysql" }), "npm");
+    expect(printed).toContain("export DATABASE_URL=mysql://user:password@host:3306/dbname");
+  });
+
   it("points a single container at docker:build and docker:run", () => {
     printNextSteps(answers({ deployTarget: "docker", docker: true }), "npm");
     expect(printed).toContain("npm run docker:build");
