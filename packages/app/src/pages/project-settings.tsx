@@ -31,6 +31,7 @@ import {
 } from "./settings-notifications.tsx";
 import { renderSettingsReview } from "./settings-review.tsx";
 import {
+  ADMIN_ONLY_SECTIONS,
   SETTINGS_TABS,
   TAB_LABELS,
   sectionsOf,
@@ -131,10 +132,14 @@ function integrationShown(section: SettingsSection, data: ProjectSettingsData): 
 }
 
 /**
- * A section shows when its page exists: `testing` sections need testing, the AI section needs AI,
- * and an integration section needs an offered provider (or a site admin to tell).
+ * A section shows when its page exists: admin-only sections need an admin (#1473), `testing`
+ * sections need testing, the AI section needs AI, and an integration section needs an offered
+ * provider (or a site admin to tell).
  */
 function sectionShown(section: SettingsSection, data: ProjectSettingsData): boolean {
+  if (ADMIN_ONLY_SECTIONS.has(section) && !data.isAdmin) {
+    return false;
+  }
   if (TESTING_SECTIONS.has(section) && !testingEnabled()) {
     return false;
   }

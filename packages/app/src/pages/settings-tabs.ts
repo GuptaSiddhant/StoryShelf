@@ -62,6 +62,22 @@ export const SECTION_TAB: Record<SettingsSection, SettingsTab> = {
   insights: "insights",
 };
 
+/**
+ * The sections only a project admin (or a site admin) sees: they list tokens, webhooks, git links,
+ * design credentials and the AI profile, so the page neither loads nor renders them for anyone
+ * else (issue #1473). The one gate for the page: `loadSettingsData` skips their data and
+ * `sectionShown` skips their markup. A section that mixes admin and member content
+ * (notifications: the channels are admin-only, "my notifications" is every member's) is not
+ * listed; it hides its admin part from the data it is given.
+ */
+export const ADMIN_ONLY_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+  "tokens",
+  "webhooks",
+  "git",
+  "design",
+  "ai",
+]);
+
 /** The sections of a tab, top to bottom. */
 export function sectionsOf(tab: SettingsTab): SettingsSection[] {
   return (Object.keys(SECTION_TAB) as SettingsSection[]).filter(

@@ -92,9 +92,10 @@ const accessTokens = [
   },
 ] as ProjectSettingsData["tokens"];
 
+/** Webhook URLs reach the page already masked (`maskUrlForDisplay`, #1473): origin and a short tail. */
 const accessWebhooks = [
-  { id: "w1", url: "https://example.com/hooks/storyshelf", events: [] },
-  { id: "w2", url: "https://ci.example.com/hook", events: ["build.approved", "build.rejected"] },
+  { id: "w1", url: "https://hooks.slack.com/…/9xQz", events: [] },
+  { id: "w2", url: "https://ci.example.com/…", events: ["build.approved", "build.rejected"] },
 ];
 
 /** Access with members, group mappings, tokens and webhooks listed. */
@@ -115,7 +116,6 @@ export const AccessList = pageStory(() =>
   }),
 );
 
-/** Access when nothing is configured: each list shows its empty state with the Add action. */
 /** A member whose account row is gone: the roster says so, never the user id. */
 export const AccessMemberUnknown = pageStory(() =>
   page("access", {
@@ -133,6 +133,7 @@ export const AccessMemberUnknown = pageStory(() =>
   }),
 );
 
+/** Access when nothing is configured: each list shows its empty state with the Add action. */
 export const AccessEmpty = pageStory(() => page("access", {}));
 
 /** Access for a member who is not an admin: no Add, Edit or Remove. */
@@ -150,6 +151,19 @@ export const AccessNotAdmin = pageStory(() =>
         email: "ana@example.com",
       },
     ],
+  }),
+);
+
+/**
+ * A Viewer gets the roster and nothing else on Access, even if the data held tokens and webhooks:
+ * the tokens and webhooks sections are admin-only (#1473), so neither renders.
+ */
+export const AccessViewerSeesNoTokensOrWebhooks = pageStory(() =>
+  page("access", {
+    isAdmin: false,
+    members: accessMembers,
+    tokens: accessTokens,
+    webhooks: accessWebhooks,
   }),
 );
 

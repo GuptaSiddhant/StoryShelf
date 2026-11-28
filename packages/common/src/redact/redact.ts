@@ -65,3 +65,31 @@ export function redactUrlForLog(url: string): string {
     return "[invalid url]";
   }
 }
+
+/** Characters of a webhook URL's last path segment that stay visible, and the shortest segment that may show them. */
+const MASK_TAIL = 4;
+const MASK_MIN_SEGMENT = 12;
+
+/**
+ * A URL for a person to recognise, never to use: its origin and, when the path ends in a long
+ * enough segment (an incoming-webhook token), `/…/` plus that segment's last four characters, as
+ * `https://hooks.slack.com/…/abcd`. A short or missing last segment shows only `/…` or nothing, so
+ * the tail never gives away a meaningful part of the secret. The userinfo, query and fragment are
+ * dropped by construction. Use it wherever a stored webhook or channel URL is displayed.
+ */
+export function maskUrlForDisplay(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const origin = `${parsed.protocol}//${parsed.host}`;
+    const segments = parsed.pathname.split("/").filter((segment) => segment !== "");
+    const last = segments.at(-1);
+    if (last === undefined) {
+      return origin;
+    }
+    return last.length >= MASK_MIN_SEGMENT && segments.length > 1
+      ? `${origin}/…/${last.slice(-MASK_TAIL)}`
+      : `${origin}/…`;
+  } catch {
+    return "[invalid url]";
+  }
+}

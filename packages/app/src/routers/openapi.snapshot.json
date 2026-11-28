@@ -5767,6 +5767,7 @@
       "get": {
         "tags": ["Webhooks"],
         "summary": "List webhooks",
+        "description": "Admin only. Each URL is masked to its origin and the end of its path: the full URL is a secret and is never returned.",
         "parameters": [
           {
             "schema": {

@@ -280,6 +280,16 @@ export const GitChannelsStopping = pageStory(() =>
     notificationChannels: [githubChannel, { ...githubChannel, id: "01JD000000000000000000CHN004" }],
     notifyProviders: providers,
     mySubscription: subscribed,
+    isAdmin: true,
+  }),
+);
+
+/** A member who is not an admin: only their own notification switches, never the channels (#1473). */
+export const NotAdminOnlyOwnSwitches = pageStory(() =>
+  settingsPage({
+    notificationChannels: [],
+    notifyProviders: providers,
+    mySubscription: subscribed,
     isAdmin: false,
   }),
 );

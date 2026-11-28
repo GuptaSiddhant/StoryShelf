@@ -121,7 +121,7 @@ export {
   type FailureLink,
 } from "./error-text.ts";
 export { UserFacingError, isUserFacingError } from "./user-facing-error.ts";
-export { redactSecrets, sanitizeErrorText } from "./redact.ts";
+export { maskUrlForDisplay, redactSecrets, sanitizeErrorText } from "./redact.ts";
 export { addTiming, roundedTimings, runWithTimings, timed, type TimingMap } from "./timing.ts";
 export { slugify, ulid } from "./ulid.ts";
 export { zipStream, type ZipSource } from "./zip-write.ts";
