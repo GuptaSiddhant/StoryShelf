@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSecrets, sanitizeErrorText } from "./redact.ts";
+import { maskUrlForDisplay, redactSecrets, sanitizeErrorText } from "./redact.ts";
 
 describe("redactSecrets", () => {
   it("redacts URL credentials", () => {
@@ -63,5 +63,43 @@ describe("redactSecrets: app tokens", () => {
   it("scrubs a signed JWT", () => {
     const jwt = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiIxMjM0NTYifQ.c2lnbmF0dXJl";
     expect(redactSecrets(`bad credentials ${jwt}`)).toBe("bad credentials [redacted]");
+  });
+});
+
+describe("maskUrlForDisplay", () => {
+  it("keeps the origin and the last four characters of a long last segment", () => {
+    expect(maskUrlForDisplay("https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXabcd")).toBe(
+      "https://hooks.slack.com/…/abcd",
+    );
+  });
+
+  it("shows no tail for a short last segment", () => {
+    expect(maskUrlForDisplay("https://example.com/hooks/ab12")).toBe("https://example.com/…");
+  });
+
+  it("shows no tail when the secret is the only path segment", () => {
+    expect(maskUrlForDisplay("https://example.com/SECRETSECRETSECRET")).toBe(
+      "https://example.com/…",
+    );
+  });
+
+  it("shows only the origin for a URL with no path", () => {
+    expect(maskUrlForDisplay("https://example.com")).toBe("https://example.com");
+  });
+
+  it("drops userinfo, query and fragment, and keeps a port", () => {
+    const masked = maskUrlForDisplay("https://user:pw@example.com:8443/a/b?token=SECRET#frag");
+    expect(masked).toBe("https://example.com:8443/…");
+    expect(masked).not.toMatch(/pw|SECRET|frag/u);
+  });
+
+  it("never prints the middle of the path", () => {
+    expect(
+      maskUrlForDisplay("https://h.example/services/T0AAA/B0BBB/SECRETPATHVALUE1234"),
+    ).not.toContain("SECRETPATH");
+  });
+
+  it("does not echo an unparseable value", () => {
+    expect(maskUrlForDisplay("not a url with SECRET")).toBe("[invalid url]");
   });
 });

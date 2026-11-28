@@ -21,7 +21,7 @@ import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
 import type { Token } from "@storyshelf/core/schema";
 import type { AuthUser } from "@storyshelf/core/types";
-import { sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
+import { maskUrlForDisplay, sanitizeErrorText, type SecretInput } from "@storyshelf/core/utils";
 import type { Context } from "hono";
 import { credentialKeys } from "../credential-keys.ts";
 import { unofferedIntegrations, unofferedReason } from "../integrations.ts";
@@ -92,7 +92,7 @@ async function loadWebhookSummaries(
   const webhooksDb = await new WebhookModel(db).list(projectId);
   return webhooksDb.map((webhook) => ({
     id: webhook.id,
-    url: webhook.url,
+    url: maskUrlForDisplay(webhook.url),
     events: WebhookModel.eventsOf(webhook),
   }));
 }
@@ -201,43 +201,61 @@ async function loadMySubscription(
   };
 }
 
-/** Notification channels, providers, and my subscription for the UI. */
+/** Notification providers and my subscription for the UI (the channels are admin data). */
 async function loadNotificationSection(
   db: DatabaseAdapter,
-  secret: SecretInput,
   projectId: string,
   userId: string | undefined,
   notifiers: readonly NotifierProvider[],
 ): Promise<{
-  notificationChannels: SettingsNotificationChannel[];
   notifyProviders: SettingsNotifyProvider[];
   mySubscription: SettingsMySubscription | null;
 }> {
-  const notificationChannels = await loadNotificationChannels(db, secret, projectId, notifiers);
   const mySubscription = await loadMySubscription(db, projectId, userId);
   const notifyProviders = notifiers.map((candidate) => ({
     kind: candidate.metadata.kind,
     name: candidate.metadata.name,
     delivery: deliveryOf(notifiers, candidate.metadata.kind),
   }));
-  return { notificationChannels, notifyProviders, mySubscription };
+  return { notifyProviders, mySubscription };
 }
 
-/** Roster, tokens and webhooks for the settings UI. */
-async function loadInventorySection(
-  db: DatabaseAdapter,
-  projectId: string,
-): Promise<{
-  labelTypes: LabelType[];
-  members: SettingsMember[];
-  groupMappings: ProjectGroupMapping[];
+/** Admin-only data (#1473): what the settings page shows only to a project or site admin. */
+interface AdminSettingsData {
   tokens: Omit<Token, "hash">[];
   webhooks: SettingsWebhook[];
-}> {
-  const { labelTypes, members, groupMappings } = await loadMembersSection(db, projectId);
-  const tokens = await loadTokenSummaries(db, projectId);
-  const webhooks = await loadWebhookSummaries(db, projectId);
-  return { labelTypes, members, groupMappings, tokens, webhooks };
+  notificationChannels: SettingsNotificationChannel[];
+  design: SettingsDesignData;
+  git: SettingsGitData | null;
+}
+
+/** What a caller below admin is given in place of `AdminSettingsData`: nothing was read. */
+const NO_ADMIN_DATA: AdminSettingsData = {
+  tokens: [],
+  webhooks: [],
+  notificationChannels: [],
+  design: { files: [], components: [], providers: [] },
+  git: null,
+};
+
+/**
+ * Tokens, webhooks, channels, design credentials and git links, read only for an admin. This is the
+ * data half of the settings gate (`ADMIN_ONLY_SECTIONS` is the markup half): a Viewer's page is
+ * built from `NO_ADMIN_DATA`, so a section added later cannot leak what was never loaded.
+ */
+async function loadAdminData(project: Project, isAdmin: boolean): Promise<AdminSettingsData> {
+  if (!isAdmin) {
+    return NO_ADMIN_DATA;
+  }
+  const { db, config, design: designProviders, notifiers } = getStore();
+  const keys = credentialKeys(config);
+  return {
+    tokens: await loadTokenSummaries(db, project.id),
+    webhooks: await loadWebhookSummaries(db, project.id),
+    notificationChannels: await loadNotificationChannels(db, keys, project.id, notifiers),
+    design: await loadDesignSection(db, keys, designProviders, project.id),
+    git: await loadGitSection(project),
+  };
 }
 
 /** Package links plus the other projects that can be picked as upstream. */
@@ -327,27 +345,13 @@ async function loadSettingsData(slug: string): Promise<SettingsData | null> {
   if (!project) {
     return null;
   }
-  const { db, config, user, authEnabled, design: designProviders, notifiers } = getStore();
-  const inventory = await loadInventorySection(db, project.id);
-  const notifications = await loadNotificationSection(
-    db,
-    credentialKeys(config),
-    project.id,
-    user?.id,
-    notifiers,
-  );
-  const isAdmin = isProjectAdmin(authEnabled, user, inventory.members);
+  const { db, user, authEnabled, notifiers } = getStore();
+  const roster = await loadMembersSection(db, project.id);
+  const isAdmin = isProjectAdmin(authEnabled, user, roster.members);
+  const notifications = await loadNotificationSection(db, project.id, user?.id, notifiers);
   const linksSection = await loadLinksSection(db, project);
-  const design = await loadDesignSection(db, credentialKeys(config), designProviders, project.id);
-  return {
-    project,
-    ...inventory,
-    ...notifications,
-    ...linksSection,
-    design,
-    isAdmin,
-    git: await loadGitSection(project),
-  };
+  const adminData = await loadAdminData(project, isAdmin);
+  return { project, ...roster, ...notifications, ...linksSection, ...adminData, isAdmin };
 }
 
 /**

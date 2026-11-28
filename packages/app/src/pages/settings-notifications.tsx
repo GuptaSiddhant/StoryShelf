@@ -391,13 +391,15 @@ export function renderSettingsNotifications(
       ) : null}
       {formState?.globalError ? <Alert tone="danger">{formState.globalError}</Alert> : null}
       {personal ? <MyNotificationsCard project={project} mySubscription={mySubscription} /> : null}
-      <ChannelsSection
-        project={project}
-        channels={channels}
-        messageKinds={messageProviders.map(({ kind, name }) => ({ kind, name }))}
-        isAdmin={isAdmin}
-        paused={paused === true}
-      />
+      {isAdmin ? (
+        <ChannelsSection
+          project={project}
+          channels={channels}
+          messageKinds={messageProviders.map(({ kind, name }) => ({ kind, name }))}
+          isAdmin={isAdmin}
+          paused={paused === true}
+        />
+      ) : null}
     </VStack>
   );
 }

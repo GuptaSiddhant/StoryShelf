@@ -17,6 +17,7 @@ import { ADD_WEBHOOK_DIALOG } from "./token-forms.tsx";
 /** Webhook row as rendered in the webhooks settings tab. */
 export interface SettingsWebhook {
   id: string;
+  /** The URL as `maskUrlForDisplay` shows it: never the full secret path (#1473). */
   url: string;
   events: string[];
 }

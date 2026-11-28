@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { WebhookModel } from "@storyshelf/core/models";
 import type { ProjectRole } from "@storyshelf/core/types";
+import { maskUrlForDisplay } from "@storyshelf/core/utils";
 import { HTTPException } from "hono/http-exception";
 import type { ShelfRouter } from "../app-types.ts";
 import { resolveAuthorizedProject, notFound } from "./helpers.ts";
@@ -18,6 +19,8 @@ const listWebhooksRoute = createRoute({
   method: "get",
   tags: ["Webhooks"],
   summary: "List webhooks",
+  description:
+    "Admin only. Each URL is masked to its origin and the end of its path: the full URL is a secret and is never returned.",
   path: "/api/v1/projects/{slug}/webhooks",
   request: { params: z.object({ slug: z.string() }) },
   responses: {
@@ -68,7 +71,7 @@ export function registerWebhooks(app: ShelfRouter): void {
     return c.json(
       webhooks.map((webhook) => ({
         id: webhook.id,
-        url: webhook.url,
+        url: maskUrlForDisplay(webhook.url),
         events: WebhookModel.eventsOf(webhook),
       })),
     );
@@ -82,7 +85,10 @@ export function registerWebhooks(app: ShelfRouter): void {
       throw new HTTPException(400, { message: refusal });
     }
     const { webhook, secret } = await webhookModel().issue(project.id, body);
-    return c.json({ id: webhook.id, url: webhook.url, events: body.events ?? [], secret }, 201);
+    return c.json(
+      { id: webhook.id, url: maskUrlForDisplay(webhook.url), events: body.events ?? [], secret },
+      201,
+    );
   });
 
   app.openapi(deleteWebhookRoute, async (c) => {
