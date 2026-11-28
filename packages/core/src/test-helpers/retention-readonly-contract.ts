@@ -64,11 +64,13 @@ async function prepared(harness: RetentionReadOnlyHarness, release: string): Pro
   await harness.boot(release);
 }
 
-async function refusal(tool: DatabaseAdapter, release: string | undefined): Promise<Error> {
-  const error = await tool
-    .activateRetentionReadOnly?.({ release })
-    .then(() => undefined)
-    .catch((caught: unknown) => caught as Error);
+async function refusal(tool: DatabaseAdapter, release?: string): Promise<Error> {
+  let error: Error | undefined;
+  try {
+    await tool.activateRetentionReadOnly?.({ release });
+  } catch (caught) {
+    error = caught as Error;
+  }
   expect(error).toBeInstanceOf(RetentionNotReadyError);
   expect(tool.buildReferenceLifecycle).toBeUndefined();
   // One plain line that names the fix.
@@ -144,7 +146,7 @@ export function retentionReadOnlyContractSuite(
         await prepared(harness, "1.2.3");
 
         await refusal(harness.open(), "0.0.0");
-        await refusal(harness.open(), undefined);
+        await refusal(harness.open());
       });
     });
 

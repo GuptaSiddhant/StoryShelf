@@ -22,31 +22,29 @@ describe("schemaServesRelease", () => {
   });
 });
 
-describe("assertRetentionReady", () => {
-  const store = (version: string | null) => ({ read: async () => version, write: async () => {} });
+const store = (version: string | null) => ({ read: async () => version, write: async () => {} });
 
+describe("assertRetentionReady", () => {
   it("passes when the level fits and no query finds a problem", async () => {
     await expect(
       assertRetentionReady({ release: "1.2.3", store: store("1.2.3"), query: async () => [] }),
     ).resolves.toBeUndefined();
   });
 
-  it("reads the invalid source rows as arrays or as objects", async () => {
-    for (const row of [
-      ["base", "two", "tombstoned"],
-      { id: "base", source_build_id: "two", problem: "tombstoned" },
-    ]) {
-      const query = async (sql: string) => (sql.includes("CASE WHEN") ? [row] : []);
-      const error = await assertRetentionReady({
-        release: "1.2.3",
-        store: store("1.2.3"),
-        query,
-      }).catch((caught: unknown) => caught as Error);
-      expect(error).toBeInstanceOf(RetentionNotReadyError);
-      expect((error as Error).message).toMatch(
-        /baseline base has an invalid source build two \(tombstoned\)/u,
-      );
-    }
+  it.each([
+    ["an array", ["base", "two", "tombstoned"]],
+    ["an object", { id: "base", source_build_id: "two", problem: "tombstoned" }],
+  ])("reads the invalid source row as %s", async (_shape, row) => {
+    const query = async (sql: string) => (sql.includes("CASE WHEN") ? [row] : []);
+    const error = await assertRetentionReady({
+      release: "1.2.3",
+      store: store("1.2.3"),
+      query,
+    }).catch((caught: unknown) => caught as Error);
+    expect(error).toBeInstanceOf(RetentionNotReadyError);
+    expect((error as Error).message).toMatch(
+      /baseline base has an invalid source build two \(tombstoned\)/u,
+    );
   });
 
   it("refuses before running any query when the schema level does not fit", async () => {
