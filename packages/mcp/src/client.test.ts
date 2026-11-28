@@ -38,6 +38,16 @@ describe("createApiClient", () => {
     await expect(call).rejects.toThrow(/forbidden/u);
     await expect(call).rejects.not.toThrow(/secret/u);
   });
+
+  it("gives a 403 the role reason, not a comments reason", async () => {
+    stubFetch(new Response("", { status: 403 }));
+    const client = createApiClient({ url: "https://s.example", token: "tok" });
+    const failure = await client.get("/projects").catch((error: unknown) => error);
+    expect((failure as ToolError).message).toBe(
+      "StoryShelf API: forbidden: this token's role does not allow that",
+    );
+    expect((failure as ToolError).message).not.toContain("comments");
+  });
 });
 
 describe("toToolError", () => {

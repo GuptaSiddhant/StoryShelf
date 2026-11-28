@@ -61,7 +61,7 @@ function toQueryString(query: Record<string, string | number | undefined> | unde
 
 const STATUS_HINTS: Record<number, string> = {
   401: "authentication failed: check SHELF_TOKEN",
-  403: "forbidden: this token's role does not allow that (comments need developer or above)",
+  403: "forbidden: this token's role does not allow that",
   404: "not found: check the project slug and build id",
   409: "conflict: AI insights are disabled for this project",
   501: "AI is not configured on this StoryShelf server",

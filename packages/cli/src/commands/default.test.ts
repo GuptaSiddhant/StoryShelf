@@ -1,4 +1,3 @@
-import { Command } from "commander";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -79,7 +78,7 @@ describe("bare storyshelf", () => {
     out = "";
     err = "";
     resetTokenFlagWarning();
-    await runDefaultCommand(new Command(), seam);
+    await runDefaultCommand(seam);
     expect(resolved(out)).toEqual(viaUpload.out);
     expect(err).toBe(viaUpload.err);
     expect(viaUpload.out.join("\n")).toContain("as head-sha on feature/x");
@@ -89,7 +88,7 @@ describe("bare storyshelf", () => {
   it("takes the PR head from the CI provider, not GITHUB_SHA", async () => {
     writeProject();
     stubPullRequest();
-    await runDefaultCommand(new Command(), { cwd: dir, dryRun: true });
+    await runDefaultCommand({ cwd: dir, dryRun: true });
     expect(out).toContain("as head-sha on feature/x");
     expect(out).not.toContain("merge-sha");
   });
@@ -97,7 +96,7 @@ describe("bare storyshelf", () => {
   it("needs no CI variables: local git or a synthesized identity is enough", async () => {
     writeProject();
     vi.stubEnv("SHELF_TOKEN", "env-token");
-    await runDefaultCommand(new Command(), { cwd: dir, dryRun: true });
+    await runDefaultCommand({ cwd: dir, dryRun: true });
     expect(out).toContain("Dry run");
     expect(process.exitCode).toBeUndefined();
   });
@@ -105,7 +104,7 @@ describe("bare storyshelf", () => {
   it("names the missing token, and exits 1 without printing the help", async () => {
     writeProject();
     vi.stubEnv("SHELF_TOKEN", "");
-    await runDefaultCommand(new Command(), { cwd: dir, dryRun: true });
+    await runDefaultCommand({ cwd: dir, dryRun: true });
     expect(err).toContain("no token");
     expect(err).toContain("SHELF_TOKEN");
     expect(out).not.toContain("Usage");
@@ -116,22 +115,37 @@ describe("bare storyshelf", () => {
     writeProject({ slug: "demo" });
     vi.stubEnv("SHELF_TOKEN", "env-token");
     vi.stubEnv("SHELF_URL", "");
-    await runDefaultCommand(new Command(), { cwd: dir, dryRun: true });
+    await runDefaultCommand({ cwd: dir, dryRun: true });
     expect(err).toContain("no server URL");
     expect(err).toContain("SHELF_URL");
     await expect(runUpload({ cwd: dir, dryRun: true })).rejects.toThrow("no server URL");
   });
 
-  it("prints the help and points at init when there is no config", async () => {
-    const program = new Command("storyshelf");
-    await runDefaultCommand(program, { cwd: dir });
+  it("points at init in one line and does not print the help when there is no config", async () => {
+    await runDefaultCommand({ cwd: dir });
     expect(err).toContain("storyshelf init");
+    expect(err.trim().split("\n")).toHaveLength(1);
+    expect(out).not.toContain("Usage:");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("names the workspace package that holds the Storybook when the root has none", async () => {
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "root", workspaces: ["packages/*"] }),
+    );
+    mkdirSync(join(dir, "packages", "ui", ".storybook"), { recursive: true });
+    writeFileSync(join(dir, "packages", "ui", ".storybook", "main.ts"), "export default {};\n");
+    await runDefaultCommand({ cwd: dir });
+    expect(err).toContain("found packages/ui/.storybook: run this from packages/ui");
+    expect(err).toContain("working-directory");
+    expect(out).not.toContain("Usage:");
     expect(process.exitCode).toBe(1);
   });
 
   it("reports a token key in the config as an error naming the key", async () => {
     writeProject({ slug: "demo", url: "https://shelf.example.com", token: "shelf_leaked" });
-    await runDefaultCommand(new Command(), { cwd: dir, dryRun: true });
+    await runDefaultCommand({ cwd: dir, dryRun: true });
     expect(err).toContain('"token" key');
     expect(err).not.toContain("shelf_leaked");
     expect(process.exitCode).toBe(1);
