@@ -94,9 +94,9 @@ describe("maskUrlForDisplay", () => {
   });
 
   it("never prints the middle of the path", () => {
-    expect(maskUrlForDisplay("https://h.example/services/T0AAA/B0BBB/SECRETPATHVALUE1234")).not.toContain(
-      "SECRETPATH",
-    );
+    expect(
+      maskUrlForDisplay("https://h.example/services/T0AAA/B0BBB/SECRETPATHVALUE1234"),
+    ).not.toContain("SECRETPATH");
   });
 
   it("does not echo an unparseable value", () => {
