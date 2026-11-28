@@ -1,5 +1,6 @@
 import type { Project } from "@storyshelf/core/schema";
 import type { ProjectGroupMapping } from "@storyshelf/core/schema";
+import type { User } from "@storyshelf/core/schema";
 import type { FC } from "hono/jsx";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
@@ -25,6 +26,28 @@ export interface SettingsMember {
   userId: string;
   role: string;
   createdAt: string;
+  /** What the roster shows for the member: the display name, else the profile name, else the email. */
+  name: string;
+  /** The member's sign-in email, or null when the member has no account row. */
+  email: string | null;
+}
+
+/**
+ * The name and email a roster row shows for a member. A name that is an address is not shown as a
+ * name (sign-in paths without a profile name store the email there), and a member with no account
+ * row is "Unknown user", never their id.
+ */
+export function memberIdentityOf(
+  user: Pick<User, "email" | "name" | "displayNameOverride"> | null,
+): Pick<SettingsMember, "name" | "email"> {
+  if (!user) {
+    return { name: "Unknown user", email: null };
+  }
+  const named = [user.displayNameOverride, user.name].find(
+    (value): value is string =>
+      typeof value === "string" && value.trim() !== "" && !value.includes("@"),
+  );
+  return { name: named?.trim() ?? user.email, email: user.email };
 }
 
 /** A Remove button that posts its own form (confirm first). */
@@ -42,9 +65,9 @@ const RemoveForm: FC<{ action: string; confirm: string }> = ({ action, confirm }
 function memberItems(project: Project, members: SettingsMember[], isAdmin: boolean): SummaryItem[] {
   return members.map((member) => ({
     id: member.id,
-    name: member.userId,
+    name: member.name,
     state: { label: statusLabel(member.role), tone: "neutral" },
-    details: `Since ${formatAbsolute(member.createdAt, "date")}`,
+    details: `${member.email && member.email !== member.name ? `${member.email} · ` : ""}Since ${formatAbsolute(member.createdAt, "date")}`,
     actions: isAdmin ? (
       <RemoveForm
         action={`/projects/${project.slug}/settings/members/${member.userId}/remove`}
