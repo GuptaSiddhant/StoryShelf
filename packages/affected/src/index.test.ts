@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { computeAffected } from "./index.ts";
+import { BASELINE_NOT_IN_CHECKOUT, computeAffected } from "./index.ts";
 
 let dir: string;
 
@@ -80,6 +80,20 @@ describe("computeAffected", () => {
     });
     expect(result.affectedImportPaths).toBeNull();
     expect(result.fullReason).toBe("story-index-unreadable");
+  });
+
+  it("names a baseline the checkout does not hold as BASELINE_NOT_IN_CHECKOUT", async () => {
+    const missing = "deadbeef".repeat(5);
+    const head = git(["rev-parse", "HEAD"]);
+    const result = await computeAffected({
+      cwd: dir,
+      buildDir: "static",
+      baseSha: missing,
+      headSha: head,
+    });
+    expect(result.affectedImportPaths).toBeNull();
+    expect(result.fullReason).toBe(BASELINE_NOT_IN_CHECKOUT);
+    expect(result.baselineSha).toBe(missing);
   });
 
   it("never throws outside a repository", async () => {

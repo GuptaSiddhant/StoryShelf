@@ -585,6 +585,38 @@ describe("runUpload affected capture", () => {
     });
   });
 
+  it("prints one line naming the baseline when the checkout does not hold it", async () => {
+    git(dir, ["-c", "init.defaultBranch=main", "init"]);
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "a.tsx"), "v1");
+    writeBuild(dir);
+    mkdirSync(join(dir, ".storybook"), { recursive: true });
+    writeFileSync(join(dir, ".storybook", "storyshelf.json"), JSON.stringify({ slug: "demo" }));
+    commitAll(dir, "base");
+    const head = git(dir, ["rev-parse", "HEAD"]);
+    // A full-length commit id this checkout has never fetched (a shallow clone's missing parent).
+    const missing = "abcdef1234567890abcdef1234567890abcdef12";
+    stubFetch({ build: { id: "b1" }, uploadUrl: "/x", baselineSha: missing });
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await runUpload({
+      url: "https://shelf.example.com",
+      token: "ci-token",
+      sha: head,
+      buildDir: "storybook-static",
+      cwd: dir,
+      zip: true,
+    });
+
+    const output = write.mock.calls.map(([chunk]) => String(chunk)).join("");
+    write.mockRestore();
+    expect(output.split("\n")).toContain(
+      "Full capture: the baseline commit abcdef1 is not in this checkout (shallow clone? fetch more history): rendering all stories",
+    );
+    expect(output).not.toContain("fatal");
+    expect(output).not.toContain("Command failed");
+  });
+
   it("synthesizes a local identity outside a git repository", async () => {
     // Ambient CI env (e.g. GITHUB_SHA on Actions runners) would take
     // precedence over synthesis — blank it so this tests the fallback.

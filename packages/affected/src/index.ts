@@ -1,4 +1,10 @@
-import { changedFiles, gitRepoRoot, gitRepoStatus, MAX_CHANGED_FILES } from "./git.ts";
+import {
+  changedFiles,
+  GitCommandError,
+  gitRepoRoot,
+  gitRepoStatus,
+  MAX_CHANGED_FILES,
+} from "./git.ts";
 import {
   keyOfChangedFile,
   keyOfStoryFile,
@@ -9,6 +15,12 @@ import {
 import { loadDepGraph, loadStoryImportPaths, statsPathFor } from "./stats.ts";
 import { matchesAnyGlob, traceAffected } from "./trace.ts";
 import type { AffectedInput, AffectedResult, DepGraph } from "./types.ts";
+
+/**
+ * `fullReason` when the baseline commit is not in the checkout (a shallow clone, or a commit never
+ * fetched). The CLI names the commit itself from `baselineSha`.
+ */
+export const BASELINE_NOT_IN_CHECKOUT = "baseline-not-in-checkout";
 
 /**
  * Compute the affected story set for an upload. Never throws: every failure
@@ -113,9 +125,19 @@ async function computeSelective(input: AffectedInput): Promise<AffectedResult> {
     changed = guardedChanged(input);
     return await traceSelective(input, changed, base);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "affected-computation-failed";
-    return fullResult(changed, input.baseSha, reason);
+    return fullResult(changed, input.baseSha, reasonOf(error));
   }
+}
+
+/**
+ * The `fullReason` for a failure: a missing baseline, git's first line for any other git failure,
+ * or the reason string a guard threw.
+ */
+function reasonOf(error: unknown): string {
+  if (error instanceof GitCommandError) {
+    return error.unknownRevision ? BASELINE_NOT_IN_CHECKOUT : error.message;
+  }
+  return error instanceof Error ? error.message : "affected-computation-failed";
 }
 
 export type { AffectedInput, AffectedResult, DepGraph, StoryLike, TraceOptions } from "./types.ts";

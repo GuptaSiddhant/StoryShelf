@@ -1,5 +1,10 @@
 /* oxlint-disable max-statements */
-import { computeAffected, selectAffectedStories, type AffectedResult } from "@storyshelf/affected";
+import {
+  BASELINE_NOT_IN_CHECKOUT,
+  computeAffected,
+  selectAffectedStories,
+  type AffectedResult,
+} from "@storyshelf/affected";
 import { ZipArchive } from "archiver";
 import { resolve } from "node:path";
 import * as picomatch from "picomatch";
@@ -639,10 +644,13 @@ function describeAffected(
   count: number | null,
   baselineSha: string,
 ): string {
+  const short = baselineSha.slice(0, 7);
+  if (result.affectedImportPaths === null && result.fullReason === BASELINE_NOT_IN_CHECKOUT) {
+    return `Full capture: the baseline commit ${short} is not in this checkout (shallow clone? fetch more history): rendering all stories`;
+  }
   if (result.affectedImportPaths === null) {
     return `Full capture (${result.fullReason ?? "unknown reason"}): rendering all stories`;
   }
-  const short = baselineSha.slice(0, 7);
   if (count === null || count === 0) {
     return `Affected capture: no stories affected (baseline ${short})`;
   }

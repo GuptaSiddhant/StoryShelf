@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   changedFiles,
+  GitCommandError,
   gitBranchName,
   gitHeadSha,
   gitRepoRoot,
@@ -88,7 +89,55 @@ describe("changedFiles", () => {
   it("throws for unknown revisions", () => {
     expect(() => changedFiles(dir, "deadbee", "deadbee")).toThrow();
   });
+
+  it("marks an unknown revision and names it with git's own single line", () => {
+    const missing = "deadbeef".repeat(5);
+    const error = captureError(() => changedFiles(dir, missing, missing));
+    expect(error).toBeInstanceOf(GitCommandError);
+    expect(error).toMatchObject({ unknownRevision: true });
+    expect(error?.message).toMatch(/^fatal: (?:ambiguous argument|Invalid revision range) /u);
+    expect(error?.message).not.toContain("\n");
+  });
+
+  it("marks a baseline a shallow clone never fetched as unknown, with one line", () => {
+    const parent = git(["rev-parse", "HEAD"]);
+    commitFile("later.ts", "later", "later");
+    const shallow = mkdtempSync(join(tmpdir(), "storyshelf-affected-shallow-"));
+    try {
+      execFileSync("git", ["clone", "--quiet", "--depth", "1", `file://${dir}`, shallow]);
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: shallow,
+        encoding: "utf8",
+      }).trim();
+      const error = captureError(() => changedFiles(shallow, parent, head));
+      expect(error).toMatchObject({ unknownRevision: true });
+      expect(error?.message).toMatch(/^fatal: Invalid revision range /u);
+      expect(error?.message).not.toContain("\n");
+    } finally {
+      rmSync(shallow, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps only the first line of any other git failure", () => {
+    // An option-shaped base makes git print `error: unknown option` and then its whole usage text.
+    const error = captureError(() => changedFiles(dir, "--no-such-option", "HEAD"));
+    expect(error).toBeInstanceOf(GitCommandError);
+    expect(error).toMatchObject({ unknownRevision: false });
+    expect(error?.message).toMatch(/^error: /u);
+    expect(error?.message).not.toContain("\n");
+    expect(error?.message).not.toContain("usage:");
+  });
 });
+
+/** The error a call throws, or `undefined` when it returns. */
+function captureError(run: () => unknown): Error | undefined {
+  try {
+    run();
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error : undefined;
+  }
+}
 
 describe("gitRepoRoot", () => {
   it("is the repository root from the root and from a package of it", () => {
