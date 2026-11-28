@@ -77,6 +77,33 @@ describe("resolveUploadIdentity", () => {
     expect(resolveUploadIdentity("/x", {}, { probe: nullProbe, ci: null }).synthesized).toBe(true);
   });
 
+  it("a synthesized sha with a real git branch is synthesized", () => {
+    const identity = resolveUploadIdentity(
+      "/x",
+      {},
+      { probe: { ...nullProbe, branchName: () => "git-branch" }, ci: null },
+    );
+    expect(identity).toMatchObject({
+      branch: "git-branch",
+      synthesized: true,
+      sources: { sha: "synthesized", branch: "local git (current branch)" },
+    });
+  });
+
+  it("a real git sha with a synthesized branch is synthesized", () => {
+    const identity = resolveUploadIdentity(
+      "/x",
+      {},
+      { probe: { ...nullProbe, headSha: () => "git-sha" }, ci: null },
+    );
+    expect(identity).toMatchObject({
+      sha: "git-sha",
+      branch: "local",
+      synthesized: true,
+      sources: { sha: "local git (HEAD)", branch: "synthesized" },
+    });
+  });
+
   it("flags alone are not synthesized", () => {
     const identity = resolveUploadIdentity(
       "/x",
