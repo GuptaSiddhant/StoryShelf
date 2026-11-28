@@ -147,6 +147,52 @@ describe("shell scripts", () => {
     }
   });
 
+  it.each([
+    [403, "Your role cannot do this."],
+    [429, "Too many requests. Wait a moment and try again."],
+    [500, "Something went wrong. Please try again."],
+    [0, "Something went wrong. Please try again."],
+  ])("a failed request with status %i toasts %j", (status, message) => {
+    const dom = new JSDOM(`<body><div data-toast-region></div></body>`, {
+      runScripts: "outside-only",
+    });
+    const { window } = dom;
+    Object.assign(window, {
+      __storyshelfShell: {
+        readCookie: () => null,
+        writeCookie: () => {},
+        applyTheme: () => {},
+        applySidebar: () => {},
+      },
+    });
+    window.eval(clientScript());
+    const event = new window.CustomEvent("htmx:responseError", { detail: { xhr: { status } } });
+    window.document.dispatchEvent(event);
+    const toast = window.document.querySelector("[data-toast-region] .toast");
+    expect(toast?.textContent).toBe(message);
+    expect(toast?.getAttribute("role")).toBe("alert");
+  });
+
+  it("a request that never reached the server keeps the generic message", () => {
+    const dom = new JSDOM(`<body><div data-toast-region></div></body>`, {
+      runScripts: "outside-only",
+    });
+    const { window } = dom;
+    Object.assign(window, {
+      __storyshelfShell: {
+        readCookie: () => null,
+        writeCookie: () => {},
+        applyTheme: () => {},
+        applySidebar: () => {},
+      },
+    });
+    window.eval(clientScript());
+    window.document.dispatchEvent(new window.CustomEvent("htmx:sendError"));
+    expect(window.document.querySelector(".toast")?.textContent).toBe(
+      "Something went wrong. Please try again.",
+    );
+  });
+
   it("review shortcuts ignore modified keys and text inputs", () => {
     const source = clientScript();
     expect(source).toContain("e.metaKey||e.ctrlKey||e.altKey||typing(e.target)");

@@ -23,6 +23,7 @@ import {
 } from "./builds.handlers.ts";
 import { isBuildAuthor, resolveTriager } from "./comment-triage.ts";
 import { createComment, reopenBuildComment, resolveBuildComment } from "./comments.ts";
+import { loadEarlierVerdict } from "./earlier-verdict.ts";
 import { flash } from "./flash.ts";
 import { resolveAuthorizedProject, resolveReviewer } from "./helpers.ts";
 import { hxRefresh, isHxRequest } from "./htmx.ts";
@@ -114,6 +115,7 @@ async function commentsSwap(
   const snapshot = await snapshotForBuild(build, snapshotId);
   const comments = await new CommentModel(getStore().db).listByBuild(build.id);
   const canTriage = (await reviewCapabilities(project)).canComment || isBuildAuthor(build);
+  const earlier = await loadEarlierVerdict(getStore().db, project, build, snapshot);
   return await renderCommentSwap({
     project,
     build,
@@ -121,6 +123,7 @@ async function commentsSwap(
     selectedStoryId: snapshot.storyId,
     comments,
     canTriage,
+    earlier,
     names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
   });
 }

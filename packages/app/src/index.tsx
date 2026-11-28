@@ -43,6 +43,7 @@ import { compression } from "./middleware/compression.ts";
 import { createHttpMiddleware } from "./middleware/http-telemetry.ts";
 import {
   authGate,
+  forbiddenPage,
   notFoundPage,
   createRateLimiter,
   hostDispatch,
@@ -61,6 +62,7 @@ import { serverTiming } from "./middleware/server-timing.ts";
 import { setupGate, type MiddlewareWiring } from "./middleware/setup-gate.ts";
 import { packageVersion } from "./package-version.ts";
 import { registerAdminGit } from "./routers/admin-git.ts";
+import { registerAdminInvites } from "./routers/admin-invites.tsx";
 import { registerAdminPages } from "./routers/admin-pages.ts";
 import { registerPublicOriginRoutes } from "./routers/admin-public-origin.tsx";
 import { registerAdmin } from "./routers/admin.ts";
@@ -269,12 +271,13 @@ function mountPortalBoundary(app: ShelfRouter, config: ShelfConfig): void {
 
 /**
  * What the request is allowed to see, inside the request store: a read-only shared account's writes
- * are refused first (#1274); the not-found page (it needs to know who is asking) wraps the sign-in
- * gate and the project gates, whose 404s it dresses.
+ * are refused first (#1274); the not-found and forbidden pages (they need to know who is asking)
+ * wrap the sign-in gate and the project gates, whose 404s and 403s they dress.
  */
 function mountAccessGates(app: ShelfRouter, options: Pick<ResolvedShelfOptions, "auth">): void {
   app.use("*", readOnlyWrites(options.auth));
   app.use("*", notFoundPage());
+  app.use("*", forbiddenPage());
   app.use("*", authGate());
   mountProjectGates(app);
 }
@@ -514,6 +517,7 @@ function registerSystemPages(
   health: HealthDeps,
 ): void {
   registerAdminPages(app, health, options.auth);
+  registerAdminInvites(app, options.auth);
   registerPublicOriginRoutes(app);
   registerAdminGit(app);
 }

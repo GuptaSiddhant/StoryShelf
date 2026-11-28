@@ -5,8 +5,10 @@ import type { Project } from "@storyshelf/core/schema";
 import { mentionSpans } from "@storyshelf/core/utils";
 import type { HtmlEscapedString } from "hono/utils/html";
 import { mentionNamesOf } from "../mentions.ts";
+import type { EarlierVerdict } from "../routers/earlier-verdict.ts";
 import { csrfField } from "../shell/csrf-field.tsx";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -36,10 +38,20 @@ export interface DiffCommentsProps {
   comments: Comment[];
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  /**
+   * Whether the viewer may comment (the server's `canComment`). Without it the box is replaced by
+   * one read-only line. Omitted counts as true: the swap answers a comment that was just posted.
+   */
+  canComment?: boolean;
+  /** The earlier build's verdict for this story, shown as a read-only note; none, no note. */
+  earlier?: EarlierVerdict | null;
   names?: ReadonlyMap<string, string>;
   /** Answering a posted comment in place: render the box empty and focused for the next one. */
   refocus?: boolean;
 }
+
+/** The one line a role that cannot review sees where the verdict and comment controls would be. */
+export const READ_ONLY_LINE = "Your role is read-only, so you can't comment or review.";
 
 /** The id the snapshot comment form swaps in place: the thread and its (emptied) box. */
 export const SNAPSHOT_COMMENTS_ID = "snapshot-comments";
@@ -243,6 +255,36 @@ function CommentForm(props: CommentFormProps): HtmlEscapedString | Promise<HtmlE
   );
 }
 
+/** "Rejected in a1b2c3d, 2 change requests still open", the sentence of the earlier-verdict note. */
+export function earlierVerdictText(earlier: EarlierVerdict): string {
+  const open = earlier.openChangeRequests.length;
+  const requests = `${open} change ${open === 1 ? "request" : "requests"} still open`;
+  const sha = earlier.build.gitSha.slice(0, 7);
+  if (earlier.verdict === null) {
+    return `${requests} in ${sha}.`;
+  }
+  const verdict = earlier.verdict === "approved" ? "Approved" : "Rejected";
+  return open === 0 ? `${verdict} in ${sha}.` : `${verdict} in ${sha}, ${requests}.`;
+}
+
+/** A read-only note: what an earlier build on this branch decided for this story, linking to it. */
+function EarlierNote(props: {
+  project: Project;
+  earlier: EarlierVerdict;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
+  const { project, earlier } = props;
+  const href = `/projects/${project.slug}/builds/${earlier.build.id}/diff?snapshot=${earlier.snapshotId}`;
+  return (
+    <Alert
+      tone={earlier.verdict === "rejected" ? "warning" : "info"}
+      role="status"
+      title="Earlier build on this branch"
+    >
+      {earlierVerdictText(props.earlier)} <a href={href}>Open that build</a>
+    </Alert>
+  );
+}
+
 /**
  * Threaded comments for the selected snapshot plus the reply form. Posting swaps this card in
  * place (`#snapshot-comments`): the new comment in the list, the box empty again.
@@ -251,12 +293,14 @@ export function DiffComments(
   props: DiffCommentsProps,
 ): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { project, build, selectedId, selectedStoryId, comments, canTriage, names } = props;
+  const canComment = props.canComment !== false;
   const visible = comments.filter((c) =>
     c.snapshotId ? c.snapshotId === selectedId : !c.storyId || c.storyId === selectedStoryId,
   );
   return (
     <Card id={SNAPSHOT_COMMENTS_ID}>
       <SectionTitle>Comments</SectionTitle>
+      {props.earlier ? <EarlierNote project={project} earlier={props.earlier} /> : null}
       <VStack>
         {visible.map((comment): HtmlEscapedString | Promise<HtmlEscapedString> => (
           <CommentCard
@@ -271,12 +315,16 @@ export function DiffComments(
         {visible.length === 0 ? <Meta>No comments on this snapshot.</Meta> : null}
       </VStack>
 
-      <CommentForm
-        project={project}
-        build={build}
-        selectedId={selectedId}
-        refocus={props.refocus}
-      />
+      {canComment ? (
+        <CommentForm
+          project={project}
+          build={build}
+          selectedId={selectedId}
+          refocus={props.refocus}
+        />
+      ) : (
+        <Meta>{READ_ONLY_LINE}</Meta>
+      )}
     </Card>
   );
 }

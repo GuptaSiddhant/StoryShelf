@@ -7,13 +7,14 @@ import {
   UserModel,
 } from "@storyshelf/core/models";
 import { isProjectRole } from "@storyshelf/core/types";
+import type { Context } from "hono";
 import type { ShelfRouter } from "../app-types.ts";
 import { AddGroupMappingForm, AddMemberForm } from "../pages/member-forms.tsx";
 import { settingsHref } from "../pages/settings-tabs.ts";
 import { getStore } from "../store.ts";
 import { flash } from "./flash.ts";
 import { respondWithForm } from "./form-response.tsx";
-import { resolveAuthorizedProject } from "./helpers.ts";
+import { isSiteAdmin, resolveAuthorizedProject } from "./helpers.ts";
 import { hxRedirect } from "./htmx.ts";
 import { asString, renderSettingsPage } from "./settings.handlers.ts";
 /** Project member settings (assign roles, remove members). */
@@ -36,7 +37,7 @@ export function registerMemberSettings(app: ShelfRouter): void {
     const project = await resolveAuthorizedProject(c, c.req.param("slug") ?? "", "admin");
     const form = await c.req.formData();
     const role = asString(form.get("role"));
-    const userId = await resolveMemberUser(form);
+    const userId = await resolveMemberUser(c, form);
     if (!userId.id || !isProjectRole(role)) {
       return respondWithForm(
         c,
@@ -44,7 +45,12 @@ export function registerMemberSettings(app: ShelfRouter): void {
         "access",
         "Add member",
         (standalone) => (
-          <AddMemberForm project={project} standalone={standalone} error={userId.error} />
+          <AddMemberForm
+            project={project}
+            standalone={standalone}
+            error={userId.error}
+            inviteEmail={userId.inviteEmail}
+          />
         ),
         400,
       );
@@ -66,14 +72,21 @@ export function registerMemberSettings(app: ShelfRouter): void {
 }
 
 /** The user an add-member form names: an email (the form) or a raw id (API-style posts). */
-async function resolveMemberUser(form: FormData): Promise<{ id?: string; error: string }> {
+async function resolveMemberUser(
+  c: Context,
+  form: FormData,
+): Promise<{ id?: string; error: string; inviteEmail?: string }> {
   const email = asString(form.get("email"));
   const rawId = asString(form.get("userId"));
   if (!email && !rawId) return { error: "Enter the member's email and a role" };
   if (!email) return { id: rawId, error: "User and role are required" };
   const user = await new UserModel(getStore().db).getByEmail(email);
   if (!user) {
-    return { error: `No account has the email ${email}. They need to sign in once first.` };
+    return {
+      error: `No account has the email ${email}. They need to sign in once first.`,
+      // Only a site admin can invite, so only they are offered it.
+      ...(getStore().authEnabled && isSiteAdmin(c) ? { inviteEmail: email } : {}),
+    };
   }
   return { id: user.id, error: "User and role are required" };
 }

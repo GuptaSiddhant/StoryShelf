@@ -63,6 +63,8 @@ export const PAGE_ROUTE_CLASSES: Readonly<Record<string, RouteClass>> = {
   "GET /admin": "hosting",
   "POST /admin/credentials/reencrypt": "hosting",
   "GET /admin/public-origin/edit": "hosting",
+  "GET /admin/invites/new": "hosting",
+  "POST /admin/invites": "hosting",
   "POST /admin/public-origin": "hosting",
   "POST /admin/public-origin/report": "hosting",
   "POST /admin/public-origin/clear": "hosting",

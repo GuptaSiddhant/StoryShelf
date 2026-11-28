@@ -15,6 +15,7 @@ import { loadBaselineView } from "./baseline-guard.ts";
 import { loadBaselineReference, loadDefaultComparison } from "./baseline-reference.ts";
 import { isBuildAuthor } from "./comment-triage.ts";
 import { designUrlsFor, loadDesignResolutions, loadReviewDesign } from "./design.handlers.ts";
+import { loadEarlierVerdict } from "./earlier-verdict.ts";
 import { linkedUsageFor } from "./links.handlers.ts";
 import { readPngSize } from "./png-size.ts";
 import { namesOf, reviewCapabilities } from "./review-section.handlers.ts";
@@ -32,11 +33,12 @@ export async function loadBuildDiffData(
   build: Build,
   view: BuildDiffView,
 ): Promise<BuildDiffData> {
-  const { db, user, authEnabled, config } = getStore();
+  const { db, config } = getStore();
   const snapshots = await new SnapshotModel(db).listByBuild(build.id);
   const comments = await new CommentModel(db).listByBuild(build.id);
   const { hasBaseline, drifted } = await loadBaselineView(project, build, snapshots);
-  const canManage = (await reviewCapabilities(project)).canComment;
+  const capabilities = await reviewCapabilities(project);
+  const canManage = capabilities.canComment;
   const selected = selectedSnapshot(snapshots, view.snapshotId);
   const design = selected
     ? await loadReviewDesign(
@@ -52,9 +54,11 @@ export async function loadBuildDiffData(
     snapshots,
     comments,
     selectedId: view.snapshotId,
-    canReview: !authEnabled || (Boolean(user) && user?.readOnly !== true),
+    canReview: capabilities.canVerdict,
+    canComment: capabilities.canComment,
     canTriage: canManage || isBuildAuthor(build),
     canManage,
+    earlier: selected ? await loadEarlierVerdict(db, project, build, selected) : null,
     names: await namesOf(comments.flatMap((item) => [item.userId, item.resolvedBy])),
     hasBaseline,
     drifted,

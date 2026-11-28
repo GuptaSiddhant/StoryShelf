@@ -68,14 +68,17 @@ const authorCell = css`
   white-space: nowrap;
 `;
 
-/** "4 to review · 1 approved · 12 snapshots", leaving out zero counts. */
-function changeSummary(build: Build): string {
+/** "4 to review · 1 approved · 1 rejected · 12 snapshots", leaving out zero counts. */
+export function changeSummary(build: Build): string {
   const parts: string[] = [];
   if (build.changedCount > 0) {
     parts.push(`${build.changedCount} to review`);
   }
   if (build.approvedCount > 0) {
     parts.push(`${build.approvedCount} approved`);
+  }
+  if (build.rejectedCount > 0) {
+    parts.push(`${build.rejectedCount} rejected`);
   }
   parts.push(`${build.snapshotCount} ${build.snapshotCount === 1 ? "snapshot" : "snapshots"}`);
   return parts.join(" · ");

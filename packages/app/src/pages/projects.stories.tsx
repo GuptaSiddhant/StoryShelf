@@ -48,3 +48,12 @@ export const NoProjectsSignInOn = pageStory(() => renderProjectsPage(), {
   dataset: "blank",
   store: { authEnabled: true },
 });
+
+/** A signed-in non-admin with no project: the plain line, no setup steps (the admin's guide is not theirs). */
+export const NotAddedYet = pageStory(() => renderProjectsPage(), {
+  dataset: "blank",
+  store: {
+    authEnabled: true,
+    user: { id: "ada", email: "ada@example.com", name: "Ada", role: "viewer" },
+  },
+});

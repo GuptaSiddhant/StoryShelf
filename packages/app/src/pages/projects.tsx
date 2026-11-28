@@ -108,6 +108,8 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
       New project
     </Button>
   ) : null;
+  // A signed-in non-admin with no project has nothing to set up here: the steps are an admin's.
+  const notAddedYet = user !== null && user.role !== "admin" && projects.length === 0;
 
   return (
     <DocumentLayout title="Projects" nav={{ active: "projects" }}>
@@ -122,16 +124,21 @@ export async function renderProjectsPage(): Promise<RenderedContent> {
             <FilterInput label="Filter projects" placeholder="Filter projects…" />
           </HStack>
         ) : null}
-        {projects.length === 0 ? (
+        {projects.length === 0 && notAddedYet ? (
+          <EmptyState
+            title="No projects yet"
+            description="You have not been added to a project yet. Ask an admin."
+          />
+        ) : null}
+        {projects.length === 0 && !notAddedYet ? (
           <EmptyState
             title="No projects yet"
             description="Create your first project to start visual testing."
             action={newProject}
           />
-        ) : (
-          <ProjectGrid summaries={summaries} urls={urls} />
-        )}
-        <SetupGuide open={projects.length === 0} />
+        ) : null}
+        {projects.length > 0 ? <ProjectGrid summaries={summaries} urls={urls} /> : null}
+        {notAddedYet ? null : <SetupGuide open={projects.length === 0} />}
       </VStack>
     </DocumentLayout>
   );

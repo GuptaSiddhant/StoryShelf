@@ -1,5 +1,5 @@
 /** Build records, status transitions, and publication helpers. */
-import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne } from "drizzle-orm";
 import type { SQL, Table } from "drizzle-orm";
 import type { DatabaseAdapter, TxStore } from "../adapters/database.ts";
 import { columnsExcept } from "../adapters/database.ts";
@@ -325,6 +325,9 @@ export class BuildModel {
     }
     if (filter.branch) {
       conditions.push(eq(col(this.tables.builds, "gitBranch"), filter.branch));
+    }
+    if (filter.createdBefore) {
+      conditions.push(lt(col(this.tables.builds, "createdAt"), filter.createdBefore));
     }
     return conditions;
   }
@@ -941,6 +944,8 @@ export interface BuildListFilter {
   branch?: string;
   labelKey?: string;
   labelValue?: string;
+  /** Only builds created strictly before this instant (ISO-8601); applied before `limit`. */
+  createdBefore?: string;
   /** Newest builds to return at most. */
   limit?: number;
 }

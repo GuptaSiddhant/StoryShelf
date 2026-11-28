@@ -6,6 +6,7 @@ import type { Snapshot } from "@storyshelf/core/schema";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { InsightPanelData } from "../insights/panel.ts";
 import type { BaselineReference, DefaultComparison } from "../routers/baseline-reference.ts";
+import type { EarlierVerdict } from "../routers/earlier-verdict.ts";
 import { DocumentLayout, type NavConfig, type RenderedContent } from "../shell/document.tsx";
 import { Alert, EmptyState, type ImageSize } from "../ui/components.tsx";
 import { canvasColumn, comparisonCard, workspace } from "../ui/styles/review-layout.ts";
@@ -31,11 +32,16 @@ export interface BuildDiffData {
   snapshots: Snapshot[];
   comments: Comment[];
   selectedId?: string;
+  /** Whether the viewer may decide (approve, reject); the server's `canVerdict`. */
   canReview: boolean;
+  /** Whether the viewer may comment; the server's `canComment`. */
+  canComment: boolean;
   /** Whether the viewer may retry or cancel the build; omitted, the header hides the menu. */
   canManage?: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  /** What the latest earlier build on the branch decided for the selected story; read-only. */
+  earlier?: EarlierVerdict | null;
   /** Display names of the users behind comments, by user id. */
   names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
@@ -64,8 +70,10 @@ export interface DiffReviewGridProps {
   comments: Comment[];
   selected?: Snapshot;
   canReview: boolean;
+  canComment: boolean;
   /** Whether the viewer may resolve and reopen comments. */
   canTriage: boolean;
+  earlier?: EarlierVerdict | null;
   /** Display names of the users behind comments, by user id. */
   names: ReadonlyMap<string, string>;
   hasBaseline: Record<string, boolean>;
@@ -101,6 +109,8 @@ function SnapshotComments(props: {
       selectedStoryId={selected.storyId}
       comments={grid.comments}
       canTriage={grid.canTriage}
+      canComment={grid.canComment}
+      earlier={grid.earlier}
       names={grid.names}
     />
   );

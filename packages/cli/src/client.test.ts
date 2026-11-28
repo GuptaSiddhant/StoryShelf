@@ -359,3 +359,43 @@ describe("429 retries on create and upload calls", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+/** A fetch mock that answers every call with a JSON error body at `status`. */
+const refuse = (status: number) =>
+  vi.fn().mockResolvedValue(Response.json({ error: { message: "Unauthorized" } }, { status }));
+
+describe("a refused token on build creation", () => {
+  const input = { gitSha: "abc", gitBranch: "main" };
+
+  it.each([401, 403])(
+    "prints one line naming the server, project and SHELF_TOKEN (%i)",
+    async (status) => {
+      vi.stubGlobal("fetch", refuse(status));
+      const error = await createClient("https://shelf.test/shelf/", "shelf_secret_token")
+        .projects.builds.createJson("demo", input)
+        .catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(RequestError);
+      expect((error as RequestError).status).toBe(status);
+      expect((error as Error).message).toBe(
+        "The server at https://shelf.test refused the token for project demo. Check SHELF_TOKEN (it may be wrong, revoked, or for another project), or run `storyshelf whoami` to see which token is in use",
+      );
+    },
+  );
+
+  it.each([401, 403])("never echoes the token (%i)", async (status) => {
+    vi.stubGlobal("fetch", refuse(status));
+    const error = (await createClient("https://shelf.test", "shelf_secret_token")
+      .projects.builds.createJson("demo", input)
+      .catch((caught: unknown) => caught)) as Error;
+    expect(error.message).not.toContain("shelf_secret_token");
+    expect(error.message).not.toContain("Request failed");
+  });
+
+  it("keeps the generic error for other statuses", async () => {
+    vi.stubGlobal("fetch", refuse(422));
+    const error = (await createClient("https://shelf.test")
+      .projects.builds.createJson("demo", input)
+      .catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toBe("Request failed (422): Unauthorized");
+  });
+});
