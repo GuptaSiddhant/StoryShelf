@@ -25,6 +25,10 @@ describe("createNeonDatabase", () => {
     expect(() => createNeonDatabase({})).toThrow("provide `url`");
   });
 
+  it("refuses a URL without a scheme, naming DATABASE_URL", () => {
+    expect(() => createNeonDatabase({ url: "localhost:5433/shelf" })).toThrow("DATABASE_URL");
+  });
+
   it("runs the shared DDL on setup", async () => {
     const pool = createRecordingPool();
     const db = createNeonDatabase({ client: pool as unknown as Pool });

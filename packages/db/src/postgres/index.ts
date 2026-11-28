@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { assertPostgresUrl, createNoticeSink, nameFailure, type NoticeSink } from "./connection.ts";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked } from "./migrate.ts";
 import {
@@ -46,7 +47,10 @@ export interface PostgresDatabaseOptions {
 }
 
 /** The caller's client, or a new one from the connection string (the options must give one of them). */
-function openClient(options: PostgresDatabaseOptions): ReturnType<typeof postgres> {
+function openClient(
+  options: PostgresDatabaseOptions,
+  sink: NoticeSink,
+): ReturnType<typeof postgres> {
   if (options.client) {
     return options.client;
   }
@@ -56,7 +60,12 @@ function openClient(options: PostgresDatabaseOptions): ReturnType<typeof postgre
       "createPostgresDatabase: provide `url` (or `connectionString`) or a preconfigured `client`",
     );
   }
+  assertPostgresUrl(connectionString);
   return postgres(connectionString, {
+    // Server notices (`... already exists, skipping`) go to the adapter's logger at debug, not the console.
+    onnotice: (notice) => {
+      sink.notice(notice);
+    },
     // Only when given: a key holding `undefined` overrides the URL's own `sslmode`, leaving TLS off.
     ...(options.ssl === undefined ? {} : { ssl: options.ssl as never }),
     prepare: options.prepare,
@@ -74,7 +83,9 @@ function openClient(options: PostgresDatabaseOptions): ReturnType<typeof postgre
  * For provider-specific TLS and pooling notes, see the deployment guide.
  */
 export function createPostgresDatabase(options: PostgresDatabaseOptions): DatabaseAdapter {
-  const client = openClient(options);
+  const sink = createNoticeSink();
+  const client = openClient(options, sink);
+  const connectionString = options.client ? undefined : (options.connectionString ?? options.url);
 
   // oxlint-disable-next-line typescript/no-unsafe-argument -- postgres instance may be from isolated store vs workspace
   const db = drizzle({ client: client as never });
@@ -90,20 +101,25 @@ export function createPostgresDatabase(options: PostgresDatabaseOptions): Databa
     },
     tables: schema,
     migrate: async ({ logger, release }) => {
-      await runMigrationsLocked(
-        async (use) => {
-          const reserved = await client.reserve();
-          try {
-            return await use(async (sql) => await reserved.unsafe(sql));
-          } finally {
-            reserved.release();
-          }
-        },
-        logger,
-        release,
-      );
-      // postgres.js opens a real session per transaction, so row locks hold between processes.
-      await activateRetention(db, retention);
+      if (logger) {
+        sink.attach(logger);
+      }
+      await nameFailure(connectionString, async () => {
+        await runMigrationsLocked(
+          async (use) => {
+            const reserved = await client.reserve();
+            try {
+              return await use(async (sql) => await reserved.unsafe(sql));
+            } finally {
+              reserved.release();
+            }
+          },
+          logger,
+          release,
+        );
+        // postgres.js opens a real session per transaction, so row locks hold between processes.
+        await activateRetention(db, retention);
+      });
     },
     close: async () => {
       await client.end();
