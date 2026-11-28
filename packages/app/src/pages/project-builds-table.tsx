@@ -187,12 +187,12 @@ function BuildRow({
       <td class="nowrap">
         <BuildSummaryCell project={project} build={build} />
       </td>
-      <td>
+      <td data-label="Status">
         <Badge tone={statusTone(build.status)} icon>
           {statusLabel(build.status)}
         </Badge>
       </td>
-      <td class="nowrap">
+      <td class="nowrap" data-label="Changes">
         <Meta as="span">
           {build.status === "skipped" ? (
             <SkippedSummary project={project} build={build} source={source} />
@@ -231,7 +231,7 @@ export function BuildsTable({
   sources?: Map<string, SkipSource>;
 }): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
-    <Table label="Builds">
+    <Table label="Builds" stackOnPhone>
       <table>
         <thead>
           <tr>

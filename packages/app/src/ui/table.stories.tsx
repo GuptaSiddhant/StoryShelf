@@ -97,6 +97,58 @@ export const Overflowing = jsxStory(() => <Table label="Recent captures">{wide}<
 /** The same wide table in the preview's 375px phone viewport: it scrolls in its own region. */
 export const OnAPhone = onAPhone(jsxStory(() => <Table label="Recent captures">{wide}</Table>));
 
+const stacked = (
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map((row) => (
+        <tr key={row.name}>
+          <td>
+            <strong>
+              <a href="#component">{row.name}</a>
+            </strong>
+            <div class="mono">{row.file}</div>
+          </td>
+          <td data-label="Status">
+            <Badge tone={row.tone} icon>
+              {row.status}
+            </Badge>
+          </td>
+          <td>
+            <HStack justify="end">
+              <Button variant="secondary" size="sm" href="#review">
+                Review
+              </Button>
+            </HStack>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+/** `stackOnPhone` at desktop width: the table is unchanged. */
+export const Stacked = jsxStory(() => (
+  <Table stackOnPhone label="Components">
+    {stacked}
+  </Table>
+));
+
+/** `stackOnPhone` in the 375px phone viewport: each row is a card and its action stays on screen. */
+export const StackedOnAPhone = onAPhone(
+  jsxStory(() => (
+    <Table stackOnPhone label="Components">
+      {stacked}
+    </Table>
+  )),
+);
+
 /** A row action is a small `<Button>`: secondary for the neutral one, danger-secondary for the destructive one, side by side. */
 export const RowActions = jsxStory(() => (
   <Table label="Components">
