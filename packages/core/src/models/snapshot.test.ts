@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Build } from "../schema/build.ts";
 import { makeDatabase } from "../test-helpers/fake-adapters.ts";
 import { SnapshotModel } from "./snapshot.ts";
 
@@ -226,5 +227,61 @@ describe("SnapshotModel.listByImportPath", () => {
     expect(summary?.storyId).toBe("a");
     expect(summary).not.toHaveProperty("a11yViolations");
     expect((await model.listByBuild("b1"))[0]?.a11yViolations).toContain("serious");
+  });
+});
+
+describe("SnapshotModel.latestEarlierOnBranch", () => {
+  const stamp = (n: number): string => `2026-01-0${n}T00:00:00.000Z`;
+
+  async function seed() {
+    const { db } = makeDatabase();
+    const build = (id: string, branch: string, status: string, day: number) =>
+      db.insert(db.tables.builds, {
+        id,
+        projectId: "p1",
+        gitSha: "sha",
+        gitBranch: branch,
+        status,
+        createdAt: stamp(day),
+        updatedAt: stamp(day),
+      } as unknown as Build);
+    const model = new SnapshotModel(db);
+    const snap = async (buildId: string, storyId = "s", browser = "chromium") => {
+      const row = await model.create("p1", buildId, {
+        ...timedRow(storyId, "desktop", null),
+        browser,
+      });
+      return row.id;
+    };
+    return { db, build, snap, model };
+  }
+
+  const selected = { projectId: "p1", storyId: "s", viewportName: "desktop", browser: "chromium" };
+
+  it("returns the newest earlier snapshot of the branch, skipping failed and cancelled builds", async () => {
+    const { build, snap, model } = await seed();
+    await build("b1", "x", "approved", 1);
+    await build("b2", "x", "reviewing", 2);
+    await build("b3", "x", "failed", 3);
+    await build("b4", "x", "cancelled", 4);
+    await build("b5", "x", "reviewing", 5);
+    await snap("b1");
+    const wanted = await snap("b2");
+    await snap("b3");
+    await snap("b4");
+    await snap("b5");
+    expect((await model.latestEarlierOnBranch(selected, "x", stamp(5)))?.id).toBe(wanted);
+  });
+
+  it("ignores other branches, stories and targets, and later builds", async () => {
+    const { build, snap, model } = await seed();
+    await build("o", "other", "approved", 1);
+    await build("b1", "x", "approved", 2);
+    await build("late", "x", "approved", 4);
+    await snap("o");
+    await snap("b1", "t");
+    await snap("b1", "s", "firefox");
+    await snap("late");
+    expect(await model.latestEarlierOnBranch(selected, "x", stamp(3))).toBeNull();
   });
 });

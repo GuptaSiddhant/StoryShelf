@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
 );
 CREATE INDEX snapshots_build_id_idx ON snapshots (build_id);
 CREATE INDEX snapshots_project_import_path_idx ON snapshots (project_id, story_import_path);
+CREATE INDEX snapshots_project_story_mode_idx ON snapshots (project_id, story_id, viewport_name, browser);
 CREATE TABLE IF NOT EXISTS baselines (
   id VARCHAR(64) PRIMARY KEY,
   project_id VARCHAR(64) NOT NULL,

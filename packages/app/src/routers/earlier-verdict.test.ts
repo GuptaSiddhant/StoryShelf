@@ -138,4 +138,24 @@ describe("loadEarlierVerdict", () => {
     const found = await loadEarlierVerdict(db, project, moved, selected);
     expect(found?.build.id).toBe("old");
   });
+
+  it("costs one query for a story that is new on the branch", async () => {
+    const { db, project, build, selected } = await setup("approved", "approved");
+    const reads: string[] = [];
+    const counted = new Proxy(db, {
+      get(target, key, receiver) {
+        const value = Reflect.get(target, key, receiver) as unknown;
+        if (typeof value !== "function" || !["list", "get", "all", "count"].includes(String(key))) {
+          return value;
+        }
+        return (...args: unknown[]) => {
+          reads.push(String(key));
+          return (value as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    });
+    const brandNew = { ...selected, storyId: "brand-new" };
+    expect(await loadEarlierVerdict(counted, project, build, brandNew)).toBeNull();
+    expect(reads).toEqual(["list"]);
+  });
 });

@@ -1,5 +1,5 @@
 /** Snapshot records for captured stories within a build. */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Table } from "drizzle-orm";
 import { DEFAULT_BROWSER } from "../adapters/capture-runner.ts";
 import type { DatabaseAdapter } from "../adapters/database.ts";
@@ -158,6 +158,33 @@ export class SnapshotModel {
         inArray(col(this.tables.snapshots, "storyImportPath"), [bare, `./${bare}`]),
       ),
     })) as unknown as Snapshot[];
+  }
+
+  /**
+   * The latest snapshot of the same story, mode (viewport) and target (engine) on an earlier build
+   * of `branch`: one bounded query (`LIMIT 1`), the build join done as a subquery. A build counts
+   * when it was created before `before` and is neither `failed` nor `cancelled`. Null when the
+   * story is new on the branch.
+   */
+  async latestEarlierOnBranch(
+    selected: Pick<Snapshot, "projectId" | "storyId" | "viewportName" | "browser">,
+    branch: string,
+    before: string,
+  ): Promise<Snapshot | null> {
+    const { snapshots } = this.tables;
+    const { builds } = this.db.tables;
+    const [row] = (await this.db.list(snapshots, {
+      where: and(
+        eq(col(snapshots, "projectId"), selected.projectId),
+        eq(col(snapshots, "storyId"), selected.storyId),
+        eq(col(snapshots, "viewportName"), selected.viewportName),
+        eq(col(snapshots, "browser"), selected.browser ?? DEFAULT_BROWSER),
+        sql`${col(snapshots, "buildId")} IN (SELECT ${col(builds, "id")} FROM ${builds} WHERE ${col(builds, "projectId")} = ${selected.projectId} AND ${col(builds, "gitBranch")} = ${branch} AND ${col(builds, "createdAt")} < ${before} AND ${col(builds, "status")} NOT IN ('failed', 'cancelled'))`,
+      ),
+      orderBy: sql`(SELECT ${col(builds, "createdAt")} FROM ${builds} WHERE ${col(builds, "id")} = ${col(snapshots, "buildId")}) DESC`,
+      limit: 1,
+    })) as unknown as Snapshot[];
+    return row ?? null;
   }
 
   /** Fetch a snapshot by id, or null if not found. */

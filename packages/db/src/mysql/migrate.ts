@@ -261,6 +261,12 @@ async function migrateIndexes(run: MigrationRunner, logger?: Logger): Promise<vo
     "CREATE INDEX builds_project_gitsha_idx ON builds (project_id, git_sha)",
   );
   await migrateBuildsListIndexes(run);
+  await ensureIndex(
+    run,
+    "snapshots",
+    "snapshots_project_story_mode_idx",
+    "CREATE INDEX snapshots_project_story_mode_idx ON snapshots (project_id, story_id, viewport_name, browser)",
+  );
   await ensureUniqueIndex(
     run,
     "design_links",
