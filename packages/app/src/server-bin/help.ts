@@ -9,7 +9,8 @@ Commands:
   serve           Start the instance (--port, default PORT or 3000; --watch restarts on changes)
   migrate         Run the database migrations and exit: setup of the database only (migrate, then roll)
   purge           Purge expired builds (--ttl-days)
-  check-storage   Read-only: report blobs the database references but storage lacks
+  check-storage   Read-only: report blobs, baseline images and snapshot images (current, baseline
+                  copy, diff) of available builds that the database references but storage lacks
                   (--sample <n>; exits 1 when something is missing)
   doctor          Check the installed @storyshelf/* packages and their peers, the instance module, its
                   settings and the schema level (no side effects)

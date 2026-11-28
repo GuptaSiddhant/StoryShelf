@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "../adapters/database.ts";
 import type { StorageAdapter } from "../adapters/storage.ts";
 import { contentKey } from "../utils/paths.ts";
 import { readManifestHashes } from "./build-deletion.ts";
+import { checkSnapshotImages } from "./snapshot-image-check.ts";
 
 /** What the check needs. */
 export interface StorageCheckDeps {
@@ -36,6 +37,12 @@ export interface StorageCheckResult {
   builds: BuildMissingBlobs[];
   unreadableManifests: string[];
   missingBaselineImages: number;
+  /** Snapshots of `available` builds whose images were looked up. */
+  snapshotsChecked: number;
+  /** Snapshot images (current, baseline copy, diff) that storage lacks. */
+  missingSnapshotImages: number;
+  /** Builds that have at least one missing snapshot image. */
+  buildsMissingImages: string[];
   /** Shared blobs no live manifest names. Informational: retention collects them after its grace. */
   unreferencedBlobs: number;
   /** True when `sample` left builds out, so `unreferencedBlobs` is not trustworthy and is 0. */
@@ -62,6 +69,7 @@ export async function checkStorage(
   const findings = await walkBuilds(deps, picked);
   const sampled = picked.length < live.length;
   const baselines = await checkBaselines(deps);
+  const images = await checkSnapshotImages(deps, options.sample);
   const complete = !sampled && findings.unreadableManifests.length === 0;
   return {
     buildsChecked: picked.length,
@@ -69,6 +77,7 @@ export async function checkStorage(
     builds: findings.builds,
     unreadableManifests: findings.unreadableManifests,
     missingBaselineImages: baselines.missing,
+    ...images,
     unreferencedBlobs: complete ? await countUnreferenced(deps, findings.referenced) : 0,
     sampled,
   };
