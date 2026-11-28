@@ -7,6 +7,7 @@ import {
   changedFiles,
   GitCommandError,
   gitBranchName,
+  hasCommit,
   gitHeadSha,
   gitRepoRoot,
   gitRepoStatus,
@@ -138,6 +139,17 @@ function captureError(run: () => unknown): Error | undefined {
     return error instanceof Error ? error : undefined;
   }
 }
+
+describe("hasCommit", () => {
+  it("is true for a commit the checkout holds, false for one it does not", () => {
+    expect(hasCommit(dir, git(["rev-parse", "HEAD"]))).toBe(true);
+    expect(hasCommit(dir, "deadbeef".repeat(5))).toBe(false);
+  });
+
+  it("is false for a name that starts with a dash", () => {
+    expect(hasCommit(dir, "--all")).toBe(false);
+  });
+});
 
 describe("gitRepoRoot", () => {
   it("is the repository root from the root and from a package of it", () => {

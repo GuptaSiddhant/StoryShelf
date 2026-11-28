@@ -152,6 +152,22 @@ export function gitRepoRoot(cwd: string): string | null {
 }
 
 /**
+ * Whether the checkout holds this commit. A shallow clone lacks the commits it never fetched, and
+ * a name starting with `-` is never a commit.
+ */
+export function hasCommit(cwd: string, sha: string): boolean {
+  if (sha.startsWith("-")) {
+    return false;
+  }
+  try {
+    git(cwd, ["cat-file", "-e", `${sha}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Current commit of the checkout, or `null` when git is missing, `cwd` is
  * not a repository, or HEAD is unborn.
  */

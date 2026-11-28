@@ -2,6 +2,7 @@ import {
   changedFiles,
   GitCommandError,
   gitRepoRoot,
+  hasCommit,
   gitRepoStatus,
   MAX_CHANGED_FILES,
 } from "./git.ts";
@@ -47,11 +48,20 @@ function selectiveResult(changed: string[], baselineSha: string, paths: string[]
   return { affectedImportPaths: paths, changedFiles: changed, baselineSha, fullReason: null };
 }
 
-/** The roots to resolve paths against, throwing a full-render reason when the checkout can't be diffed. */
+/**
+ * The roots to resolve paths against, throwing a full-render reason when the checkout can't be diffed.
+ * A shallow clone that lacks the baseline reports the missing baseline; one that holds it keeps
+ * `shallow-clone`.
+ */
 function guardedBase(input: AffectedInput): PathBase {
   const repo = gitRepoStatus(input.cwd);
+  if (repo === "shallow") {
+    throw new Error(
+      hasCommit(input.cwd, input.baseSha) ? "shallow-clone" : BASELINE_NOT_IN_CHECKOUT,
+    );
+  }
   if (repo !== "ok") {
-    throw new Error(repo === "shallow" ? "shallow-clone" : "not-a-git-repo");
+    throw new Error("not-a-git-repo");
   }
   const base = pathBase(gitRepoRoot(input.cwd), input.cwd);
   if (!base) {
@@ -125,17 +135,19 @@ async function computeSelective(input: AffectedInput): Promise<AffectedResult> {
     changed = guardedChanged(input);
     return await traceSelective(input, changed, base);
   } catch (error) {
-    return fullResult(changed, input.baseSha, reasonOf(error));
+    return fullResult(changed, input.baseSha, reasonOf(error, input));
   }
 }
 
 /**
  * The `fullReason` for a failure: a missing baseline, git's first line for any other git failure,
- * or the reason string a guard threw.
+ * or the reason string a guard threw. An unknown revision counts as a missing baseline only when
+ * the baseline itself is absent; an unresolved head keeps git's own line.
  */
-function reasonOf(error: unknown): string {
+function reasonOf(error: unknown, input: AffectedInput): string {
   if (error instanceof GitCommandError) {
-    return error.unknownRevision ? BASELINE_NOT_IN_CHECKOUT : error.message;
+    const baselineMissing = error.unknownRevision && !hasCommit(input.cwd, input.baseSha);
+    return baselineMissing ? BASELINE_NOT_IN_CHECKOUT : error.message;
   }
   return error instanceof Error ? error.message : "affected-computation-failed";
 }

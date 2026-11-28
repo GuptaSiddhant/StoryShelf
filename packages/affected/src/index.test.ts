@@ -96,6 +96,59 @@ describe("computeAffected", () => {
     expect(result.baselineSha).toBe(missing);
   });
 
+  it("keeps git's own line when the head is unresolved but the baseline is present", async () => {
+    const base = git(["rev-parse", "HEAD"]);
+    const result = await computeAffected({
+      cwd: dir,
+      buildDir: "static",
+      baseSha: base,
+      headSha: "deadbeef".repeat(5),
+    });
+    expect(result.fullReason).not.toBe(BASELINE_NOT_IN_CHECKOUT);
+    expect(result.fullReason).toMatch(/^fatal: /u);
+  });
+
+  describe("in a shallow clone", () => {
+    let shallow: string;
+    let parent: string;
+    let head: string;
+
+    beforeEach(() => {
+      parent = git(["rev-parse", "HEAD"]);
+      writeFileSync(join(dir, "second.txt"), "second");
+      git(["add", "second.txt"]);
+      git(["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "second"]);
+      shallow = mkdtempSync(join(tmpdir(), "storyshelf-affected-index-shallow-"));
+      execFileSync("git", ["clone", "--quiet", "--depth", "1", `file://${dir}`, shallow]);
+      head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: shallow, encoding: "utf8" }).trim();
+    });
+
+    afterEach(() => {
+      rmSync(shallow, { recursive: true, force: true });
+    });
+
+    it("names a baseline the clone never fetched as BASELINE_NOT_IN_CHECKOUT", async () => {
+      const result = await computeAffected({
+        cwd: shallow,
+        buildDir: "static",
+        baseSha: parent,
+        headSha: head,
+      });
+      expect(result.affectedImportPaths).toBeNull();
+      expect(result.fullReason).toBe(BASELINE_NOT_IN_CHECKOUT);
+    });
+
+    it("keeps shallow-clone when the baseline is present", async () => {
+      const result = await computeAffected({
+        cwd: shallow,
+        buildDir: "static",
+        baseSha: head,
+        headSha: head,
+      });
+      expect(result.fullReason).toBe("shallow-clone");
+    });
+  });
+
   it("never throws outside a repository", async () => {
     const result = await computeAffected({
       cwd: tmpdir(),
