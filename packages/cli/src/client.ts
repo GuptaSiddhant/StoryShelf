@@ -1,3 +1,5 @@
+import { printError } from "./output.ts";
+
 /**
  * Create a typed API client for a StoryShelf server.
  *
@@ -286,7 +288,11 @@ async function fetchJsonRetrying(url: string, options: RequestInit, attempt = 0)
     if (attempt >= RATE_LIMIT_RETRIES) {
       throw rateLimitError(error);
     }
-    await sleep(Math.min(error.retryAfterMs ?? DEFAULT_RETRY_WAIT_MS, MAX_RETRY_WAIT_MS));
+    const waitMs = Math.min(error.retryAfterMs ?? DEFAULT_RETRY_WAIT_MS, MAX_RETRY_WAIT_MS);
+    printError(
+      `Rate limited by the server; retrying in ${Math.ceil(waitMs / 1000)}s (attempt ${attempt + 1} of ${RATE_LIMIT_RETRIES})`,
+    );
+    await sleep(waitMs);
     return await fetchJsonRetrying(url, options, attempt + 1);
   }
 }

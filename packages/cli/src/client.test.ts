@@ -350,6 +350,59 @@ describe("429 retries on create and upload calls", () => {
     expect(error.message).toMatch(/rate limit.*trustProxy/u);
   });
 
+  it("prints one stderr line before each wait, and nothing to stdout", async () => {
+    vi.useFakeTimers();
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const fetchMock = vi.fn().mockImplementation(async () => throttled());
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = createClient("https://shelf.test")
+      .projects.builds.inFlight("demo", "main")
+      .catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await pending;
+    const lines = stderr.mock.calls
+      .map(([text]) => String(text))
+      .filter((text) => text.startsWith("Rate limited"));
+    expect(lines).toEqual([
+      "Rate limited by the server; retrying in 2s (attempt 1 of 3)\n",
+      "Rate limited by the server; retrying in 2s (attempt 2 of 3)\n",
+      "Rate limited by the server; retrying in 2s (attempt 3 of 3)\n",
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(stdout).not.toHaveBeenCalled();
+    stderr.mockRestore();
+    stdout.mockRestore();
+  });
+
+  it.each([
+    { header: "1.5", seconds: 2 },
+    { header: "100", seconds: 30 },
+  ])(
+    "names the wait it uses, rounded up and capped (Retry-After $header)",
+    async ({ header, seconds }) => {
+      vi.useFakeTimers();
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("{}", { status: 429, headers: { "retry-after": header } }),
+        )
+        .mockResolvedValueOnce(Response.json(created));
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = createClient("https://shelf.test").projects.builds.createJson("demo", input);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await pending).toEqual(created);
+      const lines = stderr.mock.calls
+        .map(([text]) => String(text))
+        .filter((text) => text.startsWith("Rate limited"));
+      expect(lines).toEqual([
+        `Rate limited by the server; retrying in ${seconds}s (attempt 1 of 3)\n`,
+      ]);
+      stderr.mockRestore();
+    },
+  );
+
   it("does not retry other failures", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("no", { status: 500 }));
     vi.stubGlobal("fetch", fetchMock);
