@@ -6,7 +6,7 @@ import { explainFailure } from "./review-off.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
 
 /** What a server assumes of an instance that was not asked: nothing is hidden. */
-const ALL_CAPABILITIES: InstanceCapabilities = { testing: true };
+const ALL_CAPABILITIES: InstanceCapabilities = { testing: true, ai: true };
 
 declare const __PKG_VERSION__: string;
 
@@ -60,11 +60,16 @@ function registerTools(
   }
 }
 
-/** The steps of the review prompt: the capture tools are named only when the instance serves them. */
-function reviewSteps(testing: boolean): string {
-  return testing
-    ? "Call get_build, then list_snapshots, then get_build_insight (if AI is enabled) and get_capture_logs if the build failed. Summarise: what changed, which snapshots look like regressions vs intended changes, and what a human reviewer should check first."
-    : "Call get_build (this instance has no capture, so there are no snapshots, insight or capture logs). Summarise: what the build contains and what a human reviewer should check first.";
+/**
+ * The steps of the review prompt: the capture tools are named only when the instance serves them,
+ * and the AI triage only when it has AI.
+ */
+function reviewSteps(capabilities: InstanceCapabilities): string {
+  if (!capabilities.testing) {
+    return "Call get_build (this instance has no capture, so there are no snapshots, insight or capture logs). Summarise: what the build contains and what a human reviewer should check first.";
+  }
+  const insight = capabilities.ai ? ", then get_build_insight" : "";
+  return `Call get_build, then list_snapshots${insight} and get_capture_logs if the build failed. Summarise: what changed, which snapshots look like regressions vs intended changes, and what a human reviewer should check first.`;
 }
 
 function registerPrompts(server: McpServer, capabilities: InstanceCapabilities): void {
@@ -81,7 +86,7 @@ function registerPrompts(server: McpServer, capabilities: InstanceCapabilities):
           role: "user" as const,
           content: {
             type: "text" as const,
-            text: `Review StoryShelf build ${buildId}${project ? ` in project ${project}` : ""}. ${reviewSteps(capabilities.testing)} Do not approve anything; you may add_comment with findings if asked.`,
+            text: `Review StoryShelf build ${buildId}${project ? ` in project ${project}` : ""}. ${reviewSteps(capabilities)} Do not approve anything; you may add_comment with findings if asked.`,
           },
         },
       ],

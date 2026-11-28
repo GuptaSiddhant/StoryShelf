@@ -27,6 +27,17 @@ describe("runInit", () => {
     await expect(runInit({ cwd: dir })).rejects.toThrow(".storybook/main.* not found");
   });
 
+  it("names the workspace package that holds the Storybook when the root has none", async () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ workspaces: ["packages/*"] }));
+    mkdirSync(join(dir, "packages", "ui", ".storybook"), { recursive: true });
+    writeFileSync(join(dir, "packages", "ui", ".storybook", "main.ts"), "export default {};\n");
+    const failure = await runInit({ cwd: dir }).catch((error: unknown) => error);
+    expect((failure as Error).message).toContain(
+      "found packages/ui/.storybook: run this from packages/ui",
+    );
+    expect((failure as Error).message).toContain("working-directory");
+  });
+
   it("writes the config when url and slug are provided", async () => {
     setupStorybook();
     await runInit({

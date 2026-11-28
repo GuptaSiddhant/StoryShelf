@@ -14,6 +14,8 @@ export interface ToolDef<Shape extends ZodRawShape = ZodRawShape> {
    * advertised only by an instance that has the `testing` option; unset means `hosting`.
    */
   routeClass?: "hosting" | "testing" | "review";
+  /** True for a tool that only an instance with AI configured can answer; hidden otherwise. */
+  requiresAi?: boolean;
   input: Shape;
   run(client: ApiClient, args: Record<string, unknown>): Promise<unknown>;
 }

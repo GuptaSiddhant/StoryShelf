@@ -41,7 +41,7 @@ export function createProgram(): Command {
   }
   // Bare `storyshelf [options]` is `storyshelf upload [options]`: a hidden default command built
   // from the same option table, so a flag added to `upload` is accepted here with no second copy.
-  program.addCommand(buildDefaultCommand(program), { isDefault: true, hidden: true });
+  program.addCommand(buildDefaultCommand(), { isDefault: true, hidden: true });
   return program;
 }
 
@@ -97,18 +97,16 @@ function buildUploadCommand(): Command {
  * The hidden command that runs when no subcommand is named. It takes every `upload` option, checks
  * for a client config first (pointing at `init` when there is none), then uploads.
  */
-function buildDefaultCommand(program: Command): Command {
+function buildDefaultCommand(): Command {
   return addUploadOptions(new Command("default")).action(
-    run<UploadOptions>(async () => await loadDefaultCommand(program)),
+    run<UploadOptions>(async () => await loadDefaultCommand()),
   );
 }
 
-async function loadDefaultCommand(
-  program: Command,
-): Promise<(options: UploadOptions) => Promise<void>> {
+async function loadDefaultCommand(): Promise<(options: UploadOptions) => Promise<void>> {
   const { runDefaultCommand } = await import("./commands/default.ts");
   return async (options) => {
-    await runDefaultCommand(program, options);
+    await runDefaultCommand(options);
   };
 }
 
