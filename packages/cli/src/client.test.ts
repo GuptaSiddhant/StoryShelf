@@ -375,6 +375,34 @@ describe("429 retries on create and upload calls", () => {
     stdout.mockRestore();
   });
 
+  it.each([
+    { header: "1.5", seconds: 2 },
+    { header: "100", seconds: 30 },
+  ])(
+    "names the wait it uses, rounded up and capped (Retry-After $header)",
+    async ({ header, seconds }) => {
+      vi.useFakeTimers();
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response("{}", { status: 429, headers: { "retry-after": header } }),
+        )
+        .mockResolvedValueOnce(Response.json(created));
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = createClient("https://shelf.test").projects.builds.createJson("demo", input);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await pending).toEqual(created);
+      const lines = stderr.mock.calls
+        .map(([text]) => String(text))
+        .filter((text) => text.startsWith("Rate limited"));
+      expect(lines).toEqual([
+        `Rate limited by the server; retrying in ${seconds}s (attempt 1 of 3)\n`,
+      ]);
+      stderr.mockRestore();
+    },
+  );
+
   it("does not retry other failures", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("no", { status: 500 }));
     vi.stubGlobal("fetch", fetchMock);
