@@ -115,7 +115,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database d1 1`] = `
 {
   "files": [
-    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".env.example 274 535d629faba61cefd5d1932b8a3383e1d1e2763b994764cd4e6dc4dd0312cfbb",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 729 b840ce26f04642625af00a41a8044f31c2376910d2994bcd4162576c26d2472c",
     "package.json 645 05116b7f9f9bf4c825ea93a01e3c1c3dc271ac226751fb2141d1eea8538e18e4",
@@ -141,7 +141,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database mysql 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 371 3c353de054f7e3f2437f8a0e2cd47dea05a12a065a4a3be9fe87e93b4f251d4f",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 669 ecc899133c9270f3c0a9265b31dab9c8d0b689988584cce52bed596c66421449",
@@ -158,7 +158,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=mysql://user:password@host:3306/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -169,7 +169,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database neon 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 374 31b4d9dd3d54c9cd165ed417d0d8114982e235305e732b2edd543c48e7e3fc96",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 687 97c72b3563e8f099aac157bc6aca6406ebbd8f8a914eee7e667b9d462f291d06",
@@ -186,7 +186,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=postgres://user:password@host:5432/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -197,7 +197,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database neon-http 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 374 31b4d9dd3d54c9cd165ed417d0d8114982e235305e732b2edd543c48e7e3fc96",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 687 97c72b3563e8f099aac157bc6aca6406ebbd8f8a914eee7e667b9d462f291d06",
@@ -214,7 +214,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=postgres://user:password@host:5432/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -225,7 +225,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database pg 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 374 31b4d9dd3d54c9cd165ed417d0d8114982e235305e732b2edd543c48e7e3fc96",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 665 7772355a45fd878eeecc446b18ed31929f421e2377c6e65db39a811cffbcccad",
@@ -242,7 +242,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=postgres://user:password@host:5432/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -253,7 +253,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database pglite 1`] = `
 {
   "files": [
-    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".env.example 274 535d629faba61cefd5d1932b8a3383e1d1e2763b994764cd4e6dc4dd0312cfbb",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 729 b840ce26f04642625af00a41a8044f31c2376910d2994bcd4162576c26d2472c",
     "package.json 683 be7a9b599db2ca239643a32e80026c7c7a33a08b41a6e604a5f9b81514b21f0d",
@@ -279,7 +279,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database planetscale 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 371 3c353de054f7e3f2437f8a0e2cd47dea05a12a065a4a3be9fe87e93b4f251d4f",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 685 37b36da7c278112403e0eefb7c3f88d3bc20f85b6c3320a8b40dc9cfeb59541f",
@@ -296,7 +296,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=mysql://user:password@host:3306/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -307,7 +307,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database postgres 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 374 31b4d9dd3d54c9cd165ed417d0d8114982e235305e732b2edd543c48e7e3fc96",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 671 67f2666e4a089a0c97425da8a3df71810f3d2db275163333e2a1f4024313128c",
@@ -324,7 +324,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=postgres://user:password@host:5432/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -361,7 +361,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database tidb 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 371 3c353de054f7e3f2437f8a0e2cd47dea05a12a065a4a3be9fe87e93b4f251d4f",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 684 2b1ae2996d3ae919451e1bf44171e5d307d498b9a6f5c31454f8cb2a58093906",
@@ -378,7 +378,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=mysql://user:password@host:3306/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -389,7 +389,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database turso 1`] = `
 {
   "files": [
-    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".env.example 274 535d629faba61cefd5d1932b8a3383e1d1e2763b994764cd4e6dc4dd0312cfbb",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 729 b840ce26f04642625af00a41a8044f31c2376910d2994bcd4162576c26d2472c",
     "package.json 678 82d9ba15733f4f3662726ebdaf5b43666d6a85a1be40e4e5a8abbe63a09023ca",
@@ -415,7 +415,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for database vercel 1`] = `
 {
   "files": [
-    ".env.example 294 18e02d0d2d6574793e9b04358e0330fd8161af0ebdfbb87c1c619c69606e28ba",
+    ".env.example 274 535d629faba61cefd5d1932b8a3383e1d1e2763b994764cd4e6dc4dd0312cfbb",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 729 b840ce26f04642625af00a41a8044f31c2376910d2994bcd4162576c26d2472c",
     "package.json 680 b8fbaafe7602d6e844bf5597f400954b5d59b6908c0230df07e82421b914754a",
@@ -468,7 +468,7 @@ exports[`create-storyshelf output > is unchanged for docker advanced adapters 1`
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 371 3c353de054f7e3f2437f8a0e2cd47dea05a12a065a4a3be9fe87e93b4f251d4f",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
@@ -526,7 +526,7 @@ exports[`create-storyshelf output > is unchanged for docker with postgres compos
 {
   "files": [
     ".dockerignore 36 4d50815eb0be60a4d09af46cbf124eac6766c07619be743d2e283d1a52b9556c",
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 374 31b4d9dd3d54c9cd165ed417d0d8114982e235305e732b2edd543c48e7e3fc96",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "Dockerfile 230 ff445e2057c358b4af6a2502c45ad410a0f13926b8ff3580fc7d98b04a72b5a0",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
@@ -556,7 +556,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for everything on 1`] = `
 {
   "files": [
-    ".env.example 632 721865831c46b68e31badf88551e668adfadcf35e12a199f59c22b780c49ddba",
+    ".env.example 653 bce2385bca1c6aeaf25fd1165ff1425ee0ed110b026a80adf30efca118da3c59",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 1190 6bd70557d6f8cdf140594463a420eb0b18e1fb7687196c6399e52973ad4e5674",
     "package.json 889 9abb16e71d28a0950810e8319dd9d6cfaee61f2df55d6e490d054d62f23be694",
@@ -576,7 +576,7 @@ Next steps:
   export SHELF_SECRET="$(openssl rand -hex 32)"   # keep and reuse it
   export SHELF_PUBLIC_BASE_URL=http://localhost:3000
   export SHELF_ADMIN_PASSWORD=...   # the admin's password, 12+ characters
-  export DATABASE_URL=...
+  export DATABASE_URL=postgres://user:password@host:5432/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start
@@ -643,7 +643,7 @@ Next steps:
 exports[`create-storyshelf output > is unchanged for local with advanced adapters 1`] = `
 {
   "files": [
-    ".env.example 353 e9cd2b33f94ed806ce3d86ad610ecb40086a2df5ab268b53b769c753190779c1",
+    ".env.example 371 3c353de054f7e3f2437f8a0e2cd47dea05a12a065a4a3be9fe87e93b4f251d4f",
     ".gitignore 25 40b530480d99c724523a32cb8e4e68ad41096ee56acd72f08486e39f9ed4e34a",
     "README.md 842 8aa0ac8a3f6c76171c5c936c4d933d44e3522af0d515a589a0511e20f69d9403",
     "package.json 684 2b1ae2996d3ae919451e1bf44171e5d307d498b9a6f5c31454f8cb2a58093906",
@@ -660,7 +660,7 @@ Scaffolded my-server in <tmp>/my-server
 Next steps:
   cd ./my-server
   # Required: DATABASE_URL. Set them in the shell, or in .env (copy .env.example):
-  export DATABASE_URL=...
+  export DATABASE_URL=mysql://user:password@host:3306/dbname
   npm install
   npx playwright-core install chromium   # once; add --with-deps on Linux
   npm start

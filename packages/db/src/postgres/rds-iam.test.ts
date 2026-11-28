@@ -19,6 +19,7 @@ vi.mock("pg", () => ({
     this["query"] = vi.fn(answer);
     this["connect"] = vi.fn(async () => ({ query: answer, release: vi.fn() }));
     this["end"] = vi.fn(async () => {});
+    this["on"] = vi.fn();
     pools.push(this as { end: ReturnType<typeof vi.fn> });
   }),
 }));

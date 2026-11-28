@@ -157,7 +157,7 @@ export function resolveUploadIdentity(
   return {
     sha: resolvedSha.value,
     branch: resolvedBranch.value,
-    synthesized: sha === undefined || branch === undefined,
+    synthesized: resolvedSha.source === SYNTHESIZED || resolvedBranch.source === SYNTHESIZED,
     provider: ci?.provider ?? null,
     ...commit,
     sources: {

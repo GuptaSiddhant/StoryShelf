@@ -9,8 +9,16 @@
  * Requires the optional `pg` peer (`nub add pg`).
  */
 import type { DatabaseAdapter } from "@storyshelf/core/adapter/database";
+import type { Logger } from "@storyshelf/core/logger";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type Client, type PoolClient } from "pg";
+import {
+  assertPostgresUrl,
+  createNoticeSink,
+  nameFailure,
+  routeNotices,
+  type NoticeSink,
+} from "./connection.ts";
 import { createDrizzlePgAdapter } from "./drizzle-factory-pg.ts";
 import { runMigrationsLocked, type MigrationSession } from "./migrate.ts";
 import { pooledSession, singleSession } from "./migration-session.ts";
@@ -57,15 +65,7 @@ export interface PgDatabaseOptions {
  * @returns A DatabaseAdapter backed by Postgres.
  */
 export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
-  const connectionString = options.connectionString ?? options.url;
-  if (!options.client && !connectionString && !options.host) {
-    throw new Error(
-      "createPgDatabase: provide `url` (or `connectionString`), `host`, or a preconfigured `client`",
-    );
-  }
-
-  const owned = !options.client;
-  const pool = options.client ?? newPool(options, connectionString);
+  const { connectionString, owned, sink, pool } = openPool(options);
   const db = drizzle({ client: pool });
   const retention: RetentionActivation = {};
   // Only a pool hands each transaction its own session; one injected connection shares them all,
@@ -82,10 +82,13 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
     },
     tables: schema,
     migrate: async ({ logger, release }) => {
-      await runMigrationsLocked(sessionFor(pool), logger, release);
-      if (pooled) {
-        await activateRetention(db, retention);
+      if (logger) {
+        sink.attach(logger);
       }
+      const target = owned ? (connectionString ?? hostTarget(options)) : undefined;
+      await nameFailure(target, async () => {
+        await migrateAndActivate(pool, db, retention, pooled, logger, release);
+      });
     },
     close: async () => {
       if (owned) {
@@ -108,8 +111,12 @@ export function createPgDatabase(options: PgDatabaseOptions): DatabaseAdapter {
 }
 
 /** An owned pool from URL-or-fields options. */
-function newPool(options: PgDatabaseOptions, connectionString: string | undefined): Pool {
-  return new Pool({
+function newPool(
+  options: PgDatabaseOptions,
+  connectionString: string | undefined,
+  sink: NoticeSink,
+): Pool {
+  const pool = new Pool({
     connectionString,
     host: options.host,
     port: options.port,
@@ -121,6 +128,16 @@ function newPool(options: PgDatabaseOptions, connectionString: string | undefine
     idleTimeoutMillis: options.idleTimeoutMillis,
     connectionTimeoutMillis: options.connectionTimeoutMillis,
   });
+  // `pg` has no notice option: every connection emits `notice`, which goes to the adapter's logger at debug.
+  routeNotices(pool, sink);
+  return pool;
+}
+
+/** A credential-free URL for the discrete host fields, so the failure line names them too. */
+function hostTarget(options: PgDatabaseOptions): string | undefined {
+  return options.host
+    ? `postgres://${options.host}:${options.port ?? 5432}/${options.database ?? ""}`
+    : undefined;
 }
 
 /** Close an owned client: pools end, bare clients disconnect. */
@@ -133,4 +150,46 @@ async function endClient(pool: Pool | Client | PoolClient): Promise<void> {
 /** A pool gives the migration a dedicated connection; an injected client is already one session. */
 function sessionFor(pool: Pool | Client | PoolClient): MigrationSession {
   return pool instanceof Pool ? pooledSession(pool) : singleSession(pool);
+}
+
+/** The migration on its own session, then retention where each transaction has a session of its own. */
+async function migrateAndActivate(
+  pool: Pool | Client | PoolClient,
+  db: Parameters<typeof activateRetention>[0],
+  retention: RetentionActivation,
+  pooled: boolean,
+  logger: Logger | undefined,
+  release: string | undefined,
+): Promise<void> {
+  await runMigrationsLocked(sessionFor(pool), logger, release);
+  if (pooled) {
+    await activateRetention(db, retention);
+  }
+}
+
+/** The caller's client, or an owned pool for the (checked) connection string or host, with its notices routed to the sink. */
+function openPool(options: PgDatabaseOptions): {
+  connectionString: string | undefined;
+  owned: boolean;
+  sink: NoticeSink;
+  pool: Pool | Client | PoolClient;
+} {
+  const connectionString = options.connectionString ?? options.url;
+  assertConnectable(options, connectionString);
+  const owned = !options.client;
+  const sink = createNoticeSink();
+  const pool = options.client ?? newPool(options, connectionString, sink);
+  return { connectionString, owned, sink, pool };
+}
+
+/** Refuse options that name no connection, or a connection string that is not a Postgres URL. */
+function assertConnectable(options: PgDatabaseOptions, connectionString: string | undefined): void {
+  if (!options.client && !connectionString && !options.host) {
+    throw new Error(
+      "createPgDatabase: provide `url` (or `connectionString`), `host`, or a preconfigured `client`",
+    );
+  }
+  if (connectionString) {
+    assertPostgresUrl(connectionString);
+  }
 }
