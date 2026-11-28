@@ -13,9 +13,9 @@ function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
   };
 }
 
-async function connect(api: ApiClient, testing = true): Promise<Client> {
+async function connect(api: ApiClient, testing = true, ai = true): Promise<Client> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await createStoryShelfMcpServer(api, { testing }).connect(serverSide);
+  await createStoryShelfMcpServer(api, { testing, ai }).connect(serverSide);
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(clientSide);
   return client;
@@ -227,5 +227,65 @@ describe("StoryShelf MCP server", () => {
     for (const tool of ["list_snapshots", "get_build_insight", "get_capture_logs"]) {
       expect(body).not.toContain(tool);
     }
+  });
+
+  it("hides the AI tools when the instance has testing but no AI", async () => {
+    const { tools } = await (await connect(fakeClient(), true, false)).listTools();
+    const names = tools.map((tool) => tool.name);
+    expect(names).toContain("list_snapshots");
+    expect(names).toContain("get_build");
+    expect(names).not.toContain("get_build_insight");
+    expect(names).not.toContain("get_project_health");
+  });
+
+  it("keeps the AI tools when the instance has AI", async () => {
+    const { tools } = await (await connect(fakeClient(), true, true)).listTools();
+    const names = tools.map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(["get_build_insight", "get_project_health"]));
+  });
+
+  it("leaves the AI step out of the review-build prompt when there is no AI", async () => {
+    const client = await connect(fakeClient(), true, false);
+    const prompt = await client.getPrompt({ name: "review-build", arguments: { buildId: "b1" } });
+    const body = JSON.stringify(prompt.messages);
+    expect(body).toContain("list_snapshots");
+    expect(body).not.toContain("get_build_insight");
+  });
+
+  it("answers list_projects with the token's own project when SHELF_SLUG names it", async () => {
+    const get = vi.fn().mockImplementation(async (path: string) => {
+      if (path === "/projects") {
+        throw new ToolError(
+          "StoryShelf API: forbidden: this token's role does not allow that",
+          403,
+        );
+      }
+      return { name: "Web", slug: "web", gitRepository: "x", gitDefaultBranch: "main", secret: 1 };
+    });
+    const client = await connect(fakeClient({ get, defaultSlug: "web" }));
+    const result = await client.callTool({ name: "list_projects", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(text(result))).toEqual([
+      { name: "Web", slug: "web", gitRepository: "x", gitDefaultBranch: "main" },
+    ]);
+    expect(get).toHaveBeenLastCalledWith("/projects/web");
+  });
+
+  it("says a project token cannot list projects when no project slug is set", async () => {
+    const get = vi.fn().mockRejectedValue(new ToolError("StoryShelf API: forbidden", 403));
+    const client = await connect(fakeClient({ get, defaultSlug: undefined }));
+    const result = await client.callTool({ name: "list_projects", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("A project token cannot list projects");
+    expect(text(result)).toContain("SHELF_SLUG");
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it("says a project token cannot list projects when its own project cannot be read either", async () => {
+    const get = vi.fn().mockRejectedValue(new ToolError("StoryShelf API: forbidden", 403));
+    const client = await connect(fakeClient({ get, defaultSlug: "web" }));
+    const result = await client.callTool({ name: "list_projects", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("A project token cannot list projects");
   });
 });

@@ -106,7 +106,18 @@ describe("health endpoints", () => {
     expect(body.uptimeSecs).toBeGreaterThanOrEqual(0);
     expect(typeof body.version).toBe("string");
     expect((body as { testing?: boolean }).testing).toBe(false);
+    expect((body as { ai?: boolean }).ai).toBe(false);
     expect((body as { auth?: boolean }).auth).toBe(false);
+  });
+
+  it("GET /api/v1/health reports AI on only when AI is configured", async () => {
+    const { db } = makeDatabase();
+    const { storage } = makeStorage();
+    const ai = { health: async () => ({ ok: true }), setup: async () => {} };
+    const app = createShelfApp({ database: db, storage, ai: ai as never, logger: silentLogger });
+    await app.lifecycle.setup();
+    const body = (await (await app.request("/api/v1/health")).json()) as { ai?: boolean };
+    expect(body.ai).toBe(true);
   });
 
   it("GET /api/v1/health reports whether sign-in is on", async () => {
@@ -219,6 +230,7 @@ describe("health endpoints", () => {
     ]);
     const open = await (await app.request("/api/v1/health")).json();
     expect(Object.keys(open as object).toSorted()).toEqual([
+      "ai",
       "auth",
       "status",
       "testing",

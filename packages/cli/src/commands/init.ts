@@ -1,13 +1,14 @@
 import prompts from "prompts";
 import { createClient } from "../client.ts";
 import {
-  assertStorybookMain,
   detectStorybookMeta,
+  findStorybookMain,
   loadStorybookConfig,
   type StorybookConfig,
   type StorybookMeta,
   writeStorybookConfig,
 } from "../config.ts";
+import { monorepoHint } from "../config/workspace.ts";
 import { printError, printLine } from "../output.ts";
 import { readSetting } from "../settings.ts";
 
@@ -325,14 +326,28 @@ async function finalizeInit(
 }
 
 /**
+ * The root has no `.storybook/main.*`: name the workspace package that has one, if any, so the
+ * user runs init from there (a monorepo root is the usual cause).
+ */
+async function assertInitStorybook(cwd: string): Promise<void> {
+  if (await findStorybookMain(cwd)) {
+    return;
+  }
+  const hint = await monorepoHint(cwd);
+  throw new Error(
+    `.storybook/main.* not found — ensure Storybook is set up in this project${hint ? `. ${hint}` : ""}`,
+  );
+}
+
+/**
  * Initialize .storybook/storyshelf.json for the current Storybook.
- * Fails if .storybook/main.* is not found.
+ * Fails if .storybook/main.* is not found (naming the workspace package that has one).
  *
  * @param options - Init command options.
  */
 export async function runInit(options: InitOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
-  await assertStorybookMain(cwd);
+  await assertInitStorybook(cwd);
   const answers = await resolveInitAnswers(options, cwd);
   if (!answers) {
     return;

@@ -31,6 +31,8 @@ export interface LivenessBody {
   version: string;
   /** Whether this instance has the `testing` option (capture, compare, baselines; ADR 0006). */
   testing: boolean;
+  /** Whether this instance has AI configured (insights and health digests); the MCP hides AI tools without it. */
+  ai: boolean;
   /** Whether this instance has an auth adapter; without one every operation is permitted (ADR 0008). */
   auth: boolean;
 }
@@ -66,18 +68,23 @@ export interface ReadinessBody {
   targets: Record<string, "ok" | "unreachable">;
 }
 
+/** The liveness body: process-level facts only, safe for unauthenticated probes. */
+function livenessBody(deps: HealthDeps): LivenessBody {
+  return {
+    status: "ok",
+    uptimeSecs: Math.floor((Date.now() - deps.bootTimeMs) / 1000),
+    version: deps.version,
+    testing: testingEnabled(),
+    ai: getStore().ai !== undefined,
+    auth: getStore().authEnabled,
+  };
+}
+
 /** Register `GET /api/v1/health` (open liveness) and `POST` (authed deep readiness). */
 export function registerHealth(app: ShelfRouter, deps: HealthDeps): void {
   app.get("/api/v1/health", (c) => {
-    const body: LivenessBody = {
-      status: "ok",
-      uptimeSecs: Math.floor((Date.now() - deps.bootTimeMs) / 1000),
-      version: deps.version,
-      testing: testingEnabled(),
-      auth: getStore().authEnabled,
-    };
     c.header("Cache-Control", "no-store");
-    return c.json(body);
+    return c.json(livenessBody(deps));
   });
 
   app.post("/api/v1/health", async (c) => {
