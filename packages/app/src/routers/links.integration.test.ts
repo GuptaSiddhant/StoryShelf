@@ -226,7 +226,8 @@ describe("snapshot usage API", () => {
     expect(html.match(/Uses @acme\/ds v2\.4\.0/gu)).toHaveLength(1);
     expect(html).toContain("/projects/design-system/storybook/build/ds-b1?storyId=button--primary");
     const upstreamSnapshotReads = listed.filter((table) => table === db.tables.snapshots).length;
-    expect(upstreamSnapshotReads).toBe(2); // the build's own snapshots + the upstream's, once
+    // the build's own snapshots, the upstream's (once), and the earlier-verdict lookup (one query)
+    expect(upstreamSnapshotReads).toBe(3);
   });
 
   it("renders no badge on build detail without links", async () => {
