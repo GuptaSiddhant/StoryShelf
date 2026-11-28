@@ -69,6 +69,23 @@ describe("resolveUploadIdentity", () => {
     expect(synthesized.message).toBeUndefined();
   });
 
+  it("a probe that returns a sha and branch is not synthesized", () => {
+    expect(resolveUploadIdentity("/x", {}, { probe: gitProbe, ci: null }).synthesized).toBe(false);
+  });
+
+  it("no git, no flags and no CI is synthesized", () => {
+    expect(resolveUploadIdentity("/x", {}, { probe: nullProbe, ci: null }).synthesized).toBe(true);
+  });
+
+  it("flags alone are not synthesized", () => {
+    const identity = resolveUploadIdentity(
+      "/x",
+      { sha: "flag-sha", branch: "flag-branch" },
+      { probe: nullProbe, ci: null },
+    );
+    expect(identity).toMatchObject({ sha: "flag-sha", branch: "flag-branch", synthesized: false });
+  });
+
   it("takes message and author from git first, then the provider's variables", () => {
     const withGit = resolveUploadIdentity("/x", {}, { probe: gitProbe, ci });
     expect(withGit).toMatchObject({
