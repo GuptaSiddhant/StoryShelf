@@ -7153,6 +7153,18 @@
                     "missingBaselineImages": {
                       "type": "integer"
                     },
+                    "snapshotsChecked": {
+                      "type": "integer"
+                    },
+                    "missingSnapshotImages": {
+                      "type": "integer"
+                    },
+                    "buildsMissingImages": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "unreferencedBlobs": {
                       "type": "integer"
                     },
@@ -7166,6 +7178,9 @@
                     "builds",
                     "unreadableManifests",
                     "missingBaselineImages",
+                    "snapshotsChecked",
+                    "missingSnapshotImages",
+                    "buildsMissingImages",
                     "unreferencedBlobs",
                     "sampled"
                   ]

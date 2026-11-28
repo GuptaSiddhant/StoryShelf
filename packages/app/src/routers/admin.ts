@@ -40,6 +40,9 @@ const checkStorageSchema = z.object({
   builds: z.array(z.object({ buildId: z.string(), missing: z.number().int() })),
   unreadableManifests: z.array(z.string()),
   missingBaselineImages: z.number().int(),
+  snapshotsChecked: z.number().int(),
+  missingSnapshotImages: z.number().int(),
+  buildsMissingImages: z.array(z.string()),
   unreferencedBlobs: z.number().int(),
   sampled: z.boolean(),
 });
