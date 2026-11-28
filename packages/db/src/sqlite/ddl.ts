@@ -641,6 +641,8 @@ export const IDENTITY_STATEMENTS: string[] = [
   "CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   "CREATE INDEX IF NOT EXISTS snapshots_project_import_path_idx ON snapshots (project_id, story_import_path)",
+  // The earlier-verdict lookup (#1465): the latest snapshot of one story, mode and target.
+  "CREATE INDEX IF NOT EXISTS snapshots_project_story_mode_idx ON snapshots (project_id, story_id, viewport_name, browser)",
   "CREATE UNIQUE INDEX IF NOT EXISTS design_links_project_import_path_idx ON design_links (project_id, import_path)",
   // Single-flight job kinds (ADR 0040): at most one non-terminal job per active_key; NULLs never collide.
   "CREATE UNIQUE INDEX IF NOT EXISTS capture_jobs_active_key_idx ON capture_jobs (active_key)",

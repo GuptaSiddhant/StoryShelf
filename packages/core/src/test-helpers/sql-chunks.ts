@@ -81,6 +81,29 @@ function verdictFenceMatches(chunks: SqlChunk[], text: string, lookup?: RowLooku
   return newest !== undefined && newest["id"] === params[1];
 }
 
+/**
+ * `SnapshotModel.latestEarlierOnBranch`: `build_id in (select id from builds where project_id = ?
+ * and git_branch = ? and created_at < ? and status not in ('failed', 'cancelled'))`; the params are
+ * the project, the branch and the instant, in that order.
+ */
+function earlierBuildMatches(
+  chunks: SqlChunk[],
+  row: Record<string, unknown>,
+  lookup?: RowLookup,
+): boolean {
+  const params = (chunks as unknown[]).filter((chunk) => typeof chunk === "string") as string[];
+  const [projectId, branch, before] = params;
+  return (lookup?.("builds") ?? []).some(
+    (build) =>
+      build["id"] === row["buildId"] &&
+      build["projectId"] === projectId &&
+      build["gitBranch"] === branch &&
+      String(build["createdAt"]) < String(before) &&
+      build["status"] !== "failed" &&
+      build["status"] !== "cancelled",
+  );
+}
+
 function matchChunk(
   chunks: SqlChunk[],
   row: Record<string, unknown>,
@@ -88,6 +111,9 @@ function matchChunk(
   lookup?: RowLookup,
 ): boolean {
   const text = chunks.map((c) => textOf(c) ?? "").join("");
+  if (/\bselect\b/iu.test(text) && text.includes("'failed'")) {
+    return earlierBuildMatches(chunks, row, lookup);
+  }
   if (/\bselect\b/iu.test(text)) {
     return verdictFenceMatches(chunks, text, lookup);
   }
@@ -318,8 +344,16 @@ function findOrderColumn(nodes: SqlChunk[]): string | undefined {
 }
 
 /** Sort rows per a drizzle order-by expression (single-column asc/desc). */
-export function orderRows(rows: unknown[], orderBy: SQL, table: Table): unknown[] {
+export function orderRows(
+  rows: unknown[],
+  orderBy: SQL,
+  table: Table,
+  lookup?: RowLookup,
+): unknown[] {
   const chunks = orderBy.queryChunks as unknown as SqlChunk[];
+  if (/\bselect\b/iu.test(sqlText(chunks))) {
+    return orderByBuildCreation(rows, lookup);
+  }
   const columnName = findOrderColumn(chunks);
   if (columnName === undefined) {
     return rows;
@@ -333,6 +367,14 @@ export function orderRows(rows: unknown[], orderBy: SQL, table: Table): unknown[
     );
     return descending ? -order : order;
   });
+}
+
+/** `order by (select created_at from builds where id = build_id) desc`: newest build first. */
+function orderByBuildCreation(rows: unknown[], lookup?: RowLookup): unknown[] {
+  const created = new Map((lookup?.("builds") ?? []).map((b) => [b["id"], String(b["createdAt"])]));
+  const at = (row: unknown): string =>
+    created.get((row as Record<string, unknown>)["buildId"]) ?? "";
+  return rows.toSorted((left, right) => at(right).localeCompare(at(left)));
 }
 
 function columnKey(table: Table, dbName: string): string {

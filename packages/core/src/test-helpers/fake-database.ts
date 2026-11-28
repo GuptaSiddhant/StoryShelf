@@ -112,12 +112,14 @@ export function makeDatabase(): { db: DatabaseAdapter } {
     let current = [...rowsOf(table).values()];
     if (opts.where) {
       const { where } = opts;
-      current = current.filter((row) => whereMatches(where, row as Record<string, unknown>, table));
+      current = current.filter((row) =>
+        whereMatches(where, row as Record<string, unknown>, table, lookup),
+      );
     }
     // Real adapters order by `id` last; the sort is stable, so sorting by id first does the same.
     current = current.toSorted(compareIds);
     if (opts.orderBy) {
-      current = orderRows(current, opts.orderBy, table);
+      current = orderRows(current, opts.orderBy, table, lookup);
     }
     const start = opts.offset ?? 0;
     if (opts.limit !== undefined) {

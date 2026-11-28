@@ -198,6 +198,7 @@ const IDENTITY_STATEMENTS = [
   "DROP INDEX IF EXISTS snapshots_build_story_viewport_idx",
   "DROP INDEX IF EXISTS baselines_project_story_viewport_branch_idx",
   "CREATE UNIQUE INDEX IF NOT EXISTS snapshots_build_story_mode_browser_idx ON snapshots (build_id, story_id, viewport_name, browser)",
+  "CREATE INDEX IF NOT EXISTS snapshots_project_story_mode_idx ON snapshots (project_id, story_id, viewport_name, browser)",
   "CREATE UNIQUE INDEX IF NOT EXISTS baselines_project_story_mode_browser_branch_idx ON baselines (project_id, story_id, viewport_name, browser, branch)",
   // One build per (project, idempotency key); the column is new in this release, so no row repeats a key (ADR 0044).
   "CREATE UNIQUE INDEX IF NOT EXISTS builds_project_idempotency_idx ON builds (project_id, idempotency_key)",
